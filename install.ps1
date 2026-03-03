@@ -1,6 +1,6 @@
-# install.ps1 — Junctions each extension dir nested under .\extensions\ into VS Code's extension folder.
-# Creates one junction per extension, leaving all other installed extensions untouched.
-# Run from any location; no admin rights required (uses NTFS junctions).
+# install.ps1 — Links each extension dir under .\extensions\ into VS Code's extension folder.
+# Windows: NTFS junctions (no admin needed).  Linux/macOS: symlinks.
+# Requires PowerShell >= 5 on Windows or pwsh (PowerShell Core) on Linux/macOS.
 
 param(
     [switch] $SkipBuild   # Pass -SkipBuild to skip npm install / compile
@@ -8,14 +8,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$RepoDir        = $PSScriptRoot
+$RepoDir          = $PSScriptRoot
 $ExtensionsSource = Join-Path $RepoDir 'extensions'
-$VscodeExtensions = Join-Path $env:USERPROFILE '.vscode\extensions'
+$VscodeExtensions = Join-Path $HOME '.vscode' 'extensions'
 
 Write-Host ''
 Write-Host '  an-dr VSCode Extension Installer' -ForegroundColor Cyan
-Write-Host '  Source : ' -NoNewline; Write-Host $ExtensionsSource
-Write-Host '  Target : ' -NoNewline; Write-Host $VscodeExtensions
+Write-Host "  Platform : $($IsWindows ? 'Windows (junction)' : ($IsMacOS ? 'macOS (symlink)' : 'Linux (symlink)'))"
+Write-Host '  Source   : ' -NoNewline; Write-Host $ExtensionsSource
+Write-Host '  Target   : ' -NoNewline; Write-Host $VscodeExtensions
 Write-Host ''
 
 if (-not (Test-Path $VscodeExtensions)) {
@@ -24,19 +25,35 @@ if (-not (Test-Path $VscodeExtensions)) {
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-function Is-Junction ([string]$Path) {
+function Test-ManagedLink ([string]$Path) {
     if (-not (Test-Path $Path)) { return $false }
-    $attr = (Get-Item $Path -Force).Attributes
-    return ($attr -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    $item = Get-Item $Path -Force
+    if ($IsWindows) {
+        return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    } else {
+        return $null -ne $item.LinkType
+    }
 }
 
-function Remove-Junction ([string]$Path) {
-    # rmdir removes the junction itself without touching the target
-    & cmd /c "rmdir `"$Path`"" | Out-Null
+function Remove-ManagedLink ([string]$Path) {
+    if ($IsWindows) {
+        # cmd rmdir removes the junction itself without touching the target
+        & cmd /c "rmdir `"$Path`"" | Out-Null
+    } else {
+        Remove-Item -Path $Path -Force
+    }
+}
+
+function New-ManagedLink ([string]$Dst, [string]$Src) {
+    if ($IsWindows) {
+        New-Item -ItemType Junction -Path $Dst -Target $Src | Out-Null
+    } else {
+        New-Item -ItemType SymbolicLink -Path $Dst -Target $Src | Out-Null
+    }
 }
 
 function Build-Extension ([string]$ExtDir) {
-    $pkgJson  = Join-Path $ExtDir 'package.json'
+    $pkgJson     = Join-Path $ExtDir 'package.json'
     $nodeModules = Join-Path $ExtDir 'node_modules'
     if (-not (Test-Path $pkgJson)) { return }
 
@@ -53,7 +70,7 @@ function Build-Extension ([string]$ExtDir) {
     finally { Pop-Location }
 }
 
-# ── main loop — one junction per nested extension dir ────────────────────────
+# ── main loop — one link per nested extension dir ─────────────────────────────
 
 $linked  = 0
 $skipped = 0
@@ -65,8 +82,8 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     Write-Host "  $($ext.Name)" -ForegroundColor Yellow -NoNewline
 
     if (Test-Path $dst) {
-        if (Is-Junction $dst) {
-            Remove-Junction $dst
+        if (Test-ManagedLink $dst) {
+            Remove-ManagedLink $dst
             Write-Host ' (replaced)' -NoNewline
         } else {
             Write-Host ''
@@ -78,7 +95,7 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
 
     if (-not $SkipBuild) { Build-Extension $src }
 
-    New-Item -ItemType Junction -Path $dst -Target $src | Out-Null
+    New-ManagedLink $dst $src
     Write-Host ' linked' -ForegroundColor Green
     $linked++
 }

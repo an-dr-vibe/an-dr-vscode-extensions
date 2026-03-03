@@ -1,0 +1,90 @@
+{
+  "name": "an-dr-git-tool",
+  "displayName": "an-dr: View in Git Tool",
+  "description": "Status bar button to open the current repo in a git GUI tool (SmartGit, GitKraken, Fork, Tower, and more). Auto-detects tool location.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["git", "smartgit", "gitkraken", "sourcetree", "fork", "tower", "sublime merge"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-git-tool.openInGitTool",
+        "title": "Git Tool: Open Repo in Git Tool",
+        "category": "an-dr"
+      }
+    ],
+    "configuration": {
+      "title": "an-dr: View in Git Tool",
+      "properties": {
+        "gitTool.tool": {
+          "type": "string",
+          "enum": [
+            "smartgit",
+            "gitkraken",
+            "sourcetree",
+            "fork",
+            "tower",
+            "github-desktop",
+            "sublime-merge",
+            "gitextensions",
+            "gitk",
+            "git-gui"
+          ],
+          "enumDescriptions": [
+            "SmartGit — syntevo.com/smartgit",
+            "GitKraken — gitkraken.com",
+            "SourceTree — sourcetreeapp.com (Windows/Mac)",
+            "Fork — git-fork.com (Windows/Mac)",
+            "Tower — git-tower.com (Windows/Mac)",
+            "GitHub Desktop — desktop.github.com",
+            "Sublime Merge — sublimemerge.com",
+            "Git Extensions — gitextensions.github.io (Windows/Linux)",
+            "gitk — built into Git",
+            "git gui — built into Git"
+          ],
+          "default": "smartgit",
+          "description": "Which git GUI tool to open when clicking the status bar button."
+        },
+        "gitTool.toolPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the git tool executable. Leave empty to auto-detect from PATH and common install locations."
+        },
+        "gitTool.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show or hide the status bar button."
+        },
+        "gitTool.statusBarIconOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show only the icon in the status bar, without the tool name."
+        },
+        "gitTool.statusBarAlignment": {
+          "type": "string",
+          "enum": ["left", "right"],
+          "default": "right",
+          "description": "Which side of the status bar the button appears on."
+        },
+        "gitTool.statusBarPriority": {
+          "type": "number",
+          "default": 99,
+          "description": "Priority of the status bar item (higher = further from center)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

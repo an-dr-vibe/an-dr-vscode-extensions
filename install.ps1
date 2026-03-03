@@ -38,8 +38,6 @@ function Remove-Junction ([string]$Path) {
 function Build-Extension ([string]$ExtDir) {
     $pkgJson  = Join-Path $ExtDir 'package.json'
     $nodeModules = Join-Path $ExtDir 'node_modules'
-    $outDir   = Join-Path $ExtDir 'out'
-
     if (-not (Test-Path $pkgJson)) { return }
 
     if (-not (Test-Path $nodeModules)) {
@@ -49,12 +47,10 @@ function Build-Extension ([string]$ExtDir) {
         finally { Pop-Location }
     }
 
-    if (-not (Test-Path $outDir)) {
-        Write-Host '    tsc compile...' -ForegroundColor DarkGray
-        Push-Location $ExtDir
-        try   { & npm run compile --silent }
-        finally { Pop-Location }
-    }
+    Write-Host '    tsc compile...' -ForegroundColor DarkGray
+    Push-Location $ExtDir
+    try   { & npm run compile --silent }
+    finally { Pop-Location }
 }
 
 # ── main loop — one junction per nested extension dir ────────────────────────

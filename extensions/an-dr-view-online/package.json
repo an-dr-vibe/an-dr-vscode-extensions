@@ -82,6 +82,11 @@
           "default": true,
           "description": "When there is an active selection, use the start–end line range (e.g. #L10-L20) instead of a single line."
         },
+        "viewOnline.statusBarIconOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show only the platform icon in the status bar, without the platform name text."
+        },
         "viewOnline.customHostMap": {
           "type": "object",
           "default": {},

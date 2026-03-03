@@ -217,7 +217,8 @@ function updateStatusBar(
     const includeLine = config.get<boolean>('includeLineOnClick', true);
     const line = editor.selection.active.line + 1;
 
-    item.text = `${icon} ${name}`;
+    const iconOnly = config.get<boolean>('statusBarIconOnly', false);
+    item.text = iconOnly ? icon : `${icon} ${name}`;
     item.tooltip = includeLine
         ? `Open line ${line} on ${name}  [click]`
         : `Open file on ${name}  [click]`;

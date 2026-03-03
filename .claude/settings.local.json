@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install --silent)",
+      "Bash(npm run compile)"
+    ]
+  }
+}

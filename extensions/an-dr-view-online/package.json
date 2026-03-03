@@ -1,0 +1,103 @@
+{
+  "name": "an-dr-view-online",
+  "displayName": "an-dr: View Online",
+  "description": "Status bar buttons to open the current file (and line) on GitHub, GitLab, or Bitbucket. Remote is detected automatically from git.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["git", "github", "gitlab", "bitbucket", "open in browser"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-view-online.openFile",
+        "title": "View Online: Open File",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-view-online.openFileAtLine",
+        "title": "View Online: Open File at Current Line",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-view-online.copyUrl",
+        "title": "View Online: Copy URL",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-view-online.copyUrlAtLine",
+        "title": "View Online: Copy URL at Current Line",
+        "category": "an-dr"
+      }
+    ],
+    "configuration": {
+      "title": "an-dr: View Online",
+      "properties": {
+        "viewOnline.remote": {
+          "type": "string",
+          "default": "origin",
+          "description": "Git remote name to use when building URLs (e.g. 'origin', 'upstream')."
+        },
+        "viewOnline.defaultBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "Fallback branch name when the current branch cannot be determined from git."
+        },
+        "viewOnline.openTarget": {
+          "type": "string",
+          "enum": ["browser", "clipboard", "both"],
+          "enumDescriptions": [
+            "Open the URL in the default browser.",
+            "Copy the URL to the clipboard.",
+            "Open in the browser AND copy to clipboard."
+          ],
+          "default": "browser",
+          "description": "What to do with the generated URL when a status bar button is clicked."
+        },
+        "viewOnline.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show or hide the status bar button."
+        },
+        "viewOnline.statusBarAlignment": {
+          "type": "string",
+          "enum": ["left", "right"],
+          "default": "right",
+          "description": "Which side of the status bar the button appears on."
+        },
+        "viewOnline.statusBarPriority": {
+          "type": "number",
+          "default": 100,
+          "description": "Priority of the status bar item (higher = further from center)."
+        },
+        "viewOnline.includeLineOnClick": {
+          "type": "boolean",
+          "default": true,
+          "description": "When clicking the status bar button, include the current line number in the URL."
+        },
+        "viewOnline.useSelectionRange": {
+          "type": "boolean",
+          "default": true,
+          "description": "When there is an active selection, use the start–end line range (e.g. #L10-L20) instead of a single line."
+        },
+        "viewOnline.customHostMap": {
+          "type": "object",
+          "default": {},
+          "description": "Map custom git host domains to their web URL base. Useful for self-hosted GitLab. Example: { \"git.mycompany.com\": \"https://git.mycompany.com\" }",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

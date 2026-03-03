@@ -51,12 +51,30 @@ Platform and remote URL are auto-detected from git.
 
 ## Install
 
+### One-liner (fresh machine or update)
+
+Clones the repo into `~/.vscode-an-dr` (or pulls if already cloned), then installs all extensions. Requires `git`, `node`, and `pwsh` (PowerShell Core).
+
+**Windows** — PowerShell / pwsh:
+
+```powershell
+iex (iwr 'https://raw.githubusercontent.com/an-dr/an-dr-vscode-extensions/main/bootstrap.ps1').Content
+```
+
+**Linux / macOS** — any shell:
+
+```bash
+pwsh -c "iex (iwr 'https://raw.githubusercontent.com/an-dr/an-dr-vscode-extensions/main/bootstrap.ps1').Content"
+```
+
+### Manual (if repo is already cloned)
+
 ```powershell
 # Windows (PowerShell 5+ or pwsh)
 .\install.ps1            # npm install + compile + link each extension
 .\install.ps1 -SkipBuild # skip build, link only
 
-# Linux / macOS (requires pwsh — PowerShell Core)
+# Linux / macOS
 pwsh install.ps1
 pwsh install.ps1 -SkipBuild
 ```
@@ -65,5 +83,3 @@ Then **Ctrl+Shift+P** → `Developer: Reload Window` in VS Code.
 
 - **Windows**: creates NTFS junctions — no admin rights needed.
 - **Linux/macOS**: creates symlinks — no admin rights needed.
-
-Changes to source take effect after re-running `install.ps1` and reloading the window.

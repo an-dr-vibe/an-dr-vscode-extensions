@@ -44,6 +44,11 @@
         "command": "an-dr-code-review.exportMarkdown",
         "title": "Code Review: Export to Markdown",
         "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.exportJira",
+        "title": "Code Review: Export to Jira",
+        "category": "Code Review"
       }
     ],
     "menus": {

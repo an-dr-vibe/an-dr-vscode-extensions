@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
 import { execSync } from 'child_process';
 import { randomUUID } from 'crypto';
 
@@ -45,52 +45,80 @@ class ReviewComment implements vscode.Comment {
     }
 }
 
-// ── Storage ────────────────────────────────────────────────────────────────────
+// ── Storage — vscode.workspace.fs works for both local and remote workspaces ───
 
-function getDataFilePath(): string | null {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+function getDataFileUri(): vscode.Uri | null {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri;
     if (!root) return null;
     const cfg = vscode.workspace.getConfiguration('codeReview');
-    return path.join(root, cfg.get<string>('dataFile', '.code-review.json'));
+    return vscode.Uri.joinPath(root, cfg.get<string>('dataFile', '.code-review.json'));
 }
 
-function loadData(): ReviewData {
-    const fp = getDataFilePath();
-    if (!fp || !fs.existsSync(fp)) return { version: 1, threads: [] };
-    try { return JSON.parse(fs.readFileSync(fp, 'utf8')) as ReviewData; }
-    catch { return { version: 1, threads: [] }; }
+async function loadData(): Promise<ReviewData> {
+    const uri = getDataFileUri();
+    if (!uri) return { version: 1, threads: [] };
+    try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        return JSON.parse(Buffer.from(bytes).toString('utf8')) as ReviewData;
+    } catch {
+        return { version: 1, threads: [] };
+    }
 }
 
-function saveData(data: ReviewData): void {
-    const fp = getDataFilePath();
-    if (fp) fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf8');
+async function saveData(data: ReviewData): Promise<void> {
+    const uri = getDataFileUri();
+    if (!uri) return;
+    await vscode.workspace.fs.writeFile(
+        uri, Buffer.from(JSON.stringify(data, null, 2), 'utf8'),
+    );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Git helpers ────────────────────────────────────────────────────────────────
+
+/** Returns a local filesystem path for running git commands.
+ *  - Dev Containers: uses LOCAL_WORKSPACE_FOLDER (host-side path).
+ *  - Local workspaces: uses uri.fsPath.
+ *  - True remote (SSH etc.): returns null; git features degrade gracefully. */
+function getGitCwd(): string | null {
+    const local = process.env.LOCAL_WORKSPACE_FOLDER;
+    if (local) return local;
+    const uri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (uri?.scheme === 'file') return uri.fsPath;
+    return null;
+}
+
+function gitExec(cmd: string): string {
+    const cwd = getGitCwd();
+    if (!cwd) return '';
+    try {
+        return execSync(cmd, {
+            cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
+    } catch { return ''; }
+}
 
 function getAuthor(): string {
     const cfg = vscode.workspace.getConfiguration('codeReview');
     const val = cfg.get<string>('author', '').trim();
     if (val) return val;
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (root) {
-        try {
-            return execSync('git config user.name', {
-                cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-            }).trim();
-        } catch { /* fall through */ }
-    }
+    const name = gitExec('git config user.name');
+    if (name) return name;
     return process.env.USER ?? process.env.USERNAME ?? 'unknown';
 }
 
-function gitExec(cmd: string): string {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) return '';
+/** Resolve symlinks in a workspace-relative path so the URL points to the real
+ *  file rather than the symlink.  Falls back to the original path if the real
+ *  path escapes the workspace root or cannot be resolved. */
+function resolveSymlink(relFile: string): string {
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wsRoot) return relFile;
     try {
-        return execSync(cmd, {
-            cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-        }).trim();
-    } catch { return ''; }
+        const realAbs = fs.realpathSync(path.join(wsRoot, relFile));
+        const resolved = path.relative(wsRoot, realAbs).replace(/\\/g, '/');
+        return resolved.startsWith('..') ? relFile : resolved;
+    } catch {
+        return relFile;
+    }
 }
 
 function buildFileUrl(file: string, startLine: number, endLine: number): string | null {
@@ -113,7 +141,17 @@ function buildFileUrl(file: string, startLine: number, endLine: number): string 
     const anchor = isGitLab
         ? `#L${startLine + 1}-${endLine + 1}`
         : `#L${startLine + 1}-L${endLine + 1}`;
-    return `${base}/blob/${branch}/${file}${anchor}`;
+    return `${base}/blob/${branch}/${resolveSymlink(file)}${anchor}`;
+}
+
+// ── Relative file path from workspace URI ──────────────────────────────────────
+
+function relativeFilePath(rootUri: vscode.Uri, fileUri: vscode.Uri): string {
+    const rootPrefix = rootUri.path.endsWith('/') ? rootUri.path : rootUri.path + '/';
+    if (fileUri.path.startsWith(rootPrefix)) {
+        return fileUri.path.slice(rootPrefix.length);
+    }
+    return path.basename(fileUri.path);
 }
 
 // ── Markdown export ────────────────────────────────────────────────────────────
@@ -154,12 +192,58 @@ async function exportMarkdown(data: ReviewData): Promise<void> {
         }
     }
 
-    const root = vscode.workspace.workspaceFolders![0].uri.fsPath;
-    const outPath = path.join(root, 'code-review.md');
-    fs.writeFileSync(outPath, lines.join('\n'), 'utf8');
-    const doc = await vscode.workspace.openTextDocument(outPath);
+    const rootUri = vscode.workspace.workspaceFolders![0].uri;
+    const outUri = vscode.Uri.joinPath(rootUri, 'code-review.md');
+    await vscode.workspace.fs.writeFile(outUri, Buffer.from(lines.join('\n'), 'utf8'));
+    const doc = await vscode.workspace.openTextDocument(outUri);
     await vscode.window.showTextDocument(doc);
-    vscode.window.showInformationMessage(`Code review exported to ${path.basename(outPath)}`);
+    vscode.window.showInformationMessage('Code review exported to code-review.md');
+}
+
+// ── Jira export ────────────────────────────────────────────────────────────────
+
+async function exportJira(data: ReviewData): Promise<void> {
+    if (data.threads.length === 0) {
+        vscode.window.showInformationMessage('Code Review: no comments to export.');
+        return;
+    }
+
+    const byFile = new Map<string, StoredThread[]>();
+    for (const t of data.threads) {
+        if (!byFile.has(t.file)) byFile.set(t.file, []);
+        byFile.get(t.file)!.push(t);
+    }
+
+    const lines: string[] = [
+        'h1. Code Review',
+        `_Exported: ${new Date().toISOString().split('T')[0]}_`, '',
+    ];
+
+    for (const [file, threads] of byFile) {
+        lines.push(`h2. {{${file}}}`, '');
+        for (const t of threads.sort((a, b) => a.line - b.line)) {
+            const s = t.line + 1;
+            const e = t.endLine + 1;
+            const lineLabel = s === e ? `Line ${s}` : `Lines ${s}-${e}`;
+            const url = buildFileUrl(t.file, t.line, t.endLine);
+            const linkPart = url ? ` | [View online|${url}]` : '';
+            const resolvedPart = t.resolved ? ' (resolved)' : '';
+            lines.push(`h3. ${lineLabel}${resolvedPart}${linkPart}`, '');
+            for (const c of t.comments) {
+                const date = new Date(c.timestamp).toLocaleString();
+                const meta = c.author ? `*${c.author}* | _${date}_` : `_${date}_`;
+                lines.push(meta, '', c.body, '');
+            }
+            lines.push('----', '');
+        }
+    }
+
+    const rootUri = vscode.workspace.workspaceFolders![0].uri;
+    const outUri = vscode.Uri.joinPath(rootUri, 'code-review.jira');
+    await vscode.workspace.fs.writeFile(outUri, Buffer.from(lines.join('\n'), 'utf8'));
+    const doc = await vscode.workspace.openTextDocument(outUri);
+    await vscode.window.showTextDocument(doc);
+    vscode.window.showInformationMessage('Code review exported to code-review.jira');
 }
 
 // ── Activate ───────────────────────────────────────────────────────────────────
@@ -168,30 +252,27 @@ export function activate(context: vscode.ExtensionContext): void {
     const ctrl = vscode.comments.createCommentController('an-dr-code-review', 'Code Review');
     context.subscriptions.push(ctrl);
 
-    // Show the gutter '+' button on all lines of all files
     ctrl.commentingRangeProvider = {
         provideCommentingRanges(doc) {
             return [new vscode.Range(0, 0, doc.lineCount - 1, 0)];
         },
     };
 
-    // Maps VS Code CommentThread ↔ stored thread ID.
-    // WeakMap lets disposed threads be garbage-collected automatically.
     const threadToId = new WeakMap<vscode.CommentThread, string>();
     const idToThread = new Map<string, vscode.CommentThread>();
 
     // ── Restore threads from JSON on startup ───────────────────────────────────
 
-    function restoreThreads(): void {
+    async function restoreThreads(): Promise<void> {
         for (const t of idToThread.values()) t.dispose();
         idToThread.clear();
 
-        const data = loadData();
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const data = await loadData();
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri;
         if (!root) return;
 
         for (const stored of data.threads) {
-            const uri = vscode.Uri.file(path.join(root, stored.file));
+            const uri = vscode.Uri.joinPath(root, stored.file);
             const range = new vscode.Range(stored.line, 0, stored.endLine, 0);
             const comments = stored.comments.map(c => new ReviewComment(c));
             const thread = ctrl.createCommentThread(uri, range, comments);
@@ -211,22 +292,21 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // ── Submit new comment or reply ────────────────────────────────────────────
 
-    function handleSubmit(reply: vscode.CommentReply): void {
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    async function handleSubmit(reply: vscode.CommentReply): Promise<void> {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri;
         if (!root) return;
         const body = reply.text.trim();
         if (!body) return;
-
-        const data = loadData();
-        const relFile = path.relative(root, reply.thread.uri.fsPath).replace(/\\/g, '/');
         const range = reply.thread.range;
         if (!range) return;
+
+        const data = await loadData();
+        const relFile = relativeFilePath(root, reply.thread.uri);
 
         let threadId = threadToId.get(reply.thread);
         let stored = threadId ? data.threads.find(t => t.id === threadId) : undefined;
 
         if (!stored) {
-            // First comment in a brand-new thread created by clicking '+'
             threadId = randomUUID();
             stored = {
                 id: threadId,
@@ -252,7 +332,7 @@ export function activate(context: vscode.ExtensionContext): void {
             timestamp: new Date().toISOString(),
         };
         stored.comments.push(newComment);
-        saveData(data);
+        await saveData(data);
 
         reply.thread.comments = [...reply.thread.comments, new ReviewComment(newComment)];
         reply.thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
@@ -260,8 +340,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // ── Delete a single comment ────────────────────────────────────────────────
 
-    function handleDeleteComment(comment: ReviewComment): void {
-        const data = loadData();
+    async function handleDeleteComment(comment: ReviewComment): Promise<void> {
+        const data = await loadData();
         for (const stored of data.threads) {
             const idx = stored.comments.findIndex(c => c.id === comment.id);
             if (idx === -1) continue;
@@ -273,27 +353,26 @@ export function activate(context: vscode.ExtensionContext): void {
                     c => (c as ReviewComment).id !== comment.id,
                 );
                 if (thread.comments.length === 0) {
-                    // Thread is now empty — remove it entirely
                     data.threads.splice(data.threads.indexOf(stored), 1);
                     idToThread.delete(stored.id);
                     thread.dispose();
                 }
             }
-            saveData(data);
+            await saveData(data);
             return;
         }
     }
 
     // ── Resolve / Unresolve thread ─────────────────────────────────────────────
 
-    function setResolved(thread: vscode.CommentThread, resolved: boolean): void {
+    async function setResolved(thread: vscode.CommentThread, resolved: boolean): Promise<void> {
         const threadId = threadToId.get(thread);
         if (!threadId) return;
-        const data = loadData();
+        const data = await loadData();
         const stored = data.threads.find(t => t.id === threadId);
         if (!stored) return;
         stored.resolved = resolved;
-        saveData(data);
+        await saveData(data);
         thread.contextValue = resolved ? 'resolved' : 'unresolved';
         thread.collapsibleState = resolved
             ? vscode.CommentThreadCollapsibleState.Collapsed
@@ -302,13 +381,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // ── Delete entire thread ───────────────────────────────────────────────────
 
-    function handleDeleteThread(thread: vscode.CommentThread): void {
+    async function handleDeleteThread(thread: vscode.CommentThread): Promise<void> {
         const threadId = threadToId.get(thread);
         if (threadId) {
-            const data = loadData();
+            const data = await loadData();
             const idx = data.threads.findIndex(t => t.id === threadId);
             if (idx !== -1) data.threads.splice(idx, 1);
-            saveData(data);
+            await saveData(data);
             idToThread.delete(threadId);
         }
         thread.dispose();
@@ -328,7 +407,9 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('an-dr-code-review.deleteThread',
             (thread: vscode.CommentThread) => handleDeleteThread(thread)),
         vscode.commands.registerCommand('an-dr-code-review.exportMarkdown',
-            () => exportMarkdown(loadData())),
+            async () => exportMarkdown(await loadData())),
+        vscode.commands.registerCommand('an-dr-code-review.exportJira',
+            async () => exportJira(await loadData())),
     );
 }
 

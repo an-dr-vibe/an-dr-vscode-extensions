@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { execSync } from 'child_process';
 
 // ── Git helpers ───────────────────────────────────────────────────────────────
@@ -155,8 +156,18 @@ async function openOrCopy(
     const defaultBranch = config.get<string>('defaultBranch', 'main');
     const branch = getCurrentBranch(gitRoot) || defaultBranch;
 
+    // Resolve symlinks so the URL points to the real file, not the symlink path.
+    // Fall back to filePath if resolution fails or escapes the git root.
+    let realFilePath = filePath;
+    try {
+        const resolved = fs.realpathSync(filePath);
+        if (!path.relative(gitRoot, resolved).startsWith('..')) {
+            realFilePath = resolved;
+        }
+    } catch { /* keep original */ }
+
     // Normalize to forward slashes (important on Windows)
-    const relativePath = path.relative(gitRoot, filePath).replace(/\\/g, '/');
+    const relativePath = path.relative(gitRoot, realFilePath).replace(/\\/g, '/');
 
     let startLine: number | undefined;
     let endLine: number | undefined;

@@ -1,0 +1,30 @@
+{
+  "name": "an-dr-cats",
+  "displayName": "an-dr: Cats",
+  "description": "Catch holographic cats in a fun arcade game. Take a break from coding!",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["game", "cats", "fun", "break"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-cats.openGame",
+        "title": "Cats: Open Cat Game",
+        "category": "an-dr"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "name": "an-dr-extension-control",
+  "displayName": "an-dr: Extension Control",
+  "description": "Commands to update, rebuild, and manage the an-dr VSCode extensions repo. Auto-detects repo location via junction/symlink resolution.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["extensions", "update", "reload", "development"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-extension-control.pullAndReload",
+        "title": "Extension Control: Pull & Reload",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-extension-control.openRepo",
+        "title": "Extension Control: Open Repo in New Window",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-extension-control.rebuild",
+        "title": "Extension Control: Rebuild All Extensions",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-extension-control.checkUpdates",
+        "title": "Extension Control: Check for Updates",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-extension-control.showRepoPath",
+        "title": "Extension Control: Show Repo Path",
+        "category": "an-dr"
+      }
+    ],
+    "configuration": {
+      "title": "an-dr: Extension Control",
+      "properties": {
+        "extensionControl.repoPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the extensions repo root. Leave empty to auto-detect via symlink/junction resolution from ~/.vscode/extensions."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

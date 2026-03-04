@@ -49,6 +49,28 @@ Platform and remote URL are auto-detected from git.
 
 ---
 
+### an-dr: Extension Control
+
+Manages the extensions repo from inside VS Code — pull updates, rebuild, and reload without touching a terminal.
+
+Auto-detects the repo root by resolving the NTFS junction / symlink from `~/.vscode/extensions/an-dr-*` back to the source. Falls back to `~/.vscode-an-dr`.
+
+**Commands** (Ctrl+Shift+P → `an-dr`):
+
+- `Extension Control: Pull & Reload` — `git pull`, rebuild all extensions, offer window reload
+- `Extension Control: Check for Updates` — `git fetch` and report commits behind; offers Pull & Reload
+- `Extension Control: Rebuild All Extensions` — Run `install.ps1` in a terminal (npm install + tsc + re-link)
+- `Extension Control: Open Repo in New Window` — Open the repo folder as a workspace in a new VS Code window
+- `Extension Control: Show Repo Path` — Display the detected repo path; copy or open from the notification
+
+**Config** (`extensionControl.*`):
+
+| Setting     | Default | Description                              |
+|-------------|---------|------------------------------------------|
+| `repoPath`  | `""`    | Override auto-detected repo root path.   |
+
+---
+
 ## Install
 
 ### One-liner (fresh machine or update)

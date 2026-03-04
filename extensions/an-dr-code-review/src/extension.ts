@@ -47,11 +47,32 @@ class ReviewComment implements vscode.Comment {
 
 // ── Storage — vscode.workspace.fs works for both local and remote workspaces ───
 
+const CODE_REVIEW_DIR = 'code-review';
+const GITIGNORE_CONTENT = '*\n';
+
+function getCodeReviewDirUri(): vscode.Uri | null {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (!root) return null;
+    return vscode.Uri.joinPath(root, CODE_REVIEW_DIR);
+}
+
 function getDataFileUri(): vscode.Uri | null {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri;
     if (!root) return null;
     const cfg = vscode.workspace.getConfiguration('codeReview');
-    return vscode.Uri.joinPath(root, cfg.get<string>('dataFile', '.code-review.json'));
+    return vscode.Uri.joinPath(root, cfg.get<string>('dataFile', `${CODE_REVIEW_DIR}/.code-review.json`));
+}
+
+async function ensureCodeReviewDir(): Promise<void> {
+    const dirUri = getCodeReviewDirUri();
+    if (!dirUri) return;
+    await vscode.workspace.fs.createDirectory(dirUri);
+    const gitignoreUri = vscode.Uri.joinPath(dirUri, '.gitignore');
+    try {
+        await vscode.workspace.fs.stat(gitignoreUri);
+    } catch {
+        await vscode.workspace.fs.writeFile(gitignoreUri, Buffer.from(GITIGNORE_CONTENT, 'utf8'));
+    }
 }
 
 async function loadData(): Promise<ReviewData> {
@@ -68,6 +89,7 @@ async function loadData(): Promise<ReviewData> {
 async function saveData(data: ReviewData): Promise<void> {
     const uri = getDataFileUri();
     if (!uri) return;
+    await ensureCodeReviewDir();
     await vscode.workspace.fs.writeFile(
         uri, Buffer.from(JSON.stringify(data, null, 2), 'utf8'),
     );
@@ -192,12 +214,13 @@ async function exportMarkdown(data: ReviewData): Promise<void> {
         }
     }
 
+    await ensureCodeReviewDir();
     const rootUri = vscode.workspace.workspaceFolders![0].uri;
-    const outUri = vscode.Uri.joinPath(rootUri, 'code-review.md');
+    const outUri = vscode.Uri.joinPath(rootUri, CODE_REVIEW_DIR, 'code-review.md');
     await vscode.workspace.fs.writeFile(outUri, Buffer.from(lines.join('\n'), 'utf8'));
     const doc = await vscode.workspace.openTextDocument(outUri);
     await vscode.window.showTextDocument(doc);
-    vscode.window.showInformationMessage('Code review exported to code-review.md');
+    vscode.window.showInformationMessage(`Code review exported to ${CODE_REVIEW_DIR}/code-review.md`);
 }
 
 // ── Jira export ────────────────────────────────────────────────────────────────
@@ -238,12 +261,13 @@ async function exportJira(data: ReviewData): Promise<void> {
         }
     }
 
+    await ensureCodeReviewDir();
     const rootUri = vscode.workspace.workspaceFolders![0].uri;
-    const outUri = vscode.Uri.joinPath(rootUri, 'code-review.jira');
+    const outUri = vscode.Uri.joinPath(rootUri, CODE_REVIEW_DIR, 'code-review.jira');
     await vscode.workspace.fs.writeFile(outUri, Buffer.from(lines.join('\n'), 'utf8'));
     const doc = await vscode.workspace.openTextDocument(outUri);
     await vscode.window.showTextDocument(doc);
-    vscode.window.showInformationMessage('Code review exported to code-review.jira');
+    vscode.window.showInformationMessage(`Code review exported to ${CODE_REVIEW_DIR}/code-review.jira`);
 }
 
 // ── Activate ───────────────────────────────────────────────────────────────────

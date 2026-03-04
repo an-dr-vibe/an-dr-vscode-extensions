@@ -80,7 +80,7 @@
         {
           "command": "an-dr-code-review.deleteThread",
           "group": "inline@2",
-          "when": "commentController == an-dr-code-review"
+          "when": "commentController == an-dr-code-review && (commentThread == unresolved || commentThread == resolved)"
         }
       ],
       "comments/comment/title": [
@@ -96,7 +96,7 @@
       "properties": {
         "codeReview.dataFile": {
           "type": "string",
-          "default": ".code-review.json",
+          "default": "code-review/.code-review.json",
           "description": "Path relative to workspace root where review comments are stored."
         },
         "codeReview.showAuthor": {

@@ -96,9 +96,9 @@ function buildUrl(
 // ── Platform presentation ─────────────────────────────────────────────────────
 
 function getPlatformLabel(host: string): { icon: string; name: string } {
-    if (host.includes('github'))    return { icon: '$(github)', name: 'GitHub' };
-    if (host.includes('gitlab'))    return { icon: '$(git-branch)', name: 'GitLab' };
-    if (host.includes('bitbucket')) return { icon: '$(git-commit)', name: 'Bitbucket' };
+    if (host.includes('github'))    return { icon: '$(link-external)', name: 'GitHub' };
+    if (host.includes('gitlab'))    return { icon: '$(link-external)', name: 'GitLab' };
+    if (host.includes('bitbucket')) return { icon: '$(link-external)', name: 'Bitbucket' };
     return { icon: '$(link-external)', name: host };
 }
 

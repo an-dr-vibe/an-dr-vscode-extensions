@@ -49,6 +49,29 @@ Platform and remote URL are auto-detected from git.
 
 ---
 
+### an-dr: Jira Link
+
+Status bar button that detects Jira tickets from the current branch name, commits unique to the branch, and comments in the active file, then opens them in the browser.
+
+Shows one ticket directly or a picker when multiple are found. The icon indicates where the ticket was detected: `$(git-branch)` branch name, `$(git-commit)` commit message, `$(file-code)` file comment.
+
+**Config** (`jiraLink.*`):
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `domain` | `""` | Jira base URL, e.g. `https://mycompany.atlassian.net` |
+| `projects` | `[]` | Project keys to match, e.g. `["PROJ", "APP"]`. Empty = any ALL-CAPS key. |
+| `mainBranch` | `"main"` | Base branch for scoping commit detection. |
+| `statusBarAlignment` | `"left"` | `"left"` or `"right"`. |
+| `statusBarPriority` | `10` | Higher = further from center on its side. |
+
+**Commands** (Ctrl+Shift+P → `an-dr`):
+
+- `Jira Link: Open Ticket` — open the detected ticket (or pick from a list)
+- `Jira Link: Refresh Detection` — force re-scan
+
+---
+
 ### an-dr: Extension Control
 
 Manages the extensions repo from inside VS Code — pull updates, rebuild, and reload without touching a terminal.
@@ -60,6 +83,7 @@ Auto-detects the repo root by resolving the NTFS junction / symlink from `~/.vsc
 - `Extension Control: Pull & Reload` — `git pull`, rebuild all extensions, offer window reload
 - `Extension Control: Check for Updates` — `git fetch` and report commits behind; offers Pull & Reload
 - `Extension Control: Rebuild All Extensions` — Run `install.ps1` in a terminal (npm install + tsc + re-link)
+- `Extension Control: Reinstall All Extensions in Remote/Container` — package each extension as a `.vsix` and install it into the current remote/container via `code --install-extension` (useful when connected via Dev Containers or Remote SSH)
 - `Extension Control: Open Repo in New Window` — Open the repo folder as a workspace in a new VS Code window
 - `Extension Control: Show Repo Path` — Display the detected repo path; copy or open from the notification
 

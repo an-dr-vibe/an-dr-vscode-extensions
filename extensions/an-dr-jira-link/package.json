@@ -1,0 +1,67 @@
+{
+  "name": "an-dr-jira-link",
+  "displayName": "an-dr: Jira Link",
+  "description": "Status bar button that detects Jira tickets from branch name, branch commits, and file comments, then opens them in the browser.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["jira", "issue", "ticket", "branch", "status bar"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-jira-link.open",
+        "title": "Jira Link: Open Ticket",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-jira-link.refresh",
+        "title": "Jira Link: Refresh Detection",
+        "category": "an-dr"
+      }
+    ],
+    "configuration": {
+      "title": "an-dr: Jira Link",
+      "properties": {
+        "jiraLink.domain": {
+          "type": "string",
+          "default": "",
+          "description": "Your Jira domain, e.g. 'https://mycompany.atlassian.net' or 'https://jira.mycompany.com'."
+        },
+        "jiraLink.projects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "List of Jira project keys to recognise, e.g. [\"PROJ\", \"APP\", \"BUG\"]. Leave empty to match any ALL-CAPS key."
+        },
+        "jiraLink.mainBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "The base branch used to find commits unique to the current branch (e.g. 'main' or 'master')."
+        },
+        "jiraLink.statusBarAlignment": {
+          "type": "string",
+          "enum": ["left", "right"],
+          "default": "left",
+          "description": "Which side of the status bar the button appears on."
+        },
+        "jiraLink.statusBarPriority": {
+          "type": "number",
+          "default": 10,
+          "description": "Priority of the status bar item (higher = further from center on its side)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

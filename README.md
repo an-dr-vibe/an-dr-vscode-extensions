@@ -14,14 +14,14 @@ Opens the current repo in a git GUI tool from the status bar.
 
 **Config** (`gitTool.*`):
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `tool` | `"smartgit"` | Which tool to open (`smartgit`, `gitkraken`, `sourcetree`, `fork`, `tower`, `github-desktop`, `sublime-merge`, `gitextensions`, `gitk`, `git-gui`) |
-| `toolPath` | `""` | Absolute path to executable. Empty = auto-detect. |
-| `showStatusBar` | `true` | Show/hide the status bar button. |
-| `statusBarIconOnly` | `false` | Show icon only, no tool name. |
-| `statusBarAlignment` | `"right"` | `"left"` or `"right"`. |
-| `statusBarPriority` | `99` | Higher = further from center. |
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`tool`|`"smartgit"`|Which tool to open (`smartgit`, `gitkraken`, `sourcetree`, `fork`, `tower`, `github-desktop`, `sublime-merge`, `gitextensions`, `gitk`, `git-gui`)|
+|`toolPath`|`""`|Absolute path to executable. Empty = auto-detect.|
+|`showStatusBar`|`true`|Show/hide the status bar button.|
+|`statusBarIconOnly`|`false`|Show icon only, no tool name.|
+|`statusBarAlignment`|`"right"`|`"left"` or `"right"`.|
+|`statusBarPriority`|`99`|Higher = further from center.|
 
 Tool discovery order: PATH → common install paths → directory search (handles versioned dirs).
 
@@ -34,18 +34,18 @@ Platform and remote URL are auto-detected from git.
 
 **Config** (`viewOnline.*`):
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `remote` | `"origin"` | Git remote to use. |
-| `defaultBranch` | `"main"` | Fallback branch name. |
-| `openTarget` | `"browser"` | `"browser"`, `"clipboard"`, or `"both"`. |
-| `showStatusBar` | `true` | Show/hide the status bar button. |
-| `statusBarIconOnly` | `false` | Show icon only, no platform name. |
-| `includeLineOnClick` | `true` | Include current line in URL on click. |
-| `useSelectionRange` | `true` | Use start–end range when text is selected. |
-| `customHostMap` | `{}` | Map custom hosts to base URLs (self-hosted GitLab etc.). |
-| `statusBarAlignment` | `"right"` | `"left"` or `"right"`. |
-| `statusBarPriority` | `100` | Higher = further from center. |
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`remote`|`"origin"`|Git remote to use.|
+|`defaultBranch`|`"main"`|Fallback branch name.|
+|`openTarget`|`"browser"`|`"browser"`, `"clipboard"`, or `"both"`.|
+|`showStatusBar`|`true`|Show/hide the status bar button.|
+|`statusBarIconOnly`|`false`|Show icon only, no platform name.|
+|`includeLineOnClick`|`true`|Include current line in URL on click.|
+|`useSelectionRange`|`true`|Use start–end range when text is selected.|
+|`customHostMap`|`{}`|Map custom hosts to base URLs (self-hosted GitLab etc.).|
+|`statusBarAlignment`|`"right"`|`"left"` or `"right"`.|
+|`statusBarPriority`|`100`|Higher = further from center.|
 
 ---
 
@@ -57,18 +57,50 @@ Shows one ticket directly or a picker when multiple are found. The icon indicate
 
 **Config** (`jiraLink.*`):
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `domain` | `""` | Jira base URL, e.g. `https://mycompany.atlassian.net` |
-| `projects` | `[]` | Project keys to match, e.g. `["PROJ", "APP"]`. Empty = any ALL-CAPS key. |
-| `mainBranch` | `"main"` | Base branch for scoping commit detection. |
-| `statusBarAlignment` | `"left"` | `"left"` or `"right"`. |
-| `statusBarPriority` | `10` | Higher = further from center on its side. |
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`domain`|`""`|Jira base URL, e.g. `https://mycompany.atlassian.net`|
+|`projects`|`[]`|Project keys to match, e.g. `["PROJ", "APP"]`. Empty = any ALL-CAPS key.|
+|`mainBranch`|`"main"`|Base branch for scoping commit detection.|
+|`statusBarAlignment`|`"left"`|`"left"` or `"right"`.|
+|`statusBarPriority`|`10`|Higher = further from center on its side.|
 
 **Commands** (Ctrl+Shift+P → `an-dr`):
 
 - `Jira Link: Open Ticket` — open the detected ticket (or pick from a list)
 - `Jira Link: Refresh Detection` — force re-scan
+
+---
+
+### an-dr: Editor Selection
+
+Status bar item showing the current cursor position and selection info, with quick actions to copy the file location or jump to a line.
+
+**Status bar behavior:**
+
+|State|Shows|
+|-----|-----|
+|No selection|`Ln 12, Col 5`|
+|Single-line selection|`Ln 12, Col 5  (8 selected)`|
+|Multi-line selection|`Ln 12, Col 5  (3 lines, 42 chars)`|
+
+**Click** the text → copies `relative/path/to/file.ts:12` to the clipboard.
+
+**`$(go-to-file)` button** (right next to the text) → opens the built-in Go to Line dialog.
+
+**Config** (`editorSelection.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`cursorFormat`|`"Ln {line}, Col {col}"`|Format when no selection. Placeholders: `{line}`, `{col}`.|
+|`selectionFormat`|`"Ln {line}, Col {col}  ({chars} selected)"`|Format for a single-line selection. Placeholders: `{line}`, `{col}`, `{chars}`.|
+|`multilineFormat`|`"Ln {line}, Col {col}  ({selLines} lines, {chars} chars)"`|Format for a multi-line selection. Placeholders: `{line}`, `{col}`, `{chars}`, `{selLines}`.|
+|`showGoToLineButton`|`true`|Show/hide the go-to-line button.|
+
+**Commands** (Ctrl+Shift+P → `an-dr`):
+
+- `Editor Selection: Copy Relative Path and Line` — copy `<relative-path>:<line>` to clipboard
+- `Editor Selection: Go to Line` — open the Go to Line dialog
 
 ---
 
@@ -89,9 +121,9 @@ Auto-detects the repo root by resolving the NTFS junction / symlink from `~/.vsc
 
 **Config** (`extensionControl.*`):
 
-| Setting     | Default | Description                              |
-|-------------|---------|------------------------------------------|
-| `repoPath`  | `""`    | Override auto-detected repo root path.   |
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`repoPath`|`""`|Override auto-detected repo root path.|
 
 ---
 

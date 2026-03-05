@@ -1,0 +1,59 @@
+{
+  "name": "an-dr-editor-selection",
+  "displayName": "an-dr: Editor Selection",
+  "description": "Status bar showing current line/column and selection info, with copy-path and go-to-line actions.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "an-dr: Editor Selection",
+      "properties": {
+        "editorSelection.cursorFormat": {
+          "type": "string",
+          "default": "Ln {line}, Col {col}",
+          "description": "Status bar text when there is no selection. Placeholders: {line}, {col}."
+        },
+        "editorSelection.selectionFormat": {
+          "type": "string",
+          "default": "Ln {line}, Col {col}  ({chars} selected)",
+          "description": "Status bar text for a single-line selection. Placeholders: {line}, {col}, {chars}."
+        },
+        "editorSelection.multilineFormat": {
+          "type": "string",
+          "default": "Ln {line}, Col {col}  ({selLines} lines, {chars} chars)",
+          "description": "Status bar text for a multi-line selection. Placeholders: {line}, {col}, {chars}, {selLines}."
+        },
+        "editorSelection.showGoToLineButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the go-to-line button next to the selection info."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "an-dr-editor-selection.copyPathAndLine",
+        "title": "Editor Selection: Copy Relative Path and Line",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-editor-selection.goToLine",
+        "title": "Editor Selection: Go to Line",
+        "category": "an-dr"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

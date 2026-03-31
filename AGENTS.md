@@ -27,6 +27,14 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 - Extension TypeScript code must handle paths for all three platforms (e.g. tool
   install paths in `an-dr-git-tool` cover Win/Linux/Mac variants).
 
+## Extensions
+
+- **an-dr-ui-control** — Manages Activity Bar layout (visibility + order). Scans all installed
+  extensions for `viewsContainers.activitybar` contributions and maintains an ordered
+  `uiControl.activityBar` array in `settings.json`. New containers are appended as visible; hidden
+  entries are preserved across machines via Settings Sync. Has a webview UI (drag-to-reorder,
+  visibility toggles) and applies on startup (hide-only to avoid sidebar focus side-effects).
+
 ## Adding a new extension
 
 1. Create `extensions/<name>/` with `package.json`, `tsconfig.json`, `.vscodeignore`,

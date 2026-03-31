@@ -127,6 +127,35 @@ Auto-detects the repo root by resolving the NTFS junction / symlink from `~/.vsc
 
 ---
 
+### an-dr: UI Control
+
+Keeps the Activity Bar layout consistent across machines. Stores visibility and order in `settings.json` so Settings Sync carries it everywhere. New extensions are automatically appended at the end as visible; hidden items stay hidden.
+
+**How it works:**
+
+1. On startup, scans all installed extensions for `viewsContainers.activitybar` contributions.
+2. Merges newly found containers into the config (appended as visible).
+3. Applies the config — hides items marked as not visible.
+4. On subsequent machines, synced settings are applied on startup.
+
+**Commands** (Ctrl+Shift+P → `an-dr`):
+
+- `UI Control: Configure Activity Bar` — Open the drag-and-drop configuration panel
+- `UI Control: Apply Layout Now` — Re-apply the saved config (show + hide)
+- `UI Control: Scan for New Extensions` — Discover newly installed extensions and add them to the config
+
+**Config** (`uiControl.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`activityBar`|`[]`|Ordered list of `{id, visible}` objects. Managed by the extension, but editable by hand.|
+|`applyOnStartup`|`true`|Automatically hide items on startup.|
+|`statusBarIconOnly`|`true`|Show only the icon in the status bar.|
+
+**Status bar:** `$(layout-activitybar-left)` — click to open the configure panel.
+
+---
+
 ## Install
 
 ### One-liner (fresh machine or update)

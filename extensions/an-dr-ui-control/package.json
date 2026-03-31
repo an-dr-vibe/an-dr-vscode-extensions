@@ -1,0 +1,73 @@
+{
+  "name": "an-dr-ui-control",
+  "displayName": "an-dr: UI Control",
+  "description": "Configure Activity Bar layout — visibility and order — stored in settings.json so it syncs across machines.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["activity bar", "layout", "ui", "sync"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-ui-control.configure",
+        "title": "UI Control: Configure Activity Bar",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-ui-control.applyLayout",
+        "title": "UI Control: Apply Layout Now",
+        "category": "an-dr"
+      },
+      {
+        "command": "an-dr-ui-control.scanExtensions",
+        "title": "UI Control: Scan for New Extensions",
+        "category": "an-dr"
+      }
+    ],
+    "configuration": {
+      "title": "an-dr: UI Control",
+      "properties": {
+        "uiControl.activityBar": {
+          "type": "array",
+          "description": "Ordered list of Activity Bar view containers with visibility settings. New items are appended as visible. Stored in settings.json so Settings Sync carries it across machines.",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": ["id", "visible"],
+            "properties": {
+              "id":      { "type": "string",  "description": "View container ID" },
+              "visible": { "type": "boolean", "description": "Whether to show this item in the Activity Bar", "default": true }
+            }
+          }
+        },
+        "uiControl.applyOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "On startup, write the layout to VS Code's internal state and prompt to reload if anything changed."
+        },
+        "uiControl.statusBarIconOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show only the icon in the status bar (no text label)."
+        },
+        "uiControl.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Python 3 executable (e.g. /usr/bin/python3). Leave empty to auto-detect from PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch":   "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node":   "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript":    "^5.3.0"
+  }
+}

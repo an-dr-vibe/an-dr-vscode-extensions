@@ -2,7 +2,39 @@
   "permissions": {
     "allow": [
       "Bash(npm install --silent)",
-      "Bash(npm run compile)"
+      "Bash(npm run compile)",
+      "Bash(ls -la /c/Users/mail/.vscode-an-dr/extensions/an-dr-*/)",
+      "Bash(pwsh -File install.ps1)",
+      "Read(//c/Users/mail/AppData/Roaming/Code/User/globalStorage/**)",
+      "Bash(ls *.vscdb)",
+      "Bash(python3 -c \":*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/src/extension.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/src/dataSource.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/src/gitGraphView.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/src/types.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/src/repoManager.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/web/main.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/web/graph.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mhutchie/vscode-git-graph/master/package.json\")",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\(''''name:'''', p.get\\(''''name''''\\)\\); print\\(''''displayName:'''', p.get\\(''''displayName''''\\)\\); print\\(''''publisher:'''', p.get\\(''''publisher''''\\)\\); print\\(''''version:'''', p.get\\(''''version''''\\)\\); print\\(''''license:'''', p.get\\(''''license''''\\)\\); print\\(''''engines:'''', p.get\\(''''engines''''\\)\\); print\\(''''scripts:'''', list\\(p.get\\(''''scripts'''',{}\\).keys\\(\\)\\)\\); print\\(''''dependencies:'''', list\\(p.get\\(''''dependencies'''',{}\\).keys\\(\\)\\)\\); print\\(''''devDependencies:'''', list\\(p.get\\(''''devDependencies'''',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(/tmp/rename_extension.py:*)",
+      "Bash(python /tmp/rename_extension.py)",
+      "Bash(/tmp/update_package.py:*)",
+      "Bash(python /tmp/update_package.py)",
+      "Bash(powershell.exe -File install.ps1 -SkipBuild)",
+      "Bash(pwsh -File install.ps1 -SkipBuild)",
+      "Bash(cmd /c \"rmdir \"\"C:/Users/mail/.vscode/extensions/vscode-git-graph-develop\"\"\")",
+      "Bash(npm run:*)",
+      "Bash(find /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/src -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(find /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/web -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(grep -B 5 -A 20 \"case ''loadRepos''\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/web/main.ts)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''name:'''', d.get\\(''''name''''\\)\\); print\\(''''version:'''', d.get\\(''''version''''\\)\\); print\\(''''main:'''', d.get\\(''''main''''\\)\\); print\\(''''commands:'''', [c[''''command''''] for c in d.get\\(''''contributes'''', {}\\).get\\(''''commands'''', []\\)][:5]\\)\")",
+      "Bash(ls -la c:/Users/mail/.vscode-an-dr/extensions/an-dr-git/web/*.ts)",
+      "Bash(sort -k6,7)"
     ]
   }
 }

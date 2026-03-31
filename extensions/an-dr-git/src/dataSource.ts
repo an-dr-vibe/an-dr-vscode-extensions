@@ -16,6 +16,7 @@ import { Event } from './utils/event';
 
 const DRIVE_LETTER_PATH_REGEX = /^[a-z]:\//;
 const EOL_REGEX = /\r\n|\r|\n/g;
+const DETACHED_HEAD_BRANCH_REGEXP = /^\((HEAD detached (at|from) .+|no branch)\)$/;
 const INVALID_BRANCH_REGEXP = /^\(.* .*\)$/;
 const REMOTE_HEAD_BRANCH_REGEXP = /^remotes\/.*\/HEAD$/;
 const GIT_LOG_SEPARATOR = 'XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb';
@@ -1344,6 +1345,11 @@ export class DataSource extends Disposable {
 			let lines = stdout.split(EOL_REGEX);
 			for (let i = 0; i < lines.length - 1; i++) {
 				let name = lines[i].substring(2).split(' -> ')[0];
+				if (DETACHED_HEAD_BRANCH_REGEXP.test(name)) {
+					branchData.head = 'HEAD';
+					branchData.branches.unshift('HEAD');
+					continue;
+				}
 				if (INVALID_BRANCH_REGEXP.test(name) || hideRemotePatterns.some((pattern) => name.startsWith(pattern)) || (!showRemoteHeads && REMOTE_HEAD_BRANCH_REGEXP.test(name))) {
 					continue;
 				}

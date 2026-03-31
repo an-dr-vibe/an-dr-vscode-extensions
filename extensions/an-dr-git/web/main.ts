@@ -97,7 +97,9 @@ class GitGraphView {
 			this.currentTags = values;
 			this.saveState();
 			this.renderTable();
-		});
+		}, (type, name, event) => {
+			contextMenu.show(this.getSidebarContextMenuActions(type, name), false, null, event, this.viewElem);
+		}, this.config.branchPanel.flattenSingleChildGroups, this.config.branchPanel.groupsFirst);
 
 		this.showRemoteBranchesElem = <HTMLInputElement>document.getElementById('showRemoteBranchesCheckbox')!;
 		this.showRemoteBranchesElem.addEventListener('change', () => {
@@ -981,6 +983,23 @@ class GitGraphView {
 
 	public renderRepoDropdownOptions(repo?: string) {
 		this.repoDropdown.setOptions(getRepoDropdownOptions(this.gitRepos), [repo || this.currentRepo]);
+	}
+
+	private getSidebarContextMenuActions(type: 'branch' | 'tag', name: string): ContextMenuActions {
+		return [[
+			{
+				title: 'Reveal',
+				visible: this.findRenderedRefElem(name) !== null,
+				onClick: () => this.revealReference(name)
+			},
+			{
+				title: 'Copy Name',
+				visible: true,
+				onClick: () => {
+					sendMessage({ command: 'copyToClipboard', type: type === 'tag' ? 'Tag Name' : 'Branch Name', data: name });
+				}
+			}
+		]];
 	}
 
 
@@ -1947,6 +1966,24 @@ class GitGraphView {
 				elem.classList.remove('flash');
 			}, 850);
 		}
+	}
+
+	private findRenderedRefElem(refName: string) {
+		const elems = <NodeListOf<HTMLElement>>this.tableElem.querySelectorAll('[data-fullref]');
+		for (let i = 0; i < elems.length; i++) {
+			if (elems[i].dataset.fullref === refName) return elems[i];
+		}
+		return null;
+	}
+
+	private revealReference(refName: string) {
+		const refElem = this.findRenderedRefElem(refName);
+		if (refElem === null) return;
+		const commitElem = <HTMLElement | null>refElem.closest('.commit');
+		if (commitElem === null) return;
+		const commit = this.getCommitOfElem(commitElem);
+		if (commit === null) return;
+		this.scrollToCommit(commit.hash, true, true);
 	}
 
 	private loadMoreCommits() {

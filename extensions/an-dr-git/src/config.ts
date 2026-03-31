@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import {
+	BranchPanelConfig,
 	CommitDetailsViewConfig,
 	CommitDetailsViewLocation,
 	CommitOrdering,
@@ -72,6 +73,16 @@ class Config {
 			location: this.getRenamedExtensionSetting<string>('commitDetailsView.location', 'commitDetailsViewLocation', 'Inline') === 'Docked to Bottom'
 				? CommitDetailsViewLocation.DockedToBottom
 				: CommitDetailsViewLocation.Inline
+		};
+	}
+
+	/**
+	 * Get the branch panel configuration from the Extension Settings.
+	 */
+	get branchPanel(): BranchPanelConfig {
+		return {
+			flattenSingleChildGroups: !!this.config.get('branchPanel.flattenSingleChildGroups', true),
+			groupsFirst: !!this.config.get('branchPanel.groupsFirst', true)
 		};
 	}
 
@@ -544,6 +555,13 @@ class Config {
 	 */
 	get showStatusBarItem() {
 		return !!this.config.get('showStatusBarItem', true);
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.statusBarIconOnly` Extension Setting.
+	 */
+	get statusBarIconOnly() {
+		return !!this.config.get('statusBarIconOnly', true);
 	}
 
 	/**

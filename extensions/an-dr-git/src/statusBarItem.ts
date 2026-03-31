@@ -9,6 +9,9 @@ import { Event } from './utils/event';
  * Manages the Git Graph Status Bar Item, which allows users to open the Git Graph View from the Visual Studio Code Status Bar.
  */
 export class StatusBarItem extends Disposable {
+	private static readonly NAME = 'an-dr: Git';
+	private static readonly ICON = '$(git-branch)';
+
 	private readonly logger: Logger;
 	private readonly statusBarItem: vscode.StatusBarItem;
 	private isVisible: boolean = false;
@@ -24,8 +27,6 @@ export class StatusBarItem extends Disposable {
 		this.logger = logger;
 
 		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
-		statusBarItem.text = 'Git Graph';
-		statusBarItem.tooltip = 'View Git Graph';
 		statusBarItem.command = 'an-dr-git.view';
 		this.statusBarItem = statusBarItem;
 
@@ -34,7 +35,7 @@ export class StatusBarItem extends Disposable {
 				this.setNumRepos(event.numRepos);
 			}),
 			onDidChangeConfiguration((event) => {
-				if (event.affectsConfiguration('an-dr-git.showStatusBarItem')) {
+				if (event.affectsConfiguration('an-dr-git.showStatusBarItem') || event.affectsConfiguration('an-dr-git.statusBarIconOnly')) {
 					this.refresh();
 				}
 			}),
@@ -57,14 +58,19 @@ export class StatusBarItem extends Disposable {
 	 * Show or hide the Status Bar Item according to the configured value of `an-dr-git.showStatusBarItem`, and the number of repositories known to Git Graph.
 	 */
 	private refresh() {
-		const shouldBeVisible = getConfig().showStatusBarItem && this.numRepos > 0;
+		const config = getConfig();
+		this.statusBarItem.text = config.statusBarIconOnly
+			? StatusBarItem.ICON
+			: StatusBarItem.ICON + ' ' + StatusBarItem.NAME;
+		this.statusBarItem.tooltip = StatusBarItem.NAME;
+		const shouldBeVisible = config.showStatusBarItem && this.numRepos > 0;
 		if (this.isVisible !== shouldBeVisible) {
 			if (shouldBeVisible) {
 				this.statusBarItem.show();
-				this.logger.log('Showing "Git Graph" Status Bar Item');
+				this.logger.log('Showing "' + StatusBarItem.NAME + '" Status Bar Item');
 			} else {
 				this.statusBarItem.hide();
-				this.logger.log('Hiding "Git Graph" Status Bar Item');
+				this.logger.log('Hiding "' + StatusBarItem.NAME + '" Status Bar Item');
 			}
 			this.isVisible = shouldBeVisible;
 		}

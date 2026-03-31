@@ -18,16 +18,22 @@ interface BranchTreeLeaf {
 }
 
 type BranchTreeNode = BranchTreeFolder | BranchTreeLeaf;
+type BranchPanelEntryType = 'branch' | 'tag';
+const BRANCH_PANEL_OPEN_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v1.08H1.75V3Zm12.43 3.75H1.8l1.14 5.04c.09.4.44.68.85.68h8.42c.39 0 .73-.26.84-.64l1.13-5.08Z"/></svg>';
+const BRANCH_PANEL_CLOSED_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v7.17c0 .97-.78 1.75-1.75 1.75h-9A1.75 1.75 0 0 1 1.75 12.5V3Z"/></svg>';
 
 class BranchPanel {
 	private readonly branchChangeCallback: (values: string[]) => void;
 	private readonly tagChangeCallback: (values: string[]) => void;
+	private readonly contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void;
 	private options: ReadonlyArray<DropdownOption> = [];
 	private optionsSelected: boolean[] = [];
 	private tagNames: ReadonlyArray<string> = [];
 	private tagSelected: Set<number> = new Set();
 	private pendingTagSelectionNames: Set<string> = new Set();
 	private filterValue: string = '';
+	private readonly flattenSingleChildGroups: boolean;
+	private readonly groupsFirst: boolean;
 	private localCollapsed: boolean = false;
 	private remoteCollapsed: boolean = false;
 	private tagsCollapsed: boolean = true;
@@ -40,9 +46,12 @@ class BranchPanel {
 	private readonly sidebar: HTMLElement;
 	private readonly toggleBtn: HTMLElement;
 
-	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void) {
+	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean) {
 		this.branchChangeCallback = branchChangeCallback;
 		this.tagChangeCallback = tagChangeCallback;
+		this.contextMenuCallback = contextMenuCallback;
+		this.flattenSingleChildGroups = flattenSingleChildGroups;
+		this.groupsFirst = groupsFirst;
 		const elem = document.getElementById(id)!;
 		this.sidebar = elem.parentElement!; // #sidebar
 
@@ -74,6 +83,7 @@ class BranchPanel {
 		this.listElem = elem.appendChild(document.createElement('div'));
 		this.listElem.className = 'branchPanelList';
 		this.listElem.addEventListener('click', (e) => this.handleClick(e));
+		this.listElem.addEventListener('contextmenu', (e) => this.handleContextMenu(e));
 
 		this.updateWidth(this.sidebarWidth);
 	}
@@ -239,6 +249,25 @@ class BranchPanel {
 		}
 	}
 
+	private handleContextMenu(e: MouseEvent) {
+		const target = <HTMLElement>e.target;
+		const tagItem = target.closest('.branchPanelTagItem') as HTMLElement | null;
+		const item = target.closest('.branchPanelItem') as HTMLElement | null;
+
+		if (tagItem !== null && typeof tagItem.dataset.tagid !== 'undefined') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.contextMenuCallback('tag', this.tagNames[parseInt(tagItem.dataset.tagid)], e);
+		} else if (item !== null && typeof item.dataset.id !== 'undefined') {
+			const idx = parseInt(item.dataset.id);
+			if (idx === 0) return;
+			e.preventDefault();
+			e.stopPropagation();
+			const value = this.options[idx].value;
+			this.contextMenuCallback('branch', value.startsWith('remotes/') ? value.substring(8) : value, e);
+		}
+	}
+
 	private onItemClick(idx: number) {
 		if (idx === 0) {
 			if (!this.optionsSelected[0]) {
@@ -282,13 +311,55 @@ class BranchPanel {
 	private getAutoTagItemHtml(indent: number) {
 		return '<div class="branchPanelItem branchPanelAutoTagItem' + (this.isAutoTagSelected() ? ' selected' : '') + '" title="Automatically show tags on the visible graph" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (this.isAutoTagSelected() ? SVG_ICONS.check : '') + '</span>' +
-			'<span class="branchPanelItemIcon">' + SVG_ICONS.tag + '</span>' +
 			'<span class="branchPanelItemName">Auto</span>' +
 			'</div>';
 	}
 
 	private getEmptyTagMessage() {
 		return 'No tags';
+	}
+
+	private transformTree(nodes: BranchTreeNode[]): BranchTreeNode[] {
+		const transformed = nodes.map((node) => this.transformTreeNode(node));
+		if (this.groupsFirst) {
+			transformed.sort((a, b) => {
+				if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+				const aName = a.type === 'folder' ? a.name : a.displayName;
+				const bName = b.type === 'folder' ? b.name : b.displayName;
+				return aName.localeCompare(bName, undefined, { sensitivity: 'base' });
+			});
+		}
+		return transformed;
+	}
+
+	private transformTreeNode(node: BranchTreeNode): BranchTreeNode {
+		if (node.type === 'leaf') return node;
+
+		const children = this.transformTree(node.children);
+		if (this.flattenSingleChildGroups && children.length === 1) {
+			const child = children[0];
+			if (child.type === 'leaf') {
+				return {
+					type: 'leaf',
+					displayName: node.name + '/' + child.displayName,
+					fullName: child.fullName,
+					idx: child.idx
+				};
+			}
+			return {
+				type: 'folder',
+				name: node.name + '/' + child.name,
+				path: child.path,
+				children: child.children
+			};
+		}
+
+		return {
+			type: 'folder',
+			name: node.name,
+			path: node.path,
+			children
+		};
 	}
 
 	// Build a prefix tree from "/" separated names
@@ -333,17 +404,17 @@ class BranchPanel {
 			if (node.type === 'folder') {
 				if (filter !== '' && !node.name.toLowerCase().includes(filter) && !this.treeMatchesFilter(node.children, filter)) continue;
 				const collapsed = this.folderCollapsed[node.path] ?? false;
-				const icon = collapsed ? SVG_ICONS.closedFolder : SVG_ICONS.openFolder;
+				const icon = collapsed ? BRANCH_PANEL_CLOSED_FOLDER_ICON : BRANCH_PANEL_OPEN_FOLDER_ICON;
 				html += '<div class="branchPanelFolder" data-folder="' + escapeHtml(node.path) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 					'<span class="branchPanelFolderIcon">' + icon + '</span>' +
-					'<span class="branchPanelFolderName">' + escapeHtml(node.name) + '</span>' +
+					'<span class="branchPanelFolderName">' + escapeHtml(node.name + '/') + '</span>' +
 					'</div>';
 				if (!collapsed) {
 					html += this.renderBranchTreeHtml(node.children, indent + 1, filter);
 				}
 			} else {
 				if (filter !== '' && !node.fullName.toLowerCase().includes(filter)) continue;
-				html += this.itemHtml(node.idx, node.displayName, this.optionsSelected[node.idx], indent, SVG_ICONS.branch, node.fullName);
+				html += this.itemHtml(node.idx, node.displayName, this.optionsSelected[node.idx], indent, node.fullName);
 			}
 		}
 		return html;
@@ -356,10 +427,10 @@ class BranchPanel {
 				if (filter !== '' && !node.name.toLowerCase().includes(filter) && !this.treeMatchesFilter(node.children, filter)) continue;
 				const fkey = 'tag:' + node.path;
 				const collapsed = this.folderCollapsed[fkey] ?? false;
-				const icon = collapsed ? SVG_ICONS.closedFolder : SVG_ICONS.openFolder;
+				const icon = collapsed ? BRANCH_PANEL_CLOSED_FOLDER_ICON : BRANCH_PANEL_OPEN_FOLDER_ICON;
 				html += '<div class="branchPanelFolder" data-folder="' + escapeHtml(fkey) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 					'<span class="branchPanelFolderIcon">' + icon + '</span>' +
-					'<span class="branchPanelFolderName">' + escapeHtml(node.name) + '</span>' +
+					'<span class="branchPanelFolderName">' + escapeHtml(node.name + '/') + '</span>' +
 					'</div>';
 				if (!collapsed) {
 					html += this.renderTagTreeHtml(node.children, indent + 1, filter);
@@ -369,7 +440,6 @@ class BranchPanel {
 				const selected = this.tagSelected.has(node.idx);
 				html += '<div class="branchPanelItem branchPanelTagItem' + (selected ? ' selected' : '') + '" data-tagid="' + node.idx + '" title="' + escapeHtml(node.fullName) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 					'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
-					'<span class="branchPanelTagIcon">' + SVG_ICONS.tag + '</span>' +
 					'<span class="branchPanelItemName">' + escapeHtml(node.displayName) + '</span>' +
 					'</div>';
 			}
@@ -398,7 +468,7 @@ class BranchPanel {
 
 		// Show All
 		if (filter === '' || 'show all'.indexOf(filter) > -1) {
-			html += this.itemHtml(0, this.options[0].name, this.optionsSelected[0], 0, '', this.options[0].name);
+			html += this.itemHtml(0, this.options[0].name, this.optionsSelected[0], 0, this.options[0].name);
 		}
 
 		// Glob patterns
@@ -407,13 +477,13 @@ class BranchPanel {
 			if (visibleGlobs.length > 0) {
 				html += '<div class="branchPanelSectionHeader" data-section="globs"><span class="branchPanelArrow">&#9660;</span>Glob Patterns</div>';
 				for (let i = 0; i < visibleGlobs.length; i++) {
-					html += this.itemHtml(visibleGlobs[i].idx, visibleGlobs[i].opt.name, this.optionsSelected[visibleGlobs[i].idx], 1, SVG_ICONS.branch, visibleGlobs[i].opt.name);
+					html += this.itemHtml(visibleGlobs[i].idx, visibleGlobs[i].opt.name, this.optionsSelected[visibleGlobs[i].idx], 1, visibleGlobs[i].opt.name);
 				}
 			}
 		}
 
 		// Local branches (with "/" tree grouping)
-		const localTree = this.buildTree(locals.map(l => ({ name: l.opt.name, idx: l.idx })));
+		const localTree = this.transformTree(this.buildTree(locals.map(l => ({ name: l.opt.name, idx: l.idx }))));
 		const localTreeVisible = filter === '' || this.treeMatchesFilter(localTree, filter);
 		html += '<div class="branchPanelSectionHeader' + (this.localCollapsed ? ' collapsed' : '') + '" data-section="local">' +
 			'<span class="branchPanelArrow">' + (this.localCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
@@ -433,13 +503,14 @@ class BranchPanel {
 				name: r.opt.value.startsWith('remotes/') ? r.opt.value.substring(8) : r.opt.name,
 				idx: r.idx
 			})));
-			const remoteTreeVisible = filter === '' || this.treeMatchesFilter(remoteTree, filter);
+			const transformedRemoteTree = this.transformTree(remoteTree);
+			const remoteTreeVisible = filter === '' || this.treeMatchesFilter(transformedRemoteTree, filter);
 			html += '<div class="branchPanelSectionHeader' + (this.remoteCollapsed ? ' collapsed' : '') + '" data-section="remote">' +
 				'<span class="branchPanelArrow">' + (this.remoteCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
 				'Remote (' + remotes.length + ')</div>';
 			if (!this.remoteCollapsed) {
 				if (remoteTreeVisible) {
-					html += this.renderBranchTreeHtml(remoteTree, 1, filter);
+					html += this.renderBranchTreeHtml(transformedRemoteTree, 1, filter);
 				} else if (filter !== '') {
 					html += '<div class="branchPanelNoResults">No matches</div>';
 				}
@@ -448,7 +519,7 @@ class BranchPanel {
 
 		// Tags (with "/" tree grouping)
 		if (this.tagNames.length > 0) {
-			const tagTree = this.buildTree(this.tagNames.map((name, i) => ({ name, idx: i })));
+			const tagTree = this.transformTree(this.buildTree(this.tagNames.map((name, i) => ({ name, idx: i }))));
 			const tagTreeVisible = filter === '' || this.treeMatchesFilter(tagTree, filter);
 			html += '<div class="branchPanelSectionHeader' + (this.tagsCollapsed ? ' collapsed' : '') + '" data-section="tags">' +
 				'<span class="branchPanelArrow">' + (this.tagsCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
@@ -467,10 +538,9 @@ class BranchPanel {
 		this.listElem.innerHTML = html;
 	}
 
-	private itemHtml(idx: number, name: string, selected: boolean, indent: number, iconHtml: string, title: string) {
+	private itemHtml(idx: number, name: string, selected: boolean, indent: number, title: string) {
 		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '" title="' + escapeHtml(title) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
-			(iconHtml === '' ? '' : '<span class="branchPanelItemIcon">' + iconHtml + '</span>') +
 			'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
 			'</div>';
 	}

@@ -32,8 +32,8 @@ describe('StatusBarItem', () => {
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('Git Graph');
-		expect(vscodeStatusBarItem.tooltip).toBe('View Git Graph');
+		expect(vscodeStatusBarItem.text).toBe('$(git-branch)');
+		expect(vscodeStatusBarItem.tooltip).toBe('an-dr: Git');
 		expect(vscodeStatusBarItem.command).toBe('an-dr-git.view');
 		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
 		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
@@ -45,6 +45,22 @@ describe('StatusBarItem', () => {
 		expect(vscodeStatusBarItem.dispose).toHaveBeenCalledTimes(1);
 		expect(onDidChangeRepos['listeners']).toHaveLength(0);
 		expect(onDidChangeConfiguration['listeners']).toHaveLength(0);
+	});
+
+	it('Should show the full name in the Status Bar Item when icon-only is disabled', () => {
+		// Setup
+		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
+		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', false);
+
+		// Run
+		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+
+		// Assert
+		expect(vscodeStatusBarItem.text).toBe('$(git-branch) an-dr: Git');
+		expect(vscodeStatusBarItem.tooltip).toBe('an-dr: Git');
+
+		// Teardown
+		statusBarItem.dispose();
 	});
 
 	it('Should hide the Status Bar Item after the number of repositories becomes zero', () => {
@@ -141,6 +157,31 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
+		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
+		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+
+		// Teardown
+		statusBarItem.dispose();
+	});
+
+	it('Should update the Status Bar Item text when an-dr-git.statusBarIconOnly changes', () => {
+		// Setup
+		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
+
+		// Run
+		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+
+		// Assert
+		expect(vscodeStatusBarItem.text).toBe('$(git-branch)');
+
+		// Run
+		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', false);
+		onDidChangeConfiguration.emit({
+			affectsConfiguration: (section: string) => section === 'an-dr-git.statusBarIconOnly'
+		});
+
+		// Assert
+		expect(vscodeStatusBarItem.text).toBe('$(git-branch) an-dr: Git');
 		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
 		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
 

@@ -232,6 +232,7 @@ export interface GitGraphViewInitialState {
 }
 
 export interface GitGraphViewConfig {
+	readonly branchPanel: BranchPanelConfig;
 	readonly commitDetailsView: CommitDetailsViewConfig;
 	readonly commitOrdering: CommitOrdering;
 	readonly contextMenuActionsVisibility: ContextMenuActionsVisibility;
@@ -279,6 +280,11 @@ export interface CommitDetailsViewConfig {
 	readonly fileTreeCompactFolders: boolean;
 	readonly fileViewType: FileViewType;
 	readonly location: CommitDetailsViewLocation;
+}
+
+export interface BranchPanelConfig {
+	readonly flattenSingleChildGroups: boolean;
+	readonly groupsFirst: boolean;
 }
 
 export interface GraphConfig {

@@ -2885,7 +2885,41 @@ describe('Config', () => {
 
 	describe('retainContextWhenHidden', testBooleanExtensionSetting('retainContextWhenHidden', 'retainContextWhenHidden', true));
 
+	describe('branchPanel', () => {
+		it('Should return the configured values', () => {
+			// Setup
+			vscode.mockExtensionSettingReturnValue('branchPanel.flattenSingleChildGroups', true);
+			vscode.mockExtensionSettingReturnValue('branchPanel.groupsFirst', true);
+
+			// Run
+			const value = config.branchPanel;
+
+			// Assert
+			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.flattenSingleChildGroups', true);
+			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.groupsFirst', true);
+			expect(value).toStrictEqual({
+				flattenSingleChildGroups: true,
+				groupsFirst: true
+			});
+		});
+
+		it('Should return the default values when the configuration values are not set', () => {
+			// Run
+			const value = config.branchPanel;
+
+			// Assert
+			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.flattenSingleChildGroups', true);
+			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.groupsFirst', true);
+			expect(value).toStrictEqual({
+				flattenSingleChildGroups: true,
+				groupsFirst: true
+			});
+		});
+	});
+
 	describe('showStatusBarItem', testBooleanExtensionSetting('showStatusBarItem', 'showStatusBarItem', true));
+
+	describe('statusBarIconOnly', testBooleanExtensionSetting('statusBarIconOnly', 'statusBarIconOnly', true));
 
 	describe('tabIconColourTheme', () => {
 		it('Should return TabIconColourTheme.Colour when the configuration value is "colour"', () => {

@@ -16,6 +16,7 @@ import { Disposable, toDisposable } from './utils/disposable';
  */
 export class GitGraphView extends Disposable {
 	public static currentPanel: GitGraphView | undefined;
+	private static readonly NAME = 'an-dr: Git';
 
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionPath: string;
@@ -86,7 +87,7 @@ export class GitGraphView extends Disposable {
 		this.loadViewTo = loadViewTo;
 
 		const config = getConfig();
-		this.panel = vscode.window.createWebviewPanel('an-dr-git', 'Git Graph', column || vscode.ViewColumn.One, {
+		this.panel = vscode.window.createWebviewPanel('an-dr-git', GitGraphView.NAME, column || vscode.ViewColumn.One, {
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))],
 			retainContextWhenHidden: config.retainContextWhenHidden
@@ -665,6 +666,7 @@ export class GitGraphView extends Disposable {
 		const config = getConfig(), nonce = getNonce();
 		const initialState: GitGraphViewInitialState = {
 			config: {
+				branchPanel: config.branchPanel,
 				commitDetailsView: config.commitDetailsView,
 				commitOrdering: config.commitOrder,
 				contextMenuActionsVisibility: config.contextMenuActionsVisibility,
@@ -711,7 +713,7 @@ export class GitGraphView extends Disposable {
 
 		if (this.dataSource.isGitExecutableUnknown()) {
 			body = `<body class="unableToLoad">
-			<h2>Unable to load Git Graph</h2>
+			<h2>Unable to load ${GitGraphView.NAME}</h2>
 			<p class="unableToLoadMessage">${UNABLE_TO_FIND_GIT_MSG}</p>
 			</body>`;
 		} else if (numRepos > 0) {
@@ -741,8 +743,8 @@ export class GitGraphView extends Disposable {
 			</body>`;
 		} else {
 			body = `<body class="unableToLoad">
-			<h2>Unable to load Git Graph</h2>
-			<p class="unableToLoadMessage">No Git repositories were found in the current workspace when it was last scanned by Git Graph.</p>
+			<h2>Unable to load ${GitGraphView.NAME}</h2>
+			<p class="unableToLoadMessage">No Git repositories were found in the current workspace when it was last scanned by ${GitGraphView.NAME}.</p>
 			<p>If your repositories are in subfolders of the open workspace folder(s), make sure you have set the Git Graph Setting "git-graph.maxDepthOfRepoSearch" appropriately (read the <a href="https://github.com/mhutchie/vscode-git-graph/wiki/Extension-Settings#max-depth-of-repo-search" target="_blank">documentation</a> for more information).</p>
 			<p><div id="rescanForReposBtn" class="roundedBtn">Re-scan the current workspace for repositories</div></p>
 			<script nonce="${nonce}">(function(){ var api = acquireVsCodeApi(); document.getElementById('rescanForReposBtn').addEventListener('click', function(){ api.postMessage({command: 'rescanForRepos'}); }); })();</script>
@@ -758,7 +760,7 @@ export class GitGraphView extends Disposable {
 				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${standardiseCspSource(this.panel.webview.cspSource)} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data:;">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri('out.min.css')}">
-				<title>Git Graph</title>
+				<title>${GitGraphView.NAME}</title>
 				<style>body{${colorVars}} ${colorParams}</style>
 			</head>
 			${body}

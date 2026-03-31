@@ -1,13 +1,13 @@
 {
 	"name": "an-dr-git",
-	"displayName": "an-dr Git Graph",
+	"displayName": "an-dr: Git",
 	"version": "1.30.0",
 	"publisher": "an-dr",
 	"author": {
 		"name": "an-dr (based on work by Michael Hutchison)",
 		"email": ""
 	},
-	"description": "View a Git Graph of your repository, and perform Git actions from the graph.",
+	"description": "View the Git graph of your repository, and perform Git actions from it.",
 	"keywords": [
 		"git",
 		"graph",
@@ -38,56 +38,56 @@
 	"contributes": {
 		"commands": [
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.view",
-				"title": "View Git Graph (git log)",
+				"title": "View an-dr: Git",
 				"icon": {
 					"light": "resources/cmd-icon-light.svg",
 					"dark": "resources/cmd-icon-dark.svg"
 				}
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.addGitRepository",
 				"title": "Add Git Repository..."
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.clearAvatarCache",
 				"title": "Clear Avatar Cache"
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.endAllWorkspaceCodeReviews",
 				"title": "End All Code Reviews in Workspace"
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.endSpecificWorkspaceCodeReview",
 				"title": "End a specific Code Review in Workspace..."
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.fetch",
 				"title": "Fetch from Remote(s)"
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.removeGitRepository",
 				"title": "Remove Git Repository..."
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.resumeWorkspaceCodeReview",
 				"title": "Resume a specific Code Review in Workspace..."
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.version",
 				"title": "Get Version Information"
 			},
 			{
-				"category": "Git Graph",
+				"category": "an-dr: Git",
 				"command": "an-dr-git.openFile",
 				"title": "Open File",
 				"icon": "$(go-to-file)",
@@ -96,7 +96,7 @@
 		],
 		"configuration": {
 			"type": "object",
-			"title": "Git Graph",
+			"title": "an-dr: Git",
 			"properties": {
 				"an-dr-git.commitDetailsView.autoCenter": {
 					"type": "boolean",
@@ -1133,10 +1133,25 @@
 					"default": true,
 					"description": "Specifies if the Git Graph View's Visual Studio Code context is kept when the panel is no longer visible (e.g. moved to background tab). Enabling this setting will make Git Graph load significantly faster when switching back to the Git Graph tab, however has a higher memory overhead."
 				},
+				"an-dr-git.branchPanel.flattenSingleChildGroups": {
+					"type": "boolean",
+					"default": true,
+					"description": "Flatten single-child groups in the sidebar tree, so a single grouped ref can appear as e.g. \"release/7.0\" instead of nested folders."
+				},
+				"an-dr-git.branchPanel.groupsFirst": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show grouped refs above plain refs in the sidebar tree, like directories before files."
+				},
 				"an-dr-git.showStatusBarItem": {
 					"type": "boolean",
 					"default": true,
-					"description": "Show a Status Bar Item that opens the Git Graph View when clicked."
+					"description": "Show a status bar item that opens an-dr: Git when clicked."
+				},
+				"an-dr-git.statusBarIconOnly": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show only the icon in the status bar item. The full name is still shown in the tooltip."
 				},
 				"an-dr-git.sourceCodeProviderIntegrationLocation": {
 					"type": "string",
@@ -1145,11 +1160,11 @@
 						"More Actions"
 					],
 					"enumDescriptions": [
-						"Show the 'View Git Graph' action on the title of SCM Providers",
-						"Show the 'View Git Graph' action in the 'More Actions...' menu on the title of SCM Providers"
+						"Show the 'View an-dr: Git' action on the title of SCM Providers",
+						"Show the 'View an-dr: Git' action in the 'More Actions...' menu on the title of SCM Providers"
 					],
 					"default": "Inline",
-					"description": "Specifies where the \"View Git Graph\" action appears on the title of SCM Providers."
+					"description": "Specifies where the \"View an-dr: Git\" action appears on the title of SCM Providers."
 				},
 				"an-dr-git.tabIconColourTheme": {
 					"type": "string",

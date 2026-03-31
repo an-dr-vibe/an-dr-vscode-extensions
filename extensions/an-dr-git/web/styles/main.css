@@ -9,6 +9,8 @@ body{
 	bottom:0;
 	margin:0;
 	padding:0;
+	--top-bar-height:41px;
+	--branch-panel-width:200px;
 }
 body.unableToLoad{
 	margin:0 20px;
@@ -48,7 +50,7 @@ code{
 
 #content{
 	position:relative;
-	margin-left:200px;
+	margin-left:var(--branch-panel-width);
 }
 
 
@@ -71,13 +73,7 @@ code{
 }
 
 #scrollShadow.active{
-	position:fixed;
-	top:0;
-	left:0;
-	right:0;
-	height:0;
-	box-shadow:0 -6px 6px 6px var(--vscode-scrollbar-shadow);
-	z-index:20;
+	display:none;
 }
 
 
@@ -781,27 +777,83 @@ body.tagLabelsRightAligned .gitRef.tag{
 
 /* Controls */
 
-#controls{
-	display:block;
-	position:relative;
-	left:0;
-	right:0;
+#topBar{
+	position:sticky;
 	top:0;
-	margin-left:200px;
-	padding:4px 132px 4px 0;
+	display:flex;
+	align-items:stretch;
+	z-index:15;
+}
+
+#sidebarTop{
+	display:flex;
+	align-items:center;
+	width:var(--branch-panel-width);
+	flex:0 0 var(--branch-panel-width);
+	min-width:0;
+	border-right:1px solid rgba(128,128,128,0.5);
 	border-bottom:1px solid rgba(128,128,128,0.5);
-	line-height:32px;
-	text-align:center;
+	background-color:var(--vscode-sideBar-background, var(--vscode-editor-background));
+	box-sizing:border-box;
+	overflow:hidden;
+}
+
+#branchPanelFilterHost{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	width:100%;
+	height:100%;
+	box-sizing:border-box;
+	padding:4px 6px;
+}
+
+#controls{
+	display:flex;
+	align-items:center;
+	gap:12px;
+	min-height:var(--top-bar-height);
+	padding:4px 10px;
+	border-bottom:1px solid rgba(128,128,128,0.5);
+	background-color:var(--vscode-editor-background);
+	box-sizing:border-box;
 	font-weight:700;
 	font-size:13px;
 	-webkit-user-select:none;
 	user-select:none;
+	flex:1 1 auto;
+	min-width:0;
+}
+
+#controlsLeft{
+	display:flex;
+	align-items:center;
+	gap:12px;
+	min-width:0;
+	flex:1 1 auto;
+}
+
+#findWidgetHost{
+	display:flex;
+	align-items:center;
+	min-width:0;
+	flex:0 1 auto;
+	height:100%;
+}
+
+#controlsBtns{
+	display:flex;
+	align-items:center;
+	gap:10px;
+	flex-shrink:0;
 }
 
 #repoControl{
-	display:inline-block;
+	display:inline-flex;
+	align-items:center;
 	white-space:nowrap;
-	margin:0 10px;
+	margin:0;
+	min-width:0;
 }
 #repoDropdown{
 	margin-left:3px;
@@ -817,36 +869,21 @@ body.tagLabelsRightAligned .gitRef.tag{
 	max-width:40vw;
 }
 
-#findBtn, #terminalBtn, #settingsBtn, #fetchBtn, #refreshBtn{
-	position:absolute;
-	top:50%;
+#terminalBtn, #settingsBtn, #fetchBtn, #refreshBtn{
+	position:relative;
 	width:20px;
 	height:20px;
-	margin-top:-10px;
 	cursor:pointer;
 	-webkit-user-select:none;
 	user-select:none;
 }
-#findBtn{
-	right:100px;
-}
-#terminalBtn{
-	right:70px;
-}
-#settingsBtn{
-	right:40px;
-}
 #fetchBtn{
 	display:none;
-	right:40px;
-}
-#refreshBtn{
-	right:10px;
 }
 #refreshBtn.refreshing{
 	cursor:default;
 }
-#findBtn svg, #terminalBtn svg, #settingsBtn svg, #fetchBtn svg, #refreshBtn svg{
+#terminalBtn svg, #settingsBtn svg, #fetchBtn svg, #refreshBtn svg{
 	position:absolute;
 	fill:var(--vscode-editor-foreground);
 	opacity:0.8;
@@ -854,17 +891,17 @@ body.tagLabelsRightAligned .gitRef.tag{
 	stroke-opacity:0.5;
 	stroke-width:0;
 }
-#findBtn svg, #terminalBtn svg{
+#terminalBtn svg{
 	stroke-width:0.5px;
 }
-#findBtn:hover svg, #terminalBtn:hover svg, #settingsBtn:hover svg, #fetchBtn:hover svg, #refreshBtn:hover svg{
+#terminalBtn:hover svg, #settingsBtn:hover svg, #fetchBtn:hover svg, #refreshBtn:hover svg{
 	opacity:1;
 	stroke-width:0.5px;
 }
-#findBtn:hover svg, #terminalBtn:hover svg{
+#terminalBtn:hover svg{
 	stroke-width:1px;
 }
-#findBtn svg, #terminalBtn svg, #settingsBtn svg, #fetchBtn svg{
+#terminalBtn svg, #settingsBtn svg, #fetchBtn svg{
 	left:1px;
 	top:1px;
 	width:18px !important;
@@ -884,20 +921,12 @@ body.tagLabelsRightAligned .gitRef.tag{
 	animation:loadingIconAnimation 2s linear infinite;
 }
 
-#controls.fetchSupported{
-	padding-right:162px;
-}
-#controls.fetchSupported #findBtn{
-	right:130px;
-}
-#controls.fetchSupported #terminalBtn{
-	right:100px;
-}
-#controls.fetchSupported #settingsBtn{
-	right:70px;
-}
 #controls.fetchSupported #fetchBtn{
 	display:block;
+}
+
+body.branchPanelHidden #sidebarTop{
+	border-right:none;
 }
 
 

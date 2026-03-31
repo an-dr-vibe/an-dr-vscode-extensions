@@ -1,55 +1,50 @@
 .findWidget{
-	display:block;
-	position:fixed;
-	top:-42px;
-	right:28px;
-	height:34px;
-	padding:0 10px;
-	z-index:21;
-	background-color:var(--vscode-editorWidget-background);
-	box-shadow:0 2px 8px var(--vscode-widget-shadow);
-	line-height:34px;
+	display:flex;
+	align-items:center;
+	position:relative;
+	min-width:0;
+	max-width:100%;
+	height:100%;
+	line-height:1;
 	font-size:13px;
 	color:var(--vscode-editorSuggestWidget-foreground);
 	fill:var(--vscode-editorSuggestWidget-foreground);
 	fill-opacity:0.7;
 	white-space:nowrap;
+	gap:6px;
 }
-.findWidget.active{
-	top:0;
-}
-.findWidget.transition{
-	transition:top .2s linear;
-}
-.findWidget[data-error] #findInput, .findWidget[data-error]:after{
+.findWidget[data-error] #findInput,
+.findWidget[data-error]:after{
 	outline:1px solid var(--vscode-inputValidation-errorBorder) !important;
 }
 .findWidget[data-error]:after{
 	content:attr(data-error);
-	position:relative;
-	display:block;
-	top:-5px;
+	position:absolute;
 	left:0;
-	width:201px;
+	top:calc(100% + 4px);
+	width:220px;
 	padding:5px;
 	font-size:12px;
 	line-height:16px;
 	background-color:var(--vscode-inputValidation-errorBackground);
 	outline-offset:-1px !important;
 	white-space:normal;
+	box-sizing:border-box;
+	z-index:30;
 }
 
 #findInput{
-	display:inline-block;
-	vertical-align:top;
-	margin-top:4px;
-	padding:5px 47px 5px 5px;
-	border:0;
-	height:16px;
-	width:159px;
-	background-color:var(--vscode-input-background);
-	color:var(--vscode-input-foreground);
-	font-size:13px;
+	display:block;
+	box-sizing:border-box;
+	margin:0;
+	padding:3px 6px;
+	border:1px solid rgba(128,128,128,0.5);
+	border-radius:4px;
+	height:25px;
+	width:220px;
+	background:none;
+	color:var(--vscode-editor-foreground);
+	font-size:12px;
 	outline-offset:-1px !important;
 }
 #findInput:focus{
@@ -60,9 +55,10 @@
 }
 
 .findModifier{
-	display:block;
-	position:absolute;
-	top:7px;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	position:relative;
 	height:20px;
 	width:20px;
 	line-height:20px;
@@ -82,44 +78,34 @@
 .findModifier:hover, .findModifier.active{
 	opacity:1;
 }
-#findCaseSensitive{
-	left:176px;
-}
 #findRegex{
-	left:198px;
 	font-size:12px;
 }
 
-#findPosition, #findPrev, #findNext, #findOpenCdv, #findClose{
+#findPosition, #findPrev, #findNext, #findOpenCdv{
 	display:inline-block;
 	-webkit-user-select:none;
 	user-select:none;
 }
 #findPosition{
 	min-width:75px;
-	margin-left:10px;
+	margin-left:2px;
+	line-height:20px;
 }
-#findPrev, #findNext, #findOpenCdv, #findClose{
+#findPrev, #findNext, #findOpenCdv{
 	position:relative;
 	width:20px;
 	height:20px;
 	vertical-align:top;
-	margin:7px 0 0 6px;
 	cursor:pointer;
+	flex-shrink:0;
 }
 #findPrev svg, #findNext svg, #findOpenCdv svg{
 	position:absolute;
 	left:3px;
 	top:3px;
 }
-#findClose svg{
-	position:absolute;
-	left:2px;
-	top:2px;
-	width:16px !important;
-	height:16px !important;
-}
-#findPrev:hover, #findNext:hover, #findOpenCdv:hover, #findOpenCdv.active, #findClose:hover{
+#findPrev:hover, #findNext:hover, #findOpenCdv:hover, #findOpenCdv.active{
 	fill-opacity:1;
 }
 #findPrev.disabled, #findNext.disabled{

@@ -17,6 +17,7 @@ import { Disposable, toDisposable } from './utils/disposable';
 export class GitGraphView extends Disposable {
 	public static currentPanel: GitGraphView | undefined;
 	private static readonly NAME = 'an-dr: Git';
+	private static reopenAfterCheckout: { repo: string; expires: number } | null = null;
 
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionPath: string;
@@ -103,6 +104,13 @@ export class GitGraphView extends Disposable {
 		this.registerDisposables(
 			// Dispose Git Graph View resources when disposed
 			toDisposable(() => {
+				const reopen = GitGraphView.reopenAfterCheckout;
+				if (reopen !== null && Date.now() <= reopen.expires) {
+					GitGraphView.reopenAfterCheckout = null;
+					setTimeout(() => {
+						GitGraphView.createOrShow(this.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, { repo: reopen.repo });
+					}, 50);
+				}
 				GitGraphView.currentPanel = undefined;
 				this.repoFileWatcher.stop();
 			}),
@@ -210,6 +218,9 @@ export class GitGraphView extends Disposable {
 				if (errorInfos[0] === null && msg.pullAfterwards !== null) {
 					errorInfos.push(await this.dataSource.pullBranch(msg.repo, msg.pullAfterwards.branchName, msg.pullAfterwards.remote, msg.pullAfterwards.createNewCommit, msg.pullAfterwards.squash));
 				}
+				if (errorInfos.every((error) => error === null)) {
+					GitGraphView.reopenAfterCheckout = { repo: msg.repo, expires: Date.now() + 5000 };
+				}
 				this.sendMessage({
 					command: 'checkoutBranch',
 					pullAfterwards: msg.pullAfterwards,
@@ -217,9 +228,13 @@ export class GitGraphView extends Disposable {
 				});
 				break;
 			case 'checkoutCommit':
+				const checkoutCommitError = await this.dataSource.checkoutCommit(msg.repo, msg.commitHash);
+				if (checkoutCommitError === null) {
+					GitGraphView.reopenAfterCheckout = { repo: msg.repo, expires: Date.now() + 5000 };
+				}
 				this.sendMessage({
 					command: 'checkoutCommit',
-					error: await this.dataSource.checkoutCommit(msg.repo, msg.commitHash)
+					error: checkoutCommitError
 				});
 				break;
 			case 'cherrypickCommit':
@@ -726,13 +741,22 @@ export class GitGraphView extends Disposable {
 		} else if (numRepos > 0) {
 			body = `<body>
 			<div id="view" tabindex="-1">
-				<div id="controls">
-					<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
-					<div id="findBtn" title="Find"></div>
-					<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
-					<div id="settingsBtn" title="Repository Settings"></div>
-					<div id="fetchBtn"></div>
-					<div id="refreshBtn"></div>
+				<div id="topBar">
+					<div id="sidebarTop">
+						<div id="branchPanelFilterHost"></div>
+					</div>
+					<div id="controls">
+						<div id="controlsLeft">
+							<div id="findWidgetHost"></div>
+							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
+						</div>
+						<div id="controlsBtns">
+							<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
+							<div id="settingsBtn" title="Repository Settings"></div>
+							<div id="fetchBtn"></div>
+							<div id="refreshBtn"></div>
+						</div>
+					</div>
 				</div>
 				<div id="sidebar">
 					<div id="branchPanel"></div>
@@ -819,6 +843,7 @@ export class GitGraphView extends Disposable {
 			loadViewTo: loadViewTo
 		});
 	}
+
 }
 
 /**

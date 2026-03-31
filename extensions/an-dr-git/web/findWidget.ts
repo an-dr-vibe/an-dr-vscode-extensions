@@ -34,10 +34,12 @@ class FindWidget {
 		this.view = view;
 		this.widgetElem = document.createElement('div');
 		this.widgetElem.className = 'findWidget';
-		this.widgetElem.innerHTML = '<input id="findInput" type="text" placeholder="Find" disabled/><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span><span id="findPosition"></span><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCdv" title="Open the Commit Details View for the current match"></span><span id="findClose" title="Close (Escape)"></span>';
-		document.body.appendChild(this.widgetElem);
+		this.widgetElem.innerHTML = '<input id="findInput" type="text" placeholder="Search graph..."/><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCdv" title="Open the Commit Details View for the current match"></span><span id="findPosition"></span>';
+		(document.getElementById('findWidgetHost') ?? document.body).appendChild(this.widgetElem);
 
 		this.inputElem = <HTMLInputElement>document.getElementById('findInput')!;
+		this.inputElem.addEventListener('focus', () => this.updateActiveState());
+		this.inputElem.addEventListener('blur', () => this.updateActiveState());
 		let keyupTimeout: NodeJS.Timer | null = null;
 		this.inputElem.addEventListener('keyup', (e) => {
 			if ((e.keyCode ? e.keyCode === 13 : e.key === 'Enter') && this.text !== '') {
@@ -56,6 +58,7 @@ class FindWidget {
 						this.clearMatches();
 						this.findMatches(this.getCurrentHash(), true);
 						this.openCommitDetailsViewForCurrentMatchIfEnabled();
+						this.updateActiveState();
 					}
 				}, 200);
 			}
@@ -102,44 +105,38 @@ class FindWidget {
 			this.openCommitDetailsViewForCurrentMatchIfEnabled();
 		});
 
-		const findCloseElem = document.getElementById('findClose')!;
-		findCloseElem.innerHTML = SVG_ICONS.close;
-		findCloseElem.addEventListener('click', () => this.close());
+		this.updateActiveState();
 	}
 
 	/**
 	 * Show the Find Widget.
 	 * @param transition Should the Find Widget animate when becoming visible (sliding down).
 	 */
-	public show(transition: boolean) {
-		if (!this.visible) {
-			this.visible = true;
-			this.inputElem.value = this.text;
-			this.inputElem.disabled = false;
-			this.updatePosition(-1, false);
-			alterClass(this.widgetElem, CLASS_TRANSITION, transition);
-			this.widgetElem.classList.add(CLASS_ACTIVE);
-		}
+	public show(_transition: boolean) {
+		this.visible = true;
 		this.inputElem.focus();
+		this.inputElem.select();
+		this.updateActiveState();
 	}
 
 	/**
 	 * Close the Find Widget, sliding it up out of view.
 	 */
 	public close() {
-		if (!this.visible) return;
+		if (this.text !== '') {
+			this.clearMatches();
+			this.text = '';
+			this.matches = [];
+			this.position = -1;
+			this.inputElem.value = '';
+			this.positionElem.innerHTML = 'No Results';
+			this.widgetElem.removeAttribute(ATTR_ERROR);
+			this.prevElem.classList.add(CLASS_DISABLED);
+			this.nextElem.classList.add(CLASS_DISABLED);
+		}
+		this.inputElem.blur();
 		this.visible = false;
-		this.widgetElem.classList.add(CLASS_TRANSITION);
-		this.widgetElem.classList.remove(CLASS_ACTIVE);
-		this.clearMatches();
-		this.text = '';
-		this.matches = [];
-		this.position = -1;
-		this.inputElem.value = this.text;
-		this.inputElem.disabled = true;
-		this.widgetElem.removeAttribute(ATTR_ERROR);
-		this.prevElem.classList.add(CLASS_DISABLED);
-		this.nextElem.classList.add(CLASS_DISABLED);
+		this.updateActiveState();
 		this.view.saveState();
 	}
 
@@ -188,10 +185,13 @@ class FindWidget {
 	 * @param state The previous Find Widget state.
 	 */
 	public restoreState(state: FindWidgetState) {
-		if (!state.visible) return;
 		this.text = state.text;
-		this.show(false);
-		if (this.text !== '') this.findMatches(state.currentHash, false);
+		this.inputElem.value = this.text;
+		if (this.text !== '') {
+			this.findMatches(state.currentHash, false);
+			this.visible = true;
+		}
+		this.updateActiveState();
 	}
 
 	/**
@@ -199,7 +199,12 @@ class FindWidget {
 	 * @returns TRUE => The Find Widget is visible, FALSE => The Find Widget is not visible
 	 */
 	public isVisible() {
-		return this.visible;
+		return this.text !== '' || document.activeElement === this.inputElem;
+	}
+
+	private updateActiveState() {
+		this.visible = this.text !== '' || document.activeElement === this.inputElem;
+		alterClass(this.widgetElem, CLASS_ACTIVE, this.visible);
 	}
 
 

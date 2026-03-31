@@ -158,12 +158,10 @@ class GitGraphView {
 			this.requestLoadRepoInfoAndCommits(false, false);
 		}
 
-		const fetchBtn = document.getElementById('fetchBtn')!, findBtn = document.getElementById('findBtn')!, settingsBtn = document.getElementById('settingsBtn')!, terminalBtn = document.getElementById('terminalBtn')!;
+		const fetchBtn = document.getElementById('fetchBtn')!, settingsBtn = document.getElementById('settingsBtn')!, terminalBtn = document.getElementById('terminalBtn')!;
 		fetchBtn.title = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
 		fetchBtn.innerHTML = SVG_ICONS.download;
 		fetchBtn.addEventListener('click', () => this.fetchFromRemotesAction());
-		findBtn.innerHTML = SVG_ICONS.search;
-		findBtn.addEventListener('click', () => this.findWidget.show(true));
 		settingsBtn.innerHTML = SVG_ICONS.gear;
 		settingsBtn.addEventListener('click', () => this.settingsWidget.show(this.currentRepo));
 		terminalBtn.innerHTML = SVG_ICONS.terminal;
@@ -1008,7 +1006,7 @@ class GitGraphView {
 		if (type === 'localSection') {
 			return [[{
 				title: 'Clean Up Gone Branches' + ELLIPSIS,
-				visible: this.getCleanupLocalBranches().length > 0,
+				visible: true,
 				onClick: () => this.cleanupLocalBranchesAction()
 			}]];
 		}
@@ -1033,6 +1031,61 @@ class GitGraphView {
 					visible: true,
 					onClick: () => {
 						sendMessage({ command: 'copyToClipboard', type: 'Remote Name', data: name });
+					}
+				}
+			]];
+		}
+
+		if (type === 'branch') {
+			const isRemoteBranch = name.startsWith('remotes/');
+			const refName = isRemoteBranch ? name.substring(8) : name;
+			const remoteName = isRemoteBranch && refName.includes('/') ? refName.substring(0, refName.indexOf('/')) : null;
+			const isLocalBranch = this.gitBranches.includes(refName);
+			const canCheckout = refName !== 'HEAD' && !refName.endsWith('/HEAD') && (isRemoteBranch || (isLocalBranch && this.gitBranchHead !== refName));
+			return [[
+				{
+					title: 'Checkout Branch',
+					visible: this.config.contextMenuActionsVisibility.branch.checkout && canCheckout,
+					onClick: () => {
+						if (isRemoteBranch) {
+							this.checkoutBranchAction(refName, remoteName, null, null);
+						} else {
+							this.checkoutBranchAction(refName, null, null, null);
+						}
+					}
+				},
+				{
+					title: 'Reveal',
+					visible: this.findRenderedRefElem(refName) !== null,
+					onClick: () => this.revealReference(refName)
+				},
+				{
+					title: 'Copy Name',
+					visible: true,
+					onClick: () => {
+						sendMessage({ command: 'copyToClipboard', type: 'Branch Name', data: refName });
+					}
+				}
+			]];
+		}
+
+		if (type === 'tag') {
+			return [[
+				{
+					title: 'Checkout Tag' + (globalState.alwaysAcceptCheckoutCommit ? '' : ELLIPSIS),
+					visible: this.config.contextMenuActionsVisibility.commit.checkout,
+					onClick: () => this.checkoutDetachedRefAction(name, 'tag')
+				},
+				{
+					title: 'Reveal',
+					visible: this.findRenderedRefElem(name) !== null,
+					onClick: () => this.revealReference(name)
+				},
+				{
+					title: 'Copy Name',
+					visible: true,
+					onClick: () => {
+						sendMessage({ command: 'copyToClipboard', type: 'Tag Name', data: name });
 					}
 				}
 			]];
@@ -1722,7 +1775,7 @@ class GitGraphView {
 		}, target);
 	}
 
-	private checkoutBranchAction(refName: string, remote: string | null, prefillName: string | null, target: DialogTarget & (CommitTarget | RefTarget)) {
+	private checkoutBranchAction(refName: string, remote: string | null, prefillName: string | null, target: DialogTarget | null) {
 		if (remote !== null) {
 			dialog.showRefInput('Enter the name of the new branch you would like to create when checking out <b><i>' + escapeHtml(refName) + '</i></b>:', (prefillName !== null ? prefillName : (remote !== '' ? refName.substring(remote.length + 1) : refName)), 'Checkout Branch', newBranch => {
 				if (this.gitBranches.includes(newBranch)) {
@@ -1754,6 +1807,20 @@ class GitGraphView {
 		}
 	}
 
+	private checkoutDetachedRefAction(refName: string, refType: 'tag' | 'ref', target: DialogTarget | null = null) {
+		const checkoutRef = () => runAction({ command: 'checkoutCommit', repo: this.currentRepo, commitHash: refName }, 'Checking out ' + (refType === 'tag' ? 'Tag' : 'Ref'));
+		if (globalState.alwaysAcceptCheckoutCommit) {
+			checkoutRef();
+		} else {
+			dialog.showCheckbox('Are you sure you want to checkout ' + refType + ' <b><i>' + escapeHtml(refName) + '</i></b>? This will result in a \'detached HEAD\' state.', 'Always Accept', false, 'Yes, checkout', (alwaysAccept) => {
+				if (alwaysAccept) {
+					updateGlobalViewState('alwaysAcceptCheckoutCommit', true);
+				}
+				checkoutRef();
+			}, target);
+		}
+	}
+
 	private createBranchAction(hash: string, initialName: string, initialCheckOut: boolean, target: DialogTarget & CommitTarget) {
 		dialog.showForm('Create branch at commit <b><i>' + abbrevCommit(hash) + '</i></b>:', [
 			{ type: DialogInputType.TextRef, name: 'Name', default: initialName },
@@ -1779,9 +1846,14 @@ class GitGraphView {
 	private cleanupLocalBranchesAction() {
 		if (this.currentRepo === null) return;
 		const branches = this.getCleanupLocalBranches();
-		if (branches.length === 0) return;
-
 		const skippedCurrentBranch = this.gitBranchHead !== null && this.gitGoneUpstreamBranches.includes(this.gitBranchHead);
+		if (branches.length === 0) {
+			dialog.showMessage(skippedCurrentBranch
+				? 'The current branch <b><i>' + escapeHtml(this.gitBranchHead!) + '</i></b> has a deleted tracked upstream branch, but it cannot be cleaned up while it is checked out.'
+				: 'There are no local branches with deleted tracked upstream branches to clean up.');
+			return;
+		}
+
 		const branchList = '<ul style="margin:6px 0 0 18px;padding:0;">' + branches.map((branch) => '<li><b><i>' + escapeHtml(branch) + '</i></b></li>').join('') + '</ul>';
 		const message = 'Delete the local branch' + (branches.length > 1 ? 'es' : '') + ' whose tracked remote branch no longer exists?' +
 			branchList +
@@ -2527,7 +2599,6 @@ class GitGraphView {
 						ref: refName,
 						elem: sourceElem
 					};
-
 					this.checkoutBranchAction(refName, isHead ? null : unescapeHtml((isRemoteCombinedWithHead ? <HTMLElement>eventTarget : eventElem).dataset.remote!), null, target);
 				}
 			}

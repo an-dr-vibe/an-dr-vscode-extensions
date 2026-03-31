@@ -45,6 +45,7 @@ class BranchPanel {
 	private readonly listElem: HTMLElement;
 	private readonly sidebar: HTMLElement;
 	private readonly toggleBtn: HTMLElement;
+	private readonly filterHost: HTMLElement | null;
 
 	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean) {
 		this.branchChangeCallback = branchChangeCallback;
@@ -54,6 +55,7 @@ class BranchPanel {
 		this.groupsFirst = groupsFirst;
 		const elem = document.getElementById(id)!;
 		this.sidebar = elem.parentElement!; // #sidebar
+		this.filterHost = document.getElementById('branchPanelFilterHost');
 
 		// Fixed-position toggle button (stays visible when sidebar is hidden)
 		this.toggleBtn = document.createElement('div');
@@ -70,7 +72,7 @@ class BranchPanel {
 		this.setupResize(resizeHandle);
 
 		// Filter input
-		const filterWrapper = elem.appendChild(document.createElement('div'));
+		const filterWrapper = (this.filterHost ?? elem).appendChild(document.createElement('div'));
 		filterWrapper.className = 'branchPanelFilter';
 		this.filterInput = filterWrapper.appendChild(document.createElement('input'));
 		this.filterInput.className = 'branchPanelFilterInput';
@@ -110,31 +112,30 @@ class BranchPanel {
 
 	private updateWidth(width: number) {
 		this.sidebarWidth = width;
-		if (!this.sidebarHidden) {
-			this.sidebar.style.width = width + 'px';
-			const content = document.getElementById('content');
-			if (content) content.style.marginLeft = width + 'px';
-		}
+		this.applyLayoutWidth(this.sidebarHidden ? 0 : width);
 		this.updateTogglePosition();
 		this.updateHintLayout();
 	}
 
 	private toggleSidebar() {
 		this.sidebarHidden = !this.sidebarHidden;
-		const content = document.getElementById('content');
 		if (this.sidebarHidden) {
-			this.sidebar.style.width = '0';
 			this.sidebar.style.overflow = 'hidden';
-			if (content) content.style.marginLeft = '0';
+			document.body.classList.add('branchPanelHidden');
+			this.applyLayoutWidth(0);
 			this.toggleBtn.innerHTML = '&#9654;';
 		} else {
-			this.sidebar.style.width = this.sidebarWidth + 'px';
 			this.sidebar.style.overflow = '';
-			if (content) content.style.marginLeft = this.sidebarWidth + 'px';
+			document.body.classList.remove('branchPanelHidden');
+			this.applyLayoutWidth(this.sidebarWidth);
 			this.toggleBtn.innerHTML = '&#9664;';
 		}
 		this.updateTogglePosition();
 		this.updateHintLayout();
+	}
+
+	private applyLayoutWidth(width: number) {
+		document.body.style.setProperty('--branch-panel-width', width + 'px');
 	}
 
 	private updateTogglePosition() {
@@ -288,8 +289,7 @@ class BranchPanel {
 			if (idx === 0) return;
 			e.preventDefault();
 			e.stopPropagation();
-			const value = this.options[idx].value;
-			this.contextMenuCallback('branch', value.startsWith('remotes/') ? value.substring(8) : value, e);
+			this.contextMenuCallback('branch', this.options[idx].value, e);
 		}
 	}
 

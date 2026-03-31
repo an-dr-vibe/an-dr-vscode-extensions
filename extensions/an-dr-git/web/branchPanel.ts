@@ -438,7 +438,7 @@ class BranchPanel {
 			} else {
 				if (filter !== '' && !node.fullName.toLowerCase().includes(filter)) continue;
 				const selected = this.tagSelected.has(node.idx);
-				html += '<div class="branchPanelItem branchPanelTagItem' + (selected ? ' selected' : '') + '" data-tagid="' + node.idx + '" title="' + escapeHtml(node.fullName) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+				html += '<div class="branchPanelItem branchPanelTagItem' + (selected ? ' selected' : '') + '" data-tagid="' + node.idx + '" data-drag-ref-type="tag" data-drag-ref-name="' + escapeHtml(node.fullName) + '" draggable="true" title="' + escapeHtml(node.fullName) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 					'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
 					'<span class="branchPanelItemName">' + escapeHtml(node.displayName) + '</span>' +
 					'</div>';
@@ -539,7 +539,10 @@ class BranchPanel {
 	}
 
 	private itemHtml(idx: number, name: string, selected: boolean, indent: number, title: string) {
-		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '" title="' + escapeHtml(title) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+		const isDraggableBranch = idx > 0 && !this.options[idx].name.startsWith('Glob: ') && !this.options[idx].value.startsWith('remotes/');
+		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '"' +
+			(isDraggableBranch ? ' data-drag-ref-type="branch" data-drag-ref-name="' + escapeHtml(this.options[idx].value) + '" draggable="true"' : '') +
+			' title="' + escapeHtml(title) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
 			'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
 			'</div>';

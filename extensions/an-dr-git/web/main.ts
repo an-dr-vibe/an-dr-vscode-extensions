@@ -1,6 +1,12 @@
 // Based on vscode-git-graph by Michael Hutchison
 // Original: https://github.com/mhutchie/vscode-git-graph
 // License: MIT
+type DraggedRef = {
+	type: 'branch' | 'tag';
+	name: string;
+	tagType?: 'annotated' | 'lightweight';
+};
+
 class GitGraphView {
 	private gitRepos: GG.GitRepoSet;
 	private gitBranches: ReadonlyArray<string> = [];
@@ -33,6 +39,7 @@ class GitGraphView {
 
 	private readonly graph: Graph;
 	private readonly config: Config;
+	private commitDropTarget: HTMLElement | null = null;
 
 	private moreCommitsAvailable: boolean = false;
 	private expandedCommit: ExpandedCommit | null = null;
@@ -853,7 +860,7 @@ class GitGraphView {
 			for (j = 0; j < branchLabels.heads.length; j++) {
 				refName = escapeHtml(branchLabels.heads[j].name);
 				refActive = branchLabels.heads[j].name === this.gitBranchHead;
-				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
+				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
 				for (k = 0; k < branchLabels.heads[j].remotes.length; k++) {
 					remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
 					refHtml += '<span class="gitRefHeadRemote" data-remote="' + remoteName + '" data-fullref="' + escapeHtml(branchLabels.heads[j].remotes[k] + '/' + branchLabels.heads[j].name) + '">' + remoteName + '</span>';
@@ -870,7 +877,7 @@ class GitGraphView {
 			for (j = 0; j < commit.tags.length; j++) {
 				if (selectedTags.size > 0 && !selectedTags.has(commit.tags[j].name)) continue;
 				refName = escapeHtml(commit.tags[j].name);
-				refTags += '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '">' + SVG_ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>';
+				refTags += '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '" data-drag-ref-type="tag" data-drag-ref-name="' + refName + '" draggable="true">' + SVG_ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>';
 			}
 
 			if (commit.stash !== null) {
@@ -1245,15 +1252,7 @@ class GitGraphView {
 			}, {
 				title: 'Reset current branch to this Commit' + ELLIPSIS,
 				visible: visibility.reset,
-				onClick: () => {
-					dialog.showSelect('Are you sure you want to reset ' + (this.gitBranchHead !== null ? '<b><i>' + escapeHtml(this.gitBranchHead) + '</i></b> (the current branch)' : 'the current branch') + ' to commit <b><i>' + abbrevCommit(hash) + '</i></b>?', this.config.dialogDefaults.resetCommit.mode, [
-						{ name: 'Soft - Keep all changes, but reset head', value: GG.GitResetMode.Soft },
-						{ name: 'Mixed - Keep working tree, but reset index', value: GG.GitResetMode.Mixed },
-						{ name: 'Hard - Discard all changes', value: GG.GitResetMode.Hard }
-					], 'Yes, reset', (mode) => {
-						runAction({ command: 'resetToCommit', repo: this.currentRepo, commit: hash, resetMode: <GG.GitResetMode>mode }, 'Resetting to Commit');
-					}, target);
-				}
+				onClick: () => this.resetCurrentBranchToCommitAction(hash, target)
 			}
 		], [
 			{
@@ -1730,6 +1729,114 @@ class GitGraphView {
 			let interactive = <boolean>values[0];
 			runAction({ command: 'rebase', repo: this.currentRepo, obj: obj, actionOn: actionOn, ignoreDate: <boolean>values[1], interactive: interactive }, interactive ? 'Launching Interactive Rebase' : 'Rebasing on ' + actionOn);
 		}, target);
+	}
+
+	private resetCurrentBranchToCommitAction(hash: string, target: DialogTarget & CommitTarget) {
+		dialog.showSelect('Are you sure you want to reset ' + (this.gitBranchHead !== null ? '<b><i>' + escapeHtml(this.gitBranchHead) + '</i></b> (the current branch)' : 'the current branch') + ' to commit <b><i>' + abbrevCommit(hash) + '</i></b>?', this.config.dialogDefaults.resetCommit.mode, [
+			{ name: 'Soft - Keep all changes, but reset head', value: GG.GitResetMode.Soft },
+			{ name: 'Mixed - Keep working tree, but reset index', value: GG.GitResetMode.Mixed },
+			{ name: 'Hard - Discard all changes', value: GG.GitResetMode.Hard }
+		], 'Yes, reset', (mode) => {
+			runAction({ command: 'resetToCommit', repo: this.currentRepo, commit: hash, resetMode: <GG.GitResetMode>mode }, 'Resetting to Commit');
+		}, target);
+	}
+
+	private getDraggedRef(eventTarget: Element): DraggedRef | null {
+		if (eventTarget.closest('.gitRefHeadRemote') !== null && eventTarget.closest('[data-drag-ref-type="tag"]') === null) {
+			return null;
+		}
+		const refElem = eventTarget.closest('[data-drag-ref-type][data-drag-ref-name]') as HTMLElement | null;
+		if (refElem === null) return null;
+
+		const type = refElem.dataset.dragRefType;
+		const name = unescapeHtml(refElem.dataset.dragRefName!);
+		if (type === 'branch' || type === 'tag') {
+			return {
+				type,
+				name,
+				tagType: refElem.dataset.tagtype === 'annotated' || refElem.dataset.tagtype === 'lightweight'
+					? <'annotated' | 'lightweight'>refElem.dataset.tagtype
+					: undefined
+			};
+		}
+		return null;
+	}
+
+	private getDraggedRefFromEvent(e: DragEvent): DraggedRef | null {
+		if (e.dataTransfer === null) return null;
+		const raw = e.dataTransfer.getData('application/vnd.an-dr-git-ref');
+		if (raw === '') return null;
+		try {
+			const ref = <DraggedRef>JSON.parse(raw);
+			return (ref.type === 'branch' || ref.type === 'tag') && typeof ref.name === 'string'
+				? ref
+				: null;
+		} catch (_) {
+			return null;
+		}
+	}
+
+	private setCommitDropTarget(commitElem: HTMLElement) {
+		if (this.commitDropTarget === commitElem) return;
+		this.clearCommitDropTarget();
+		this.commitDropTarget = commitElem;
+		this.commitDropTarget.classList.add('dropTarget');
+	}
+
+	private clearCommitDropTarget() {
+		if (this.commitDropTarget !== null) {
+			this.commitDropTarget.classList.remove('dropTarget');
+			this.commitDropTarget = null;
+		}
+	}
+
+	private inferTagType(tagName: string): GG.TagType {
+		for (let i = 0; i < this.commits.length; i++) {
+			for (let j = 0; j < this.commits[i].tags.length; j++) {
+				if (this.commits[i].tags[j].name === tagName) {
+					return this.commits[i].tags[j].annotated ? GG.TagType.Annotated : GG.TagType.Lightweight;
+				}
+			}
+		}
+		return this.config.dialogDefaults.addTag.type;
+	}
+
+	private getDroppedRefContextMenuActions(ref: DraggedRef, target: DialogTarget & CommitTarget): ContextMenuActions {
+		if (ref.type === 'branch') {
+			const isCurrentBranch = ref.name === this.gitBranchHead;
+			return [[
+				{
+					title: 'Move Branch \'' + ref.name + '\' to ' + abbrevCommit(target.hash),
+					visible: ref.name !== 'HEAD' && !isCurrentBranch,
+					onClick: () => {
+						runAction({ command: 'createBranch', repo: this.currentRepo, branchName: ref.name, commitHash: target.hash, checkout: false, force: true }, 'Moving Branch');
+					}
+				},
+				{
+					title: 'Reset HEAD to ' + abbrevCommit(target.hash),
+					visible: isCurrentBranch,
+					onClick: () => this.resetCurrentBranchToCommitAction(target.hash, target)
+				},
+				{
+					title: 'Rebase \'' + ref.name + '\' onto ' + abbrevCommit(target.hash) + ELLIPSIS,
+					visible: isCurrentBranch && ref.name !== 'HEAD',
+					onClick: () => this.rebaseAction(target.hash, abbrevCommit(target.hash), GG.RebaseActionOn.Commit, target)
+				}
+			]];
+		}
+
+		const tagType = ref.tagType === 'annotated'
+			? GG.TagType.Annotated
+			: ref.tagType === 'lightweight'
+				? GG.TagType.Lightweight
+				: this.inferTagType(ref.name);
+		return [[
+			{
+				title: 'Move Tag \'' + ref.name + '\' to ' + abbrevCommit(target.hash) + ELLIPSIS,
+				visible: true,
+				onClick: () => this.addTagAction(target.hash, ref.name, tagType, '', null, target, false)
+			}
+		]];
 	}
 
 
@@ -2324,6 +2431,62 @@ class GitGraphView {
 
 					this.checkoutBranchAction(refName, isHead ? null : unescapeHtml((isRemoteCombinedWithHead ? <HTMLElement>eventTarget : eventElem).dataset.remote!), null, target);
 				}
+			}
+		});
+
+		this.viewElem.addEventListener('dragstart', (e: DragEvent) => {
+			if (e.target === null) return;
+			const ref = this.getDraggedRef(<Element>e.target);
+			if (ref === null || e.dataTransfer === null) return;
+
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('application/vnd.an-dr-git-ref', JSON.stringify(ref));
+			e.dataTransfer.setData('text/plain', ref.name);
+		});
+
+		this.viewElem.addEventListener('dragend', () => {
+			this.clearCommitDropTarget();
+		});
+
+		this.tableElem.addEventListener('dragover', (e: DragEvent) => {
+			if (e.target === null || this.getDraggedRefFromEvent(e) === null) return;
+			const commitElem = (<Element>e.target).closest('.commit') as HTMLElement | null;
+			if (commitElem === null || commitElem.dataset.id === '0') return;
+
+			e.preventDefault();
+			if (e.dataTransfer !== null) e.dataTransfer.dropEffect = 'move';
+			this.setCommitDropTarget(commitElem);
+		});
+
+		this.tableElem.addEventListener('dragleave', (e: DragEvent) => {
+			if (e.target === null) return;
+			const commitElem = (<Element>e.target).closest('.commit') as HTMLElement | null;
+			if (commitElem !== null && commitElem === this.commitDropTarget && !commitElem.contains(<Node>e.relatedTarget)) {
+				this.clearCommitDropTarget();
+			}
+		});
+
+		this.tableElem.addEventListener('drop', (e: DragEvent) => {
+			if (e.target === null) return;
+			const draggedRef = this.getDraggedRefFromEvent(e);
+			const commitElem = (<Element>e.target).closest('.commit') as HTMLElement | null;
+			this.clearCommitDropTarget();
+			if (draggedRef === null || commitElem === null || commitElem.dataset.id === '0') return;
+
+			e.preventDefault();
+			e.stopPropagation();
+			const commit = this.getCommitOfElem(commitElem);
+			if (commit === null || commit.hash === UNCOMMITTED) return;
+
+			const target: ContextMenuTarget & DialogTarget & CommitTarget = {
+				type: TargetType.Commit,
+				hash: commit.hash,
+				index: parseInt(commitElem.dataset.id!),
+				elem: commitElem
+			};
+			const actions = this.getDroppedRefContextMenuActions(draggedRef, target);
+			if (actions.some((group) => group.some((action) => action.visible))) {
+				contextMenu.show(actions, false, target, <MouseEvent><unknown>e, this.viewElem);
 			}
 		});
 

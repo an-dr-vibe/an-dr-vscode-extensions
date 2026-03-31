@@ -226,6 +226,9 @@ code{
 #commitTable tr.commit.current span.description .text{
 	font-weight:bold;
 }
+#commitTable tr.commit.dropTarget td{
+	background-color:var(--vscode-list-dropBackground);
+}
 
 #commitTable tr.commit span.description{
 	display:flex;
@@ -707,6 +710,9 @@ body.vscode-high-contrast #commitTable tr.commit.findCurrentCommit{
 	font-size:12px;
 	cursor:default;
 	overflow:hidden;
+}
+.gitRef[draggable="true"]{
+	cursor:grab;
 }
 .gitRef.active{
 	border-color:var(--git-graph-color);

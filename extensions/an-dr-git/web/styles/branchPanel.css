@@ -172,6 +172,9 @@
 	white-space:nowrap;
 	overflow:hidden;
 }
+.branchPanelItem[draggable="true"]{
+	cursor:grab;
+}
 .branchPanelItem:hover{
 	background-color:var(--vscode-list-hoverBackground, rgba(128,128,128,0.1));
 }

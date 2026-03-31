@@ -66,6 +66,7 @@ interface DialogSelectInputOption {
 	readonly value: string;
 	readonly hint?: string;
 	readonly hintKind?: 'upstream' | 'gone';
+	readonly isCurrent?: boolean;
 }
 
 interface DialogRadioInputOption {

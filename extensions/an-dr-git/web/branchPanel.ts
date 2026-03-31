@@ -599,12 +599,14 @@ class BranchPanel {
 		const isDraggableBranch = idx > 0 && !this.options[idx].name.startsWith('Glob: ') && !this.options[idx].value.startsWith('remotes/');
 		const hint = typeof this.options[idx].hint === 'string' && this.options[idx].hint !== '' ? this.options[idx].hint! : null;
 		const hintKind = typeof this.options[idx].hintKind === 'string' ? this.options[idx].hintKind : null;
-		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '"' +
+		const isCurrent = this.options[idx].isCurrent === true;
+		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + (isCurrent ? ' currentBranch' : '') + '" data-id="' + idx + '"' +
 			(isDraggableBranch ? ' data-drag-ref-type="branch" data-drag-ref-name="' + escapeHtml(this.options[idx].value) + '" draggable="true"' : '') +
 			' title="' + escapeHtml(title + (hint !== null ? ' ' + hint : '')) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
 			'<span class="branchPanelItemContent">' +
 			'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
+			(isCurrent ? '<span class="branchPanelCurrentBadge">HEAD</span>' : '') +
 			(hint !== null ? '<span class="branchPanelItemHint' + (hintKind !== null ? ' ' + hintKind : '') + '">' + escapeHtml(hint) + '</span>' : '') +
 			'</span>' +
 			'</div>';

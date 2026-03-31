@@ -559,6 +559,7 @@ class GitGraphView {
 			options.push({
 				name: branch.indexOf('remotes/') === 0 ? branch.substring(8) : branch,
 				value: branch,
+				isCurrent: branch === this.gitBranchHead,
 				hint: typeof upstream === 'string'
 					? (this.gitGoneUpstreamBranches.includes(branch) ? '? ' + upstream : '= ' + upstream)
 					: undefined,

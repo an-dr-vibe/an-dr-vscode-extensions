@@ -18,7 +18,7 @@ interface BranchTreeLeaf {
 }
 
 type BranchTreeNode = BranchTreeFolder | BranchTreeLeaf;
-type BranchPanelEntryType = 'branch' | 'tag';
+type BranchPanelEntryType = 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection';
 const BRANCH_PANEL_OPEN_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v1.08H1.75V3Zm12.43 3.75H1.8l1.14 5.04c.09.4.44.68.85.68h8.42c.39 0 .73-.26.84-.64l1.13-5.08Z"/></svg>';
 const BRANCH_PANEL_CLOSED_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v7.17c0 .97-.78 1.75-1.75 1.75h-9A1.75 1.75 0 0 1 1.75 12.5V3Z"/></svg>';
 
@@ -116,6 +116,7 @@ class BranchPanel {
 			if (content) content.style.marginLeft = width + 'px';
 		}
 		this.updateTogglePosition();
+		this.updateHintLayout();
 	}
 
 	private toggleSidebar() {
@@ -133,6 +134,7 @@ class BranchPanel {
 			this.toggleBtn.innerHTML = '&#9664;';
 		}
 		this.updateTogglePosition();
+		this.updateHintLayout();
 	}
 
 	private updateTogglePosition() {
@@ -251,6 +253,29 @@ class BranchPanel {
 
 	private handleContextMenu(e: MouseEvent) {
 		const target = <HTMLElement>e.target;
+		const sectionHeader = target.closest('.branchPanelSectionHeader') as HTMLElement | null;
+		if (sectionHeader !== null && sectionHeader.dataset.section === 'local') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.contextMenuCallback('localSection', '', e);
+			return;
+		}
+
+		if (sectionHeader !== null && sectionHeader.dataset.section === 'remote') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.contextMenuCallback('remoteSection', '', e);
+			return;
+		}
+
+		const folder = target.closest('.branchPanelFolder') as HTMLElement | null;
+		if (folder !== null && folder.dataset.entryType === 'remote' && typeof folder.dataset.entryName !== 'undefined') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.contextMenuCallback('remote', folder.dataset.entryName, e);
+			return;
+		}
+
 		const tagItem = target.closest('.branchPanelTagItem') as HTMLElement | null;
 		const item = target.closest('.branchPanelItem') as HTMLElement | null;
 
@@ -319,8 +344,8 @@ class BranchPanel {
 		return 'No tags';
 	}
 
-	private transformTree(nodes: BranchTreeNode[]): BranchTreeNode[] {
-		const transformed = nodes.map((node) => this.transformTreeNode(node));
+	private transformTree(nodes: BranchTreeNode[], preserveRootFolders: boolean = false, depth: number = 0): BranchTreeNode[] {
+		const transformed = nodes.map((node) => this.transformTreeNode(node, preserveRootFolders, depth));
 		if (this.groupsFirst) {
 			transformed.sort((a, b) => {
 				if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
@@ -332,11 +357,11 @@ class BranchPanel {
 		return transformed;
 	}
 
-	private transformTreeNode(node: BranchTreeNode): BranchTreeNode {
+	private transformTreeNode(node: BranchTreeNode, preserveRootFolders: boolean, depth: number): BranchTreeNode {
 		if (node.type === 'leaf') return node;
 
-		const children = this.transformTree(node.children);
-		if (this.flattenSingleChildGroups && children.length === 1) {
+		const children = this.transformTree(node.children, preserveRootFolders, depth + 1);
+		if (this.flattenSingleChildGroups && children.length === 1 && !(preserveRootFolders && depth === 0)) {
 			const child = children[0];
 			if (child.type === 'leaf') {
 				return {
@@ -398,19 +423,22 @@ class BranchPanel {
 		return false;
 	}
 
-	private renderBranchTreeHtml(nodes: BranchTreeNode[], indent: number, filter: string): string {
+	private renderBranchTreeHtml(nodes: BranchTreeNode[], indent: number, filter: string, treeType: 'local' | 'remote' = 'local'): string {
 		let html = '';
 		for (const node of nodes) {
 			if (node.type === 'folder') {
 				if (filter !== '' && !node.name.toLowerCase().includes(filter) && !this.treeMatchesFilter(node.children, filter)) continue;
 				const collapsed = this.folderCollapsed[node.path] ?? false;
 				const icon = collapsed ? BRANCH_PANEL_CLOSED_FOLDER_ICON : BRANCH_PANEL_OPEN_FOLDER_ICON;
-				html += '<div class="branchPanelFolder" data-folder="' + escapeHtml(node.path) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+				const isRemoteRoot = treeType === 'remote' && indent === 1;
+				html += '<div class="branchPanelFolder" data-folder="' + escapeHtml(node.path) + '"' +
+					(isRemoteRoot ? ' data-entry-type="remote" data-entry-name="' + escapeHtml(node.name) + '"' : '') +
+					' style="padding-left:' + (4 + indent * 14) + 'px">' +
 					'<span class="branchPanelFolderIcon">' + icon + '</span>' +
 					'<span class="branchPanelFolderName">' + escapeHtml(node.name + '/') + '</span>' +
 					'</div>';
 				if (!collapsed) {
-					html += this.renderBranchTreeHtml(node.children, indent + 1, filter);
+					html += this.renderBranchTreeHtml(node.children, indent + 1, filter, treeType);
 				}
 			} else {
 				if (filter !== '' && !node.fullName.toLowerCase().includes(filter)) continue;
@@ -490,7 +518,7 @@ class BranchPanel {
 			'Local (' + locals.length + ')</div>';
 		if (!this.localCollapsed) {
 			if (localTreeVisible) {
-				html += this.renderBranchTreeHtml(localTree, 1, filter);
+				html += this.renderBranchTreeHtml(localTree, 1, filter, 'local');
 			} else if (filter !== '') {
 				html += '<div class="branchPanelNoResults">No matches</div>';
 			}
@@ -503,14 +531,14 @@ class BranchPanel {
 				name: r.opt.value.startsWith('remotes/') ? r.opt.value.substring(8) : r.opt.name,
 				idx: r.idx
 			})));
-			const transformedRemoteTree = this.transformTree(remoteTree);
+			const transformedRemoteTree = this.transformTree(remoteTree, true);
 			const remoteTreeVisible = filter === '' || this.treeMatchesFilter(transformedRemoteTree, filter);
 			html += '<div class="branchPanelSectionHeader' + (this.remoteCollapsed ? ' collapsed' : '') + '" data-section="remote">' +
 				'<span class="branchPanelArrow">' + (this.remoteCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
 				'Remote (' + remotes.length + ')</div>';
 			if (!this.remoteCollapsed) {
 				if (remoteTreeVisible) {
-					html += this.renderBranchTreeHtml(transformedRemoteTree, 1, filter);
+					html += this.renderBranchTreeHtml(transformedRemoteTree, 1, filter, 'remote');
 				} else if (filter !== '') {
 					html += '<div class="branchPanelNoResults">No matches</div>';
 				}
@@ -536,15 +564,49 @@ class BranchPanel {
 		}
 
 		this.listElem.innerHTML = html;
+		this.updateHintLayout();
+	}
+
+	private updateHintLayout() {
+		const rows = this.listElem.querySelectorAll('.branchPanelItemContent');
+		for (let i = 0; i < rows.length; i++) {
+			const content = rows[i] as HTMLElement;
+			const name = content.querySelector('.branchPanelItemName') as HTMLElement | null;
+			const hint = content.querySelector('.branchPanelItemHint') as HTMLElement | null;
+			if (name === null || hint === null) continue;
+
+			name.style.maxWidth = '';
+			hint.style.maxWidth = '';
+			hint.classList.remove('hidden');
+
+			const available = content.clientWidth;
+			const gap = parseFloat(getComputedStyle(hint).marginLeft) || 0;
+			const nameWidth = name.scrollWidth;
+			const hintWidth = hint.scrollWidth;
+
+			if (nameWidth + gap + hintWidth <= available) continue;
+
+			if (nameWidth < available) {
+				hint.style.maxWidth = Math.max(0, available - nameWidth - gap) + 'px';
+			} else {
+				hint.classList.add('hidden');
+				name.style.maxWidth = available + 'px';
+			}
+		}
 	}
 
 	private itemHtml(idx: number, name: string, selected: boolean, indent: number, title: string) {
 		const isDraggableBranch = idx > 0 && !this.options[idx].name.startsWith('Glob: ') && !this.options[idx].value.startsWith('remotes/');
+		const hint = typeof this.options[idx].hint === 'string' && this.options[idx].hint !== '' ? this.options[idx].hint! : null;
+		const hintKind = typeof this.options[idx].hintKind === 'string' ? this.options[idx].hintKind : null;
 		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '"' +
 			(isDraggableBranch ? ' data-drag-ref-type="branch" data-drag-ref-name="' + escapeHtml(this.options[idx].value) + '" draggable="true"' : '') +
-			' title="' + escapeHtml(title) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+			' title="' + escapeHtml(title + (hint !== null ? ' ' + hint : '')) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
+			'<span class="branchPanelItemContent">' +
 			'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
+			(hint !== null ? '<span class="branchPanelItemHint' + (hintKind !== null ? ' ' + hintKind : '') + '">' + escapeHtml(hint) + '</span>' : '') +
+			'</span>' +
 			'</div>';
 	}
 }

@@ -1143,6 +1143,11 @@
 					"default": true,
 					"description": "Show grouped refs above plain refs in the sidebar tree, like directories before files."
 				},
+				"an-dr-git.branchPanel.showLocalBranchUpstream": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show each local branch's upstream as subtle trailing text in the sidebar, similar to SmartGit."
+				},
 				"an-dr-git.showStatusBarItem": {
 					"type": "boolean",
 					"default": true,

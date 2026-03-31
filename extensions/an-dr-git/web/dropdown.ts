@@ -2,6 +2,7 @@ interface DropdownOption {
 	readonly name: string;
 	readonly value: string;
 	readonly hint?: string;
+	readonly hintKind?: 'upstream' | 'gone';
 }
 
 /**

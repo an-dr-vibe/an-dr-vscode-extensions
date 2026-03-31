@@ -64,6 +64,8 @@ interface DialogCheckboxInput {
 interface DialogSelectInputOption {
 	readonly name: string;
 	readonly value: string;
+	readonly hint?: string;
+	readonly hintKind?: 'upstream' | 'gone';
 }
 
 interface DialogRadioInputOption {

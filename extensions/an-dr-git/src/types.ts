@@ -285,6 +285,7 @@ export interface CommitDetailsViewConfig {
 export interface BranchPanelConfig {
 	readonly flattenSingleChildGroups: boolean;
 	readonly groupsFirst: boolean;
+	readonly showLocalBranchUpstream: boolean;
 }
 
 export interface GraphConfig {
@@ -769,6 +770,16 @@ export interface ResponseCreatePullRequest extends ResponseWithMultiErrorInfo {
 	readonly push: boolean;
 }
 
+export interface RequestCleanupLocalBranches extends RepoRequest {
+	readonly command: 'cleanupLocalBranches';
+	readonly branchNames: ReadonlyArray<string>;
+	readonly forceDelete: boolean;
+}
+export interface ResponseCleanupLocalBranches extends ResponseWithMultiErrorInfo {
+	readonly command: 'cleanupLocalBranches';
+	readonly branchNames: ReadonlyArray<string>;
+}
+
 export interface RequestDeleteBranch extends RepoRequest {
 	readonly command: 'deleteBranch';
 	readonly branchName: string;
@@ -949,6 +960,8 @@ export interface ResponseLoadRepoInfo extends ResponseWithErrorInfo {
 	readonly command: 'loadRepoInfo';
 	readonly refreshId: number;
 	readonly branches: ReadonlyArray<string>;
+	readonly branchUpstreams: { readonly [branchName: string]: string };
+	readonly goneUpstreamBranches: ReadonlyArray<string>;
 	readonly head: string | null;
 	readonly remotes: ReadonlyArray<string>;
 	readonly stashes: ReadonlyArray<GitStash>;
@@ -1269,6 +1282,7 @@ export type RequestMessage =
 	| RequestCreateArchive
 	| RequestCreateBranch
 	| RequestCreatePullRequest
+	| RequestCleanupLocalBranches
 	| RequestDeleteBranch
 	| RequestDeleteRemote
 	| RequestDeleteRemoteBranch
@@ -1333,6 +1347,7 @@ export type ResponseMessage =
 	| ResponseCreateArchive
 	| ResponseCreateBranch
 	| ResponseCreatePullRequest
+	| ResponseCleanupLocalBranches
 	| ResponseDeleteBranch
 	| ResponseDeleteRemote
 	| ResponseDeleteRemoteBranch

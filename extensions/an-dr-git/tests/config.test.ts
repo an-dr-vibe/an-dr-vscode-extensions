@@ -2890,6 +2890,7 @@ describe('Config', () => {
 			// Setup
 			vscode.mockExtensionSettingReturnValue('branchPanel.flattenSingleChildGroups', true);
 			vscode.mockExtensionSettingReturnValue('branchPanel.groupsFirst', true);
+			vscode.mockExtensionSettingReturnValue('branchPanel.showLocalBranchUpstream', true);
 
 			// Run
 			const value = config.branchPanel;
@@ -2897,9 +2898,11 @@ describe('Config', () => {
 			// Assert
 			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.flattenSingleChildGroups', true);
 			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.groupsFirst', true);
+			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.showLocalBranchUpstream', true);
 			expect(value).toStrictEqual({
 				flattenSingleChildGroups: true,
-				groupsFirst: true
+				groupsFirst: true,
+				showLocalBranchUpstream: true
 			});
 		});
 
@@ -2910,9 +2913,11 @@ describe('Config', () => {
 			// Assert
 			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.flattenSingleChildGroups', true);
 			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.groupsFirst', true);
+			expect(workspaceConfiguration.get).toBeCalledWith('branchPanel.showLocalBranchUpstream', true);
 			expect(value).toStrictEqual({
 				flattenSingleChildGroups: true,
-				groupsFirst: true
+				groupsFirst: true,
+				showLocalBranchUpstream: true
 			});
 		});
 	});

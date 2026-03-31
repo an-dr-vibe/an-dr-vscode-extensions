@@ -144,9 +144,17 @@ export class DataSource extends Disposable {
 			this.getRemotes(repo),
 			showStashes ? this.getStashes(repo) : Promise.resolve([])
 		]).then((results) => {
-			return { branches: results[0].branches, head: results[0].head, remotes: results[1], stashes: results[2], error: null };
+			return {
+				branches: results[0].branches,
+				branchUpstreams: results[0].branchUpstreams,
+				goneUpstreamBranches: results[0].goneUpstreamBranches,
+				head: results[0].head,
+				remotes: results[1],
+				stashes: results[2],
+				error: null
+			};
 		}).catch((errorMessage) => {
-			return { branches: [], head: null, remotes: [], stashes: [], error: errorMessage };
+			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], head: null, remotes: [], stashes: [], error: errorMessage };
 		});
 	}
 
@@ -895,6 +903,21 @@ export class DataSource extends Disposable {
 	}
 
 	/**
+	 * Delete multiple local branches in a repository.
+	 * @param repo The path of the repository.
+	 * @param branchNames The names of the branches to delete.
+	 * @param force Should force the branches to be deleted (even if not merged).
+	 * @returns The ErrorInfo for each executed delete command.
+	 */
+	public async cleanupLocalBranches(repo: string, branchNames: ReadonlyArray<string>, force: boolean) {
+		const errors: ErrorInfo[] = [];
+		for (let i = 0; i < branchNames.length; i++) {
+			errors.push(await this.deleteBranch(repo, branchNames[i], force));
+		}
+		return errors;
+	}
+
+	/**
 	 * Delete a remote branch in a repository.
 	 * @param repo The path of the repository.
 	 * @param branchName The name of the branch.
@@ -1340,27 +1363,52 @@ export class DataSource extends Disposable {
 		const hideRemotePatterns = hideRemotes.map((remote) => 'remotes/' + remote + '/');
 		const showRemoteHeads = getConfig().showRemoteHeads;
 
-		return this.spawnGit(args, repo, (stdout) => {
-			let branchData: GitBranchData = { branches: [], head: null, error: null };
-			let lines = stdout.split(EOL_REGEX);
-			for (let i = 0; i < lines.length - 1; i++) {
-				let name = lines[i].substring(2).split(' -> ')[0];
-				if (DETACHED_HEAD_BRANCH_REGEXP.test(name)) {
-					branchData.head = 'HEAD';
-					branchData.branches.unshift('HEAD');
-					continue;
-				}
-				if (INVALID_BRANCH_REGEXP.test(name) || hideRemotePatterns.some((pattern) => name.startsWith(pattern)) || (!showRemoteHeads && REMOTE_HEAD_BRANCH_REGEXP.test(name))) {
-					continue;
-				}
+		return Promise.all([
+			this.spawnGit(args, repo, (stdout) => {
+				let branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], head: null, error: null };
+				let lines = stdout.split(EOL_REGEX);
+				for (let i = 0; i < lines.length - 1; i++) {
+					let name = lines[i].substring(2).split(' -> ')[0];
+					if (DETACHED_HEAD_BRANCH_REGEXP.test(name)) {
+						branchData.head = 'HEAD';
+						branchData.branches.unshift('HEAD');
+						continue;
+					}
+					if (INVALID_BRANCH_REGEXP.test(name) || hideRemotePatterns.some((pattern) => name.startsWith(pattern)) || (!showRemoteHeads && REMOTE_HEAD_BRANCH_REGEXP.test(name))) {
+						continue;
+					}
 
-				if (lines[i][0] === '*') {
-					branchData.head = name;
-					branchData.branches.unshift(name);
-				} else {
-					branchData.branches.push(name);
+					if (lines[i][0] === '*') {
+						branchData.head = name;
+						branchData.branches.unshift(name);
+					} else {
+						branchData.branches.push(name);
+					}
 				}
-			}
+				return branchData;
+			}),
+			this.spawnGit(['for-each-ref', 'refs/heads', '--format=%(refname:short)' + GIT_LOG_SEPARATOR + '%(upstream:short)' + GIT_LOG_SEPARATOR + '%(upstream:track)'], repo, (stdout) => {
+				let branchUpstreams: { [branchName: string]: string } = {};
+				let goneUpstreamBranches: string[] = [];
+				let lines = stdout.split(EOL_REGEX);
+				for (let i = 0; i < lines.length - 1; i++) {
+					const record = lines[i].split(GIT_LOG_SEPARATOR);
+					if (record.length >= 2 && record[1] !== '') {
+						branchUpstreams[record[0]] = record[1];
+					}
+					if (record.length >= 3 && record[2] === '[gone]') {
+						goneUpstreamBranches.push(record[0]);
+					}
+				}
+				return { branchUpstreams, goneUpstreamBranches };
+			})
+		]).then(([branchData, upstreamData]) => {
+			Object.keys(upstreamData.branchUpstreams).forEach((branch) => {
+				if (branchData.branches.includes(branch)) {
+					branchData.branchUpstreams[branch] = upstreamData.branchUpstreams[branch];
+				}
+			});
+			branchData.goneUpstreamBranches = upstreamData.goneUpstreamBranches.filter((branch) => branchData.branches.includes(branch));
 			return branchData;
 		});
 	}
@@ -1959,6 +2007,8 @@ interface DiffNumStatRecord {
 
 interface GitBranchData {
 	branches: string[];
+	branchUpstreams: { [branchName: string]: string };
+	goneUpstreamBranches: string[];
 	head: string | null;
 	error: ErrorInfo;
 }

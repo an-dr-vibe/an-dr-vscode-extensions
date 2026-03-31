@@ -298,6 +298,13 @@ export class GitGraphView extends Disposable {
 					errors: errorInfos
 				});
 				break;
+			case 'cleanupLocalBranches':
+				this.sendMessage({
+					command: 'cleanupLocalBranches',
+					branchNames: msg.branchNames,
+					errors: await this.dataSource.cleanupLocalBranches(msg.repo, msg.branchNames, msg.forceDelete)
+				});
+				break;
 			case 'deleteBranch':
 				errorInfos = [await this.dataSource.deleteBranch(msg.repo, msg.branchName, msg.forceDelete)];
 				if (errorInfos[0] === null) {
@@ -721,7 +728,6 @@ export class GitGraphView extends Disposable {
 			<div id="view" tabindex="-1">
 				<div id="controls">
 					<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
-					<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Show Remote Branches</label>
 					<div id="findBtn" title="Find"></div>
 					<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
 					<div id="settingsBtn" title="Repository Settings"></div>

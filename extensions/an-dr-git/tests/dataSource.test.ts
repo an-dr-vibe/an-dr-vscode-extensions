@@ -151,6 +151,7 @@ describe('DataSource', () => {
 				'  remotes/origin/develop\n' +
 				'  remotes/origin/master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce(
 				'98adab72e57a098a45cc36e43a6c0fda95c44f8bXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbb30d6d4d14462e09515df02a8635e83b4278c8b1 26970361eca306caa6d6bed3baf022dbd8fa404cXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbrefs/stash@{0}XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbTest AuthorXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbtest@mhutchie.comXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb1592306634XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPbWIP on develop: b30d6d4 y\n' +
@@ -164,6 +165,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master', 'remotes/origin/HEAD', 'remotes/origin/develop', 'remotes/origin/master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [
@@ -191,6 +194,7 @@ describe('DataSource', () => {
 				error: null
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '-a', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['for-each-ref', 'refs/heads', '--format=%(refname:short)XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%(upstream:short)XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%(upstream:track)'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -201,6 +205,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -211,6 +216,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -227,6 +234,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -243,6 +251,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -259,6 +269,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -275,6 +286,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -291,6 +304,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -307,6 +321,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -323,6 +339,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -339,6 +356,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -355,6 +374,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 
 			// Run
@@ -363,6 +383,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -370,7 +392,7 @@ describe('DataSource', () => {
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '-a', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toHaveBeenCalledTimes(2);
+			expect(spyOnSpawn).toHaveBeenCalledTimes(3);
 		});
 
 		it('Should return the repository info (hidden remote and an invalid branch)', async () => {
@@ -382,6 +404,7 @@ describe('DataSource', () => {
 				'  remotes/origin/develop\n' +
 				'  remotes/origin/master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -392,6 +415,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -411,6 +436,7 @@ describe('DataSource', () => {
 				'  remotes/origin/develop\n' +
 				'  remotes/origin/master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', false);
@@ -421,6 +447,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master', 'remotes/origin/develop', 'remotes/origin/master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
@@ -439,6 +467,7 @@ describe('DataSource', () => {
 				'  remotes/origin/HEAD\n' +
 				'  remotes/origin/sobc\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -449,7 +478,40 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['HEAD', 'sobc', 'remotes/origin/HEAD', 'remotes/origin/sobc'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'HEAD',
+				remotes: ['origin'],
+				stashes: [],
+				error: null
+			});
+		});
+
+		it('Should return local branches whose upstream is gone', async () => {
+			// Setup
+			mockGitSuccessOnce(
+				'* develop\n' +
+				'  master\n' +
+				'  feature/test\n'
+			);
+			mockGitSuccessOnce(
+				'developXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPborigin/developXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb\n' +
+				'masterXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPborigin/masterXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb[gone]\n' +
+				'feature/testXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPborigin/feature/testXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb[gone]\n'
+			);
+			mockGitSuccessOnce('origin\n');
+			mockGitSuccessOnce('\n');
+			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
+
+			// Run
+			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
+
+			// Assert
+			expect(result).toStrictEqual({
+				branches: ['develop', 'master', 'feature/test'],
+				branchUpstreams: { develop: 'origin/develop', master: 'origin/master', 'feature/test': 'origin/feature/test' },
+				goneUpstreamBranches: ['master', 'feature/test'],
+				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],
 				error: null
@@ -459,6 +521,7 @@ describe('DataSource', () => {
 		it('Should return an error message thrown by git (when getting branches)', async () => {
 			// Setup
 			mockGitThrowingErrorOnce();
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -469,6 +532,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: [],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: null,
 				remotes: [],
 				stashes: [],
@@ -482,6 +547,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitThrowingErrorOnce();
 			mockGitSuccessOnce('\n');
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -492,6 +558,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: [],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: null,
 				remotes: [],
 				stashes: [],
@@ -505,6 +573,7 @@ describe('DataSource', () => {
 				'* develop\n' +
 				'  master\n'
 			);
+			mockGitSuccessOnce('\n');
 			mockGitSuccessOnce('origin\n');
 			mockGitThrowingErrorOnce();
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
@@ -515,6 +584,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				branches: ['develop', 'master'],
+				branchUpstreams: {},
+				goneUpstreamBranches: [],
 				head: 'develop',
 				remotes: ['origin'],
 				stashes: [],

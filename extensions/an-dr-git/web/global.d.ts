@@ -49,6 +49,8 @@ declare global {
 		readonly currentRepoLoading: boolean;
 		readonly gitRepos: GG.GitRepoSet;
 		readonly gitBranches: ReadonlyArray<string>;
+		readonly gitBranchUpstreams: { readonly [branchName: string]: string };
+		readonly gitGoneUpstreamBranches: ReadonlyArray<string>;
 		readonly gitBranchHead: string | null;
 		readonly gitConfig: GG.GitRepoConfig | null;
 		readonly gitRemotes: ReadonlyArray<string>;

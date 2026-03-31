@@ -82,7 +82,8 @@ class Config {
 	get branchPanel(): BranchPanelConfig {
 		return {
 			flattenSingleChildGroups: !!this.config.get('branchPanel.flattenSingleChildGroups', true),
-			groupsFirst: !!this.config.get('branchPanel.groupsFirst', true)
+			groupsFirst: !!this.config.get('branchPanel.groupsFirst', true),
+			showLocalBranchUpstream: !!this.config.get('branchPanel.showLocalBranchUpstream', true)
 		};
 	}
 

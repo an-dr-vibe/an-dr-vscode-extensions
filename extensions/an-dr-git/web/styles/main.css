@@ -798,16 +798,13 @@ body.tagLabelsRightAligned .gitRef.tag{
 	user-select:none;
 }
 
-#repoControl, #showRemoteBranchesControl{
+#repoControl{
 	display:inline-block;
 	white-space:nowrap;
 	margin:0 10px;
 }
 #repoDropdown{
 	margin-left:3px;
-}
-#showRemoteBranchesControl > .customCheckbox{
-	margin-right:6px;
 }
 
 .dropdownCurrentValue{
@@ -901,13 +898,6 @@ body.tagLabelsRightAligned .gitRef.tag{
 }
 #controls.fetchSupported #fetchBtn{
 	display:block;
-}
-
-#controls input:focus{
-	outline:none;
-}
-#controls label{
-	cursor:pointer;
 }
 
 

@@ -10,6 +10,8 @@ type DraggedRef = {
 class GitGraphView {
 	private gitRepos: GG.GitRepoSet;
 	private gitBranches: ReadonlyArray<string> = [];
+	private gitBranchUpstreams: { readonly [branchName: string]: string } = {};
+	private gitGoneUpstreamBranches: ReadonlyArray<string> = [];
 	private gitBranchHead: string | null = null;
 	private gitConfig: GG.GitRepoConfig | null = null;
 	private gitRemotes: ReadonlyArray<string> = [];
@@ -61,7 +63,6 @@ class GitGraphView {
 	private readonly controlsElem: HTMLElement;
 	private readonly tableElem: HTMLElement;
 	private readonly footerElem: HTMLElement;
-	private readonly showRemoteBranchesElem: HTMLInputElement;
 	private readonly refreshBtnElem: HTMLElement;
 	private readonly scrollShadowElem: HTMLElement;
 
@@ -108,12 +109,6 @@ class GitGraphView {
 			contextMenu.show(this.getSidebarContextMenuActions(type, name), false, null, event, this.viewElem);
 		}, this.config.branchPanel.flattenSingleChildGroups, this.config.branchPanel.groupsFirst);
 
-		this.showRemoteBranchesElem = <HTMLInputElement>document.getElementById('showRemoteBranchesCheckbox')!;
-		this.showRemoteBranchesElem.addEventListener('change', () => {
-			this.saveRepoStateValue(this.currentRepo, 'showRemoteBranchesV2', this.showRemoteBranchesElem.checked ? GG.BooleanOverride.Enabled : GG.BooleanOverride.Disabled);
-			this.refresh(true);
-		});
-
 		this.refreshBtnElem = document.getElementById('refreshBtn')!;
 		this.refreshBtnElem.addEventListener('click', () => {
 			if (!this.refreshBtnElem.classList.contains(CLASS_REFRESHING)) {
@@ -144,11 +139,10 @@ class GitGraphView {
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
 			this.branchDropdown.setSelectedTags(this.currentTags);
-			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
+			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
 			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 			this.findWidget.restoreState(prevState.findWidget);
 			this.settingsWidget.restoreState(prevState.settingsWidget);
-			this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[prevState.currentRepo].showRemoteBranchesV2);
 		}
 
 		let loadViewTo = initialState.loadViewTo;
@@ -226,12 +220,13 @@ class GitGraphView {
 	private loadRepo(repo: string) {
 		this.currentRepo = repo;
 		this.currentRepoLoading = true;
-		this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[this.currentRepo].showRemoteBranchesV2);
 		this.maxCommits = this.config.initialLoadCommits;
 		this.gitConfig = null;
 		this.gitRemotes = [];
 		this.gitStashes = [];
 		this.gitTags = [];
+		this.gitBranchUpstreams = {};
+		this.gitGoneUpstreamBranches = [];
 		this.currentBranches = null;
 		this.renderFetchButton();
 		this.closeCommitDetails(false);
@@ -240,11 +235,11 @@ class GitGraphView {
 		this.refresh(true);
 	}
 
-	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
+	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
 		// Changes to this.gitStashes are reflected as changes to the commits when loadCommits is run
 		this.gitStashes = stashes;
 
-		if (!isRepo || (!this.currentRepoRefreshState.hard && arraysStrictlyEqual(this.gitBranches, branchOptions) && this.gitBranchHead === branchHead && arraysStrictlyEqual(this.gitRemotes, remotes))) {
+		if (!isRepo || (!this.currentRepoRefreshState.hard && arraysStrictlyEqual(this.gitBranches, branchOptions) && shallowStringMapEqual(this.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(this.gitGoneUpstreamBranches, goneUpstreamBranches) && this.gitBranchHead === branchHead && arraysStrictlyEqual(this.gitRemotes, remotes))) {
 			this.saveState();
 			this.finaliseLoadRepoInfo(false, isRepo);
 			return;
@@ -252,6 +247,8 @@ class GitGraphView {
 
 		// Changes to these properties must be indicated as a repository info change
 		this.gitBranches = branchOptions;
+		this.gitBranchUpstreams = branchUpstreams;
+		this.gitGoneUpstreamBranches = goneUpstreamBranches;
 		this.gitBranchHead = branchHead;
 		this.gitRemotes = remotes;
 
@@ -488,7 +485,7 @@ class GitGraphView {
 		if (msg.error === null) {
 			const refreshState = this.currentRepoRefreshState;
 			if (refreshState.inProgress && refreshState.loadRepoInfoRefreshId === msg.refreshId) {
-				this.loadRepoInfo(msg.branches, msg.head, msg.remotes, msg.stashes, msg.isRepo);
+				this.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.head, msg.remotes, msg.stashes, msg.isRepo);
 			}
 		} else {
 			this.displayLoadDataError('Unable to load Repository Info', msg.error);
@@ -557,7 +554,20 @@ class GitGraphView {
 			options.push({ name: 'Glob: ' + this.config.customBranchGlobPatterns[i].name, value: this.config.customBranchGlobPatterns[i].glob });
 		}
 		for (let i = 0; i < this.gitBranches.length; i++) {
-			options.push({ name: this.gitBranches[i].indexOf('remotes/') === 0 ? this.gitBranches[i].substring(8) : this.gitBranches[i], value: this.gitBranches[i] });
+			const branch = this.gitBranches[i];
+			const upstream = this.config.branchPanel.showLocalBranchUpstream && branch.indexOf('remotes/') !== 0
+				? this.gitBranchUpstreams[branch]
+				: undefined;
+			options.push({
+				name: branch.indexOf('remotes/') === 0 ? branch.substring(8) : branch,
+				value: branch,
+				hint: typeof upstream === 'string'
+					? (this.gitGoneUpstreamBranches.includes(branch) ? '? ' + upstream : '= ' + upstream)
+					: undefined,
+				hintKind: typeof upstream === 'string'
+					? (this.gitGoneUpstreamBranches.includes(branch) ? 'gone' : 'upstream')
+					: undefined
+			});
 		}
 		return options;
 	}
@@ -620,7 +630,7 @@ class GitGraphView {
 			command: 'loadRepoInfo',
 			repo: this.currentRepo,
 			refreshId: ++this.currentRepoRefreshState.loadRepoInfoRefreshId,
-			showRemoteBranches: getShowRemoteBranches(repoState.showRemoteBranchesV2),
+			showRemoteBranches: true,
 			showStashes: getShowStashes(repoState.showStashes),
 			hideRemotes: repoState.hideRemotes
 		});
@@ -635,7 +645,7 @@ class GitGraphView {
 			branches: this.currentBranches === null || (this.currentBranches.length === 1 && this.currentBranches[0] === SHOW_ALL_BRANCHES) ? null : this.currentBranches,
 			maxCommits: this.maxCommits,
 			showTags: true,
-			showRemoteBranches: getShowRemoteBranches(repoState.showRemoteBranchesV2),
+			showRemoteBranches: true,
 			includeCommitsMentionedByReflogs: getIncludeCommitsMentionedByReflogs(repoState.includeCommitsMentionedByReflogs),
 			onlyFollowFirstParent: getOnlyFollowFirstParent(repoState.onlyFollowFirstParent),
 			commitOrdering: getCommitOrdering(repoState.commitOrdering),
@@ -737,6 +747,8 @@ class GitGraphView {
 			currentRepoLoading: this.currentRepoLoading,
 			gitRepos: this.gitRepos,
 			gitBranches: this.gitBranches,
+			gitBranchUpstreams: this.gitBranchUpstreams,
+			gitGoneUpstreamBranches: this.gitGoneUpstreamBranches,
 			gitBranchHead: this.gitBranchHead,
 			gitConfig: this.gitConfig,
 			gitRemotes: this.gitRemotes,
@@ -992,7 +1004,40 @@ class GitGraphView {
 		this.repoDropdown.setOptions(getRepoDropdownOptions(this.gitRepos), [repo || this.currentRepo]);
 	}
 
-	private getSidebarContextMenuActions(type: 'branch' | 'tag', name: string): ContextMenuActions {
+	private getSidebarContextMenuActions(type: 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection', name: string): ContextMenuActions {
+		if (type === 'localSection') {
+			return [[{
+				title: 'Clean Up Gone Branches' + ELLIPSIS,
+				visible: this.getCleanupLocalBranches().length > 0,
+				onClick: () => this.cleanupLocalBranchesAction()
+			}]];
+		}
+
+		if (type === 'remoteSection') {
+			return [[{
+				title: 'Add Remote' + ELLIPSIS,
+				visible: true,
+				onClick: () => this.addRemoteAction()
+			}]];
+		}
+
+		if (type === 'remote') {
+			return [[
+				{
+					title: 'Delete Remote' + ELLIPSIS,
+					visible: true,
+					onClick: () => this.deleteRemoteAction(name)
+				},
+				{
+					title: 'Copy Name',
+					visible: true,
+					onClick: () => {
+						sendMessage({ command: 'copyToClipboard', type: 'Remote Name', data: name });
+					}
+				}
+			]];
+		}
+
 		return [[
 			{
 				title: 'Reveal',
@@ -1589,6 +1634,30 @@ class GitGraphView {
 
 	/* Actions */
 
+	private getCleanupLocalBranches() {
+		return this.gitGoneUpstreamBranches.filter((branch) => branch !== this.gitBranchHead);
+	}
+
+	private addRemoteAction() {
+		if (this.currentRepo === null) return;
+		const pushUrlPlaceholder = 'Leave blank to use the Fetch URL';
+		dialog.showForm('Add a new remote to this repository:', [
+			{ type: DialogInputType.Text, name: 'Name', default: '', placeholder: null },
+			{ type: DialogInputType.Text, name: 'Fetch URL', default: '', placeholder: null },
+			{ type: DialogInputType.Text, name: 'Push URL', default: '', placeholder: pushUrlPlaceholder },
+			{ type: DialogInputType.Checkbox, name: 'Fetch Immediately', value: true }
+		], 'Add Remote', (values) => {
+			runAction({
+				command: 'addRemote',
+				repo: this.currentRepo,
+				name: <string>values[0],
+				url: <string>values[1],
+				pushUrl: <string>values[2] !== '' ? <string>values[2] : null,
+				fetch: <boolean>values[3]
+			}, 'Adding Remote');
+		}, { type: TargetType.Repo });
+	}
+
 	private addTagAction(hash: string, initialName: string, initialType: GG.TagType, initialMessage: string, initialPushToRemote: string | null, target: DialogTarget & CommitTarget, isInitialLoad: boolean = true) {
 		let mostRecentTagsIndex = -1;
 		for (let i = 0; i < this.commits.length; i++) {
@@ -1705,6 +1774,36 @@ class GitGraphView {
 
 	private deleteTagAction(refName: string, deleteOnRemote: string | null) {
 		runAction({ command: 'deleteTag', repo: this.currentRepo, tagName: refName, deleteOnRemote: deleteOnRemote }, 'Deleting Tag');
+	}
+
+	private cleanupLocalBranchesAction() {
+		if (this.currentRepo === null) return;
+		const branches = this.getCleanupLocalBranches();
+		if (branches.length === 0) return;
+
+		const skippedCurrentBranch = this.gitBranchHead !== null && this.gitGoneUpstreamBranches.includes(this.gitBranchHead);
+		const branchList = '<ul style="margin:6px 0 0 18px;padding:0;">' + branches.map((branch) => '<li><b><i>' + escapeHtml(branch) + '</i></b></li>').join('') + '</ul>';
+		const message = 'Delete the local branch' + (branches.length > 1 ? 'es' : '') + ' whose tracked remote branch no longer exists?' +
+			branchList +
+			(skippedCurrentBranch ? '<p style="margin:8px 0 0 0;"><i>The current branch <b>' + escapeHtml(this.gitBranchHead!) + '</b> is also marked as gone and will be skipped.</i></p>' : '');
+
+		dialog.showForm(message, [
+			{ type: DialogInputType.Checkbox, name: 'Force Delete', value: this.config.dialogDefaults.deleteBranch.forceDelete }
+		], 'Delete Branch' + (branches.length > 1 ? 'es' : ''), (values) => {
+			runAction({
+				command: 'cleanupLocalBranches',
+				repo: this.currentRepo,
+				branchNames: branches,
+				forceDelete: <boolean>values[0]
+			}, 'Cleaning Up Branches');
+		}, { type: TargetType.Repo });
+	}
+
+	private deleteRemoteAction(name: string) {
+		if (this.currentRepo === null) return;
+		dialog.showConfirmation('Are you sure you want to delete the remote <b><i>' + escapeHtml(name) + '</i></b>?', 'Yes, delete', () => {
+			runAction({ command: 'deleteRemote', repo: this.currentRepo, name: name }, 'Deleting Remote');
+		}, { type: TargetType.Repo });
 	}
 
 	private fetchFromRemotesAction() {
@@ -3472,6 +3571,9 @@ window.addEventListener('load', () => {
 					}
 				}, true);
 				break;
+			case 'cleanupLocalBranches':
+				refreshAndDisplayErrors(msg.errors, 'Unable to Clean Up Local Branches');
+				break;
 			case 'deleteBranch':
 				handleResponseDeleteBranch(msg);
 				break;
@@ -3974,10 +4076,14 @@ function getCommitOrdering(repoValue: GG.RepoCommitOrdering): GG.CommitOrdering 
 	}
 }
 
-function getShowRemoteBranches(repoValue: GG.BooleanOverride) {
-	return repoValue === GG.BooleanOverride.Default
-		? initialState.config.showRemoteBranches
-		: repoValue === GG.BooleanOverride.Enabled;
+function shallowStringMapEqual(a: { readonly [key: string]: string }, b: { readonly [key: string]: string }) {
+	const aKeys = Object.keys(a), bKeys = Object.keys(b);
+	if (aKeys.length !== bKeys.length) return false;
+	for (let i = 0; i < aKeys.length; i++) {
+		const key = aKeys[i];
+		if (a[key] !== b[key]) return false;
+	}
+	return true;
 }
 
 function getShowStashes(repoValue: GG.BooleanOverride) {

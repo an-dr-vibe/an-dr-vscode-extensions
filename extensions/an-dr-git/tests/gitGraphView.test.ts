@@ -1521,6 +1521,35 @@ describe('GitGraphView', () => {
 			});
 		});
 
+		describe('cleanupLocalBranches', () => {
+			it('Should clean up local branches', async () => {
+				// Setup
+				const cleanupLocalBranchesResolvedValue = [null, 'error message'];
+				const spyOnCleanupLocalBranches = jest.spyOn(dataSource, 'cleanupLocalBranches');
+				spyOnCleanupLocalBranches.mockResolvedValueOnce(cleanupLocalBranchesResolvedValue);
+
+				// Run
+				onDidReceiveMessage({
+					command: 'cleanupLocalBranches',
+					repo: '/path/to/repo',
+					branchNames: ['feature-1', 'feature-2'],
+					forceDelete: true
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnCleanupLocalBranches).toHaveBeenCalledWith('/path/to/repo', ['feature-1', 'feature-2'], true);
+					expect(messages).toStrictEqual([
+						{
+							command: 'cleanupLocalBranches',
+							branchNames: ['feature-1', 'feature-2'],
+							errors: cleanupLocalBranchesResolvedValue
+						}
+					]);
+				});
+			});
+		});
+
 		describe('deleteRemote', () => {
 			it('Should delete a remote', async () => {
 				// Setup
@@ -2316,6 +2345,8 @@ describe('GitGraphView', () => {
 				// Setup
 				const getRepoInfoResolvedValue = {
 					branches: ['master'],
+					branchUpstreams: {},
+					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
 					stashes: [],
@@ -2350,6 +2381,8 @@ describe('GitGraphView', () => {
 							command: 'loadRepoInfo',
 							refreshId: 0,
 							branches: getRepoInfoResolvedValue.branches,
+							branchUpstreams: getRepoInfoResolvedValue.branchUpstreams,
+							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
 							stashes: getRepoInfoResolvedValue.stashes,
@@ -2366,6 +2399,8 @@ describe('GitGraphView', () => {
 				// Setup
 				const getRepoInfoResolvedValue = {
 					branches: ['master'],
+					branchUpstreams: {},
+					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
 					stashes: [],
@@ -2399,6 +2434,8 @@ describe('GitGraphView', () => {
 							command: 'loadRepoInfo',
 							refreshId: 1,
 							branches: getRepoInfoResolvedValue.branches,
+							branchUpstreams: getRepoInfoResolvedValue.branchUpstreams,
+							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
 							stashes: getRepoInfoResolvedValue.stashes,
@@ -2415,6 +2452,8 @@ describe('GitGraphView', () => {
 				// Setup
 				const getRepoInfoResolvedValue = {
 					branches: ['master'],
+					branchUpstreams: {},
+					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
 					stashes: [],
@@ -2449,6 +2488,8 @@ describe('GitGraphView', () => {
 							command: 'loadRepoInfo',
 							refreshId: 2,
 							branches: getRepoInfoResolvedValue.branches,
+							branchUpstreams: getRepoInfoResolvedValue.branchUpstreams,
+							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
 							stashes: getRepoInfoResolvedValue.stashes,
@@ -2465,6 +2506,8 @@ describe('GitGraphView', () => {
 				// Setup
 				const getRepoInfoResolvedValue = {
 					branches: ['master'],
+					branchUpstreams: {},
+					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
 					stashes: [],
@@ -2499,6 +2542,8 @@ describe('GitGraphView', () => {
 							command: 'loadRepoInfo',
 							refreshId: 3,
 							branches: getRepoInfoResolvedValue.branches,
+							branchUpstreams: getRepoInfoResolvedValue.branchUpstreams,
+							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
 							stashes: getRepoInfoResolvedValue.stashes,

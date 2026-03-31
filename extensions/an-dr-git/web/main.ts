@@ -15,6 +15,7 @@ class GitGraphView {
 	private onlyFollowFirstParent: boolean = false;
 	private avatars: AvatarImageCollection = {};
 	private currentBranches: string[] | null = null;
+	private currentTags: string[] = [];
 
 	private currentRepo!: string;
 	private currentRepoLoading: boolean = true;
@@ -92,6 +93,10 @@ class GitGraphView {
 			this.saveState();
 			this.clearCommits();
 			this.requestLoadRepoInfoAndCommits(true, true);
+		}, (values) => {
+			this.currentTags = values;
+			this.saveState();
+			this.renderTable();
 		});
 
 		this.showRemoteBranchesElem = <HTMLInputElement>document.getElementById('showRemoteBranchesCheckbox')!;
@@ -124,10 +129,12 @@ class GitGraphView {
 		if (prevState && !prevState.currentRepoLoading && typeof this.gitRepos[prevState.currentRepo] !== 'undefined') {
 			this.currentRepo = prevState.currentRepo;
 			this.currentBranches = prevState.currentBranches;
+			this.currentTags = prevState.currentTags || [];
 			this.maxCommits = prevState.maxCommits;
 			this.expandedCommit = prevState.expandedCommit;
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
+			this.branchDropdown.setSelectedTags(this.currentTags);
 			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
 			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 			this.findWidget.restoreState(prevState.findWidget);
@@ -307,7 +314,11 @@ class GitGraphView {
 		// This list of tags is just used to provide additional information in the dialogs. Tag information included in commits is used for all other purposes (e.g. rendering, context menus)
 		const tagsChanged = !arraysStrictlyEqual(this.gitTags, tags);
 		this.gitTags = tags;
-		if (tagsChanged) this.branchDropdown.setTags(tags);
+		if (tagsChanged) {
+			this.currentTags = this.currentTags.filter((tagName) => this.gitTags.includes(tagName));
+			this.branchDropdown.setTags(tags);
+			this.branchDropdown.setSelectedTags(this.currentTags);
+		}
 
 		if (!this.currentRepoLoading && !this.currentRepoRefreshState.hard && this.moreCommitsAvailable === moreAvailable && this.onlyFollowFirstParent === onlyFollowFirstParent && this.commitHead === commitHead && commits.length > 0 && arraysEqual(this.commits, commits, (a, b) =>
 			a.hash === b.hash &&
@@ -614,7 +625,7 @@ class GitGraphView {
 			refreshId: ++this.currentRepoRefreshState.loadCommitsRefreshId,
 			branches: this.currentBranches === null || (this.currentBranches.length === 1 && this.currentBranches[0] === SHOW_ALL_BRANCHES) ? null : this.currentBranches,
 			maxCommits: this.maxCommits,
-			showTags: getShowTags(repoState.showTags),
+			showTags: true,
 			showRemoteBranches: getShowRemoteBranches(repoState.showRemoteBranchesV2),
 			includeCommitsMentionedByReflogs: getIncludeCommitsMentionedByReflogs(repoState.includeCommitsMentionedByReflogs),
 			onlyFollowFirstParent: getOnlyFollowFirstParent(repoState.onlyFollowFirstParent),
@@ -726,6 +737,7 @@ class GitGraphView {
 			commitHead: this.commitHead,
 			avatars: this.avatars,
 			currentBranches: this.currentBranches,
+			currentTags: this.currentTags,
 			moreCommitsAvailable: this.moreCommitsAvailable,
 			maxCommits: this.maxCommits,
 			onlyFollowFirstParent: this.onlyFollowFirstParent,
@@ -828,6 +840,7 @@ class GitGraphView {
 			(colVisibility.commit ? '<th class="tableColHeader" data-col="4">Commit</th>' : '') +
 			'</tr>';
 
+		const selectedTags = new Set(this.currentTags);
 		for (let i = 0; i < this.commits.length; i++) {
 			let commit = this.commits[i];
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
@@ -853,6 +866,7 @@ class GitGraphView {
 			}
 
 			for (j = 0; j < commit.tags.length; j++) {
+				if (selectedTags.size > 0 && !selectedTags.has(commit.tags[j].name)) continue;
 				refName = escapeHtml(commit.tags[j].name);
 				refTags += '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '">' + SVG_ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>';
 			}
@@ -1941,8 +1955,6 @@ class GitGraphView {
 		this.saveState();
 		this.requestLoadRepoInfoAndCommits(false, true);
 	}
-
-
 	/* Observers */
 
 	private observeWindowSizeChanges() {
@@ -3771,12 +3783,6 @@ function getShowRemoteBranches(repoValue: GG.BooleanOverride) {
 function getShowStashes(repoValue: GG.BooleanOverride) {
 	return repoValue === GG.BooleanOverride.Default
 		? initialState.config.showStashes
-		: repoValue === GG.BooleanOverride.Enabled;
-}
-
-function getShowTags(repoValue: GG.BooleanOverride) {
-	return repoValue === GG.BooleanOverride.Default
-		? initialState.config.showTags
 		: repoValue === GG.BooleanOverride.Enabled;
 }
 

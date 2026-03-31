@@ -93,6 +93,11 @@
 	align-items:center;
 	white-space:nowrap;
 }
+.branchPanelSectionTitle{
+	flex:1;
+	overflow:hidden;
+	text-overflow:ellipsis;
+}
 .branchPanelSectionHeader:hover{
 	opacity:1;
 }
@@ -135,6 +140,7 @@
 	fill:var(--vscode-editor-foreground);
 	width:14px;
 	height:14px;
+	opacity:0.95;
 }
 .branchPanelFolderIcon .openFolderIcon,
 .branchPanelFolderIcon .closedFolderIcon{
@@ -178,6 +184,22 @@
 	margin-right:4px;
 }
 .branchPanelCheck svg{
+	fill:var(--vscode-editor-foreground);
+	width:12px;
+	height:12px;
+}
+
+.branchPanelItemIcon{
+	width:16px;
+	height:16px;
+	flex-shrink:0;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	margin-right:3px;
+	opacity:0.75;
+}
+.branchPanelItemIcon svg{
 	fill:var(--vscode-editor-foreground);
 	width:12px;
 	height:12px;

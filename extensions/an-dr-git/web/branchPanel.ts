@@ -20,11 +20,13 @@ interface BranchTreeLeaf {
 type BranchTreeNode = BranchTreeFolder | BranchTreeLeaf;
 
 class BranchPanel {
-	private readonly changeCallback: (values: string[]) => void;
+	private readonly branchChangeCallback: (values: string[]) => void;
+	private readonly tagChangeCallback: (values: string[]) => void;
 	private options: ReadonlyArray<DropdownOption> = [];
 	private optionsSelected: boolean[] = [];
 	private tagNames: ReadonlyArray<string> = [];
 	private tagSelected: Set<number> = new Set();
+	private pendingTagSelectionNames: Set<string> = new Set();
 	private filterValue: string = '';
 	private localCollapsed: boolean = false;
 	private remoteCollapsed: boolean = false;
@@ -38,8 +40,9 @@ class BranchPanel {
 	private readonly sidebar: HTMLElement;
 	private readonly toggleBtn: HTMLElement;
 
-	constructor(id: string, changeCallback: (values: string[]) => void) {
-		this.changeCallback = changeCallback;
+	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void) {
+		this.branchChangeCallback = branchChangeCallback;
+		this.tagChangeCallback = tagChangeCallback;
 		const elem = document.getElementById(id)!;
 		this.sidebar = elem.parentElement!; // #sidebar
 
@@ -127,8 +130,23 @@ class BranchPanel {
 	}
 
 	public setTags(tags: ReadonlyArray<string>) {
+		const selectedTagNames = new Set<string>([
+			...Array.from(this.tagSelected).map((i) => this.tagNames[i]),
+			...Array.from(this.pendingTagSelectionNames)
+		]);
 		this.tagNames = tags;
-		this.tagSelected = new Set();
+		this.tagSelected = new Set(tags
+			.map((tagName, i) => selectedTagNames.has(tagName) ? i : -1)
+			.filter((i) => i !== -1));
+		this.pendingTagSelectionNames.clear();
+		this.render();
+	}
+
+	public setSelectedTags(tags: ReadonlyArray<string>) {
+		this.pendingTagSelectionNames = new Set(tags);
+		this.tagSelected = new Set(this.tagNames
+			.map((tagName, i) => this.pendingTagSelectionNames.has(tagName) ? i : -1)
+			.filter((i) => i !== -1));
 		this.render();
 	}
 
@@ -161,7 +179,7 @@ class BranchPanel {
 		if (idx > -1 && !this.optionsSelected[0] && !this.optionsSelected[idx]) {
 			this.optionsSelected[idx] = true;
 			this.render();
-			this.changeCallback(this.getSelectedValues());
+			this.branchChangeCallback(this.getSelectedBranchValues());
 		}
 	}
 
@@ -173,9 +191,9 @@ class BranchPanel {
 				for (let i = 1; i < this.optionsSelected.length; i++) this.optionsSelected[i] = true;
 			}
 			this.optionsSelected[idx] = false;
-			if (this.optionsSelected.every((s) => !s) && !this.tagSelected.size) this.optionsSelected[0] = true;
+			if (this.optionsSelected.every((s) => !s)) this.optionsSelected[0] = true;
 			this.render();
-			this.changeCallback(this.getSelectedValues());
+			this.branchChangeCallback(this.getSelectedBranchValues());
 		}
 	}
 
@@ -186,20 +204,25 @@ class BranchPanel {
 	public isOpen() { return false; }
 	public close() { /* no-op: sidebar is always visible */ }
 
-	private getSelectedValues(): string[] {
+	private getSelectedBranchValues(): string[] {
 		if (this.optionsSelected[0]) return [this.options[0].value];
-		const branchValues = this.options.filter((_, i) => this.optionsSelected[i]).map((o) => o.value);
-		const tagValues = Array.from(this.tagSelected).map(i => this.tagNames[i]);
-		return [...branchValues, ...tagValues];
+		return this.options.filter((_, i) => this.optionsSelected[i]).map((o) => o.value);
+	}
+
+	private getSelectedTagValues(): string[] {
+		return Array.from(this.tagSelected).map((i) => this.tagNames[i]);
 	}
 
 	private handleClick(e: MouseEvent) {
+		const autoItem = (<HTMLElement>e.target).closest('.branchPanelAutoTagItem') as HTMLElement | null;
 		const sectionHeader = (<HTMLElement>e.target).closest('.branchPanelSectionHeader') as HTMLElement | null;
 		const folder = (<HTMLElement>e.target).closest('.branchPanelFolder') as HTMLElement | null;
 		const tagItem = (<HTMLElement>e.target).closest('.branchPanelTagItem') as HTMLElement | null;
 		const item = (<HTMLElement>e.target).closest('.branchPanelItem') as HTMLElement | null;
 
-		if (sectionHeader !== null) {
+		if (autoItem !== null) {
+			this.onAutoTagClick();
+		} else if (sectionHeader !== null) {
 			const section = sectionHeader.dataset.section;
 			if (section === 'local') this.localCollapsed = !this.localCollapsed;
 			else if (section === 'remote') this.remoteCollapsed = !this.remoteCollapsed;
@@ -221,29 +244,51 @@ class BranchPanel {
 			if (!this.optionsSelected[0]) {
 				this.optionsSelected[0] = true;
 				for (let i = 1; i < this.optionsSelected.length; i++) this.optionsSelected[i] = false;
-				this.tagSelected = new Set();
 				this.render();
-				this.changeCallback(this.getSelectedValues());
+				this.branchChangeCallback(this.getSelectedBranchValues());
 			}
 		} else {
 			if (this.optionsSelected[0]) this.optionsSelected[0] = false;
 			this.optionsSelected[idx] = !this.optionsSelected[idx];
-			if (this.optionsSelected.every((s) => !s) && !this.tagSelected.size) this.optionsSelected[0] = true;
+			if (this.optionsSelected.every((s) => !s)) this.optionsSelected[0] = true;
 			this.render();
-			this.changeCallback(this.getSelectedValues());
+			this.branchChangeCallback(this.getSelectedBranchValues());
 		}
 	}
 
 	private onTagClick(tagIdx: number) {
-		if (this.optionsSelected[0]) this.optionsSelected[0] = false;
 		if (this.tagSelected.has(tagIdx)) {
 			this.tagSelected.delete(tagIdx);
 		} else {
 			this.tagSelected.add(tagIdx);
 		}
-		if (this.optionsSelected.every((s) => !s) && !this.tagSelected.size) this.optionsSelected[0] = true;
+		this.pendingTagSelectionNames.clear();
 		this.render();
-		this.changeCallback(this.getSelectedValues());
+		this.tagChangeCallback(this.getSelectedTagValues());
+	}
+
+	private onAutoTagClick() {
+		if (this.tagSelected.size === 0 && this.pendingTagSelectionNames.size === 0) return;
+		this.tagSelected = new Set();
+		this.pendingTagSelectionNames.clear();
+		this.render();
+		this.tagChangeCallback([]);
+	}
+
+	private isAutoTagSelected() {
+		return this.tagSelected.size === 0 && this.pendingTagSelectionNames.size === 0;
+	}
+
+	private getAutoTagItemHtml(indent: number) {
+		return '<div class="branchPanelItem branchPanelAutoTagItem' + (this.isAutoTagSelected() ? ' selected' : '') + '" title="Automatically show tags on the visible graph" style="padding-left:' + (4 + indent * 14) + 'px">' +
+			'<span class="branchPanelCheck">' + (this.isAutoTagSelected() ? SVG_ICONS.check : '') + '</span>' +
+			'<span class="branchPanelItemIcon">' + SVG_ICONS.tag + '</span>' +
+			'<span class="branchPanelItemName">Auto</span>' +
+			'</div>';
+	}
+
+	private getEmptyTagMessage() {
+		return 'No tags';
 	}
 
 	// Build a prefix tree from "/" separated names
@@ -298,7 +343,7 @@ class BranchPanel {
 				}
 			} else {
 				if (filter !== '' && !node.fullName.toLowerCase().includes(filter)) continue;
-				html += this.itemHtml(node.idx, node.displayName, this.optionsSelected[node.idx], indent);
+				html += this.itemHtml(node.idx, node.displayName, this.optionsSelected[node.idx], indent, SVG_ICONS.branch, node.fullName);
 			}
 		}
 		return html;
@@ -353,7 +398,7 @@ class BranchPanel {
 
 		// Show All
 		if (filter === '' || 'show all'.indexOf(filter) > -1) {
-			html += this.itemHtml(0, this.options[0].name, this.optionsSelected[0], 0);
+			html += this.itemHtml(0, this.options[0].name, this.optionsSelected[0], 0, '', this.options[0].name);
 		}
 
 		// Glob patterns
@@ -362,7 +407,7 @@ class BranchPanel {
 			if (visibleGlobs.length > 0) {
 				html += '<div class="branchPanelSectionHeader" data-section="globs"><span class="branchPanelArrow">&#9660;</span>Glob Patterns</div>';
 				for (let i = 0; i < visibleGlobs.length; i++) {
-					html += this.itemHtml(visibleGlobs[i].idx, visibleGlobs[i].opt.name, this.optionsSelected[visibleGlobs[i].idx], 1);
+					html += this.itemHtml(visibleGlobs[i].idx, visibleGlobs[i].opt.name, this.optionsSelected[visibleGlobs[i].idx], 1, SVG_ICONS.branch, visibleGlobs[i].opt.name);
 				}
 			}
 		}
@@ -405,16 +450,16 @@ class BranchPanel {
 		if (this.tagNames.length > 0) {
 			const tagTree = this.buildTree(this.tagNames.map((name, i) => ({ name, idx: i })));
 			const tagTreeVisible = filter === '' || this.treeMatchesFilter(tagTree, filter);
-			if (filter === '' || tagTreeVisible) {
-				html += '<div class="branchPanelSectionHeader' + (this.tagsCollapsed ? ' collapsed' : '') + '" data-section="tags">' +
-					'<span class="branchPanelArrow">' + (this.tagsCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
-					'Tags (' + this.tagNames.length + ')</div>';
-				if (!this.tagsCollapsed) {
-					if (tagTreeVisible) {
-						html += this.renderTagTreeHtml(tagTree, 1, filter);
-					} else if (filter !== '') {
-						html += '<div class="branchPanelNoResults">No matches</div>';
-					}
+			html += '<div class="branchPanelSectionHeader' + (this.tagsCollapsed ? ' collapsed' : '') + '" data-section="tags">' +
+				'<span class="branchPanelArrow">' + (this.tagsCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
+				'<span class="branchPanelSectionTitle">Tags (' + this.tagNames.length + ')</span>' +
+				'</div>';
+			if (!this.tagsCollapsed) {
+				html += this.getAutoTagItemHtml(1);
+				if (tagTreeVisible) {
+					html += this.renderTagTreeHtml(tagTree, 1, filter);
+				} else {
+					html += '<div class="branchPanelNoResults">' + (filter !== '' ? 'No matches' : this.getEmptyTagMessage()) + '</div>';
 				}
 			}
 		}
@@ -422,9 +467,10 @@ class BranchPanel {
 		this.listElem.innerHTML = html;
 	}
 
-	private itemHtml(idx: number, name: string, selected: boolean, indent: number) {
-		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '" title="' + escapeHtml(name) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+	private itemHtml(idx: number, name: string, selected: boolean, indent: number, iconHtml: string, title: string) {
+		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + '" data-id="' + idx + '" title="' + escapeHtml(title) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
+			(iconHtml === '' ? '' : '<span class="branchPanelItemIcon">' + iconHtml + '</span>') +
 			'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
 			'</div>';
 	}

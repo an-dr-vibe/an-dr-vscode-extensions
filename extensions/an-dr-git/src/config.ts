@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
 import {
+	AuthorAvatarSize,
+	AuthorDisplayMode,
+	AuthorAvatarMode,
+	AuthorAvatarShape,
 	BranchPanelConfig,
 	CommitDetailsViewConfig,
 	CommitDetailsViewLocation,
@@ -367,6 +371,50 @@ class Config {
 	 */
 	get fetchAvatars() {
 		return !!this.getRenamedExtensionSetting('repository.commits.fetchAvatars', 'fetchAvatars', false);
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.repository.commits.avatar.mode` Extension Setting.
+	 */
+	get authorAvatarMode() {
+		const mode = this.config.get<string>('repository.commits.avatar.mode', 'Auto (Fetched then Pattern)');
+		return mode === 'Fetched Only'
+			? AuthorAvatarMode.FetchedOnly
+			: mode === 'Procedural Pattern'
+				? AuthorAvatarMode.ProceduralPattern
+				: mode === 'Disabled'
+					? AuthorAvatarMode.Disabled
+					: AuthorAvatarMode.Auto;
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.repository.commits.authorDisplay` Extension Setting.
+	 */
+	get authorDisplayMode() {
+		const displayMode = this.config.get<string>('repository.commits.authorDisplay', 'Auto Compact');
+		return displayMode === 'Avatar Only'
+			? AuthorDisplayMode.AvatarOnly
+			: displayMode === 'Auto Compact'
+				? AuthorDisplayMode.AutoCompact
+				: AuthorDisplayMode.Both;
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.repository.commits.avatar.size` Extension Setting.
+	 */
+	get authorAvatarSize() {
+		return this.config.get<string>('repository.commits.avatar.size', 'Normal') === 'Small'
+			? AuthorAvatarSize.Small
+			: AuthorAvatarSize.Normal;
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.repository.commits.avatar.shape` Extension Setting.
+	 */
+	get authorAvatarShape() {
+		return this.config.get<string>('repository.commits.avatar.shape', 'Circle') === 'Square'
+			? AuthorAvatarShape.Square
+			: AuthorAvatarShape.Circle;
 	}
 
 	/**

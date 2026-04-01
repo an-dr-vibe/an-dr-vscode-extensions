@@ -979,6 +979,56 @@
 					"default": false,
 					"description": "Fetch avatars of commit authors and committers. By enabling this setting, you consent to commit author and committer email addresses being sent GitHub, GitLab or Gravatar, depending on the repositories remote origin."
 				},
+				"an-dr-git.repository.commits.authorDisplay": {
+					"type": "string",
+					"enum": [
+						"Both",
+						"Avatar Only",
+						"Auto Compact"
+					],
+					"enumDescriptions": [
+						"Show author visual and author text.",
+						"Show only the author visual in the Author column.",
+						"Show both when there is enough space, otherwise automatically switch to avatar-only."
+					],
+					"default": "Auto Compact",
+					"description": "Controls how the Author column is rendered."
+				},
+				"an-dr-git.repository.commits.avatar.mode": {
+					"type": "string",
+					"enum": [
+						"Auto (Fetched then Pattern)",
+						"Fetched Only",
+						"Procedural Pattern",
+						"Disabled"
+					],
+					"enumDescriptions": [
+						"Show fetched avatars when available, otherwise show deterministic procedural patterns.",
+						"Show only fetched avatars (no fallback visual).",
+						"Always show deterministic procedural patterns.",
+						"Don't show any author visual."
+					],
+					"default": "Auto (Fetched then Pattern)",
+					"description": "Controls how author visuals are rendered in the Author column and Commit Details."
+				},
+				"an-dr-git.repository.commits.avatar.size": {
+					"type": "string",
+					"enum": [
+						"Normal",
+						"Small"
+					],
+					"default": "Normal",
+					"description": "Controls avatar size in the Author column."
+				},
+				"an-dr-git.repository.commits.avatar.shape": {
+					"type": "string",
+					"enum": [
+						"Circle",
+						"Square"
+					],
+					"default": "Circle",
+					"description": "Controls the shape of author visuals in the Author column and Commit Details."
+				},
 				"an-dr-git.repository.commits.initialLoad": {
 					"type": "number",
 					"default": 300,

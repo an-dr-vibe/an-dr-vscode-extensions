@@ -840,6 +840,10 @@ export class GitGraphView extends Disposable {
 		const config = getConfig(), nonce = getNonce();
 		const initialState: GitGraphViewInitialState = {
 			config: {
+				authorDisplay: config.authorDisplayMode,
+				avatarMode: config.authorAvatarMode,
+				avatarSize: config.authorAvatarSize,
+				avatarShape: config.authorAvatarShape,
 				branchPanel: config.branchPanel,
 				commitDetailsView: config.commitDetailsView,
 				commitOrdering: config.commitOrder,

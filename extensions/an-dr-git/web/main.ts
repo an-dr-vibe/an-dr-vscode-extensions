@@ -15,6 +15,9 @@ type SidebarResolvedRef =
 type SidebarTagContextResolver = (result: { hash: string; annotated: boolean } | null) => void;
 
 class GitGraphView {
+	private static readonly AUTHOR_AUTO_COMPACT_THRESHOLD_NORMAL = 112;
+	private static readonly AUTHOR_AUTO_COMPACT_THRESHOLD_SMALL = 98;
+
 	private gitRepos: GG.GitRepoSet;
 	private gitBranches: ReadonlyArray<string> = [];
 	private gitBranchUpstreams: { readonly [branchName: string]: string } = {};
@@ -30,6 +33,7 @@ class GitGraphView {
 	private commitLookup: { [hash: string]: number } = {};
 	private onlyFollowFirstParent: boolean = false;
 	private avatars: AvatarImageCollection = {};
+	private proceduralAvatars: { [seed: string]: string } = {};
 	private currentBranches: string[] | null = null;
 	private currentTags: string[] = [];
 
@@ -445,7 +449,7 @@ class GitGraphView {
 					expandedCompareWithCommitVisible = true;
 				}
 			}
-			if (this.config.fetchAvatars && typeof this.avatars[commit.email] !== 'string' && commit.email !== '') {
+			if (this.shouldFetchAuthorAvatars() && typeof this.avatars[commit.email] !== 'string' && commit.email !== '') {
 				if (typeof avatarsNeeded[commit.email] === 'undefined') {
 					avatarsNeeded[commit.email] = [commit.hash];
 				} else {
@@ -605,12 +609,206 @@ class GitGraphView {
 	public loadAvatar(email: string, image: string) {
 		this.avatars[email] = image;
 		this.saveState();
+		if (!this.shouldFetchAuthorAvatars()) return;
+
 		let avatarsElems = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName('avatar'), escapedEmail = escapeHtml(email);
 		for (let i = 0; i < avatarsElems.length; i++) {
 			if (avatarsElems[i].dataset.email === escapedEmail) {
+				avatarsElems[i].classList.remove('empty');
+				delete avatarsElems[i].dataset.procedural;
 				avatarsElems[i].innerHTML = '<img class="avatarImg" src="' + image + '">';
 			}
 		}
+
+		let cdvAvatarsElems = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName('cdvSummaryAvatar');
+		for (let i = 0; i < cdvAvatarsElems.length; i++) {
+			if (cdvAvatarsElems[i].dataset.email === escapedEmail) {
+				delete cdvAvatarsElems[i].dataset.procedural;
+				cdvAvatarsElems[i].innerHTML = '<img class="avatarImg" src="' + image + '">';
+			}
+		}
+
+		if (this.expandedCommit !== null && this.expandedCommit.commitDetails !== null && this.expandedCommit.commitDetails.authorEmail === email) {
+			this.expandedCommit.avatar = image;
+			if (this.config.avatarMode === GG.AuthorAvatarMode.FetchedOnly) {
+				this.renderCommitDetailsView(true);
+			}
+		}
+	}
+
+	private shouldFetchAuthorAvatars() {
+		return this.config.fetchAvatars && (
+			this.config.avatarMode === GG.AuthorAvatarMode.Auto
+			|| this.config.avatarMode === GG.AuthorAvatarMode.FetchedOnly
+		);
+	}
+
+	private getAuthorAvatarShapeClass() {
+		return this.config.avatarShape === GG.AuthorAvatarShape.Square ? 'square' : 'circle';
+	}
+
+	private getAuthorAvatarSizeClass() {
+		return this.config.avatarSize === GG.AuthorAvatarSize.Small ? 'small' : 'normal';
+	}
+
+	private shouldUseAvatarOnlyAuthorDisplay() {
+		if (this.config.authorDisplay === GG.AuthorDisplayMode.AvatarOnly) {
+			return true;
+		}
+		if (this.config.authorDisplay !== GG.AuthorDisplayMode.AutoCompact) {
+			return false;
+		}
+
+		const authorColHeader = <HTMLElement | null>this.tableElem.querySelector('#tableColHeaders th.authorCol');
+		if (authorColHeader === null) {
+			return false;
+		}
+		const threshold = this.config.avatarSize === GG.AuthorAvatarSize.Small
+			? GitGraphView.AUTHOR_AUTO_COMPACT_THRESHOLD_SMALL
+			: GitGraphView.AUTHOR_AUTO_COMPACT_THRESHOLD_NORMAL;
+		return authorColHeader.clientWidth <= threshold;
+	}
+
+	private updateAuthorColumnDisplayMode() {
+		this.tableElem.classList.toggle('authorAvatarOnly', this.shouldUseAvatarOnlyAuthorDisplay());
+	}
+
+	private getAuthorAvatarSeed(author: string, email: string) {
+		const normalizedEmail = email.trim().toLowerCase();
+		if (normalizedEmail !== '') {
+			return 'email:' + normalizedEmail;
+		}
+
+		const normalizedAuthor = author.trim().toLowerCase();
+		return normalizedAuthor !== '' ? 'author:' + normalizedAuthor : 'author:unknown';
+	}
+
+	private getProceduralAvatarImage(seed: string) {
+		if (typeof this.proceduralAvatars[seed] === 'string') {
+			return this.proceduralAvatars[seed];
+		}
+
+		let hash = 2166136261;
+		for (let i = 0; i < seed.length; i++) {
+			hash ^= seed.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		let state = (hash >>> 0) || 1;
+		const next = () => {
+			state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+			return state / 4294967296;
+		};
+
+		const size = 40, grid = 5, cellSize = 8, radius = 1;
+		const hue = Math.floor(next() * 360);
+		const background = 'hsl(' + hue + ', 38%, 20%)';
+		const colours = [
+			'hsl(' + ((hue + 24) % 360) + ', 68%, 58%)',
+			'hsl(' + ((hue + 160) % 360) + ', 68%, 55%)',
+			'hsl(' + ((hue + 290) % 360) + ', 64%, 61%)'
+		];
+
+		let cells = '';
+		for (let y = 0; y < grid; y++) {
+			for (let x = 0; x < Math.ceil(grid / 2); x++) {
+				if (next() >= 0.42) {
+					const fill = colours[Math.floor(next() * colours.length)];
+					const leftX = x * cellSize, rightX = (grid - 1 - x) * cellSize, topY = y * cellSize;
+					cells += '<rect x="' + leftX + '" y="' + topY + '" width="' + cellSize + '" height="' + cellSize + '" rx="' + radius + '" ry="' + radius + '" fill="' + fill + '" />';
+					if (rightX !== leftX) {
+						cells += '<rect x="' + rightX + '" y="' + topY + '" width="' + cellSize + '" height="' + cellSize + '" rx="' + radius + '" ry="' + radius + '" fill="' + fill + '" />';
+					}
+				}
+			}
+		}
+
+		if (next() > 0.5) {
+			const stripe = colours[Math.floor(next() * colours.length)];
+			cells += '<path d="M0 0 L' + size + ' 0 L0 ' + size + ' Z" fill="' + stripe + '" opacity="0.18" />';
+		}
+
+		const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '"><rect x="0" y="0" width="' + size + '" height="' + size + '" fill="' + background + '" />' + cells + '</svg>';
+		const image = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+		this.proceduralAvatars[seed] = image;
+		return image;
+	}
+
+	private getAuthorVisual(author: string, email: string, fetchedAvatar: string | null) {
+		const mode = this.config.avatarMode;
+		if (mode === GG.AuthorAvatarMode.Disabled) {
+			return { image: <string | null>null, procedural: false, updateOnFetch: false };
+		}
+
+		const canFetchByEmail = email !== '' && this.shouldFetchAuthorAvatars();
+		const cachedFetchedAvatar = fetchedAvatar !== null
+			? fetchedAvatar
+			: (typeof this.avatars[email] === 'string' ? this.avatars[email] : null);
+
+		if (mode === GG.AuthorAvatarMode.ProceduralPattern) {
+			return {
+				image: this.getProceduralAvatarImage(this.getAuthorAvatarSeed(author, email)),
+				procedural: true,
+				updateOnFetch: false
+			};
+		}
+
+		if (mode === GG.AuthorAvatarMode.FetchedOnly) {
+			return {
+				image: canFetchByEmail ? cachedFetchedAvatar : null,
+				procedural: false,
+				updateOnFetch: canFetchByEmail
+			};
+		}
+
+		// Auto mode
+		if (cachedFetchedAvatar !== null) {
+			return {
+				image: cachedFetchedAvatar,
+				procedural: false,
+				updateOnFetch: canFetchByEmail
+			};
+		}
+		return {
+			image: this.getProceduralAvatarImage(this.getAuthorAvatarSeed(author, email)),
+			procedural: true,
+			updateOnFetch: canFetchByEmail
+		};
+	}
+
+	private getCommitAuthorAvatarHtml(author: string, email: string) {
+		const visual = this.getAuthorVisual(author, email, null);
+		const shapeClass = this.getAuthorAvatarShapeClass();
+		const sizeClass = this.getAuthorAvatarSizeClass();
+
+		if (visual.image === null) {
+			return visual.updateOnFetch
+				? '<span class="avatar ' + shapeClass + ' ' + sizeClass + ' empty" data-email="' + escapeHtml(email) + '"></span>'
+				: '';
+		}
+
+		let attributes = '';
+		if (visual.updateOnFetch) {
+			attributes += ' data-email="' + escapeHtml(email) + '"';
+		}
+		if (visual.procedural) {
+			attributes += ' data-procedural="true"';
+		}
+		return '<span class="avatar ' + shapeClass + ' ' + sizeClass + '"' + attributes + '><img class="avatarImg" src="' + visual.image + '"></span>';
+	}
+
+	private getCommitDetailsAvatarHtml(author: string, email: string, fetchedAvatar: string | null) {
+		const visual = this.getAuthorVisual(author, email, fetchedAvatar);
+		if (visual.image === null) return '';
+
+		const shapeClass = this.getAuthorAvatarShapeClass();
+		let attributes = '';
+		if (visual.updateOnFetch) {
+			attributes += ' data-email="' + escapeHtml(email) + '"';
+		}
+		if (visual.procedural) {
+			attributes += ' data-procedural="true"';
+		}
+		return '<span class="cdvSummaryAvatar ' + shapeClass + '"' + attributes + '><img class="avatarImg" src="' + visual.image + '"></span>';
 	}
 
 
@@ -795,13 +993,14 @@ class GitGraphView {
 
 	public requestCommitDetails(hash: string, refresh: boolean) {
 		let commit = this.commits[this.commitLookup[hash]];
+		const requestAvatar = this.shouldFetchAuthorAvatars() && hash !== UNCOMMITTED && commit.email !== '';
 		sendMessage({
 			command: 'commitDetails',
 			repo: this.currentRepo,
 			commitHash: hash,
 			hasParents: commit.parents.length > 0,
 			stash: commit.stash,
-			avatarEmail: this.config.fetchAvatars && hash !== UNCOMMITTED ? commit.email : null,
+			avatarEmail: requestAvatar ? commit.email : null,
 			refresh: refresh
 		});
 	}
@@ -818,6 +1017,7 @@ class GitGraphView {
 	}
 
 	private requestAvatars(avatars: { [email: string]: string[] }) {
+		if (!this.shouldFetchAuthorAvatars()) return;
 		let emails = Object.keys(avatars), remote = this.gitRemotes.length > 0 ? this.gitRemotes.includes('origin') ? 'origin' : this.gitRemotes[0] : null;
 		for (let i = 0; i < emails.length; i++) {
 			sendMessage({ command: 'fetchAvatar', repo: this.currentRepo, remote: remote, email: emails[i], commits: avatars[emails[i]] });
@@ -1018,13 +1218,14 @@ class GitGraphView {
 			html += '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
 				(this.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td><span class="description">' + commitDot : '<td></td><td><span class="description">' + commitDot + refBranches) + (this.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
 				(colVisibility.date ? '<td class="dateCol text" title="' + date.title + '">' + date.formatted + '</td>' : '') +
-				(colVisibility.author ? '<td class="authorCol text" title="' + escapeHtml(commit.author + ' <' + commit.email + '>') + '">' + (this.config.fetchAvatars ? '<span class="avatar" data-email="' + escapeHtml(commit.email) + '">' + (typeof this.avatars[commit.email] === 'string' ? '<img class="avatarImg" src="' + this.avatars[commit.email] + '">' : '') + '</span>' : '') + escapeHtml(commit.author) + '</td>' : '') +
+				(colVisibility.author ? '<td class="authorCol text" title="' + escapeHtml(commit.author + ' <' + commit.email + '>') + '">' + this.getCommitAuthorAvatarHtml(commit.author, commit.email) + '<span class="authorName">' + escapeHtml(commit.author) + '</span></td>' : '') +
 				(colVisibility.commit ? '<td class="text" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
 				'</tr>';
 		}
 		this.tableElem.innerHTML = '<table>' + html + '</table>';
 		this.footerElem.innerHTML = this.moreCommitsAvailable ? '<div id="loadMoreCommitsBtn" class="roundedBtn">Load More Commits</div>' : '';
 		this.makeTableResizable();
+		this.updateAuthorColumnDisplayMode();
 		this.findWidget.refresh();
 		this.renderedGitBranchHead = this.gitBranchHead;
 
@@ -1076,7 +1277,7 @@ class GitGraphView {
 		const colVisibility = this.getColumnVisibility(), date = formatShortDate(this.commits[0].date);
 		document.getElementById('uncommittedChanges')!.innerHTML = '<td></td><td><b>' + escapeHtml(this.commits[0].message) + '</b></td>' +
 			(colVisibility.date ? '<td class="dateCol text" title="' + date.title + '">' + date.formatted + '</td>' : '') +
-			(colVisibility.author ? '<td class="authorCol text" title="* <>">*</td>' : '') +
+			(colVisibility.author ? '<td class="authorCol text" title="* <>*"><span class="authorName">*</span></td>' : '') +
 			(colVisibility.commit ? '<td class="text" title="*">*</td>' : '');
 	}
 
@@ -2472,6 +2673,7 @@ class GitGraphView {
 					cols[colIndex + 1].style.width = columnWidths[nextCol] + 'px';
 				}
 				mouseX = mouseEvent.clientX;
+				this.updateAuthorColumnDisplayMode();
 			}
 		};
 		const stopResizingColumn: EventListener = () => {
@@ -2481,6 +2683,7 @@ class GitGraphView {
 				mouseX = -1;
 				eventOverlay.remove();
 				this.saveColumnWidths(columnWidths);
+				this.updateAuthorColumnDisplayMode();
 			}
 		};
 
@@ -2558,6 +2761,8 @@ class GitGraphView {
 				]
 			], true, null, e, this.viewElem);
 		});
+
+		this.updateAuthorColumnDisplayMode();
 	}
 
 	public getColumnVisibility() {
@@ -2656,6 +2861,7 @@ class GitGraphView {
 		let windowWidth = window.outerWidth, windowHeight = window.outerHeight;
 		window.addEventListener('resize', () => {
 			this.updateControlsLayout();
+			this.updateAuthorColumnDisplayMode();
 			if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 				this.renderGraph();
 			} else {
@@ -3616,6 +3822,7 @@ class GitGraphView {
 						urls: true
 					});
 					const commitDetails = expandedCommit.commitDetails!;
+					const commitDetailsAvatar = this.getCommitDetailsAvatarHtml(commitDetails.author, commitDetails.authorEmail, expandedCommit.avatar);
 					const parents = commitDetails.parents.length > 0
 						? commitDetails.parents.map((parent) => {
 							const escapedParent = escapeHtml(parent);
@@ -3624,7 +3831,7 @@ class GitGraphView {
 								: escapedParent;
 						}).join(', ')
 						: 'None';
-					html += '<span class="cdvSummaryTop' + (expandedCommit.avatar !== null ? ' withAvatar' : '') + '"><span class="cdvSummaryTopRow"><span class="cdvSummaryKeyValues">'
+					html += '<span class="cdvSummaryTop' + (commitDetailsAvatar !== '' ? ' withAvatar' : '') + '"><span class="cdvSummaryTopRow"><span class="cdvSummaryKeyValues">'
 						+ '<b>Commit: </b>' + escapeHtml(commitDetails.hash) + '<br>'
 						+ '<b>Parents: </b>' + parents + '<br>'
 						+ '<b>Author: </b>' + escapeHtml(commitDetails.author) + (commitDetails.authorEmail !== '' ? ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(commitDetails.authorEmail) + '" tabindex="-1">' + escapeHtml(commitDetails.authorEmail) + '</a>&gt;' : '') + '<br>'
@@ -3632,7 +3839,7 @@ class GitGraphView {
 						+ '<b>Committer: </b>' + escapeHtml(commitDetails.committer) + (commitDetails.committerEmail !== '' ? ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(commitDetails.committerEmail) + '" tabindex="-1">' + escapeHtml(commitDetails.committerEmail) + '</a>&gt;' : '') + (commitDetails.signature !== null ? generateSignatureHtml(commitDetails.signature) : '') + '<br>'
 						+ '<b>' + (commitDetails.authorDate !== commitDetails.committerDate ? 'Committer ' : '') + 'Date: </b>' + formatLongDate(commitDetails.committerDate)
 						+ '</span>'
-						+ (expandedCommit.avatar !== null ? '<span class="cdvSummaryAvatar"><img src="' + expandedCommit.avatar + '"></span>' : '')
+						+ commitDetailsAvatar
 						+ '</span></span><br><br>' + textFormatter.format(commitDetails.body);
 				} else {
 					html += 'Displaying all uncommitted changes.';

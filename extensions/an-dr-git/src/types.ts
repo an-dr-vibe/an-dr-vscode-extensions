@@ -243,6 +243,10 @@ export interface GitGraphViewInitialState {
 }
 
 export interface GitGraphViewConfig {
+	readonly authorDisplay: AuthorDisplayMode;
+	readonly avatarMode: AuthorAvatarMode;
+	readonly avatarSize: AuthorAvatarSize;
+	readonly avatarShape: AuthorAvatarShape;
 	readonly branchPanel: BranchPanelConfig;
 	readonly commitDetailsView: CommitDetailsViewConfig;
 	readonly commitOrdering: CommitOrdering;
@@ -361,6 +365,29 @@ export const enum CommitOrdering {
 	Date = 'date',
 	AuthorDate = 'author-date',
 	Topological = 'topo'
+}
+
+export const enum AuthorAvatarMode {
+	Auto = 'auto',
+	FetchedOnly = 'fetched-only',
+	ProceduralPattern = 'procedural-pattern',
+	Disabled = 'disabled'
+}
+
+export const enum AuthorAvatarShape {
+	Circle = 'circle',
+	Square = 'square'
+}
+
+export const enum AuthorDisplayMode {
+	Both = 'both',
+	AvatarOnly = 'avatar-only',
+	AutoCompact = 'auto-compact'
+}
+
+export const enum AuthorAvatarSize {
+	Normal = 'normal',
+	Small = 'small'
 }
 
 export interface ContextMenuActionsVisibility {

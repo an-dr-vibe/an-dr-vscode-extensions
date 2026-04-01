@@ -372,7 +372,18 @@ export class RepoManager extends Disposable {
 	 */
 	public checkReposExist() {
 		let repoPaths = Object.keys(this.repos), changes = false;
-		return evalPromises(repoPaths, 3, (path) => this.dataSource.repoRoot(path)).then((results) => {
+		return evalPromises(repoPaths, 3, async (path) => {
+			let root = await this.dataSource.repoRoot(path);
+			if (root === null) {
+				// Retry if repoRoot returns null (could be transient during checkout)
+				for (let i = 0; i < 2; i++) {
+					await new Promise(resolve => setTimeout(resolve, 200));
+					root = await this.dataSource.repoRoot(path);
+					if (root !== null) break;
+				}
+			}
+			return root;
+		}).then((results) => {
 			for (let i = 0; i < repoPaths.length; i++) {
 				if (results[i] === null) {
 					this.removeRepo(repoPaths[i]);

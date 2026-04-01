@@ -38,6 +38,7 @@ class BranchPanel {
 	private remoteCollapsed: boolean = false;
 	private tagsCollapsed: boolean = true;
 	private folderCollapsed: { [path: string]: boolean } = {};
+	private listScrollTop: number = 0;
 	private sidebarWidth: number = 200;
 	private sidebarHidden: boolean = false;
 
@@ -46,6 +47,7 @@ class BranchPanel {
 	private readonly sidebar: HTMLElement;
 	private readonly toggleBtn: HTMLElement;
 	private readonly filterHost: HTMLElement | null;
+	private pendingScrollRestoreHandle: number | null = null;
 
 	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean) {
 		this.branchChangeCallback = branchChangeCallback;
@@ -86,6 +88,9 @@ class BranchPanel {
 		this.listElem.className = 'branchPanelList';
 		this.listElem.addEventListener('click', (e) => this.handleClick(e));
 		this.listElem.addEventListener('contextmenu', (e) => this.handleContextMenu(e));
+		this.sidebar.addEventListener('scroll', () => {
+			this.listScrollTop = this.sidebar.scrollTop;
+		});
 
 		this.updateWidth(this.sidebarWidth);
 	}
@@ -115,6 +120,7 @@ class BranchPanel {
 		this.applyLayoutWidth(this.sidebarHidden ? 0 : width);
 		this.updateTogglePosition();
 		this.updateHintLayout();
+		this.scheduleScrollRestore();
 	}
 
 	private toggleSidebar() {
@@ -212,6 +218,35 @@ class BranchPanel {
 
 	public refresh() {
 		if (this.options.length > 0) this.render();
+	}
+
+	public getState(): GG.GitGraphBranchPanelState {
+		return {
+			filterValue: this.filterValue,
+			localCollapsed: this.localCollapsed,
+			remoteCollapsed: this.remoteCollapsed,
+			tagsCollapsed: this.tagsCollapsed,
+			folderCollapsed: Object.assign({}, this.folderCollapsed),
+			sidebarWidth: this.sidebarWidth,
+			sidebarHidden: this.sidebarHidden,
+			scrollTop: this.listScrollTop
+		};
+	}
+
+	public restoreState(state: GG.GitGraphBranchPanelState) {
+		this.filterValue = state.filterValue;
+		this.localCollapsed = state.localCollapsed;
+		this.remoteCollapsed = state.remoteCollapsed;
+		this.tagsCollapsed = state.tagsCollapsed;
+		this.folderCollapsed = Object.assign({}, state.folderCollapsed);
+		this.filterInput.value = this.filterValue;
+		this.sidebarWidth = state.sidebarWidth;
+		this.updateWidth(this.sidebarWidth);
+		if (this.sidebarHidden !== state.sidebarHidden) {
+			this.toggleSidebar();
+		}
+		this.listScrollTop = state.scrollTop;
+		this.render();
 	}
 
 	public isOpen() { return false; }
@@ -565,6 +600,21 @@ class BranchPanel {
 
 		this.listElem.innerHTML = html;
 		this.updateHintLayout();
+		this.scheduleScrollRestore();
+	}
+
+	private scheduleScrollRestore() {
+		if (this.pendingScrollRestoreHandle !== null) {
+			cancelAnimationFrame(this.pendingScrollRestoreHandle);
+		}
+
+		this.pendingScrollRestoreHandle = requestAnimationFrame(() => {
+			this.sidebar.scrollTop = this.listScrollTop;
+			this.pendingScrollRestoreHandle = requestAnimationFrame(() => {
+				this.sidebar.scrollTop = this.listScrollTop;
+				this.pendingScrollRestoreHandle = null;
+			});
+		});
 	}
 
 	private updateHintLayout() {

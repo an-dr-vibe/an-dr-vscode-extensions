@@ -106,6 +106,14 @@ describe('GitGraphView', () => {
 			expect(spyOnLog).toHaveBeenCalledWith('Created Git Graph View');
 		});
 
+		it('Should pin the Git Graph tab when constructing a new WebviewPanel', () => {
+			// Run
+			GitGraphView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+
+			// Assert
+			expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.action.keepEditor');
+		});
+
 		it('Should reveal the existing WebviewPanel (when one exists)', () => {
 			// Setup
 			GitGraphView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
@@ -2518,7 +2526,7 @@ describe('GitGraphView', () => {
 				const spyOnSetLastActiveRepo = jest.spyOn(extensionState, 'setLastActiveRepo');
 				const spyOnRepoFileWatcherStart = jest.spyOn(GitGraphView.currentPanel!['repoFileWatcher'], 'start');
 				spyOnGetRepoInfo.mockResolvedValueOnce(getRepoInfoResolvedValue);
-				spyOnRepoRoot.mockResolvedValueOnce(null);
+				spyOnRepoRoot.mockResolvedValue(null);
 				GitGraphView.currentPanel!['currentRepo'] = '/path/to/repo';
 
 				// Run

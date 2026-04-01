@@ -219,6 +219,17 @@ export interface GitRepoState {
 	workspaceFolderIndex: number | null;
 }
 
+export interface GitGraphBranchPanelState {
+	readonly filterValue: string;
+	readonly localCollapsed: boolean;
+	readonly remoteCollapsed: boolean;
+	readonly tagsCollapsed: boolean;
+	readonly folderCollapsed: { readonly [path: string]: boolean };
+	readonly sidebarWidth: number;
+	readonly sidebarHidden: boolean;
+	readonly scrollTop: number;
+}
+
 
 /* Git Graph View Types */
 
@@ -304,6 +315,10 @@ export interface KeybindingConfig {
 
 export type LoadGitGraphViewTo = {
 	readonly repo: string,
+	readonly selectedBranches?: string[] | null,
+	readonly selectedTags?: string[],
+	readonly scrollTop?: number,
+	readonly branchPanelState?: GitGraphBranchPanelState,
 	readonly commitDetails?: {
 		readonly commitHash: string,
 		readonly compareWithHash: string | null
@@ -643,6 +658,10 @@ export interface RequestCheckoutBranch extends RepoRequest {
 	readonly command: 'checkoutBranch';
 	readonly branchName: string;
 	readonly remoteBranch: string | null;
+	readonly selectedBranches?: string[] | null;
+	readonly selectedTags?: string[];
+	readonly scrollTop?: number;
+	readonly branchPanelState?: GitGraphBranchPanelState;
 	readonly pullAfterwards: {
 		readonly branchName: string;
 		readonly remote: string;

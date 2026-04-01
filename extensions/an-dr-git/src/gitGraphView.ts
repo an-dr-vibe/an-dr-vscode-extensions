@@ -7,7 +7,7 @@ import { ExtensionState } from './extensionState';
 import { Logger } from './logger';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
-import { ErrorInfo, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestMessage, ResponseMessage, TabIconColourTheme } from './types';
+import { ErrorInfo, GitConfigLocation, GitGraphBranchPanelState, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestMessage, ResponseMessage, TabIconColourTheme } from './types';
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
 
@@ -17,12 +17,14 @@ import { Disposable, toDisposable } from './utils/disposable';
 export class GitGraphView extends Disposable {
 	public static currentPanel: GitGraphView | undefined;
 	private static readonly NAME = 'an-dr: Git';
+	private static nextInstanceId = 1;
 
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionPath: string;
 	private readonly avatarManager: AvatarManager;
 	private readonly dataSource: DataSource;
 	private readonly extensionState: ExtensionState;
+	private readonly instanceId: number;
 	private readonly repoFileWatcher: RepoFileWatcher;
 	private readonly repoManager: RepoManager;
 	private readonly logger: Logger;
@@ -30,6 +32,8 @@ export class GitGraphView extends Disposable {
 	private isPanelVisible: boolean = true;
 	private currentRepo: string | null = null;
 	private loadViewTo: LoadGitGraphViewTo = null; // Is used by the next call to getHtmlForWebview, and is then reset to null
+	private reopenAfterUnexpectedCloseUntil: number = 0;
+	private reopenViewTo: LoadGitGraphViewTo = null;
 
 	private loadRepoInfoRefreshId: number = 0;
 	private loadCommitsRefreshId: number = 0;
@@ -48,6 +52,7 @@ export class GitGraphView extends Disposable {
 		const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
 
 		if (GitGraphView.currentPanel) {
+			logger.log('GitGraphView.createOrShow reusing existing panel [' + GitGraphView.currentPanel.instanceId + '] visible=' + GitGraphView.currentPanel.panel.visible + ', active=' + GitGraphView.currentPanel.panel.active);
 			// If Git Graph panel already exists
 			if (GitGraphView.currentPanel.isPanelVisible) {
 				// If the Git Graph panel is visible
@@ -62,6 +67,33 @@ export class GitGraphView extends Disposable {
 		} else {
 			// If Git Graph panel doesn't already exist
 			GitGraphView.currentPanel = new GitGraphView(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, loadViewTo, column);
+		}
+	}
+
+	public static disposeCurrentPanelIfOrphaned(logger: Logger) {
+		if (!GitGraphView.currentPanel) return;
+		logger.log('GitGraphView detected orphaned panel [' + GitGraphView.currentPanel.instanceId + '], disposing stale panel handle.');
+		GitGraphView.currentPanel.dispose();
+	}
+
+	public static recoverOrphanedPanelIfNeeded(logger: Logger) {
+		if (!GitGraphView.currentPanel) return;
+
+		const panel = GitGraphView.currentPanel;
+		const shouldReopen = (new Date()).getTime() <= panel.reopenAfterUnexpectedCloseUntil;
+		const reopenViewTo = panel.reopenViewTo;
+		const extensionPath = panel.extensionPath;
+		const dataSource = panel.dataSource;
+		const extensionState = panel.extensionState;
+		const avatarManager = panel.avatarManager;
+		const repoManager = panel.repoManager;
+
+		logger.log('GitGraphView detected orphaned panel [' + panel.instanceId + '], disposing stale panel handle.' + (shouldReopen ? ' Auto-reopen scheduled.' : ''));
+		panel.dispose();
+
+		if (shouldReopen) {
+			logger.log('GitGraphView recreating panel after unexpected close.');
+			GitGraphView.createOrShow(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, reopenViewTo);
 		}
 	}
 
@@ -82,6 +114,7 @@ export class GitGraphView extends Disposable {
 		this.avatarManager = avatarManager;
 		this.dataSource = dataSource;
 		this.extensionState = extensionState;
+		this.instanceId = GitGraphView.nextInstanceId++;
 		this.repoManager = repoManager;
 		this.logger = logger;
 		this.loadViewTo = loadViewTo;
@@ -92,6 +125,11 @@ export class GitGraphView extends Disposable {
 			localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))],
 			retainContextWhenHidden: config.retainContextWhenHidden
 		});
+		// Keep the Git Graph tab pinned so branch checkouts that reload editors don't replace it.
+		void vscode.commands.executeCommand('workbench.action.keepEditor').then(
+			() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command succeeded.'),
+			() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command failed.')
+		);
 		this.panel.iconPath = config.tabIconColourTheme === TabIconColourTheme.Colour
 			? this.getResourcesUri('webview-icon.svg')
 			: {
@@ -103,24 +141,25 @@ export class GitGraphView extends Disposable {
 		this.registerDisposables(
 			// Dispose Git Graph View resources when disposed
 			toDisposable(() => {
-				this.logger.log('Disposing GitGraphView instance...');
+				this.logger.log('Disposing GitGraphView[' + this.instanceId + '] instance...');
 				GitGraphView.currentPanel = undefined;
 				this.repoFileWatcher.stop();
 			}),
 
 			// Dispose this Git Graph View when the Webview Panel is disposed
 			this.panel.onDidDispose(() => {
-				this.logger.log('Webview panel onDidDispose event fired.');
+				this.logger.log('GitGraphView[' + this.instanceId + '] webview panel onDidDispose fired. visible=' + this.panel.visible + ', active=' + this.panel.active);
 				if (GitGraphView.currentPanel === this) {
-					this.logger.log('GitGraphView.currentPanel matches this instance, clearing it.');
+					this.logger.log('GitGraphView[' + this.instanceId + '] currentPanel matches this instance.');
 				} else {
-					this.logger.log('GitGraphView.currentPanel does NOT match this instance.');
+					this.logger.log('GitGraphView[' + this.instanceId + '] currentPanel does NOT match this instance.');
 				}
 				this.dispose();
 			}),
 
 			// Register a callback that is called when the view is shown or hidden
 			this.panel.onDidChangeViewState(() => {
+				this.logger.log('GitGraphView[' + this.instanceId + '] onDidChangeViewState: visible=' + this.panel.visible + ', active=' + this.panel.active + ', trackedVisible=' + this.isPanelVisible);
 				if (this.panel.visible !== this.isPanelVisible) {
 					if (this.panel.visible) {
 						this.update();
@@ -170,7 +209,7 @@ export class GitGraphView extends Disposable {
 		// Render the content of the Webview
 		this.update();
 
-		this.logger.log('Created Git Graph View' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
+		this.logger.log('Created Git Graph View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
 	}
 
 	/**
@@ -216,6 +255,7 @@ export class GitGraphView extends Disposable {
 				break;
 			case 'checkoutBranch':
 				this.logger.log('Processing checkoutBranch command for repo: ' + msg.repo + ', branch: ' + msg.branchName);
+				this.scheduleReopenAfterUnexpectedClose(msg.repo, msg.selectedBranches, msg.selectedTags, msg.scrollTop, msg.branchPanelState);
 				errorInfos = [await this.dataSource.checkoutBranch(msg.repo, msg.branchName, msg.remoteBranch)];
 				if (errorInfos[0] === null && msg.pullAfterwards !== null) {
 					errorInfos.push(await this.dataSource.pullBranch(msg.repo, msg.pullAfterwards.branchName, msg.pullAfterwards.remote, msg.pullAfterwards.createNewCommit, msg.pullAfterwards.squash));
@@ -852,6 +892,18 @@ export class GitGraphView extends Disposable {
 			lastActiveRepo: this.extensionState.getLastActiveRepo(),
 			loadViewTo: loadViewTo
 		});
+	}
+
+	private scheduleReopenAfterUnexpectedClose(repo: string, selectedBranches?: string[] | null, selectedTags?: string[], scrollTop?: number, branchPanelState?: GitGraphBranchPanelState) {
+		this.reopenAfterUnexpectedCloseUntil = (new Date()).getTime() + 5000;
+		this.reopenViewTo = {
+			repo: repo,
+			selectedBranches: typeof selectedBranches === 'undefined' ? undefined : selectedBranches,
+			selectedTags: typeof selectedTags === 'undefined' ? undefined : selectedTags,
+			scrollTop: scrollTop,
+			branchPanelState: branchPanelState
+		};
+		this.logger.log('GitGraphView[' + this.instanceId + '] scheduled auto-reopen window for repo: ' + repo);
 	}
 
 }

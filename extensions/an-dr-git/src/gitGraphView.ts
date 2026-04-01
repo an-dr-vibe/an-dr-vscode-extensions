@@ -7,7 +7,7 @@ import { ExtensionState } from './extensionState';
 import { Logger } from './logger';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
-import { ErrorInfo, GitConfigLocation, GitGraphBranchPanelState, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestMessage, ResponseMessage, TabIconColourTheme } from './types';
+import { ErrorInfo, GitConfigLocation, GitGraphBranchPanelState, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestMessage, RequestSidebarBatchRefAction, ResponseMessage, SidebarBatchRefActionTarget, SidebarBatchRefActionType, SidebarBatchRefType, TabIconColourTheme } from './types';
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
 
@@ -586,6 +586,12 @@ export class GitGraphView extends Disposable {
 					error: await this.dataSource.pruneRemote(msg.repo, msg.name)
 				});
 				break;
+			case 'setRemoteDefaultBranch':
+				this.sendMessage({
+					command: 'setRemoteDefaultBranch',
+					error: await this.dataSource.setRemoteDefaultBranch(msg.repo, msg.remote, msg.branch)
+				});
+				break;
 			case 'pullBranch':
 				this.sendMessage({
 					command: 'pullBranch',
@@ -667,6 +673,13 @@ export class GitGraphView extends Disposable {
 					error: await this.extensionState.setWorkspaceViewState(msg.state)
 				});
 				break;
+			case 'sidebarBatchRefAction':
+				this.sendMessage({
+					command: 'sidebarBatchRefAction',
+					action: msg.action,
+					results: await this.executeSidebarBatchRefAction(msg)
+				});
+				break;
 			case 'showErrorMessage':
 				showErrorMessage(msg.message);
 				break;
@@ -684,6 +697,14 @@ export class GitGraphView extends Disposable {
 					tagName: msg.tagName,
 					commitHash: msg.commitHash,
 					...await this.dataSource.getTagDetails(msg.repo, msg.tagName)
+				});
+				break;
+			case 'resolveSidebarTagContext':
+				this.sendMessage({
+					command: 'resolveSidebarTagContext',
+					requestId: msg.requestId,
+					tagName: msg.tagName,
+					...await this.dataSource.getTagContext(msg.repo, msg.tagName)
 				});
 				break;
 			case 'updateCodeReview':
@@ -719,6 +740,68 @@ export class GitGraphView extends Disposable {
 		}
 
 		this.repoFileWatcher.unmute();
+	}
+
+	private async executeSidebarBatchRefAction(msg: RequestSidebarBatchRefAction): Promise<ReadonlyArray<{ type: SidebarBatchRefType, name: string, error: ErrorInfo }>> {
+		const results: { type: SidebarBatchRefType, name: string, error: ErrorInfo }[] = [];
+		for (let i = 0; i < msg.refs.length; i++) {
+			const ref = msg.refs[i];
+			results.push({
+				type: ref.type,
+				name: this.getSidebarBatchRefDisplayName(ref),
+				error: await this.executeSidebarBatchRefActionForRef(msg, ref)
+			});
+		}
+		return results;
+	}
+
+	private async executeSidebarBatchRefActionForRef(msg: RequestSidebarBatchRefAction, ref: SidebarBatchRefActionTarget): Promise<ErrorInfo> {
+		switch (msg.action) {
+			case SidebarBatchRefActionType.Delete:
+				if (ref.type === SidebarBatchRefType.LocalBranch) {
+					return this.dataSource.deleteBranch(msg.repo, ref.name, false);
+				}
+				if (ref.type === SidebarBatchRefType.RemoteBranch) {
+					if (ref.remote === null) return 'Unable to delete remote branch: Missing remote name.';
+					return this.dataSource.deleteRemoteBranch(msg.repo, ref.name, ref.remote);
+				}
+				if (ref.type === SidebarBatchRefType.Tag) {
+					return this.dataSource.deleteTag(msg.repo, ref.name, null);
+				}
+				break;
+
+			case SidebarBatchRefActionType.Push:
+				if (ref.type === SidebarBatchRefType.LocalBranch) {
+					const errors = await this.dataSource.pushBranchToMultipleRemotes(msg.repo, ref.name, <string[]>msg.remotes, msg.setUpstream, msg.pushMode);
+					return this.reduceSequentialCommandErrors(errors);
+				}
+				if (ref.type === SidebarBatchRefType.Tag) {
+					if (ref.hash === null) return 'Unable to push tag "' + ref.name + '": Missing resolved tag hash.';
+					const errors = await this.dataSource.pushTag(msg.repo, ref.name, <string[]>msg.remotes, ref.hash, msg.skipRemoteCheck);
+					return this.reduceSequentialCommandErrors(errors);
+				}
+				return 'Push is not supported for the selected remote-tracking branch "' + this.getSidebarBatchRefDisplayName(ref) + '".';
+
+			case SidebarBatchRefActionType.Archive:
+				if (ref.type === SidebarBatchRefType.RemoteBranch) {
+					if (ref.remote === null) return 'Unable to create archive: Missing remote name.';
+					return archive(msg.repo, ref.remote + '/' + ref.name, this.dataSource);
+				}
+				return archive(msg.repo, ref.name, this.dataSource);
+		}
+
+		return 'Unsupported sidebar batch action.';
+	}
+
+	private getSidebarBatchRefDisplayName(ref: SidebarBatchRefActionTarget) {
+		return ref.type === SidebarBatchRefType.RemoteBranch && ref.remote !== null ? ref.remote + '/' + ref.name : ref.name;
+	}
+
+	private reduceSequentialCommandErrors(errors: ErrorInfo[]): ErrorInfo {
+		for (let i = 0; i < errors.length; i++) {
+			if (errors[i] !== null) return errors[i];
+		}
+		return null;
 	}
 
 	/**

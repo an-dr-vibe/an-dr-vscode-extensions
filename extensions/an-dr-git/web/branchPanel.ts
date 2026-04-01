@@ -19,6 +19,10 @@ interface BranchTreeLeaf {
 
 type BranchTreeNode = BranchTreeFolder | BranchTreeLeaf;
 type BranchPanelEntryType = 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection';
+interface BranchPanelActionSelectionItem {
+	type: 'branch' | 'tag';
+	name: string;
+}
 const BRANCH_PANEL_OPEN_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v1.08H1.75V3Zm12.43 3.75H1.8l1.14 5.04c.09.4.44.68.85.68h8.42c.39 0 .73-.26.84-.64l1.13-5.08Z"/></svg>';
 const BRANCH_PANEL_CLOSED_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v7.17c0 .97-.78 1.75-1.75 1.75h-9A1.75 1.75 0 0 1 1.75 12.5V3Z"/></svg>';
 
@@ -41,6 +45,10 @@ class BranchPanel {
 	private listScrollTop: number = 0;
 	private sidebarWidth: number = 200;
 	private sidebarHidden: boolean = false;
+	private actionSelection: Set<string> = new Set();
+	private actionSelectionAnchor: string | null = null;
+	private actionSelectionActive: string | null = null;
+	private actionSelectionVisible: boolean = false;
 
 	private readonly filterInput: HTMLInputElement;
 	private readonly listElem: HTMLElement;
@@ -88,6 +96,21 @@ class BranchPanel {
 		this.listElem.className = 'branchPanelList';
 		this.listElem.addEventListener('click', (e) => this.handleClick(e));
 		this.listElem.addEventListener('contextmenu', (e) => this.handleContextMenu(e));
+		this.listElem.addEventListener('mousedown', () => this.setActionSelectionVisible(true));
+		this.filterInput.addEventListener('focus', () => this.setActionSelectionVisible(false));
+		document.addEventListener('mousedown', (e) => {
+			const target = e.target;
+			if (target === null) return;
+			const insideSidebar = target instanceof Node && (this.sidebar.contains(target) || (this.filterHost !== null && this.filterHost.contains(target)));
+			if (!insideSidebar) this.setActionSelectionVisible(false);
+		});
+		document.addEventListener('focusin', (e) => {
+			const target = e.target;
+			if (target === null) return;
+			const insideSidebar = target instanceof Node && (this.sidebar.contains(target) || (this.filterHost !== null && this.filterHost.contains(target)));
+			if (!insideSidebar) this.setActionSelectionVisible(false);
+		});
+		window.addEventListener('blur', () => this.setActionSelectionVisible(false));
 		this.sidebar.addEventListener('scroll', () => {
 			this.listScrollTop = this.sidebar.scrollTop;
 		});
@@ -162,6 +185,7 @@ class BranchPanel {
 			.map((tagName, i) => selectedTagNames.has(tagName) ? i : -1)
 			.filter((i) => i !== -1));
 		this.pendingTagSelectionNames.clear();
+		this.pruneActionSelection();
 		this.render();
 	}
 
@@ -185,6 +209,7 @@ class BranchPanel {
 		if (selectedOption === -1) {
 			this.optionsSelected[0] = true;
 		}
+		this.pruneActionSelection();
 		this.render();
 	}
 
@@ -256,6 +281,16 @@ class BranchPanel {
 	public isOpen() { return false; }
 	public close() { /* no-op: sidebar is always visible */ }
 
+	public getActionSelection(): ReadonlyArray<BranchPanelActionSelectionItem> {
+		return Array.from(this.actionSelection)
+			.map((key) => this.parseActionSelectionKey(key))
+			.filter((item): item is BranchPanelActionSelectionItem => item !== null);
+	}
+
+	public isActionSelected(type: 'branch' | 'tag', name: string) {
+		return this.actionSelection.has(this.getActionSelectionKey(type, name));
+	}
+
 	private getSelectedBranchValues(): string[] {
 		if (this.optionsSelected[0]) return [this.options[0].value];
 		return this.options.filter((_, i) => this.optionsSelected[i]).map((o) => o.value);
@@ -266,11 +301,13 @@ class BranchPanel {
 	}
 
 	private handleClick(e: MouseEvent) {
-		const autoItem = (<HTMLElement>e.target).closest('.branchPanelAutoTagItem') as HTMLElement | null;
-		const sectionHeader = (<HTMLElement>e.target).closest('.branchPanelSectionHeader') as HTMLElement | null;
-		const folder = (<HTMLElement>e.target).closest('.branchPanelFolder') as HTMLElement | null;
-		const tagItem = (<HTMLElement>e.target).closest('.branchPanelTagItem') as HTMLElement | null;
-		const item = (<HTMLElement>e.target).closest('.branchPanelItem') as HTMLElement | null;
+		const eventTarget = <HTMLElement>e.target;
+		const autoItem = eventTarget.closest('.branchPanelAutoTagItem') as HTMLElement | null;
+		const sectionHeader = eventTarget.closest('.branchPanelSectionHeader') as HTMLElement | null;
+		const folder = eventTarget.closest('.branchPanelFolder') as HTMLElement | null;
+		const tagItem = eventTarget.closest('.branchPanelTagItem') as HTMLElement | null;
+		const item = eventTarget.closest('.branchPanelItem') as HTMLElement | null;
+		const clickedCheck = eventTarget.closest('.branchPanelCheck') !== null;
 
 		if (autoItem !== null) {
 			this.onAutoTagClick();
@@ -285,9 +322,22 @@ class BranchPanel {
 			this.folderCollapsed[path] = !(this.folderCollapsed[path] ?? false);
 			this.render();
 		} else if (tagItem !== null && typeof tagItem.dataset.tagid !== 'undefined') {
-			this.onTagClick(parseInt(tagItem.dataset.tagid));
+			const tagName = this.tagNames[parseInt(tagItem.dataset.tagid)];
+			if (clickedCheck) {
+				this.onTagClick(parseInt(tagItem.dataset.tagid));
+			} else if (typeof tagName !== 'undefined') {
+				this.onActionItemClick('tag', tagName, e);
+			}
 		} else if (item !== null && typeof item.dataset.id !== 'undefined') {
-			this.onItemClick(parseInt(item.dataset.id));
+			const idx = parseInt(item.dataset.id);
+			if (idx === 0 || clickedCheck) {
+				this.onItemClick(idx);
+			} else {
+				const option = this.options[idx];
+				if (typeof option !== 'undefined') {
+					this.onActionItemClick('branch', option.value, e);
+				}
+			}
 		}
 	}
 
@@ -320,15 +370,35 @@ class BranchPanel {
 		const item = target.closest('.branchPanelItem') as HTMLElement | null;
 
 		if (tagItem !== null && typeof tagItem.dataset.tagid !== 'undefined') {
+			const tagName = this.tagNames[parseInt(tagItem.dataset.tagid)];
+			if (typeof tagName === 'undefined') return;
+			if (!this.isActionSelected('tag', tagName)) {
+				this.setSingleActionSelection('tag', tagName);
+			} else {
+				this.actionSelectionAnchor = this.getActionSelectionKey('tag', tagName);
+				this.actionSelectionActive = this.actionSelectionAnchor;
+				this.setActionSelectionVisible(true);
+				this.updateActionSelectionStyles();
+			}
 			e.preventDefault();
 			e.stopPropagation();
-			this.contextMenuCallback('tag', this.tagNames[parseInt(tagItem.dataset.tagid)], e);
+			this.contextMenuCallback('tag', tagName, e);
 		} else if (item !== null && typeof item.dataset.id !== 'undefined') {
 			const idx = parseInt(item.dataset.id);
 			if (idx === 0) return;
+			const option = this.options[idx];
+			if (typeof option === 'undefined') return;
+			if (!this.isActionSelected('branch', option.value)) {
+				this.setSingleActionSelection('branch', option.value);
+			} else {
+				this.actionSelectionAnchor = this.getActionSelectionKey('branch', option.value);
+				this.actionSelectionActive = this.actionSelectionAnchor;
+				this.setActionSelectionVisible(true);
+				this.updateActionSelectionStyles();
+			}
 			e.preventDefault();
 			e.stopPropagation();
-			this.contextMenuCallback('branch', this.options[idx].value, e);
+			this.contextMenuCallback('branch', option.value, e);
 		}
 	}
 
@@ -505,7 +575,8 @@ class BranchPanel {
 			} else {
 				if (filter !== '' && !node.fullName.toLowerCase().includes(filter)) continue;
 				const selected = this.tagSelected.has(node.idx);
-				html += '<div class="branchPanelItem branchPanelTagItem' + (selected ? ' selected' : '') + '" data-tagid="' + node.idx + '" data-drag-ref-type="tag" data-drag-ref-name="' + escapeHtml(node.fullName) + '" draggable="true" title="' + escapeHtml(node.fullName) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+				const actionKey = this.getActionSelectionKey('tag', node.fullName);
+				html += '<div class="branchPanelItem branchPanelTagItem' + (selected ? ' selected' : '') + '" data-tagid="' + node.idx + '" data-action-key="' + escapeHtml(actionKey) + '" data-drag-ref-type="tag" data-drag-ref-name="' + escapeHtml(node.fullName) + '" draggable="true" title="' + escapeHtml(node.fullName) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 					'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
 					'<span class="branchPanelItemName">' + escapeHtml(node.displayName) + '</span>' +
 					'</div>';
@@ -603,6 +674,7 @@ class BranchPanel {
 		}
 
 		this.listElem.innerHTML = html;
+		this.updateActionSelectionStyles();
 		this.updateHintLayout();
 		this.scheduleScrollRestore();
 	}
@@ -654,15 +726,171 @@ class BranchPanel {
 		const hint = typeof this.options[idx].hint === 'string' && this.options[idx].hint !== '' ? this.options[idx].hint! : null;
 		const hintKind = typeof this.options[idx].hintKind === 'string' ? this.options[idx].hintKind : null;
 		const isCurrent = this.options[idx].isCurrent === true;
+		const isRemoteDefault = this.options[idx].isRemoteDefault === true;
+		const optRemoteDefaultHint = this.options[idx].remoteDefaultHint;
+		const remoteDefaultHint = typeof optRemoteDefaultHint === 'string' && optRemoteDefaultHint !== ''
+			? optRemoteDefaultHint
+			: null;
+		const remoteDefaultTitle: string = remoteDefaultHint ?? 'Remote default branch';
+		const actionKey = idx > 0 ? this.getActionSelectionKey('branch', this.options[idx].value) : null;
 		return '<div class="branchPanelItem' + (selected ? ' selected' : '') + (isCurrent ? ' currentBranch' : '') + '" data-id="' + idx + '"' +
+			(actionKey !== null ? ' data-action-key="' + escapeHtml(actionKey) + '"' : '') +
 			(isDraggableBranch ? ' data-drag-ref-type="branch" data-drag-ref-name="' + escapeHtml(this.options[idx].value) + '" draggable="true"' : '') +
-			' title="' + escapeHtml(title + (hint !== null ? ' ' + hint : '')) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
+			' title="' + escapeHtml(title + (hint !== null ? ' ' + hint : '') + (remoteDefaultHint !== null ? ' (' + remoteDefaultHint + ')' : '')) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
 			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
 			'<span class="branchPanelItemContent">' +
 			'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
 			(isCurrent ? '<span class="branchPanelCurrentBadge">HEAD</span>' : '') +
+			(isRemoteDefault ? '<span class="branchPanelRemoteDefaultBadge" title="' + escapeHtml(remoteDefaultTitle) + '">default</span>' : '') +
 			(hint !== null ? '<span class="branchPanelItemHint' + (hintKind !== null ? ' ' + hintKind : '') + '">' + escapeHtml(hint) + '</span>' : '') +
 			'</span>' +
 			'</div>';
+	}
+
+	private getActionSelectionKey(type: 'branch' | 'tag', name: string) {
+		return type + ':' + name;
+	}
+
+	private parseActionSelectionKey(key: string): BranchPanelActionSelectionItem | null {
+		const separator = key.indexOf(':');
+		if (separator === -1) return null;
+		const type = key.substring(0, separator);
+		const name = key.substring(separator + 1);
+		if (name === '' || (type !== 'branch' && type !== 'tag')) return null;
+		return { type: <'branch' | 'tag'>type, name: name };
+	}
+
+	private pruneActionSelection() {
+		const branchValues = new Set<string>(this.options.slice(1).map((option) => option.value));
+		const tagValues = new Set<string>(this.tagNames);
+		let changed = false;
+		this.actionSelection.forEach((key) => {
+			const item = this.parseActionSelectionKey(key);
+			if (item === null) {
+				this.actionSelection.delete(key);
+				changed = true;
+				return;
+			}
+			if ((item.type === 'branch' && !branchValues.has(item.name)) || (item.type === 'tag' && !tagValues.has(item.name))) {
+				this.actionSelection.delete(key);
+				changed = true;
+			}
+		});
+		if (this.actionSelectionAnchor !== null && !this.actionSelection.has(this.actionSelectionAnchor)) {
+			this.actionSelectionAnchor = null;
+			changed = true;
+		}
+		if (this.actionSelectionActive !== null && !this.actionSelection.has(this.actionSelectionActive)) {
+			this.actionSelectionActive = this.actionSelectionAnchor;
+			changed = true;
+		}
+		if (changed) {
+			this.updateActionSelectionStyles();
+		}
+	}
+
+	private onActionItemClick(type: 'branch' | 'tag', name: string, event: MouseEvent) {
+		const key = this.getActionSelectionKey(type, name);
+		if (event.shiftKey) {
+			this.selectActionRange(key);
+			return;
+		}
+		if (event.ctrlKey || event.metaKey) {
+			if (this.actionSelection.has(key)) {
+				this.actionSelection.delete(key);
+				if (this.actionSelectionAnchor === key) {
+					this.actionSelectionAnchor = null;
+				}
+				if (this.actionSelectionActive === key) {
+					this.actionSelectionActive = this.actionSelectionAnchor;
+				}
+			} else {
+				this.actionSelection.add(key);
+				this.actionSelectionAnchor = key;
+				this.actionSelectionActive = key;
+			}
+			this.setActionSelectionVisible(true);
+			this.updateActionSelectionStyles();
+			return;
+		}
+		this.actionSelection.clear();
+		this.actionSelection.add(key);
+		this.actionSelectionAnchor = key;
+		this.actionSelectionActive = key;
+		this.setActionSelectionVisible(true);
+		this.updateActionSelectionStyles();
+	}
+
+	private setSingleActionSelection(type: 'branch' | 'tag', name: string) {
+		const key = this.getActionSelectionKey(type, name);
+		this.actionSelection.clear();
+		this.actionSelection.add(key);
+		this.actionSelectionAnchor = key;
+		this.actionSelectionActive = key;
+		this.setActionSelectionVisible(true);
+		this.updateActionSelectionStyles();
+	}
+
+	private selectActionRange(targetKey: string) {
+		const visibleKeys = this.getVisibleActionSelectionKeys();
+		if (visibleKeys.length === 0) return;
+		let anchor = this.actionSelectionAnchor;
+		if (anchor === null || visibleKeys.indexOf(anchor) === -1) {
+			anchor = targetKey;
+		}
+		const anchorIdx = visibleKeys.indexOf(anchor);
+		const targetIdx = visibleKeys.indexOf(targetKey);
+		if (anchorIdx === -1 || targetIdx === -1) {
+			this.actionSelection.clear();
+			this.actionSelection.add(targetKey);
+			this.actionSelectionAnchor = targetKey;
+			this.updateActionSelectionStyles();
+			return;
+		}
+		const start = Math.min(anchorIdx, targetIdx);
+		const end = Math.max(anchorIdx, targetIdx);
+		this.actionSelection.clear();
+		for (let i = start; i <= end; i++) {
+			this.actionSelection.add(visibleKeys[i]);
+		}
+		this.actionSelectionAnchor = anchor;
+		this.actionSelectionActive = targetKey;
+		this.setActionSelectionVisible(true);
+		this.updateActionSelectionStyles();
+	}
+
+	private getVisibleActionSelectionKeys() {
+		const rows = this.listElem.querySelectorAll('.branchPanelItem[data-action-key]');
+		const keys: string[] = [];
+		for (let i = 0; i < rows.length; i++) {
+			const key = (<HTMLElement>rows[i]).dataset.actionKey;
+			if (typeof key === 'string' && key !== '') {
+				keys.push(key);
+			}
+		}
+		return keys;
+	}
+
+	private updateActionSelectionStyles() {
+		this.listElem.classList.toggle('actionSelectionVisible', this.actionSelectionVisible);
+		const rows = this.listElem.querySelectorAll('.branchPanelItem[data-action-key]');
+		for (let i = 0; i < rows.length; i++) {
+			const row = <HTMLElement>rows[i];
+			const key = row.dataset.actionKey;
+			const isSelected = typeof key === 'string' && this.actionSelection.has(key);
+			row.classList.toggle('actionSelectedRow', isSelected);
+			row.classList.toggle('actionSelected',
+				this.actionSelectionVisible &&
+				isSelected &&
+				this.actionSelectionActive !== null &&
+				key === this.actionSelectionActive
+			);
+		}
+	}
+
+	private setActionSelectionVisible(visible: boolean) {
+		if (this.actionSelectionVisible === visible) return;
+		this.actionSelectionVisible = visible;
+		this.updateActionSelectionStyles();
 	}
 }

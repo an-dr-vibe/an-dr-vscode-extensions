@@ -7,11 +7,19 @@ type DraggedRef = {
 	tagType?: 'annotated' | 'lightweight';
 };
 
+type SidebarResolvedRef =
+	{ kind: 'localBranch'; name: string; displayName: string }
+	| { kind: 'remoteBranch'; name: string; displayName: string; remote: string; branchName: string }
+	| { kind: 'tag'; name: string; displayName: string; hash: string | null; annotated: boolean | null };
+
+type SidebarTagContextResolver = (result: { hash: string; annotated: boolean } | null) => void;
+
 class GitGraphView {
 	private gitRepos: GG.GitRepoSet;
 	private gitBranches: ReadonlyArray<string> = [];
 	private gitBranchUpstreams: { readonly [branchName: string]: string } = {};
 	private gitGoneUpstreamBranches: ReadonlyArray<string> = [];
+	private gitRemoteHeadTargets: { readonly [remoteName: string]: string } = {};
 	private gitBranchHead: string | null = null;
 	private gitConfig: GG.GitRepoConfig | null = null;
 	private gitRemotes: ReadonlyArray<string> = [];
@@ -73,6 +81,8 @@ class GitGraphView {
 	private readonly moreBtnElem: HTMLElement;
 	private compactFindWidgetPinnedOpen: boolean = false;
 	private pendingBranchPanelState: GG.GitGraphBranchPanelState | null = null;
+	private sidebarTagContextRequestId: number = 0;
+	private sidebarTagContextResolvers: { [requestId: number]: SidebarTagContextResolver } = {};
 
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
 		this.gitRepos = initialState.repos;
@@ -121,7 +131,7 @@ class GitGraphView {
 			this.saveState();
 			this.renderTable();
 		}, (type, name, event) => {
-			contextMenu.show(this.getSidebarContextMenuActions(type, name), false, null, event, this.viewElem);
+			void this.openSidebarContextMenu(type, name, event);
 		}, this.config.branchPanel.flattenSingleChildGroups, this.config.branchPanel.groupsFirst);
 
 		this.renderRefreshButton();
@@ -153,7 +163,7 @@ class GitGraphView {
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
 			this.branchDropdown.setSelectedTags(this.currentTags);
-			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
+			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
 			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 			this.branchDropdown.restoreState(prevState.branchPanel);
 			this.findWidget.restoreState(prevState.findWidget);
@@ -270,6 +280,7 @@ class GitGraphView {
 		this.gitTags = [];
 		this.gitBranchUpstreams = {};
 		this.gitGoneUpstreamBranches = [];
+		this.gitRemoteHeadTargets = {};
 		this.currentBranches = null;
 		this.renderFetchButton();
 		this.closeCommitDetails(false);
@@ -278,11 +289,11 @@ class GitGraphView {
 		this.refresh(true);
 	}
 
-	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
+	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
 		// Changes to this.gitStashes are reflected as changes to the commits when loadCommits is run
 		this.gitStashes = stashes;
 
-		if (!isRepo || (!this.currentRepoRefreshState.hard && arraysStrictlyEqual(this.gitBranches, branchOptions) && shallowStringMapEqual(this.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(this.gitGoneUpstreamBranches, goneUpstreamBranches) && this.gitBranchHead === branchHead && arraysStrictlyEqual(this.gitRemotes, remotes))) {
+		if (!isRepo || (!this.currentRepoRefreshState.hard && arraysStrictlyEqual(this.gitBranches, branchOptions) && shallowStringMapEqual(this.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(this.gitGoneUpstreamBranches, goneUpstreamBranches) && shallowStringMapEqual(this.gitRemoteHeadTargets, remoteHeadTargets) && this.gitBranchHead === branchHead && arraysStrictlyEqual(this.gitRemotes, remotes))) {
 			this.saveState();
 			this.finaliseLoadRepoInfo(false, isRepo);
 			return;
@@ -292,6 +303,7 @@ class GitGraphView {
 		this.gitBranches = branchOptions;
 		this.gitBranchUpstreams = branchUpstreams;
 		this.gitGoneUpstreamBranches = goneUpstreamBranches;
+		this.gitRemoteHeadTargets = remoteHeadTargets;
 		this.gitBranchHead = branchHead;
 		this.gitRemotes = remotes;
 
@@ -548,7 +560,7 @@ class GitGraphView {
 		if (msg.error === null) {
 			const refreshState = this.currentRepoRefreshState;
 			if (refreshState.inProgress && refreshState.loadRepoInfoRefreshId === msg.refreshId) {
-				this.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.head, msg.remotes, msg.stashes, msg.isRepo);
+				this.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.remoteHeadTargets, msg.head, msg.remotes, msg.stashes, msg.isRepo);
 			}
 		} else {
 			this.displayLoadDataError('Unable to load Repository Info', msg.error);
@@ -618,6 +630,23 @@ class GitGraphView {
 		}
 		for (let i = 0; i < this.gitBranches.length; i++) {
 			const branch = this.gitBranches[i];
+			let isRemoteDefault = false, remoteDefaultHint: string | undefined;
+			if (branch.startsWith('remotes/')) {
+				const firstSlash = branch.indexOf('/', 8);
+				if (firstSlash > -1) {
+					const remoteName = branch.substring(8, firstSlash);
+					const remoteRefName = branch.substring(8);
+					const remoteHeadRef = 'remotes/' + remoteName + '/HEAD';
+					const remoteHeadTarget = this.gitRemoteHeadTargets[remoteName];
+					if (branch === remoteHeadRef && typeof remoteHeadTarget === 'string' && remoteHeadTarget !== '') {
+						continue;
+					}
+					if (typeof remoteHeadTarget === 'string' && remoteHeadTarget === remoteRefName) {
+						isRemoteDefault = true;
+						remoteDefaultHint = remoteName + '/HEAD -> ' + remoteHeadTarget;
+					}
+				}
+			}
 			const upstream = this.config.branchPanel.showLocalBranchUpstream && branch.indexOf('remotes/') !== 0
 				? this.gitBranchUpstreams[branch]
 				: undefined;
@@ -625,6 +654,8 @@ class GitGraphView {
 				name: branch.indexOf('remotes/') === 0 ? branch.substring(8) : branch,
 				value: branch,
 				isCurrent: branch === this.gitBranchHead,
+				isRemoteDefault: isRemoteDefault,
+				remoteDefaultHint: remoteDefaultHint,
 				hint: typeof upstream === 'string'
 					? (this.gitGoneUpstreamBranches.includes(branch) ? '? ' + upstream : '= ' + upstream)
 					: undefined,
@@ -634,6 +665,10 @@ class GitGraphView {
 			});
 		}
 		return options;
+	}
+
+	public getRemoteHeadTargets(): { readonly [remoteName: string]: string } {
+		return this.gitRemoteHeadTargets;
 	}
 
 	public getCommitId(hash: string) {
@@ -813,6 +848,7 @@ class GitGraphView {
 			gitBranches: this.gitBranches,
 			gitBranchUpstreams: this.gitBranchUpstreams,
 			gitGoneUpstreamBranches: this.gitGoneUpstreamBranches,
+			gitRemoteHeadTargets: this.gitRemoteHeadTargets,
 			gitBranchHead: this.gitBranchHead,
 			gitConfig: this.gitConfig,
 			gitRemotes: this.gitRemotes,
@@ -905,6 +941,7 @@ class GitGraphView {
 			: this.config.graph.grid.y;
 		this.config.graph.grid.offsetY = headerHeight + this.config.graph.grid.y / 2;
 
+		this.graph.setRemoteHeadTargets(this.gitRemoteHeadTargets);
 		this.graph.render(expandedCommit);
 	}
 
@@ -931,7 +968,7 @@ class GitGraphView {
 			let commit = this.commits[i];
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
 			let date = formatShortDate(commit.date);
-			let branchLabels = getBranchLabels(commit.heads, commit.remotes);
+			let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.gitRemoteHeadTargets);
 			let refBranches = '', refTags = '', j, k, refName, remoteName, refActive, refHtml, branchCheckedOutAtCommit: string | null = null;
 
 			for (j = 0; j < branchLabels.heads.length; j++) {
@@ -940,7 +977,12 @@ class GitGraphView {
 				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
 				for (k = 0; k < branchLabels.heads[j].remotes.length; k++) {
 					remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
-					refHtml += '<span class="gitRefHeadRemote" data-remote="' + remoteName + '" data-fullref="' + escapeHtml(branchLabels.heads[j].remotes[k] + '/' + branchLabels.heads[j].name) + '">' + remoteName + '</span>';
+					const remoteRefName = branchLabels.heads[j].remotes[k] + '/' + branchLabels.heads[j].name;
+					const isRemoteDefault = this.gitRemoteHeadTargets[branchLabels.heads[j].remotes[k]] === remoteRefName;
+					const defaultBadge = isRemoteDefault
+						? '<span class="gitRefRemoteDefaultBadge" title="' + escapeHtml(branchLabels.heads[j].remotes[k] + '/HEAD -> ' + remoteRefName) + '">default</span>'
+						: '';
+					refHtml += '<span class="gitRefHeadRemote' + (isRemoteDefault ? ' default' : '') + '" data-remote="' + remoteName + '" data-fullref="' + escapeHtml(remoteRefName) + '">' + remoteName + defaultBadge + '</span>';
 				}
 				refHtml += '</span>';
 				refBranches = refActive ? refHtml + refBranches : refBranches + refHtml;
@@ -948,7 +990,11 @@ class GitGraphView {
 			}
 			for (j = 0; j < branchLabels.remotes.length; j++) {
 				refName = escapeHtml(branchLabels.remotes[j].name);
-				refBranches += '<span class="gitRef remote" data-name="' + refName + '" data-remote="' + (branchLabels.remotes[j].remote !== null ? escapeHtml(branchLabels.remotes[j].remote!) : '') + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>';
+				const isRemoteDefault = branchLabels.remotes[j].remote !== null && this.gitRemoteHeadTargets[branchLabels.remotes[j].remote!] === branchLabels.remotes[j].name;
+				const defaultBadge = isRemoteDefault && branchLabels.remotes[j].remote !== null
+					? '<span class="gitRefRemoteDefaultBadge" title="' + escapeHtml(branchLabels.remotes[j].remote! + '/HEAD -> ' + branchLabels.remotes[j].name) + '">default</span>'
+					: '';
+				refBranches += '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (branchLabels.remotes[j].remote !== null ? escapeHtml(branchLabels.remotes[j].remote!) : '') + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>' + defaultBadge + '</span>';
 			}
 
 			for (j = 0; j < commit.tags.length; j++) {
@@ -1069,7 +1115,27 @@ class GitGraphView {
 		this.repoDropdown.setOptions(getRepoDropdownOptions(this.gitRepos), [repo || this.currentRepo]);
 	}
 
-	private getSidebarContextMenuActions(type: 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection', name: string): ContextMenuActions {
+	private async openSidebarContextMenu(type: 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection', name: string, event: MouseEvent) {
+		try {
+			const actions = await this.getSidebarContextMenuActions(type, name);
+			contextMenu.show(actions, false, null, event, this.viewElem);
+		} catch {
+			contextMenu.show([[
+				{
+					title: 'Reveal',
+					visible: this.findRenderedRefElem(name) !== null,
+					onClick: () => this.revealReference(name)
+				},
+				{
+					title: 'Copy Name',
+					visible: true,
+					onClick: () => sendMessage({ command: 'copyToClipboard', type: 'Reference Name', data: name })
+				}
+			]], false, null, event, this.viewElem);
+		}
+	}
+
+	private async getSidebarContextMenuActions(type: 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection', name: string): Promise<ContextMenuActions> {
 		if (type === 'localSection') {
 			return [[{
 				title: 'Clean Up Gone Branches' + ELLIPSIS,
@@ -1103,59 +1169,55 @@ class GitGraphView {
 			]];
 		}
 
+		const selection = this.branchDropdown.getActionSelection();
+		if ((type === 'branch' || type === 'tag') && selection.length > 1) {
+			const resolvedSelection = await this.resolveSidebarSelection(selection);
+			return this.getSidebarBatchContextMenuActions(resolvedSelection);
+		}
+
 		if (type === 'branch') {
-			const isRemoteBranch = name.startsWith('remotes/');
-			const refName = isRemoteBranch ? name.substring(8) : name;
-			const remoteName = isRemoteBranch && refName.includes('/') ? refName.substring(0, refName.indexOf('/')) : null;
-			const isLocalBranch = this.gitBranches.includes(refName);
-			const canCheckout = refName !== 'HEAD' && !refName.endsWith('/HEAD') && (isRemoteBranch || (isLocalBranch && this.gitBranchHead !== refName));
-			return [[
-				{
-					title: 'Checkout Branch',
-					visible: this.config.contextMenuActionsVisibility.branch.checkout && canCheckout,
-					onClick: () => {
-						if (isRemoteBranch) {
-							this.checkoutBranchAction(refName, remoteName, null, null);
-						} else {
-							this.checkoutBranchAction(refName, null, null, null);
-						}
+			const resolvedBranch = this.resolveSidebarBranch(name);
+			if (resolvedBranch === null) {
+				return [[
+					{
+						title: 'Reveal',
+						visible: this.findRenderedRefElem(name) !== null,
+						onClick: () => this.revealReference(name)
+					},
+					{
+						title: 'Copy Name',
+						visible: true,
+						onClick: () => sendMessage({ command: 'copyToClipboard', type: 'Branch Name', data: name })
 					}
-				},
-				{
-					title: 'Reveal',
-					visible: this.findRenderedRefElem(refName) !== null,
-					onClick: () => this.revealReference(refName)
-				},
-				{
-					title: 'Copy Name',
-					visible: true,
-					onClick: () => {
-						sendMessage({ command: 'copyToClipboard', type: 'Branch Name', data: refName });
-					}
-				}
-			]];
+				]];
+			}
+
+			const target = this.createSidebarRefTarget(resolvedBranch.name);
+			const actions = resolvedBranch.kind === 'remoteBranch'
+				? this.getRemoteBranchContextMenuActions(resolvedBranch.remote, target)
+				: this.getBranchContextMenuActions(target);
+			return this.appendSidebarRevealAction(actions, resolvedBranch.name);
 		}
 
 		if (type === 'tag') {
-			return [[
-				{
-					title: 'Checkout Tag' + (globalState.alwaysAcceptCheckoutCommit ? '' : ELLIPSIS),
-					visible: this.config.contextMenuActionsVisibility.commit.checkout,
-					onClick: () => this.checkoutDetachedRefAction(name, 'tag')
-				},
-				{
-					title: 'Reveal',
-					visible: this.findRenderedRefElem(name) !== null,
-					onClick: () => this.revealReference(name)
-				},
-				{
-					title: 'Copy Name',
-					visible: true,
-					onClick: () => {
-						sendMessage({ command: 'copyToClipboard', type: 'Tag Name', data: name });
+			const tagContext = await this.resolveSidebarTagContext(name);
+			if (tagContext === null) {
+				return [[
+					{
+						title: 'Reveal',
+						visible: this.findRenderedRefElem(name) !== null,
+						onClick: () => this.revealReference(name)
+					},
+					{
+						title: 'Copy Tag Name to Clipboard',
+						visible: true,
+						onClick: () => sendMessage({ command: 'copyToClipboard', type: 'Tag Name', data: name })
 					}
-				}
-			]];
+				]];
+			}
+			const target = this.createSidebarRefTarget(name, tagContext.hash);
+			const actions = this.getTagContextMenuActions(tagContext.annotated, target);
+			return this.appendSidebarRevealAction(actions, name);
 		}
 
 		return [[
@@ -1167,11 +1229,246 @@ class GitGraphView {
 			{
 				title: 'Copy Name',
 				visible: true,
+				onClick: () => sendMessage({ command: 'copyToClipboard', type: 'Reference Name', data: name })
+			}
+		]];
+	}
+
+	private appendSidebarRevealAction(actions: ContextMenuActions, refName: string): ContextMenuActions {
+		return [
+			...actions,
+			[{
+				title: 'Reveal',
+				visible: this.findRenderedRefElem(refName) !== null,
+				onClick: () => this.revealReference(refName)
+			}]
+		];
+	}
+
+	private createSidebarRefTarget(refName: string, hash: string = ''): DialogTarget & RefTarget {
+		const elem = this.findRenderedRefElem(refName);
+		return {
+			type: TargetType.Ref,
+			hash: hash,
+			ref: refName,
+			elem: elem !== null ? elem : this.viewElem
+		};
+	}
+
+	private resolveSidebarBranch(value: string): SidebarResolvedRef | null {
+		if (value.startsWith('remotes/')) {
+			const refName = value.substring(8);
+			const slash = refName.indexOf('/');
+			if (slash === -1) return null;
+			const remote = refName.substring(0, slash);
+			const branchName = refName.substring(slash + 1);
+			return {
+				kind: 'remoteBranch',
+				name: refName,
+				displayName: refName,
+				remote: remote,
+				branchName: branchName
+			};
+		}
+		return {
+			kind: 'localBranch',
+			name: value,
+			displayName: value
+		};
+	}
+
+	private async resolveSidebarSelection(selection: ReadonlyArray<BranchPanelActionSelectionItem>): Promise<ReadonlyArray<SidebarResolvedRef>> {
+		const resolved: SidebarResolvedRef[] = [];
+		for (let i = 0; i < selection.length; i++) {
+			const item = selection[i];
+			if (item.type === 'branch') {
+				const branch = this.resolveSidebarBranch(item.name);
+				if (branch !== null) resolved.push(branch);
+			} else if (item.type === 'tag') {
+				const tagContext = await this.resolveSidebarTagContext(item.name);
+				resolved.push({
+					kind: 'tag',
+					name: item.name,
+					displayName: item.name,
+					hash: tagContext !== null ? tagContext.hash : null,
+					annotated: tagContext !== null ? tagContext.annotated : null
+				});
+			}
+		}
+		return resolved;
+	}
+
+	private getSidebarBatchContextMenuActions(selection: ReadonlyArray<SidebarResolvedRef>): ContextMenuActions {
+		const selectionSize = selection.length;
+		const canDelete = selection.every((item) => item.kind === 'localBranch' || item.kind === 'remoteBranch' || item.kind === 'tag');
+		const canArchive = selection.every(() => true);
+		const canPushBranches = this.gitRemotes.length > 0 && selection.every((item) => item.kind === 'localBranch');
+		const canPushTags = this.gitRemotes.length > 0 && selection.every((item) => item.kind === 'tag' && item.hash !== null);
+		const canPush = canPushBranches || canPushTags;
+		const revealRefName = selection.map((item) => item.name).find((refName) => this.findRenderedRefElem(refName) !== null) || null;
+
+		const actions: ContextMenuActions = [[
+			{
+				title: 'Delete Selected' + ELLIPSIS,
+				visible: canDelete,
 				onClick: () => {
-					sendMessage({ command: 'copyToClipboard', type: type === 'tag' ? 'Tag Name' : 'Branch Name', data: name });
+					dialog.showConfirmation('Are you sure you want to delete <b>' + selectionSize + '</b> selected reference' + (selectionSize === 1 ? '' : 's') + '?', 'Yes, delete', () => {
+						runAction({
+							command: 'sidebarBatchRefAction',
+							repo: this.currentRepo,
+							action: GG.SidebarBatchRefActionType.Delete,
+							refs: this.getSidebarBatchRequestRefs(selection),
+							remotes: [],
+							setUpstream: false,
+							pushMode: GG.GitPushBranchMode.Normal,
+							skipRemoteCheck: globalState.pushTagSkipRemoteCheck
+						}, 'Deleting Selected References');
+					}, { type: TargetType.Repo });
+				}
+			},
+			{
+				title: 'Push Selected' + ELLIPSIS,
+				visible: canPush,
+				onClick: () => {
+					if (this.gitRemotes.length === 1) {
+						dialog.showForm('Push <b>' + selectionSize + '</b> selected reference' + (selectionSize === 1 ? '' : 's') + ' to remote <b><i>' + escapeHtml(this.gitRemotes[0]) + '</i></b>?', canPushBranches
+							? [
+								{ type: DialogInputType.Checkbox, name: 'Set Upstream', value: true },
+								{
+									type: DialogInputType.Radio,
+									name: 'Push Mode',
+									options: [
+										{ name: 'Normal', value: GG.GitPushBranchMode.Normal },
+										{ name: 'Force With Lease', value: GG.GitPushBranchMode.ForceWithLease },
+										{ name: 'Force', value: GG.GitPushBranchMode.Force }
+									],
+									default: GG.GitPushBranchMode.Normal
+								}
+							] : [], 'Yes, push', (values) => {
+							runAction({
+								command: 'sidebarBatchRefAction',
+								repo: this.currentRepo,
+								action: GG.SidebarBatchRefActionType.Push,
+								refs: this.getSidebarBatchRequestRefs(selection),
+								remotes: [this.gitRemotes[0]],
+								setUpstream: canPushBranches ? <boolean>values[0] : false,
+								pushMode: canPushBranches ? <GG.GitPushBranchMode>values[1] : GG.GitPushBranchMode.Normal,
+								skipRemoteCheck: globalState.pushTagSkipRemoteCheck
+							}, 'Pushing Selected References');
+						}, { type: TargetType.Repo });
+					} else {
+						const inputs: DialogInput[] = [
+							{
+								type: DialogInputType.Select,
+								name: 'Push to Remote(s)',
+								defaults: [this.getPushRemote()],
+								options: this.gitRemotes.map((remote) => ({ name: remote, value: remote })),
+								multiple: true
+							}
+						];
+						if (canPushBranches) {
+							inputs.push(
+								{ type: DialogInputType.Checkbox, name: 'Set Upstream', value: true },
+								{
+									type: DialogInputType.Radio,
+									name: 'Push Mode',
+									options: [
+										{ name: 'Normal', value: GG.GitPushBranchMode.Normal },
+										{ name: 'Force With Lease', value: GG.GitPushBranchMode.ForceWithLease },
+										{ name: 'Force', value: GG.GitPushBranchMode.Force }
+									],
+									default: GG.GitPushBranchMode.Normal
+								}
+							);
+						}
+						dialog.showForm('Push <b>' + selectionSize + '</b> selected reference' + (selectionSize === 1 ? '' : 's') + '?', inputs, 'Yes, push', (values) => {
+							runAction({
+								command: 'sidebarBatchRefAction',
+								repo: this.currentRepo,
+								action: GG.SidebarBatchRefActionType.Push,
+								refs: this.getSidebarBatchRequestRefs(selection),
+								remotes: <string[]>values[0],
+								setUpstream: canPushBranches ? <boolean>values[1] : false,
+								pushMode: canPushBranches ? <GG.GitPushBranchMode>values[2] : GG.GitPushBranchMode.Normal,
+								skipRemoteCheck: globalState.pushTagSkipRemoteCheck
+							}, 'Pushing Selected References');
+						}, { type: TargetType.Repo });
+					}
+				}
+			},
+			{
+				title: 'Create Archive for Selected' + ELLIPSIS,
+				visible: canArchive,
+				onClick: () => {
+					dialog.showConfirmation('Create archives for <b>' + selectionSize + '</b> selected reference' + (selectionSize === 1 ? '' : 's') + '?', 'Yes, create archives', () => {
+						runAction({
+							command: 'sidebarBatchRefAction',
+							repo: this.currentRepo,
+							action: GG.SidebarBatchRefActionType.Archive,
+							refs: this.getSidebarBatchRequestRefs(selection),
+							remotes: [],
+							setUpstream: false,
+							pushMode: GG.GitPushBranchMode.Normal,
+							skipRemoteCheck: globalState.pushTagSkipRemoteCheck
+						}, 'Creating Archives');
+					}, { type: TargetType.Repo });
+				}
+			}
+		], [
+			{
+				title: 'Copy Selected Names to Clipboard',
+				visible: selectionSize > 0,
+				onClick: () => sendMessage({
+					command: 'copyToClipboard',
+					type: 'Reference Names',
+					data: selection.map((item) => item.displayName).join('\n')
+				})
+			},
+			{
+				title: 'Reveal',
+				visible: revealRefName !== null,
+				onClick: () => {
+					if (revealRefName !== null) this.revealReference(revealRefName);
 				}
 			}
 		]];
+
+		return actions;
+	}
+
+	private getSidebarBatchRequestRefs(selection: ReadonlyArray<SidebarResolvedRef>): GG.SidebarBatchRefActionTarget[] {
+		return selection.map((item) => {
+			switch (item.kind) {
+				case 'localBranch':
+					return { type: GG.SidebarBatchRefType.LocalBranch, name: item.name, remote: null, hash: null };
+				case 'remoteBranch':
+					return { type: GG.SidebarBatchRefType.RemoteBranch, name: item.branchName, remote: item.remote, hash: null };
+				case 'tag':
+					return { type: GG.SidebarBatchRefType.Tag, name: item.name, remote: null, hash: item.hash };
+			}
+		});
+	}
+
+	private async resolveSidebarTagContext(tagName: string): Promise<{ hash: string; annotated: boolean } | null> {
+		const repo = this.currentRepo;
+		if (typeof repo !== 'string' || repo === '') return null;
+		const requestId = ++this.sidebarTagContextRequestId;
+		return new Promise((resolve) => {
+			this.sidebarTagContextResolvers[requestId] = resolve;
+			sendMessage({
+				command: 'resolveSidebarTagContext',
+				repo: repo,
+				tagName: tagName,
+				requestId: requestId
+			});
+		});
+	}
+
+	public processResolveSidebarTagContext(msg: GG.ResponseResolveSidebarTagContext) {
+		const resolver = this.sidebarTagContextResolvers[msg.requestId];
+		if (typeof resolver === 'undefined') return;
+		delete this.sidebarTagContextResolvers[msg.requestId];
+		resolver(msg.error === null && msg.context !== null ? msg.context : null);
 	}
 
 
@@ -1901,20 +2198,6 @@ class GitGraphView {
 				branchPanelState: checkoutRequestState.branchPanelState,
 				pullAfterwards: null
 			}, 'Checking out Branch');
-		}
-	}
-
-	private checkoutDetachedRefAction(refName: string, refType: 'tag' | 'ref', target: DialogTarget | null = null) {
-		const checkoutRef = () => runAction({ command: 'checkoutCommit', repo: this.currentRepo, commitHash: refName }, 'Checking out ' + (refType === 'tag' ? 'Tag' : 'Ref'));
-		if (globalState.alwaysAcceptCheckoutCommit) {
-			checkoutRef();
-		} else {
-			dialog.showCheckbox('Are you sure you want to checkout ' + refType + ' <b><i>' + escapeHtml(refName) + '</i></b>? This will result in a \'detached HEAD\' state.', 'Always Accept', false, 'Yes, checkout', (alwaysAccept) => {
-				if (alwaysAccept) {
-					updateGlobalViewState('alwaysAcceptCheckoutCommit', true);
-				}
-				checkoutRef();
-			}, target);
 		}
 	}
 
@@ -2975,13 +3258,16 @@ class GitGraphView {
 				const commitElem = <HTMLElement>eventElem.closest('.commit')!;
 				const commit = this.getCommitOfElem(commitElem);
 				if (commit === null) return;
+				const headRemoteElem = eventTarget.closest('.gitRefHeadRemote') as HTMLElement | null;
 
 				if (eventElem.classList.contains(CLASS_REF_HEAD) || eventElem.classList.contains(CLASS_REF_REMOTE)) {
 					let sourceElem = <HTMLElement>eventElem.children[1];
-					let refName = unescapeHtml(eventElem.dataset.name!), isHead = eventElem.classList.contains(CLASS_REF_HEAD), isRemoteCombinedWithHead = eventTarget.classList.contains('gitRefHeadRemote');
-					if (isHead && isRemoteCombinedWithHead) {
-						refName = unescapeHtml((<HTMLElement>eventTarget).dataset.fullref!);
-						sourceElem = <HTMLElement>eventTarget;
+					let remoteRefElem = eventElem;
+					let refName = unescapeHtml(eventElem.dataset.name!), isHead = eventElem.classList.contains(CLASS_REF_HEAD);
+					if (isHead && headRemoteElem !== null) {
+						refName = unescapeHtml(headRemoteElem.dataset.fullref!);
+						sourceElem = headRemoteElem;
+						remoteRefElem = headRemoteElem;
 						isHead = false;
 					}
 
@@ -2992,7 +3278,7 @@ class GitGraphView {
 						ref: refName,
 						elem: sourceElem
 					};
-					this.checkoutBranchAction(refName, isHead ? null : unescapeHtml((isRemoteCombinedWithHead ? <HTMLElement>eventTarget : eventElem).dataset.remote!), null, target);
+					this.checkoutBranchAction(refName, isHead ? null : unescapeHtml(remoteRefElem.dataset.remote!), null, target);
 				}
 			}
 		});
@@ -3066,6 +3352,7 @@ class GitGraphView {
 				const commitElem = <HTMLElement>eventElem.closest('.commit')!;
 				const commit = this.getCommitOfElem(commitElem);
 				if (commit === null) return;
+				const headRemoteElem = eventTarget.closest('.gitRefHeadRemote') as HTMLElement | null;
 
 				const target: ContextMenuTarget & DialogTarget & RefTarget = {
 					type: TargetType.Ref,
@@ -3081,16 +3368,18 @@ class GitGraphView {
 				} else if (eventElem.classList.contains(CLASS_REF_TAG)) {
 					actions = this.getTagContextMenuActions(eventElem.dataset.tagtype === 'annotated', target);
 				} else {
-					let isHead = eventElem.classList.contains(CLASS_REF_HEAD), isRemoteCombinedWithHead = eventTarget.classList.contains('gitRefHeadRemote');
-					if (isHead && isRemoteCombinedWithHead) {
-						target.ref = unescapeHtml((<HTMLElement>eventTarget).dataset.fullref!);
-						target.elem = <HTMLElement>eventTarget;
+					let remoteRefElem = eventElem;
+					let isHead = eventElem.classList.contains(CLASS_REF_HEAD);
+					if (isHead && headRemoteElem !== null) {
+						target.ref = unescapeHtml(headRemoteElem.dataset.fullref!);
+						target.elem = headRemoteElem;
+						remoteRefElem = headRemoteElem;
 						isHead = false;
 					}
 					if (isHead) {
 						actions = this.getBranchContextMenuActions(target);
 					} else {
-						const remote = unescapeHtml((isRemoteCombinedWithHead ? <HTMLElement>eventTarget : eventElem).dataset.remote!);
+						const remote = unescapeHtml(remoteRefElem.dataset.remote!);
 						actions = this.getRemoteBranchContextMenuActions(remote, target);
 					}
 				}
@@ -4112,6 +4401,9 @@ window.addEventListener('load', () => {
 			case 'pruneRemote':
 				refreshOrDisplayError(msg.error, 'Unable to Prune Remote');
 				break;
+			case 'setRemoteDefaultBranch':
+				refreshOrDisplayError(msg.error, 'Unable to Set Remote Default Branch');
+				break;
 			case 'pullBranch':
 				refreshOrDisplayError(msg.error, 'Unable to Pull Branch');
 				break;
@@ -4154,6 +4446,9 @@ window.addEventListener('load', () => {
 			case 'revertCommit':
 				refreshOrDisplayError(msg.error, 'Unable to Revert Commit');
 				break;
+			case 'resolveSidebarTagContext':
+				gitGraph.processResolveSidebarTagContext(msg);
+				break;
 			case 'setGlobalViewState':
 				finishOrDisplayError(msg.error, 'Unable to save the Global View State');
 				break;
@@ -4173,6 +4468,9 @@ window.addEventListener('load', () => {
 				} else {
 					dialog.showError('Unable to retrieve Tag Details', msg.error, null, null);
 				}
+				break;
+			case 'sidebarBatchRefAction':
+				handleSidebarBatchRefActionResponse(msg);
 				break;
 			case 'updateCodeReview':
 				if (msg.error !== null) {
@@ -4226,6 +4524,19 @@ window.addEventListener('load', () => {
 				skipRemoteCheck: true
 			}, 'Pushing Tag');
 		}, { type: TargetType.Repo }, 'Cancel', null, true);
+	}
+
+	function handleSidebarBatchRefActionResponse(msg: GG.ResponseSidebarBatchRefAction) {
+		dialog.closeActionRunning();
+		const failed = msg.results.filter((result) => result.error !== null);
+		if (failed.length > 0) {
+			const summary = failed.map((result) => '[' + result.type + '] ' + result.name + ': ' + result.error).join('\n\n');
+			dialog.showError('Some selected actions failed (' + failed.length + '/' + msg.results.length + ')', summary, null, null);
+		}
+		const successCount = msg.results.length - failed.length;
+		if (successCount > 0 && msg.action !== GG.SidebarBatchRefActionType.Archive) {
+			gitGraph.refresh(false);
+		}
 	}
 
 	function refreshOrDisplayError(error: GG.ErrorInfo, errorMessage: string, configChanges: boolean = false) {
@@ -4689,27 +5000,39 @@ function runAction(msg: GG.RequestMessage, action: string) {
 	sendMessage(msg);
 }
 
-function getBranchLabels(heads: ReadonlyArray<string>, remotes: ReadonlyArray<GG.GitCommitRemote>) {
+function getBranchLabels(heads: ReadonlyArray<string>, remotes: ReadonlyArray<GG.GitCommitRemote>, remoteHeadTargets: { readonly [remoteName: string]: string } = {}) {
 	let headLabels: { name: string; remotes: string[] }[] = [], headLookup: { [name: string]: number } = {}, remoteLabels: ReadonlyArray<GG.GitCommitRemote>;
 	for (let i = 0; i < heads.length; i++) {
 		headLabels.push({ name: heads[i], remotes: [] });
 		headLookup[heads[i]] = i;
 	}
+	const filteredRemotes: GG.GitCommitRemote[] = [];
+	for (let i = 0; i < remotes.length; i++) {
+		const remote = remotes[i];
+		if (remote.remote !== null && remote.name === remote.remote + '/HEAD') {
+			const remoteHeadTarget = remoteHeadTargets[remote.remote];
+			if (typeof remoteHeadTarget === 'string' && remoteHeadTarget !== '') {
+				continue;
+			}
+		}
+		filteredRemotes.push(remote);
+	}
 	if (initialState.config.referenceLabels.combineLocalAndRemoteBranchLabels) {
-		let remainingRemoteLabels = [];
-		for (let i = 0; i < remotes.length; i++) {
-			if (remotes[i].remote !== null) { // If the remote of the remote branch ref is known
-				let branchName = remotes[i].name.substring(remotes[i].remote!.length + 1);
+		let remainingRemoteLabels: GG.GitCommitRemote[] = [];
+		for (let i = 0; i < filteredRemotes.length; i++) {
+			const remote = filteredRemotes[i];
+			if (remote.remote !== null) { // If the remote of the remote branch ref is known
+				let branchName = remote.name.substring(remote.remote.length + 1);
 				if (typeof headLookup[branchName] === 'number') {
-					headLabels[headLookup[branchName]].remotes.push(remotes[i].remote!);
+					headLabels[headLookup[branchName]].remotes.push(remote.remote);
 					continue;
 				}
 			}
-			remainingRemoteLabels.push(remotes[i]);
+			remainingRemoteLabels.push(remote);
 		}
 		remoteLabels = remainingRemoteLabels;
 	} else {
-		remoteLabels = remotes;
+		remoteLabels = filteredRemotes;
 	}
 	return { heads: headLabels, remotes: remoteLabels };
 }

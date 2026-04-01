@@ -242,7 +242,7 @@ class FindWidget {
 				const commits = this.view.getCommits();
 				for (let i = 0; i < commits.length; i++) {
 					commit = commits[i];
-					let branchLabels = getBranchLabels(commit.heads, commit.remotes);
+					let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.view.getRemoteHeadTargets());
 					if (commit.hash !== UNCOMMITTED && (
 						(colVisibility.author && findPattern.test(commit.author))
 						|| (colVisibility.commit && (commit.hash.search(findPattern) === 0 || findPattern.test(abbrevCommit(commit.hash))))

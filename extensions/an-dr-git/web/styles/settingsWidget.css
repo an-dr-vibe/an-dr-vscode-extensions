@@ -150,7 +150,7 @@
 	width:14px !important;
 	height:14px !important;
 }
-.settingsSection > table #deleteRepoName svg, .settingsSection > table #clearInitialBranches svg, .settingsSection > table .deleteRemote svg, .settingsSection > table .fetchRemote svg, .settingsSection > table .pruneRemote svg{
+.settingsSection > table #deleteRepoName svg, .settingsSection > table #clearInitialBranches svg, .settingsSection > table .deleteRemote svg, .settingsSection > table .fetchRemote svg, .settingsSection > table .pruneRemote svg, .settingsSection > table .setDefaultRemoteBranch svg{
 	position:absolute;
 	left:0.5px;
 	top:0.5px;

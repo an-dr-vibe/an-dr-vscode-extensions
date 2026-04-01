@@ -981,6 +981,7 @@ export interface ResponseLoadRepoInfo extends ResponseWithErrorInfo {
 	readonly branches: ReadonlyArray<string>;
 	readonly branchUpstreams: { readonly [branchName: string]: string };
 	readonly goneUpstreamBranches: ReadonlyArray<string>;
+	readonly remoteHeadTargets: { readonly [remoteName: string]: string };
 	readonly head: string | null;
 	readonly remotes: ReadonlyArray<string>;
 	readonly stashes: ReadonlyArray<GitStash>;
@@ -1065,6 +1066,15 @@ export interface RequestPruneRemote extends RepoRequest {
 }
 export interface ResponsePruneRemote extends ResponseWithErrorInfo {
 	readonly command: 'pruneRemote';
+}
+
+export interface RequestSetRemoteDefaultBranch extends RepoRequest {
+	readonly command: 'setRemoteDefaultBranch';
+	readonly remote: string;
+	readonly branch: string;
+}
+export interface ResponseSetRemoteDefaultBranch extends ResponseWithErrorInfo {
+	readonly command: 'setRemoteDefaultBranch';
 }
 
 export interface RequestPullBranch extends RepoRequest {
@@ -1229,6 +1239,60 @@ export interface ResponseTagDetails extends ResponseWithErrorInfo {
 	readonly details: GitTagDetails | null;
 }
 
+export interface RequestResolveSidebarTagContext extends RepoRequest {
+	readonly command: 'resolveSidebarTagContext';
+	readonly tagName: string;
+	readonly requestId: number;
+}
+export interface ResponseResolveSidebarTagContext extends ResponseWithErrorInfo {
+	readonly command: 'resolveSidebarTagContext';
+	readonly tagName: string;
+	readonly requestId: number;
+	readonly context: {
+		readonly hash: string;
+		readonly annotated: boolean;
+	} | null;
+}
+
+export const enum SidebarBatchRefType {
+	LocalBranch = 'localBranch',
+	RemoteBranch = 'remoteBranch',
+	Tag = 'tag'
+}
+
+export interface SidebarBatchRefActionTarget {
+	readonly type: SidebarBatchRefType;
+	readonly name: string;
+	readonly remote: string | null;
+	readonly hash: string | null;
+}
+
+export const enum SidebarBatchRefActionType {
+	Delete = 'delete',
+	Push = 'push',
+	Archive = 'archive'
+}
+
+export interface RequestSidebarBatchRefAction extends RepoRequest {
+	readonly command: 'sidebarBatchRefAction';
+	readonly action: SidebarBatchRefActionType;
+	readonly refs: ReadonlyArray<SidebarBatchRefActionTarget>;
+	readonly remotes: ReadonlyArray<string>;
+	readonly setUpstream: boolean;
+	readonly pushMode: GitPushBranchMode;
+	readonly skipRemoteCheck: boolean;
+}
+
+export interface ResponseSidebarBatchRefAction extends BaseMessage {
+	readonly command: 'sidebarBatchRefAction';
+	readonly action: SidebarBatchRefActionType;
+	readonly results: ReadonlyArray<{
+		readonly type: SidebarBatchRefType;
+		readonly name: string;
+		readonly error: ErrorInfo;
+	}>;
+}
+
 export interface RequestUpdateCodeReview extends RepoRequest {
 	readonly command: 'updateCodeReview';
 	readonly id: string;
@@ -1331,9 +1395,12 @@ export type RequestMessage =
 	| RequestRevertCommit
 	| RequestSetGlobalViewState
 	| RequestSetRepoState
+	| RequestSetRemoteDefaultBranch
 	| RequestSetWorkspaceViewState
 	| RequestShowErrorDialog
+	| RequestSidebarBatchRefAction
 	| RequestStartCodeReview
+	| RequestResolveSidebarTagContext
 	| RequestTagDetails
 	| RequestUpdateCodeReview
 	| RequestViewDiff
@@ -1393,8 +1460,11 @@ export type ResponseMessage =
 	| ResponseResetToCommit
 	| ResponseRevertCommit
 	| ResponseSetGlobalViewState
+	| ResponseSetRemoteDefaultBranch
+	| ResponseSidebarBatchRefAction
 	| ResponseSetWorkspaceViewState
 	| ResponseStartCodeReview
+	| ResponseResolveSidebarTagContext
 	| ResponseTagDetails
 	| ResponseUpdateCodeReview
 	| ResponseViewDiff

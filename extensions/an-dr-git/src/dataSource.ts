@@ -148,13 +148,14 @@ export class DataSource extends Disposable {
 				branches: results[0].branches,
 				branchUpstreams: results[0].branchUpstreams,
 				goneUpstreamBranches: results[0].goneUpstreamBranches,
+				remoteHeadTargets: results[0].remoteHeadTargets,
 				head: results[0].head,
 				remotes: results[1],
 				stashes: results[2],
 				error: null
 			};
 		}).catch((errorMessage) => {
-			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], head: null, remotes: [], stashes: [], error: errorMessage };
+			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], stashes: [], error: errorMessage };
 		});
 	}
 
@@ -538,6 +539,49 @@ export class DataSource extends Disposable {
 			error: null
 		})).catch((errorMessage) => ({
 			details: null,
+			error: errorMessage
+		}));
+	}
+
+	/**
+	 * Resolve the object hash and tag type for a tag.
+	 * @param repo The path of the repository.
+	 * @param tagName The name of the tag.
+	 * @returns The resolved tag context.
+	 */
+	public getTagContext(repo: string, tagName: string): Promise<GitTagContextData> {
+		const ref = 'refs/tags/' + tagName;
+		return this.spawnGit(['show-ref', '--tags', '-d', ref], repo, (stdout) => {
+			let hash: string | null = null;
+			let annotated = false;
+			const lines = stdout.split(EOL_REGEX);
+			for (let i = 0; i < lines.length; i++) {
+				if (lines[i].trim() === '') continue;
+				const parts = lines[i].split(' ');
+				if (parts.length < 2) continue;
+				const lineHash = parts[0];
+				const lineRef = parts[parts.length - 1];
+				if (lineRef === ref) {
+					if (hash === null) hash = lineHash;
+				} else if (lineRef === ref + '^{}') {
+					hash = lineHash;
+					annotated = true;
+				}
+			}
+			return {
+				hash: hash,
+				annotated: annotated
+			};
+		}).then((tag) => ({
+			context: tag.hash !== null
+				? {
+					hash: tag.hash,
+					annotated: tag.annotated
+				}
+				: null,
+			error: tag.hash !== null ? null : 'Unable to find tag "' + tagName + '".'
+		})).catch((errorMessage) => ({
+			context: null,
 			error: errorMessage
 		}));
 	}
@@ -931,6 +975,17 @@ export class DataSource extends Disposable {
 			return trackingBranchStatus === null ? null : 'Branch does not exist on the remote, deleting the remote tracking branch ' + remote + '/' + branchName + '.\n' + trackingBranchStatus;
 		}
 		return remoteStatus;
+	}
+
+	/**
+	 * Set the default branch for a remote.
+	 * @param repo The path of the repository.
+	 * @param remote The name of the remote.
+	 * @param branch The branch name on the remote.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public setRemoteDefaultBranch(repo: string, remote: string, branch: string) {
+		return this.runGitCommand(['remote', 'set-head', remote, branch], repo);
 	}
 
 	/**
@@ -1365,10 +1420,21 @@ export class DataSource extends Disposable {
 
 		return Promise.all([
 			this.spawnGit(args, repo, (stdout) => {
-				let branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], head: null, error: null };
+				let branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, error: null };
 				let lines = stdout.split(EOL_REGEX);
 				for (let i = 0; i < lines.length - 1; i++) {
-					let name = lines[i].substring(2).split(' -> ')[0];
+					let lineContents = lines[i].substring(2);
+					let symbolicRefSplit = lineContents.split(' -> ');
+					let name = symbolicRefSplit[0];
+					const symbolicTarget = symbolicRefSplit.length > 1 ? symbolicRefSplit.slice(1).join(' -> ').trim() : null;
+
+					if (showRemoteHeads && symbolicTarget !== null && REMOTE_HEAD_BRANCH_REGEXP.test(name)) {
+						const remoteName = name.substring(8, name.length - 5);
+						if (remoteName !== '' && symbolicTarget !== '') {
+							branchData.remoteHeadTargets[remoteName] = symbolicTarget;
+						}
+					}
+
 					if (DETACHED_HEAD_BRANCH_REGEXP.test(name)) {
 						branchData.head = 'HEAD';
 						branchData.branches.unshift('HEAD');
@@ -2009,6 +2075,7 @@ interface GitBranchData {
 	branches: string[];
 	branchUpstreams: { [branchName: string]: string };
 	goneUpstreamBranches: string[];
+	remoteHeadTargets: { [remoteName: string]: string };
 	head: string | null;
 	error: ErrorInfo;
 }
@@ -2075,6 +2142,14 @@ interface GitStatusFiles {
 
 interface GitTagDetailsData {
 	details: GitTagDetails | null;
+	error: ErrorInfo;
+}
+
+interface GitTagContextData {
+	context: {
+		hash: string;
+		annotated: boolean;
+	} | null;
 	error: ErrorInfo;
 }
 

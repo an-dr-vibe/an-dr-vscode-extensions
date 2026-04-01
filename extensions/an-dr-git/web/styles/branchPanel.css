@@ -200,7 +200,17 @@ body.branchPanelHidden #sidebarResizeHandle{
 	background-color:var(--vscode-list-hoverBackground, rgba(128,128,128,0.1));
 }
 .branchPanelItem.selected{
-	background-color:var(--vscode-list-activeSelectionBackground, rgba(128,128,128,0.15));
+	background-color:transparent;
+}
+.branchPanelItem.actionSelectedRow{
+	background-color:var(--vscode-list-inactiveSelectionBackground, rgba(128,128,128,0.12));
+}
+.branchPanelList.actionSelectionVisible .branchPanelItem.actionSelectedRow{
+	background-color:var(--vscode-list-activeSelectionBackground, rgba(128,128,128,0.18));
+}
+.branchPanelItem.actionSelected{
+	outline:1px solid var(--vscode-focusBorder, rgba(128,128,128,0.55));
+	outline-offset:-1px;
 }
 
 .branchPanelItemContent{
@@ -218,11 +228,27 @@ body.branchPanelHidden #sidebarResizeHandle{
 	align-items:center;
 	justify-content:center;
 	margin-right:4px;
+	border-radius:3px;
+	box-sizing:border-box;
+}
+.branchPanelCheck:empty{
+	border:1px solid color-mix(in srgb, var(--vscode-checkbox-border, var(--vscode-focusBorder, rgba(128,128,128,0.5))) 70%, transparent);
+	background-color:color-mix(in srgb, var(--vscode-checkbox-background, transparent) 35%, transparent);
+	opacity:0.75;
+}
+.branchPanelCheck:not(:empty){
+	border:1px solid var(--vscode-checkbox-selectBorder, var(--vscode-focusBorder, rgba(128,128,128,0.7)));
+	background-color:color-mix(in srgb, var(--vscode-checkbox-selectBackground, rgba(128,128,128,0.3)) 70%, transparent);
+}
+.branchPanelItem:hover .branchPanelCheck:empty,
+.branchPanelItem.selected .branchPanelCheck:empty,
+.branchPanelItem.actionSelected .branchPanelCheck:empty{
+	opacity:1;
 }
 .branchPanelCheck svg{
-	fill:var(--vscode-editor-foreground);
-	width:12px;
-	height:12px;
+	fill:var(--vscode-checkbox-foreground, var(--vscode-editor-foreground));
+	width:10px;
+	height:10px;
 }
 
 .branchPanelItemName{
@@ -252,6 +278,23 @@ body.branchPanelHidden #sidebarResizeHandle{
 	opacity:0.85;
 }
 
+.branchPanelRemoteDefaultBadge{
+	display:inline-block;
+	margin-left:6px;
+	padding:0 5px;
+	height:16px;
+	line-height:16px;
+	border-radius:8px;
+	font-size:10px;
+	font-weight:700;
+	letter-spacing:0.2px;
+	flex-shrink:0;
+	background-color:rgba(128,128,128,0.16);
+	border:1px solid rgba(128,128,128,0.45);
+	color:var(--vscode-descriptionForeground, var(--vscode-editor-foreground));
+	opacity:0.85;
+}
+
 .branchPanelItemHint{
 	margin-left:6px;
 	font-size:11px;
@@ -269,7 +312,7 @@ body.branchPanelHidden #sidebarResizeHandle{
 	display:none;
 }
 .branchPanelItem:hover .branchPanelItemHint,
-.branchPanelItem.selected .branchPanelItemHint{
+.branchPanelItem.actionSelected .branchPanelItemHint{
 	opacity:0.8;
 }
 .branchPanelItemHint.gone{

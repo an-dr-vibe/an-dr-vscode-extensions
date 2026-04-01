@@ -190,7 +190,7 @@ class SettingsWidget {
 						html += '<tr class="lineAbove">' +
 							'<td class="left" rowspan="2"><span class="hideRemoteBtn" data-index="' + i + '" title="Click to ' + (hidden ? 'show' : 'hide') + ' branches of this remote.">' + (hidden ? SVG_ICONS.eyeClosed : SVG_ICONS.eyeOpen) + '</span>' + escapeHtml(remote.name) + '</td>' +
 							'<td class="leftWithEllipsis" title="Fetch URL: ' + fetchUrl + '">' + fetchUrl + '</td><td>Fetch</td>' +
-							'<td class="btns remoteBtns" rowspan="2" data-index="' + i + '"><div class="fetchRemote" title="Fetch from Remote' + ELLIPSIS + '">' + SVG_ICONS.download + '</div> <div class="pruneRemote" title="Prune Remote' + ELLIPSIS + '">' + SVG_ICONS.branch + '</div><br><div class="editRemote" title="Edit Remote' + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div> <div class="deleteRemote" title="Delete Remote' + ELLIPSIS + '">' + SVG_ICONS.close + '</div></td>' +
+							'<td class="btns remoteBtns" rowspan="2" data-index="' + i + '"><div class="fetchRemote" title="Fetch from Remote' + ELLIPSIS + '">' + SVG_ICONS.download + '</div> <div class="pruneRemote" title="Prune Remote' + ELLIPSIS + '">' + SVG_ICONS.branch + '</div><br><div class="setDefaultRemoteBranch" title="Set Default Branch' + ELLIPSIS + '">' + SVG_ICONS.branch + '</div><br><div class="editRemote" title="Edit Remote' + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div> <div class="deleteRemote" title="Delete Remote' + ELLIPSIS + '">' + SVG_ICONS.close + '</div></td>' +
 							'</tr><tr><td class="leftWithEllipsis" title="Push URL: ' + pushUrl + '">' + pushUrl + '</td><td>Push</td></tr>';
 					});
 				} else {
@@ -421,6 +421,42 @@ class SettingsWidget {
 					dialog.showConfirmation('Are you sure you want to prune remote-tracking references that no longer exist on the remote <b><i>' + escapeHtml(remote.name) + '</i></b>?', 'Yes, prune', () => {
 						if (this.currentRepo === null) return;
 						runAction({ command: 'pruneRemote', repo: this.currentRepo, name: remote.name }, 'Pruning Remote');
+					}, { type: TargetType.Repo });
+				});
+
+				addListenerToClass('setDefaultRemoteBranch', 'click', (e) => {
+					const remote = this.getRemoteForBtnEvent(e);
+					if (remote === null) return;
+					const prefix = 'remotes/' + remote.name + '/';
+					const branchOptions = Array.from(new Set(this.view.getBranches()
+						.filter((branch) => branch.startsWith(prefix) && branch !== prefix + 'HEAD')
+						.map((branch) => branch.substring(prefix.length))))
+						.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+						.map((branch) => ({ name: branch, value: branch }));
+					if (branchOptions.length === 0) {
+						dialog.showError('Unable to Set Remote Default Branch', 'No remote-tracking branches for remote "' + remote.name + '" are currently known. Fetch from this remote and try again.', null, null);
+						return;
+					}
+
+					const remoteHeadTarget = this.view.getRemoteHeadTargets()[remote.name];
+					const defaultBranch = typeof remoteHeadTarget === 'string' && remoteHeadTarget.startsWith(remote.name + '/')
+						? remoteHeadTarget.substring(remote.name.length + 1)
+						: branchOptions[0].value;
+					dialog.showForm('Set the default branch (remote HEAD) for remote <b><i>' + escapeHtml(remote.name) + '</i></b>:', [
+						{
+							type: DialogInputType.Select,
+							name: 'Branch',
+							options: branchOptions,
+							default: branchOptions.some((option) => option.value === defaultBranch) ? defaultBranch : branchOptions[0].value
+						}
+					], 'Set Default Branch', (values) => {
+						if (this.currentRepo === null) return;
+						runAction({
+							command: 'setRemoteDefaultBranch',
+							repo: this.currentRepo,
+							remote: remote.name,
+							branch: <string>values[0]
+						}, 'Setting Remote Default Branch');
 					}, { type: TargetType.Repo });
 				});
 

@@ -348,6 +348,7 @@ class Graph {
 	private commits: ReadonlyArray<GG.GitCommit> = [];
 	private commitHead: string | null = null;
 	private commitLookup: { [hash: string]: number } = {};
+	private remoteHeadTargets: { readonly [remoteName: string]: string } = {};
 	private onlyFollowFirstParent: boolean = false;
 	private expandedCommitIndex: number = -1;
 
@@ -440,6 +441,10 @@ class Graph {
 				i++;
 			}
 		}
+	}
+
+	public setRemoteHeadTargets(remoteHeadTargets: { readonly [remoteName: string]: string }) {
+		this.remoteHeadTargets = remoteHeadTargets;
 	}
 
 	public render(expandedCommit: ExpandedCommit | null) {
@@ -833,7 +838,7 @@ class Graph {
 			html += '<div class="graphTooltipSection">This commit is ' + (childrenIncludesHead ? '' : '<b><i>not</i></b> ') + 'included in <span class="graphTooltipRef">HEAD</span></div>';
 		}
 		if (heads.length > 0 || remotes.length > 0) {
-			let branchLabels = getBranchLabels(heads, remotes), htmlRefs: string[] = [];
+			let branchLabels = getBranchLabels(heads, remotes, this.remoteHeadTargets), htmlRefs: string[] = [];
 			branchLabels.heads.forEach((head) => {
 				let html = head.remotes.reduce((prev, remote) => prev + '<span class="graphTooltipCombinedRef">' + escapeHtml(remote) + '</span>', '');
 				htmlRefs.push('<span class="graphTooltipRef">' + escapeHtml(head.name) + html + '</span>');

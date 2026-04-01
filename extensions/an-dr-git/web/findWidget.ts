@@ -34,7 +34,7 @@ class FindWidget {
 		this.view = view;
 		this.widgetElem = document.createElement('div');
 		this.widgetElem.className = 'findWidget';
-		this.widgetElem.innerHTML = '<input id="findInput" type="text" placeholder="Search graph..."/><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCdv" title="Open the Commit Details View for the current match"></span><span id="findPosition"></span>';
+		this.widgetElem.innerHTML = '<div class="findInputContainer"><input id="findInput" type="text" placeholder="Search graph..."/><span class="findInputModifiers"><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span></span></div><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCdv" title="Open the Commit Details View for the current match"></span><span id="findPosition"></span>';
 		(document.getElementById('findWidgetHost') ?? document.body).appendChild(this.widgetElem);
 
 		this.inputElem = <HTMLInputElement>document.getElementById('findInput')!;
@@ -85,6 +85,8 @@ class FindWidget {
 		});
 
 		this.positionElem = document.getElementById('findPosition')!;
+		this.positionElem.innerHTML = 'No Results';
+		this.positionElem.classList.add('empty');
 
 		this.prevElem = document.getElementById('findPrev')!;
 		this.prevElem.classList.add(CLASS_DISABLED);
@@ -130,6 +132,7 @@ class FindWidget {
 			this.position = -1;
 			this.inputElem.value = '';
 			this.positionElem.innerHTML = 'No Results';
+			this.positionElem.classList.add('empty');
 			this.widgetElem.removeAttribute(ATTR_ERROR);
 			this.prevElem.classList.add(CLASS_DISABLED);
 			this.nextElem.classList.add(CLASS_DISABLED);
@@ -137,6 +140,7 @@ class FindWidget {
 		this.inputElem.blur();
 		this.visible = false;
 		this.updateActiveState();
+		this.view.requestControlsLayoutUpdate();
 		this.view.saveState();
 	}
 
@@ -371,7 +375,14 @@ class FindWidget {
 			this.matches[this.position].elem.classList.add(CLASS_FIND_CURRENT_COMMIT);
 			if (scrollToCommit) this.view.scrollToCommit(this.matches[position].hash, false);
 		}
-		this.positionElem.innerHTML = this.matches.length > 0 ? (this.position + 1) + ' of ' + this.matches.length : 'No Results';
+		if (this.matches.length > 0) {
+			this.positionElem.innerHTML = (this.position + 1) + ' of ' + this.matches.length;
+			this.positionElem.classList.remove('empty');
+		} else {
+			this.positionElem.innerHTML = 'No Results';
+			this.positionElem.classList.add('empty');
+		}
+		this.view.requestControlsLayoutUpdate();
 		this.view.saveState();
 	}
 

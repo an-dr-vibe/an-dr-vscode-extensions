@@ -61,10 +61,20 @@ class GitGraphView {
 
 	private readonly viewElem: HTMLElement;
 	private readonly controlsElem: HTMLElement;
+	private readonly controlsLeftElem: HTMLElement;
+	private readonly controlsBtnsElem: HTMLElement;
 	private readonly tableElem: HTMLElement;
 	private readonly footerElem: HTMLElement;
 	private readonly refreshBtnElem: HTMLElement;
 	private readonly scrollShadowElem: HTMLElement;
+	private readonly terminalBtnElem: HTMLElement;
+	private readonly findWidgetToggleBtnElem: HTMLElement;
+	private readonly settingsBtnElem: HTMLElement;
+	private readonly fetchBtnElem: HTMLElement;
+	private readonly pullBtnElem: HTMLElement;
+	private readonly pushBtnElem: HTMLElement;
+	private readonly moreBtnElem: HTMLElement;
+	private compactFindWidgetPinnedOpen: boolean = false;
 	private pendingBranchPanelState: GG.GitGraphBranchPanelState | null = null;
 
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
@@ -84,9 +94,18 @@ class GitGraphView {
 		};
 
 		this.controlsElem = document.getElementById('controls')!;
+		this.controlsLeftElem = document.getElementById('controlsLeft')!;
+		this.controlsBtnsElem = document.getElementById('controlsBtns')!;
 		this.tableElem = document.getElementById('commitTable')!;
 		this.footerElem = document.getElementById('footer')!;
 		this.scrollShadowElem = <HTMLInputElement>document.getElementById('scrollShadow')!;
+		this.findWidgetToggleBtnElem = document.getElementById('findWidgetToggleBtn')!;
+		this.terminalBtnElem = document.getElementById('terminalBtn')!;
+		this.settingsBtnElem = document.getElementById('settingsBtn')!;
+		this.fetchBtnElem = document.getElementById('fetchBtn')!;
+		this.pullBtnElem = document.getElementById('pullBtn')!;
+		this.pushBtnElem = document.getElementById('pushBtn')!;
+		this.moreBtnElem = document.getElementById('moreBtn')!;
 
 		viewElem.focus();
 
@@ -131,7 +150,12 @@ class GitGraphView {
 		this.observeUrls();
 		this.observeTableEvents();
 
-		if (prevState && !prevState.currentRepoLoading && typeof this.gitRepos[prevState.currentRepo] !== 'undefined') {
+		const canRestoreFromPrevState = !!prevState &&
+			!prevState.currentRepoLoading &&
+			typeof this.gitRepos[prevState.currentRepo] !== 'undefined' &&
+			prevState.commits.length > 0;
+
+		if (canRestoreFromPrevState && prevState) {
 			this.currentRepo = prevState.currentRepo;
 			this.currentBranches = prevState.currentBranches;
 			this.currentTags = prevState.currentTags || [];
@@ -148,8 +172,14 @@ class GitGraphView {
 		}
 
 		let loadViewTo = initialState.loadViewTo;
-		if (loadViewTo === null && prevState && prevState.currentRepoLoading && typeof prevState.currentRepo !== 'undefined') {
-			loadViewTo = { repo: prevState.currentRepo };
+		if (loadViewTo === null && prevState && typeof prevState.currentRepo !== 'undefined' && typeof this.gitRepos[prevState.currentRepo] !== 'undefined' && !canRestoreFromPrevState) {
+			loadViewTo = {
+				repo: prevState.currentRepo,
+				selectedBranches: prevState.currentBranches,
+				selectedTags: prevState.currentTags || [],
+				scrollTop: prevState.scrollTop,
+				branchPanelState: prevState.branchPanel
+			};
 		}
 		if (loadViewTo !== null) {
 			this.pendingBranchPanelState = typeof loadViewTo.branchPanelState !== 'undefined' ? loadViewTo.branchPanelState! : null;
@@ -163,20 +193,42 @@ class GitGraphView {
 			this.requestLoadRepoInfoAndCommits(false, false);
 		}
 
-		const fetchBtn = document.getElementById('fetchBtn')!, settingsBtn = document.getElementById('settingsBtn')!, terminalBtn = document.getElementById('terminalBtn')!;
-		fetchBtn.title = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
-		fetchBtn.innerHTML = SVG_ICONS.download;
-		fetchBtn.addEventListener('click', () => this.fetchFromRemotesAction());
-		settingsBtn.innerHTML = SVG_ICONS.gear;
-		settingsBtn.addEventListener('click', () => this.settingsWidget.show(this.currentRepo));
-		terminalBtn.innerHTML = SVG_ICONS.terminal;
-		terminalBtn.addEventListener('click', () => {
+		if (prevState !== null) {
+			// After VS Code restores a webview, the first load sequence can occasionally stall.
+			// Re-request repos shortly after startup to guarantee the view fully bootstraps.
+			setTimeout(() => {
+				sendMessage({ command: 'loadRepos', check: false });
+			}, 350);
+		}
+
+		this.fetchBtnElem.title = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
+		this.fetchBtnElem.innerHTML = SVG_ICONS.download;
+		this.fetchBtnElem.addEventListener('click', () => this.fetchFromRemotesAction());
+		this.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
+		this.findWidgetToggleBtnElem.addEventListener('click', () => this.showFindWidgetFromToggle());
+		this.pullBtnElem.title = 'Pull Current Branch';
+		this.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
+		this.pullBtnElem.addEventListener('click', () => this.pullCurrentBranchAction());
+		this.pushBtnElem.title = 'Push Current Branch';
+		this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
+		this.pushBtnElem.addEventListener('click', () => this.pushCurrentBranchAction());
+		this.pushBtnElem.addEventListener('contextmenu', (event) => {
+			event.preventDefault();
+			this.showPushButtonContextMenu(event);
+		});
+		this.settingsBtnElem.innerHTML = SVG_ICONS.gear;
+		this.settingsBtnElem.addEventListener('click', () => this.settingsWidget.show(this.currentRepo));
+		this.terminalBtnElem.innerHTML = SVG_ICONS.terminal;
+		this.terminalBtnElem.addEventListener('click', () => {
 			runAction({
 				command: 'openTerminal',
 				repo: this.currentRepo,
 				name: this.gitRepos[this.currentRepo].name || getRepoName(this.currentRepo)
 			}, 'Opening Terminal');
 		});
+		this.moreBtnElem.innerHTML = '&hellip;';
+		this.moreBtnElem.addEventListener('click', (event) => this.showOverflowActions(event));
+		this.updateControlsLayout();
 	}
 
 
@@ -995,7 +1047,10 @@ class GitGraphView {
 	}
 
 	private renderFetchButton() {
-		alterClass(this.controlsElem, CLASS_FETCH_SUPPORTED, this.gitRemotes.length > 0);
+		const hasRemotes = this.gitRemotes.length > 0;
+		alterClass(this.controlsElem, CLASS_FETCH_SUPPORTED, hasRemotes);
+		alterClass(this.controlsElem, 'pullPushSupported', hasRemotes && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD');
+		this.updateControlsLayout();
 	}
 
 	public renderRefreshButton() {
@@ -2332,12 +2387,252 @@ class GitGraphView {
 	private observeWindowSizeChanges() {
 		let windowWidth = window.outerWidth, windowHeight = window.outerHeight;
 		window.addEventListener('resize', () => {
+			this.updateControlsLayout();
 			if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 				this.renderGraph();
 			} else {
 				windowWidth = window.outerWidth;
 				windowHeight = window.outerHeight;
 			}
+		});
+	}
+
+	private getCurrentPullRemote() {
+		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD' || this.gitConfig === null) return null;
+		const branchConfig = this.gitConfig.branches[this.gitBranchHead];
+		if (typeof branchConfig === 'undefined' || branchConfig.remote === null) return null;
+		return this.gitRemotes.includes(branchConfig.remote) ? branchConfig.remote : null;
+	}
+
+	private pullCurrentBranchAction() {
+		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD') {
+			showErrorMessage('Unable to pull because there is no checked out local branch.');
+			return;
+		}
+		const remote = this.getCurrentPullRemote();
+		if (remote === null) {
+			showErrorMessage('Unable to pull because the current branch has no configured remote.');
+			return;
+		}
+		dialog.showForm('Are you sure you want to pull the remote branch <b><i>' + escapeHtml(remote + '/' + this.gitBranchHead) + '</i></b> into <b><i>' + escapeHtml(this.gitBranchHead) + '</i></b>? If a merge is required:', [
+			{ type: DialogInputType.Checkbox, name: 'Create a new commit even if fast-forward is possible', value: this.config.dialogDefaults.pullBranch.noFastForward },
+			{ type: DialogInputType.Checkbox, name: 'Squash Commits', value: this.config.dialogDefaults.pullBranch.squash, info: 'Create a single commit on the current branch whose effect is the same as merging this remote branch.' }
+		], 'Yes, pull', (values) => {
+			runAction({ command: 'pullBranch', repo: this.currentRepo, branchName: this.gitBranchHead!, remote: remote, createNewCommit: <boolean>values[0], squash: <boolean>values[1] }, 'Pulling Branch');
+		}, null);
+	}
+
+	private pushCurrentBranchAction(mode: GG.GitPushBranchMode = GG.GitPushBranchMode.Normal) {
+		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD') {
+			showErrorMessage('Unable to push because there is no checked out local branch.');
+			return;
+		}
+		if (this.gitRemotes.length === 0) {
+			showErrorMessage('Unable to push because this repository has no remotes.');
+			return;
+		}
+		const branchName = this.gitBranchHead;
+		const multipleRemotes = this.gitRemotes.length > 1;
+		const inputs: DialogInput[] = [
+			{ type: DialogInputType.Checkbox, name: 'Set Upstream', value: true }
+		];
+
+		if (multipleRemotes) {
+			inputs.unshift({
+				type: DialogInputType.Select,
+				name: 'Push to Remote(s)',
+				defaults: [this.getPushRemote(branchName)],
+				options: this.gitRemotes.map((remote) => ({ name: remote, value: remote })),
+				multiple: true
+			});
+		}
+
+		dialog.showForm('Are you sure you want to push the branch <b><i>' + escapeHtml(branchName) + '</i></b>' + (multipleRemotes ? '' : ' to the remote <b><i>' + escapeHtml(this.gitRemotes[0]) + '</i></b>') + '?', inputs, 'Yes, push', (values) => {
+			const remotes = multipleRemotes ? <string[]>values.shift() : [this.gitRemotes[0]];
+			const setUpstream = <boolean>values[0];
+			runAction({
+				command: 'pushBranch',
+				repo: this.currentRepo,
+				branchName: branchName,
+				remotes: remotes,
+				setUpstream: setUpstream,
+				mode: mode,
+				willUpdateBranchConfig: setUpstream && remotes.length > 0 && (this.gitConfig === null || typeof this.gitConfig.branches[branchName] === 'undefined' || this.gitConfig.branches[branchName].remote !== remotes[remotes.length - 1])
+			}, 'Pushing Branch');
+		}, null);
+	}
+
+	private showPushButtonContextMenu(event: MouseEvent) {
+		contextMenu.show([[
+			{
+				title: 'Push',
+				visible: true,
+				onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Normal)
+			},
+			{
+				title: 'Push Force With Lease',
+				visible: true,
+				onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.ForceWithLease)
+			},
+			{
+				title: 'Push Force',
+				visible: true,
+				onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
+			}
+		]], false, null, event, this.viewElem);
+	}
+
+	private getTopBarButtons() {
+		return [
+			{ id: 'terminalBtn', elem: this.terminalBtnElem, visible: true, title: 'Open Terminal', onClick: () => this.terminalBtnElem.click() },
+			{ id: 'settingsBtn', elem: this.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => this.settingsBtnElem.click() },
+			{ id: 'fetchBtn', elem: this.fetchBtnElem, visible: this.gitRemotes.length > 0, title: this.fetchBtnElem.title || 'Fetch', onClick: () => this.fetchBtnElem.click() },
+			{ id: 'pullBtn', elem: this.pullBtnElem, visible: this.gitRemotes.length > 0 && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD', title: 'Pull Current Branch', onClick: () => this.pullCurrentBranchAction() },
+			{ id: 'pushBtn', elem: this.pushBtnElem, visible: this.gitRemotes.length > 0 && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD', title: 'Push Current Branch', onClick: () => this.pushCurrentBranchAction() },
+			{ id: 'refreshBtn', elem: this.refreshBtnElem, visible: true, title: 'Refresh', onClick: () => this.refreshBtnElem.click() }
+		];
+	}
+
+	private showOverflowActions(event: MouseEvent) {
+		handledEvent(event);
+		const hiddenButtons = this.getTopBarButtons().filter((button) => button.visible && button.elem.classList.contains('overflowHidden'));
+		if (hiddenButtons.length === 0) return;
+
+		const actions: ContextMenuAction[][] = [];
+		for (let i = 0; i < hiddenButtons.length; i++) {
+			const button = hiddenButtons[i];
+			if (button.id === 'pushBtn') {
+				actions.push([
+					{
+						title: 'Push',
+						visible: true,
+						onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Normal)
+					},
+					{
+						title: 'Push Force With Lease',
+						visible: true,
+						onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.ForceWithLease)
+					},
+					{
+						title: 'Push Force',
+						visible: true,
+						onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
+					}
+				]);
+			} else {
+				actions.push([{
+					title: button.title,
+					visible: true,
+					onClick: button.onClick
+				}]);
+			}
+		}
+
+		contextMenu.show(actions, false, null, event, this.viewElem);
+	}
+
+	private updateControlsLayout() {
+		const buttons = this.getTopBarButtons();
+		const isOverflowing = () => {
+			const widthOverflow = this.controlsElem.scrollWidth > this.controlsElem.clientWidth;
+			const leftRect = this.controlsLeftElem.getBoundingClientRect();
+			const rightRect = this.controlsBtnsElem.getBoundingClientRect();
+			const touching = leftRect.right >= rightRect.left - 1;
+			const leftInternalOverflow = this.controlsLeftElem.scrollWidth > this.controlsLeftElem.clientWidth + 1;
+			return widthOverflow || touching || leftInternalOverflow;
+		};
+		if (this.controlsElem.clientWidth <= 0) {
+			// Layout isn't ready yet (e.g. tab just opened or moved); retry on next frame.
+			requestAnimationFrame(() => this.updateControlsLayout());
+			return;
+		}
+
+		alterClass(document.body, 'compactSearch', false);
+		buttons.forEach((button) => alterClass(button.elem, 'overflowHidden', !button.visible));
+		alterClass(this.moreBtnElem, 'overflowHidden', true);
+
+		const applyLayout = () => {
+			let overflow = isOverflowing();
+			if (overflow) {
+				alterClass(document.body, 'compactSearch', true);
+				overflow = isOverflowing();
+			}
+
+			const hideOrder = ['terminalBtn', 'settingsBtn', 'refreshBtn', 'fetchBtn', 'pullBtn', 'pushBtn'];
+			for (let i = 0; i < hideOrder.length && overflow; i++) {
+				const button = buttons.find((item) => item.id === hideOrder[i]);
+				if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;
+				alterClass(button.elem, 'overflowHidden', true);
+				alterClass(this.moreBtnElem, 'overflowHidden', false);
+				overflow = isOverflowing();
+			}
+			this.updateCompactFindWidgetState();
+		};
+
+		requestAnimationFrame(applyLayout);
+	}
+
+	public requestControlsLayoutUpdate() {
+		this.updateControlsLayout();
+	}
+
+	private showFindWidgetFromToggle() {
+		const compact = document.body.classList.contains('compactSearch');
+		if (!compact) {
+			this.findWidget.show(true);
+			return;
+		}
+
+		const currentlyOpen = document.body.classList.contains('compactSearchWidgetOpen');
+		if (currentlyOpen) {
+			this.compactFindWidgetPinnedOpen = false;
+			this.findWidget.close();
+			this.updateCompactFindWidgetState();
+			return;
+		}
+
+		this.compactFindWidgetPinnedOpen = true;
+		this.findWidget.show(true);
+		this.updateCompactFindWidgetState();
+	}
+
+	private updateCompactFindWidgetState() {
+		const compact = document.body.classList.contains('compactSearch');
+		if (!compact) {
+			this.compactFindWidgetPinnedOpen = false;
+			alterClass(document.body, 'compactSearchWidgetOpen', false);
+			alterClass(this.findWidgetToggleBtnElem, CLASS_ACTIVE, false);
+			const host = document.getElementById('findWidgetHost');
+			if (host !== null) {
+				host.style.removeProperty('left');
+				host.style.removeProperty('top');
+			}
+			return;
+		}
+
+		const shouldShowWidget = this.compactFindWidgetPinnedOpen || this.findWidget.isVisible();
+		alterClass(document.body, 'compactSearchWidgetOpen', shouldShowWidget);
+		alterClass(this.findWidgetToggleBtnElem, CLASS_ACTIVE, shouldShowWidget);
+		if (shouldShowWidget) {
+			this.positionCompactFindWidget();
+		}
+	}
+
+	private positionCompactFindWidget() {
+		const host = document.getElementById('findWidgetHost');
+		if (host === null) return;
+
+		requestAnimationFrame(() => {
+			const btnRect = this.findWidgetToggleBtnElem.getBoundingClientRect();
+			const hostRect = host.getBoundingClientRect();
+			const margin = 8;
+			let left = btnRect.left;
+			const maxLeft = window.innerWidth - hostRect.width - margin;
+			if (left > maxLeft) left = Math.max(margin, maxLeft);
+			if (left < margin) left = margin;
+			const top = btnRect.bottom + 6;
+			host.style.left = Math.round(left) + 'px';
+			host.style.top = Math.round(top) + 'px';
 		});
 	}
 
@@ -2471,7 +2766,7 @@ class GitGraphView {
 						this.refresh(true, true);
 						handledEvent(e);
 					} else if (key === keybindings.find) {
-						this.findWidget.show(true);
+						this.showFindWidgetFromToggle();
 						handledEvent(e);
 					} else if (key === keybindings.scrollToHead && this.commitHead !== null) {
 						this.scrollToCommit(this.commitHead, true, true);
@@ -2490,6 +2785,8 @@ class GitGraphView {
 					handledEvent(e);
 				} else if (this.findWidget.isVisible()) {
 					this.findWidget.close();
+					this.compactFindWidgetPinnedOpen = false;
+					this.updateCompactFindWidgetState();
 					handledEvent(e);
 				} else if (this.expandedCommit !== null) {
 					this.closeCommitDetails(true);

@@ -158,6 +158,12 @@ export async function activate(context: vscode.ExtensionContext) {
 		}));
 	}
 	logger.log('Started Git Graph - Ready to use!');
+	if (extensionState.getReopenGitGraphOnStartup()) {
+		logger.log('Reopening Git Graph because it was open before reload.');
+		setTimeout(() => {
+			void vscode.commands.executeCommand('an-dr-git.view');
+		}, 150);
+	}
 
 	extensionState.expireOldCodeReviews();
 	onStartUp(context).catch(() => { });

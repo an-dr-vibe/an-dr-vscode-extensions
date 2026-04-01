@@ -17,6 +17,7 @@ import { Disposable, toDisposable } from './utils/disposable';
 export class GitGraphView extends Disposable {
 	public static currentPanel: GitGraphView | undefined;
 	private static readonly NAME = 'an-dr: Git';
+	private static readonly VIEW_TYPE = 'an-dr-git';
 	private static nextInstanceId = 1;
 
 	private readonly panel: vscode.WebviewPanel;
@@ -70,6 +71,14 @@ export class GitGraphView extends Disposable {
 		}
 	}
 
+	public static revive(panel: vscode.WebviewPanel, extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger) {
+		if (GitGraphView.currentPanel) {
+			logger.log('GitGraphView.revive disposing existing currentPanel [' + GitGraphView.currentPanel.instanceId + '] before restoring webview panel.');
+			GitGraphView.currentPanel.dispose();
+		}
+		GitGraphView.currentPanel = new GitGraphView(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, null, panel.viewColumn, panel, true);
+	}
+
 	public static disposeCurrentPanelIfOrphaned(logger: Logger) {
 		if (!GitGraphView.currentPanel) return;
 		logger.log('GitGraphView detected orphaned panel [' + GitGraphView.currentPanel.instanceId + '], disposing stale panel handle.');
@@ -108,7 +117,7 @@ export class GitGraphView extends Disposable {
 	 * @param loadViewTo What to load the view to.
 	 * @param column The column the view should be loaded in.
 	 */
-	private constructor(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadGitGraphViewTo, column: vscode.ViewColumn | undefined) {
+	private constructor(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadGitGraphViewTo, column: vscode.ViewColumn | undefined, existingPanel?: vscode.WebviewPanel, restoredFromSerializer: boolean = false) {
 		super();
 		this.extensionPath = extensionPath;
 		this.avatarManager = avatarManager;
@@ -120,16 +129,26 @@ export class GitGraphView extends Disposable {
 		this.loadViewTo = loadViewTo;
 
 		const config = getConfig();
-		this.panel = vscode.window.createWebviewPanel('an-dr-git', GitGraphView.NAME, column || vscode.ViewColumn.One, {
-			enableScripts: true,
-			localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))],
-			retainContextWhenHidden: config.retainContextWhenHidden
-		});
-		// Keep the Git Graph tab pinned so branch checkouts that reload editors don't replace it.
-		void vscode.commands.executeCommand('workbench.action.keepEditor').then(
-			() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command succeeded.'),
-			() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command failed.')
-		);
+		if (existingPanel) {
+			this.panel = existingPanel;
+			this.panel.webview.options = {
+				enableScripts: true,
+				localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))]
+			};
+		} else {
+			this.panel = vscode.window.createWebviewPanel(GitGraphView.VIEW_TYPE, GitGraphView.NAME, column || vscode.ViewColumn.One, {
+				enableScripts: true,
+				localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))],
+				retainContextWhenHidden: config.retainContextWhenHidden
+			});
+			// Keep the Git Graph tab pinned so branch checkouts that reload editors don't replace it.
+			void vscode.commands.executeCommand('workbench.action.keepEditor').then(
+				() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command succeeded.'),
+				() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command failed.')
+			);
+		}
+		this.extensionState.setReopenGitGraphOnStartup(true);
+		this.isPanelVisible = this.panel.visible;
 		this.panel.iconPath = config.tabIconColourTheme === TabIconColourTheme.Colour
 			? this.getResourcesUri('webview-icon.svg')
 			: {
@@ -149,6 +168,7 @@ export class GitGraphView extends Disposable {
 			// Dispose this Git Graph View when the Webview Panel is disposed
 			this.panel.onDidDispose(() => {
 				this.logger.log('GitGraphView[' + this.instanceId + '] webview panel onDidDispose fired. visible=' + this.panel.visible + ', active=' + this.panel.active);
+				this.extensionState.setReopenGitGraphOnStartup(false);
 				if (GitGraphView.currentPanel === this) {
 					this.logger.log('GitGraphView[' + this.instanceId + '] currentPanel matches this instance.');
 				} else {
@@ -162,9 +182,14 @@ export class GitGraphView extends Disposable {
 				this.logger.log('GitGraphView[' + this.instanceId + '] onDidChangeViewState: visible=' + this.panel.visible + ', active=' + this.panel.active + ', trackedVisible=' + this.isPanelVisible);
 				if (this.panel.visible !== this.isPanelVisible) {
 					if (this.panel.visible) {
-						this.update();
+						if (this.panel.webview.html.trim().length === 0) {
+							this.update();
+						} else {
+							this.respondLoadRepos(this.repoManager.getRepos(), this.loadViewTo);
+							this.loadViewTo = null;
+							this.sendMessage({ command: 'refresh' });
+						}
 					} else {
-						this.currentRepo = null;
 						this.repoFileWatcher.stop();
 					}
 					this.isPanelVisible = this.panel.visible;
@@ -209,7 +234,7 @@ export class GitGraphView extends Disposable {
 		// Render the content of the Webview
 		this.update();
 
-		this.logger.log('Created Git Graph View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
+		this.logger.log((restoredFromSerializer ? 'Restored' : 'Created') + ' Git Graph View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
 	}
 
 	/**
@@ -798,13 +823,17 @@ export class GitGraphView extends Disposable {
 					<div id="controls">
 						<div id="controlsLeft">
 							<div id="findWidgetHost"></div>
+							<div id="findWidgetToggleBtn" title="Search Graph"></div>
 							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
 						</div>
 						<div id="controlsBtns">
 							<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
 							<div id="settingsBtn" title="Repository Settings"></div>
 							<div id="fetchBtn"></div>
+							<div id="pullBtn"></div>
+							<div id="pushBtn"></div>
 							<div id="refreshBtn"></div>
+							<div id="moreBtn" title="More Actions"></div>
 						</div>
 					</div>
 				</div>

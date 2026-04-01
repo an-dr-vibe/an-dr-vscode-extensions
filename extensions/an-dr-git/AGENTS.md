@@ -97,7 +97,9 @@ Each CSS file corresponds 1:1 to its component. All get concatenated into `media
 ├── #controls (41px, fixed top bar)
 │   ├── #repoDropdown
 │   ├── #showRemoteBranchesCheckbox
-│   ├── #findBtn, #terminalBtn, #settingsBtn, #fetchBtn, #refreshBtn
+│   ├── #findWidget / #findWidgetToggleBtn
+│   ├── #pullBtn, #pushBtn, #settingsBtn, #moreBtn
+│   ├── Pull right-click menu includes Fetch
 ├── #sidebar (fixed left, resizable via JS)
 │   ├── #branchPanel  ← BranchPanel mounts here
 │   └── #sidebarResizeHandle

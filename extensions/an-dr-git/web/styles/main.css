@@ -905,7 +905,7 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 	max-width:40vw;
 }
 
-#terminalBtn, #settingsBtn, #fetchBtn, #pullBtn, #pushBtn, #refreshBtn, #moreBtn{
+#settingsBtn, #pullBtn, #pushBtn, #moreBtn{
 	position:relative;
 	width:20px;
 	height:20px;
@@ -913,13 +913,10 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 	-webkit-user-select:none;
 	user-select:none;
 }
-#fetchBtn, #pullBtn, #pushBtn, #moreBtn{
+#pullBtn, #pushBtn, #moreBtn{
 	display:none;
 }
-#refreshBtn.refreshing{
-	cursor:default;
-}
-#terminalBtn svg, #settingsBtn svg, #fetchBtn svg, #pullBtn svg, #pushBtn svg, #refreshBtn svg{
+#settingsBtn svg, #pullBtn svg, #pushBtn svg{
 	position:absolute;
 	fill:var(--vscode-editor-foreground);
 	opacity:0.8;
@@ -927,34 +924,15 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 	stroke-opacity:0.5;
 	stroke-width:0;
 }
-#terminalBtn svg{
-	stroke-width:0.5px;
-}
-#terminalBtn:hover svg, #settingsBtn:hover svg, #fetchBtn:hover svg, #pullBtn:hover svg, #pushBtn:hover svg, #refreshBtn:hover svg{
+#settingsBtn:hover svg, #pullBtn:hover svg, #pushBtn:hover svg{
 	opacity:1;
 	stroke-width:0.5px;
 }
-#terminalBtn:hover svg{
-	stroke-width:1px;
-}
-#terminalBtn svg, #settingsBtn svg, #fetchBtn svg, #pullBtn svg, #pushBtn svg{
+#settingsBtn svg, #pullBtn svg, #pushBtn svg{
 	left:1px;
 	top:1px;
 	width:18px !important;
 	height:18px !important;
-}
-#refreshBtn svg{
-	left:2px;
-	top:2px;
-	width:16px !important;
-	height:16px !important;
-}
-#refreshBtn.refreshing svg{
-	left:3.25px;
-	top:2px;
-	width:13.5px !important;
-	height:18px !important;
-	animation:loadingIconAnimation 2s linear infinite;
 }
 
 #moreBtn{
@@ -1003,7 +981,6 @@ body.compactSearch #findWidgetToggleBtn{
 	background-color:var(--vscode-inputOption-activeBackground);
 }
 
-#controls.fetchSupported #fetchBtn,
 #controls.pullPushSupported #pullBtn,
 #controls.pullPushSupported #pushBtn{
 	display:block;

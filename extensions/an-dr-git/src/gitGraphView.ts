@@ -574,12 +574,6 @@ export class GitGraphView extends Disposable {
 					error: await openFile(msg.repo, msg.filePath, msg.hash, this.dataSource)
 				});
 				break;
-			case 'openTerminal':
-				this.sendMessage({
-					command: 'openTerminal',
-					error: await this.dataSource.openGitTerminal(msg.repo, null, msg.name)
-				});
-				break;
 			case 'popStash':
 				this.sendMessage({
 					command: 'popStash',
@@ -827,12 +821,9 @@ export class GitGraphView extends Disposable {
 							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
 						</div>
 						<div id="controlsBtns">
-							<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
-							<div id="settingsBtn" title="Repository Settings"></div>
-							<div id="fetchBtn"></div>
 							<div id="pullBtn"></div>
 							<div id="pushBtn"></div>
-							<div id="refreshBtn"></div>
+							<div id="settingsBtn" title="Repository Settings"></div>
 							<div id="moreBtn" title="More Actions"></div>
 						</div>
 					</div>

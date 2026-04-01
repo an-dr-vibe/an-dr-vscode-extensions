@@ -1050,14 +1050,6 @@ export interface ResponseOpenFile extends ResponseWithErrorInfo {
 	readonly command: 'openFile';
 }
 
-export interface RequestOpenTerminal extends RepoRequest {
-	readonly command: 'openTerminal';
-	readonly name: string;
-}
-export interface ResponseOpenTerminal extends ResponseWithErrorInfo {
-	readonly command: 'openTerminal';
-}
-
 export interface RequestPopStash extends RepoRequest {
 	readonly command: 'popStash';
 	readonly selector: string;
@@ -1325,7 +1317,6 @@ export type RequestMessage =
 	| RequestOpenExternalDirDiff
 	| RequestOpenExternalUrl
 	| RequestOpenFile
-	| RequestOpenTerminal
 	| RequestPopStash
 	| RequestPruneRemote
 	| RequestPullBranch
@@ -1389,7 +1380,6 @@ export type ResponseMessage =
 	| ResponseOpenExternalDirDiff
 	| ResponseOpenExternalUrl
 	| ResponseOpenFile
-	| ResponseOpenTerminal
 	| ResponsePopStash
 	| ResponsePruneRemote
 	| ResponsePullBranch

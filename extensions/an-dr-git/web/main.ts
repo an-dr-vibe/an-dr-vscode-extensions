@@ -65,12 +65,9 @@ class GitGraphView {
 	private readonly controlsBtnsElem: HTMLElement;
 	private readonly tableElem: HTMLElement;
 	private readonly footerElem: HTMLElement;
-	private readonly refreshBtnElem: HTMLElement;
 	private readonly scrollShadowElem: HTMLElement;
-	private readonly terminalBtnElem: HTMLElement;
 	private readonly findWidgetToggleBtnElem: HTMLElement;
 	private readonly settingsBtnElem: HTMLElement;
-	private readonly fetchBtnElem: HTMLElement;
 	private readonly pullBtnElem: HTMLElement;
 	private readonly pushBtnElem: HTMLElement;
 	private readonly moreBtnElem: HTMLElement;
@@ -100,9 +97,7 @@ class GitGraphView {
 		this.footerElem = document.getElementById('footer')!;
 		this.scrollShadowElem = <HTMLInputElement>document.getElementById('scrollShadow')!;
 		this.findWidgetToggleBtnElem = document.getElementById('findWidgetToggleBtn')!;
-		this.terminalBtnElem = document.getElementById('terminalBtn')!;
 		this.settingsBtnElem = document.getElementById('settingsBtn')!;
-		this.fetchBtnElem = document.getElementById('fetchBtn')!;
 		this.pullBtnElem = document.getElementById('pullBtn')!;
 		this.pushBtnElem = document.getElementById('pushBtn')!;
 		this.moreBtnElem = document.getElementById('moreBtn')!;
@@ -129,12 +124,6 @@ class GitGraphView {
 			contextMenu.show(this.getSidebarContextMenuActions(type, name), false, null, event, this.viewElem);
 		}, this.config.branchPanel.flattenSingleChildGroups, this.config.branchPanel.groupsFirst);
 
-		this.refreshBtnElem = document.getElementById('refreshBtn')!;
-		this.refreshBtnElem.addEventListener('click', () => {
-			if (!this.refreshBtnElem.classList.contains(CLASS_REFRESHING)) {
-				this.refresh(true, true);
-			}
-		});
 		this.renderRefreshButton();
 
 		this.findWidget = new FindWidget(this);
@@ -201,33 +190,32 @@ class GitGraphView {
 			}, 350);
 		}
 
-		this.fetchBtnElem.title = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
-		this.fetchBtnElem.innerHTML = SVG_ICONS.download;
-		this.fetchBtnElem.addEventListener('click', () => this.fetchFromRemotesAction());
 		this.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
 		this.findWidgetToggleBtnElem.addEventListener('click', () => this.showFindWidgetFromToggle());
+		this.findWidgetToggleBtnElem.addEventListener('contextmenu', (event) => handledEvent(event));
 		this.pullBtnElem.title = 'Pull Current Branch';
 		this.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
 		this.pullBtnElem.addEventListener('click', () => this.pullCurrentBranchAction());
+		this.pullBtnElem.addEventListener('contextmenu', (event) => {
+			handledEvent(event);
+			this.showPullButtonContextMenu(event);
+		});
 		this.pushBtnElem.title = 'Push Current Branch';
 		this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
 		this.pushBtnElem.addEventListener('click', () => this.pushCurrentBranchAction());
 		this.pushBtnElem.addEventListener('contextmenu', (event) => {
-			event.preventDefault();
+			handledEvent(event);
 			this.showPushButtonContextMenu(event);
 		});
 		this.settingsBtnElem.innerHTML = SVG_ICONS.gear;
 		this.settingsBtnElem.addEventListener('click', () => this.settingsWidget.show(this.currentRepo));
-		this.terminalBtnElem.innerHTML = SVG_ICONS.terminal;
-		this.terminalBtnElem.addEventListener('click', () => {
-			runAction({
-				command: 'openTerminal',
-				repo: this.currentRepo,
-				name: this.gitRepos[this.currentRepo].name || getRepoName(this.currentRepo)
-			}, 'Opening Terminal');
+		this.settingsBtnElem.addEventListener('contextmenu', (event) => {
+			handledEvent(event);
+			this.showSettingsButtonContextMenu(event);
 		});
 		this.moreBtnElem.innerHTML = '&hellip;';
 		this.moreBtnElem.addEventListener('click', (event) => this.showOverflowActions(event));
+		this.moreBtnElem.addEventListener('contextmenu', (event) => handledEvent(event));
 		this.updateControlsLayout();
 	}
 
@@ -1048,16 +1036,13 @@ class GitGraphView {
 
 	private renderFetchButton() {
 		const hasRemotes = this.gitRemotes.length > 0;
-		alterClass(this.controlsElem, CLASS_FETCH_SUPPORTED, hasRemotes);
 		alterClass(this.controlsElem, 'pullPushSupported', hasRemotes && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD');
 		this.updateControlsLayout();
 	}
 
 	public renderRefreshButton() {
-		const enabled = !this.currentRepoRefreshState.inProgress;
-		this.refreshBtnElem.title = enabled ? 'Refresh' : 'Refreshing';
-		this.refreshBtnElem.innerHTML = enabled ? SVG_ICONS.refresh : SVG_ICONS.loading;
-		alterClass(this.refreshBtnElem, CLASS_REFRESHING, !enabled);
+		// Refresh now lives in the Settings context menu.
+		// Keep this method so existing refresh call sites stay unchanged.
 	}
 
 	public renderTagDetails(tagName: string, commitHash: string, details: GG.GitTagDetails) {
@@ -2482,14 +2467,42 @@ class GitGraphView {
 		]], false, null, event, this.viewElem);
 	}
 
+	private showPullButtonContextMenu(event: MouseEvent) {
+		const fetchTitle = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
+		contextMenu.show([[
+			{
+				title: 'Pull Current Branch',
+				visible: true,
+				onClick: () => this.pullCurrentBranchAction()
+			},
+			{
+				title: fetchTitle,
+				visible: true,
+				onClick: () => this.fetchFromRemotesAction()
+			}
+		]], false, null, event, this.viewElem);
+	}
+
+	private showSettingsButtonContextMenu(event: MouseEvent) {
+		contextMenu.show([[
+			{
+				title: 'Repository Settings',
+				visible: true,
+				onClick: () => this.settingsWidget.show(this.currentRepo)
+			},
+			{
+				title: 'Refresh',
+				visible: true,
+				onClick: () => this.refresh(true, true)
+			}
+		]], false, null, event, this.viewElem);
+	}
+
 	private getTopBarButtons() {
 		return [
-			{ id: 'terminalBtn', elem: this.terminalBtnElem, visible: true, title: 'Open Terminal', onClick: () => this.terminalBtnElem.click() },
-			{ id: 'settingsBtn', elem: this.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => this.settingsBtnElem.click() },
-			{ id: 'fetchBtn', elem: this.fetchBtnElem, visible: this.gitRemotes.length > 0, title: this.fetchBtnElem.title || 'Fetch', onClick: () => this.fetchBtnElem.click() },
 			{ id: 'pullBtn', elem: this.pullBtnElem, visible: this.gitRemotes.length > 0 && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD', title: 'Pull Current Branch', onClick: () => this.pullCurrentBranchAction() },
 			{ id: 'pushBtn', elem: this.pushBtnElem, visible: this.gitRemotes.length > 0 && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD', title: 'Push Current Branch', onClick: () => this.pushCurrentBranchAction() },
-			{ id: 'refreshBtn', elem: this.refreshBtnElem, visible: true, title: 'Refresh', onClick: () => this.refreshBtnElem.click() }
+			{ id: 'settingsBtn', elem: this.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => this.settingsBtnElem.click() }
 		];
 	}
 
@@ -2501,7 +2514,20 @@ class GitGraphView {
 		const actions: ContextMenuAction[][] = [];
 		for (let i = 0; i < hiddenButtons.length; i++) {
 			const button = hiddenButtons[i];
-			if (button.id === 'pushBtn') {
+			if (button.id === 'pullBtn') {
+				actions.push([
+					{
+						title: 'Pull Current Branch',
+						visible: true,
+						onClick: () => this.pullCurrentBranchAction()
+					},
+					{
+						title: 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)',
+						visible: true,
+						onClick: () => this.fetchFromRemotesAction()
+					}
+				]);
+			} else if (button.id === 'pushBtn') {
 				actions.push([
 					{
 						title: 'Push',
@@ -2517,6 +2543,19 @@ class GitGraphView {
 						title: 'Push Force',
 						visible: true,
 						onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
+					}
+				]);
+			} else if (button.id === 'settingsBtn') {
+				actions.push([
+					{
+						title: 'Repository Settings',
+						visible: true,
+						onClick: () => this.settingsWidget.show(this.currentRepo)
+					},
+					{
+						title: 'Refresh',
+						visible: true,
+						onClick: () => this.refresh(true, true)
 					}
 				]);
 			} else {
@@ -2558,7 +2597,7 @@ class GitGraphView {
 				overflow = isOverflowing();
 			}
 
-			const hideOrder = ['terminalBtn', 'settingsBtn', 'refreshBtn', 'fetchBtn', 'pullBtn', 'pushBtn'];
+			const hideOrder = ['settingsBtn', 'pullBtn', 'pushBtn'];
 			for (let i = 0; i < hideOrder.length && overflow; i++) {
 				const button = buttons.find((item) => item.id === hideOrder[i]);
 				if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;
@@ -4066,9 +4105,6 @@ window.addEventListener('load', () => {
 				break;
 			case 'openFile':
 				finishOrDisplayError(msg.error, 'Unable to Open File');
-				break;
-			case 'openTerminal':
-				finishOrDisplayError(msg.error, 'Unable to Open Terminal', true);
 				break;
 			case 'popStash':
 				refreshOrDisplayError(msg.error, 'Unable to Pop Stash');

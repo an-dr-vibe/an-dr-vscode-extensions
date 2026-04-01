@@ -71,7 +71,7 @@ export const mocks = {
 /* Visual Studio Code API Mocks */
 
 export const commands = {
-	executeCommand: jest.fn((command: string, ...rest: any[]) => mockedCommands[command](...rest)),
+	executeCommand: jest.fn((command: string, ...rest: any[]) => mockedCommands[command] ? mockedCommands[command](...rest) : Promise.resolve(null)),
 	registerCommand: jest.fn((command: string, callback: (...args: any[]) => any) => {
 		mockedCommands[command] = callback;
 		return {

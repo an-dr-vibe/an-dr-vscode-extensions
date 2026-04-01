@@ -65,6 +65,7 @@ class GitGraphView {
 	private readonly footerElem: HTMLElement;
 	private readonly refreshBtnElem: HTMLElement;
 	private readonly scrollShadowElem: HTMLElement;
+	private pendingBranchPanelState: GG.GitGraphBranchPanelState | null = null;
 
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
 		this.gitRepos = initialState.repos;
@@ -141,6 +142,7 @@ class GitGraphView {
 			this.branchDropdown.setSelectedTags(this.currentTags);
 			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
 			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
+			this.branchDropdown.restoreState(prevState.branchPanel);
 			this.findWidget.restoreState(prevState.findWidget);
 			this.settingsWidget.restoreState(prevState.settingsWidget);
 		}
@@ -148,6 +150,9 @@ class GitGraphView {
 		let loadViewTo = initialState.loadViewTo;
 		if (loadViewTo === null && prevState && prevState.currentRepoLoading && typeof prevState.currentRepo !== 'undefined') {
 			loadViewTo = { repo: prevState.currentRepo };
+		}
+		if (loadViewTo !== null) {
+			this.pendingBranchPanelState = typeof loadViewTo.branchPanelState !== 'undefined' ? loadViewTo.branchPanelState! : null;
 		}
 
 		if (!this.loadRepos(this.gitRepos, initialState.lastActiveRepo, loadViewTo)) {
@@ -253,6 +258,15 @@ class GitGraphView {
 		// Update the state of the fetch button
 		this.renderFetchButton();
 
+		if (this.loadViewTo !== null && this.loadViewTo.repo === this.currentRepo) {
+			if (typeof this.loadViewTo.selectedBranches !== 'undefined') {
+				this.currentBranches = this.loadViewTo.selectedBranches;
+			}
+			if (typeof this.loadViewTo.selectedTags !== 'undefined') {
+				this.currentTags = this.loadViewTo.selectedTags;
+			}
+		}
+
 		// Configure current branches
 		if (this.currentBranches !== null && !(this.currentBranches.length === 1 && this.currentBranches[0] === SHOW_ALL_BRANCHES)) {
 			// Filter any branches that are currently selected, but no longer exist
@@ -286,6 +300,9 @@ class GitGraphView {
 
 		// Set up branch dropdown options
 		this.branchDropdown.setOptions(this.getBranchOptions(true), this.currentBranches);
+		if (this.pendingBranchPanelState !== null) {
+			this.branchDropdown.restoreState(this.pendingBranchPanelState);
+		}
 
 		// Remove hidden remotes that no longer exist
 		let hiddenRemotes = this.gitRepos[this.currentRepo].hideRemotes;
@@ -448,13 +465,21 @@ class GitGraphView {
 				} else {
 					showErrorMessage('Unable to resume Code Review, it could not be found in the latest ' + this.maxCommits + ' commits that were loaded in this repository.');
 				}
-			} else if (this.loadViewTo.runCommandOnLoad) {
+		} else if (this.loadViewTo.runCommandOnLoad) {
 				switch (this.loadViewTo.runCommandOnLoad) {
 					case 'fetch':
 						this.fetchFromRemotesAction();
 						break;
 				}
 			}
+			if (typeof this.loadViewTo.scrollTop === 'number') {
+				this.scrollTop = this.loadViewTo.scrollTop;
+				this.viewElem.scroll(0, this.scrollTop);
+			}
+		}
+		if (this.pendingBranchPanelState !== null) {
+			this.branchDropdown.restoreState(this.pendingBranchPanelState);
+			this.pendingBranchPanelState = null;
 		}
 		this.loadViewTo = null;
 
@@ -763,6 +788,7 @@ class GitGraphView {
 			onlyFollowFirstParent: this.onlyFollowFirstParent,
 			expandedCommit: expandedCommit,
 			scrollTop: this.scrollTop,
+			branchPanel: this.branchDropdown.getState(),
 			findWidget: this.findWidget.getState(),
 			settingsWidget: this.settingsWidget.getState()
 		});
@@ -1777,6 +1803,12 @@ class GitGraphView {
 	}
 
 	private checkoutBranchAction(refName: string, remote: string | null, prefillName: string | null, target: DialogTarget | null) {
+		const checkoutRequestState = {
+			selectedBranches: this.currentBranches,
+			selectedTags: this.currentTags,
+			scrollTop: this.scrollTop,
+			branchPanelState: this.branchDropdown.getState()
+		};
 		if (remote !== null) {
 			dialog.showRefInput('Enter the name of the new branch you would like to create when checking out <b><i>' + escapeHtml(refName) + '</i></b>:', (prefillName !== null ? prefillName : (remote !== '' ? refName.substring(remote.length + 1) : refName)), 'Checkout Branch', newBranch => {
 				if (this.gitBranches.includes(newBranch)) {
@@ -1789,6 +1821,10 @@ class GitGraphView {
 							repo: this.currentRepo,
 							branchName: newBranch,
 							remoteBranch: null,
+							selectedBranches: checkoutRequestState.selectedBranches,
+							selectedTags: checkoutRequestState.selectedTags,
+							scrollTop: checkoutRequestState.scrollTop,
+							branchPanelState: checkoutRequestState.branchPanelState,
 							pullAfterwards: canPullFromRemote
 								? {
 									branchName: refName.substring(remote.length + 1),
@@ -1800,11 +1836,31 @@ class GitGraphView {
 						}, 'Checking out Branch' + (canPullFromRemote ? ' & Pulling Changes' : ''));
 					}, target);
 				} else {
-					runAction({ command: 'checkoutBranch', repo: this.currentRepo, branchName: newBranch, remoteBranch: refName, pullAfterwards: null }, 'Checking out Branch');
+					runAction({
+						command: 'checkoutBranch',
+						repo: this.currentRepo,
+						branchName: newBranch,
+						remoteBranch: refName,
+						selectedBranches: checkoutRequestState.selectedBranches,
+						selectedTags: checkoutRequestState.selectedTags,
+						scrollTop: checkoutRequestState.scrollTop,
+						branchPanelState: checkoutRequestState.branchPanelState,
+						pullAfterwards: null
+					}, 'Checking out Branch');
 				}
 			}, target);
 		} else {
-			runAction({ command: 'checkoutBranch', repo: this.currentRepo, branchName: refName, remoteBranch: null, pullAfterwards: null }, 'Checking out Branch');
+			runAction({
+				command: 'checkoutBranch',
+				repo: this.currentRepo,
+				branchName: refName,
+				remoteBranch: null,
+				selectedBranches: checkoutRequestState.selectedBranches,
+				selectedTags: checkoutRequestState.selectedTags,
+				scrollTop: checkoutRequestState.scrollTop,
+				branchPanelState: checkoutRequestState.branchPanelState,
+				pullAfterwards: null
+			}, 'Checking out Branch');
 		}
 	}
 

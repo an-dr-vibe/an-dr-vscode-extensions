@@ -323,6 +323,7 @@ export class RepoManager extends Disposable {
 	 * @param repo The path of the repository.
 	 */
 	private removeRepo(repo: string) {
+		this.logger.log('Attempting to remove repo: ' + repo);
 		delete this.repos[repo];
 		this.extensionState.saveRepos(this.repos);
 		this.logger.log('Removed repo: ' + repo);
@@ -372,7 +373,18 @@ export class RepoManager extends Disposable {
 	 */
 	public checkReposExist() {
 		let repoPaths = Object.keys(this.repos), changes = false;
-		return evalPromises(repoPaths, 3, (path) => this.dataSource.repoRoot(path)).then((results) => {
+		return evalPromises(repoPaths, 3, async (path) => {
+			let root = await this.dataSource.repoRoot(path);
+			if (root === null) {
+				// Retry if repoRoot returns null (could be transient during checkout)
+				for (let i = 0; i < 2; i++) {
+					await new Promise(resolve => setTimeout(resolve, 200));
+					root = await this.dataSource.repoRoot(path);
+					if (root !== null) break;
+				}
+			}
+			return root;
+		}).then((results) => {
 			for (let i = 0; i < repoPaths.length; i++) {
 				if (results[i] === null) {
 					this.removeRepo(repoPaths[i]);
@@ -590,11 +602,23 @@ export class RepoManager extends Disposable {
 	 * Handle a file system deletion event.
 	 * @param uri The URI of the deletion event.
 	 */
-	private onWatcherDelete(uri: vscode.Uri) {
+	private async onWatcherDelete(uri: vscode.Uri) {
 		let path = getPathFromUri(uri);
+		this.logger.log('Watcher Delete Event: ' + path);
 		if (path.indexOf('/.git/') > -1) return;
 		if (path.endsWith('/.git')) path = path.slice(0, -5);
-		if (this.removeReposWithinFolder(path)) this.sendRepos();
+
+		// Verify that the path really doesn't exist before removing repositories (could be transient during checkout)
+		if (await doesPathExist(path)) return;
+		for (let i = 0; i < 2; i++) {
+			await new Promise(resolve => setTimeout(resolve, 200));
+			if (await doesPathExist(path)) return;
+		}
+
+		if (this.removeReposWithinFolder(path)) {
+			this.logger.log('Removed one or more repos due to watcher delete event at: ' + path);
+			this.sendRepos();
+		}
 	}
 
 	/**
@@ -618,7 +642,15 @@ export class RepoManager extends Disposable {
 	 */
 	private async processOnWatcherChangeEvent(path: string) {
 		if (!await doesPathExist(path)) {
+			// Verify that the path really doesn't exist before removing repositories (could be transient during checkout)
+			for (let i = 0; i < 2; i++) {
+				await new Promise(resolve => setTimeout(resolve, 200));
+				if (await doesPathExist(path)) return false;
+			}
+
+			this.logger.log('Watcher Change Event: path does not exist: ' + path);
 			if (this.removeReposWithinFolder(path)) {
+				this.logger.log('Removed one or more repos due to watcher change event at: ' + path);
 				return true;
 			}
 		}

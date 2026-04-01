@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import {
 	AuthorAvatarSize,
-	AuthorDisplayMode,
 	AuthorAvatarMode,
 	AuthorAvatarShape,
 	BranchPanelConfig,
+	CommittedVisualMode,
+	CommitsColumnVisibility,
 	CommitDetailsViewConfig,
 	CommitDetailsViewLocation,
 	CommitOrdering,
@@ -14,8 +15,6 @@ import {
 	CustomPullRequestProvider,
 	DateFormat,
 	DateFormatType,
-	DateType,
-	DefaultColumnVisibility,
 	DialogDefaults,
 	FileViewType,
 	GitResetMode,
@@ -164,24 +163,14 @@ class Config {
 	}
 
 	/**
-	 * Get the value of the `an-dr-git.date.type` Extension Setting.
+	 * Get the value of the `an-dr-git.repository.commits.columnVisibility` Extension Setting.
 	 */
-	get dateType() {
-		return this.getRenamedExtensionSetting<string>('date.type', 'dateType', 'Author Date') === 'Commit Date'
-			? DateType.Commit
-			: DateType.Author;
-	}
-
-	/**
-	 * Get the value of the `an-dr-git.defaultColumnVisibility` Extension Setting.
-	 */
-	get defaultColumnVisibility(): DefaultColumnVisibility {
-		let obj: any = this.config.get('defaultColumnVisibility', {});
-		if (typeof obj === 'object' && obj !== null && typeof obj['Date'] === 'boolean' && typeof obj['Author'] === 'boolean' && typeof obj['Commit'] === 'boolean') {
-			return { author: obj['Author'], commit: obj['Commit'], date: obj['Date'] };
-		} else {
-			return { author: true, commit: true, date: true };
+	get commitsColumnVisibility(): CommitsColumnVisibility {
+		let obj: any = this.config.get('repository.commits.columnVisibility', {});
+		if (typeof obj === 'object' && obj !== null && typeof obj['Committed'] === 'boolean' && typeof obj['ID'] === 'boolean') {
+			return { committed: obj['Committed'], id: obj['ID'] };
 		}
+		return { committed: true, id: true };
 	}
 
 	/**
@@ -388,18 +377,6 @@ class Config {
 	}
 
 	/**
-	 * Get the value of the `an-dr-git.repository.commits.authorDisplay` Extension Setting.
-	 */
-	get authorDisplayMode() {
-		const displayMode = this.config.get<string>('repository.commits.authorDisplay', 'Auto Compact');
-		return displayMode === 'Avatar Only'
-			? AuthorDisplayMode.AvatarOnly
-			: displayMode === 'Auto Compact'
-				? AuthorDisplayMode.AutoCompact
-				: AuthorDisplayMode.Both;
-	}
-
-	/**
 	 * Get the value of the `an-dr-git.repository.commits.avatar.size` Extension Setting.
 	 */
 	get authorAvatarSize() {
@@ -415,6 +392,15 @@ class Config {
 		return this.config.get<string>('repository.commits.avatar.shape', 'Circle') === 'Square'
 			? AuthorAvatarShape.Square
 			: AuthorAvatarShape.Circle;
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.repository.commits.committedVisual` Extension Setting.
+	 */
+	get committedVisual() {
+		return this.config.get<string>('repository.commits.committedVisual', 'Avatar') === 'Initials'
+			? CommittedVisualMode.Initials
+			: CommittedVisualMode.Avatar;
 	}
 
 	/**

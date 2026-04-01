@@ -664,6 +664,21 @@ export class GitGraphView extends Disposable {
 					error: await this.extensionState.setGlobalViewState(msg.state)
 				});
 				break;
+			case 'setColumnVisibility':
+				let setColumnVisibilityError: ErrorInfo = null;
+				try {
+					await vscode.workspace.getConfiguration('an-dr-git').update('repository.commits.columnVisibility', {
+						Committed: msg.visibility.committed,
+						ID: msg.visibility.id
+					}, vscode.ConfigurationTarget.Global);
+				} catch (e) {
+					setColumnVisibilityError = e instanceof Error ? e.message : 'Unable to update setting "an-dr-git.repository.commits.columnVisibility".';
+				}
+				this.sendMessage({
+					command: 'setColumnVisibility',
+					error: setColumnVisibilityError
+				});
+				break;
 			case 'setRepoState':
 				this.repoManager.setRepoState(msg.repo, msg.state);
 				break;
@@ -840,19 +855,19 @@ export class GitGraphView extends Disposable {
 		const config = getConfig(), nonce = getNonce();
 		const initialState: GitGraphViewInitialState = {
 			config: {
-				authorDisplay: config.authorDisplayMode,
 				avatarMode: config.authorAvatarMode,
 				avatarSize: config.authorAvatarSize,
 				avatarShape: config.authorAvatarShape,
+				committedVisual: config.committedVisual,
 				branchPanel: config.branchPanel,
 				commitDetailsView: config.commitDetailsView,
 				commitOrdering: config.commitOrder,
+				commitsColumnVisibility: config.commitsColumnVisibility,
 				contextMenuActionsVisibility: config.contextMenuActionsVisibility,
 				customBranchGlobPatterns: config.customBranchGlobPatterns,
 				customEmojiShortcodeMappings: config.customEmojiShortcodeMappings,
 				customPullRequestProviders: config.customPullRequestProviders,
 				dateFormat: config.dateFormat,
-				defaultColumnVisibility: config.defaultColumnVisibility,
 				dialogDefaults: config.dialogDefaults,
 				enhancedAccessibility: config.enhancedAccessibility,
 				fetchAndPrune: config.fetchAndPrune,

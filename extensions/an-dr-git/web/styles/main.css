@@ -255,22 +255,22 @@ code{
 	width:100%;
 	max-width:0;
 }
-#commitTable.autoLayout td.authorCol, #commitTable.autoLayout th.authorCol{
-	max-width:124px;
+#commitTable.autoLayout td.committedCol, #commitTable.autoLayout th.committedCol{
+	max-width:190px;
 }
 @media screen and (min-width: 775px) and (max-width: 850px) {
-	#commitTable.autoLayout td.dateCol, #commitTable.autoLayout th.dateCol, #commitTable.autoLayout td.authorCol, #commitTable.autoLayout th.authorCol{
-		max-width:100px;
+	#commitTable.autoLayout td.committedCol, #commitTable.autoLayout th.committedCol{
+		max-width:172px;
 	}
 }
 @media screen and (min-width: 700px) and (max-width: 775px) {
-	#commitTable.autoLayout td.dateCol, #commitTable.autoLayout th.dateCol, #commitTable.autoLayout td.authorCol, #commitTable.autoLayout th.authorCol{
-		max-width:90px;
+	#commitTable.autoLayout td.committedCol, #commitTable.autoLayout th.committedCol{
+		max-width:156px;
 	}
 }
 @media screen and (max-width: 700px) {
-	#commitTable.autoLayout td.dateCol, #commitTable.autoLayout th.dateCol, #commitTable.autoLayout td.authorCol, #commitTable.autoLayout th.authorCol{
-		max-width:80px;
+	#commitTable.autoLayout td.committedCol, #commitTable.autoLayout th.committedCol{
+		max-width:142px;
 	}
 }
 
@@ -661,14 +661,46 @@ svg.openFolderIcon, svg.closedFolderIcon, svg.fileIcon{
 	width:100%;
 	height:100%;
 }
+#commitTable td.committedCol .committedMeta{
+	display:inline-block;
+	vertical-align:top;
+	white-space:nowrap;
+	max-width:100%;
+	overflow:hidden;
+	text-overflow:ellipsis;
+}
+#commitTable td.committedCol .committedDate, #commitTable td.committedCol .committedTime{
+	display:inline-block;
+	vertical-align:top;
+}
+#commitTable td.committedCol .committedDate{
+	margin-right:4px;
+}
+#commitTable td.committedCol .avatar.normal + .committedMeta{
+	max-width:calc(100% - 22px);
+}
+#commitTable td.committedCol .avatar.small + .committedMeta{
+	max-width:calc(100% - 18px);
+}
+#commitTable.committedHideTime td.committedCol .committedTime{
+	display:none;
+}
+.commit .avatar.initials{
+	align-items:center;
+	justify-content:center;
+	font-weight:700;
+	font-size:10px;
+	line-height:1;
+	color:var(--vscode-editor-foreground);
+}
+.commit .avatar.small.initials{
+	font-size:9px;
+}
 .avatar.circle{
 	border-radius:50%;
 }
 .avatar.square{
 	border-radius:4px;
-}
-#commitTable.authorAvatarOnly td.authorCol .authorName{
-	display:none;
 }
 
 

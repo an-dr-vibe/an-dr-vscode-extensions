@@ -15,9 +15,6 @@ type SidebarResolvedRef =
 type SidebarTagContextResolver = (result: { hash: string; annotated: boolean } | null) => void;
 
 class GitGraphView {
-	private static readonly AUTHOR_AUTO_COMPACT_THRESHOLD_NORMAL = 112;
-	private static readonly AUTHOR_AUTO_COMPACT_THRESHOLD_SMALL = 98;
-
 	private gitRepos: GG.GitRepoSet;
 	private gitBranches: ReadonlyArray<string> = [];
 	private gitBranchUpstreams: { readonly [branchName: string]: string } = {};
@@ -651,26 +648,31 @@ class GitGraphView {
 		return this.config.avatarSize === GG.AuthorAvatarSize.Small ? 'small' : 'normal';
 	}
 
-	private shouldUseAvatarOnlyAuthorDisplay() {
-		if (this.config.authorDisplay === GG.AuthorDisplayMode.AvatarOnly) {
-			return true;
-		}
-		if (this.config.authorDisplay !== GG.AuthorDisplayMode.AutoCompact) {
-			return false;
+	private updateCommittedColumnDisplayMode() {
+		this.tableElem.classList.remove('committedHideTime');
+
+		if (this.config.dateFormat.type !== GG.DateFormatType.DateAndTime || !this.getColumnVisibility().committed) {
+			return;
 		}
 
-		const authorColHeader = <HTMLElement | null>this.tableElem.querySelector('#tableColHeaders th.authorCol');
-		if (authorColHeader === null) {
-			return false;
-		}
-		const threshold = this.config.avatarSize === GG.AuthorAvatarSize.Small
-			? GitGraphView.AUTHOR_AUTO_COMPACT_THRESHOLD_SMALL
-			: GitGraphView.AUTHOR_AUTO_COMPACT_THRESHOLD_NORMAL;
-		return authorColHeader.clientWidth <= threshold;
-	}
+		const committedCells = <NodeListOf<HTMLElement>>this.tableElem.querySelectorAll('tr.commit td.committedCol');
+		for (let i = 0; i < committedCells.length; i++) {
+			const cell = committedCells[i];
+			const meta = <HTMLElement | null>cell.querySelector('.committedMeta');
+			if (meta === null) continue;
 
-	private updateAuthorColumnDisplayMode() {
-		this.tableElem.classList.toggle('authorAvatarOnly', this.shouldUseAvatarOnlyAuthorDisplay());
+			const avatar = <HTMLElement | null>cell.querySelector('.avatar');
+			const avatarWidth = avatar !== null ? avatar.offsetWidth + 4 : 0; // width + right margin
+			const style = window.getComputedStyle(cell);
+			const paddingLeft = parseFloat(style.paddingLeft) || 0;
+			const paddingRight = parseFloat(style.paddingRight) || 0;
+			const availableWidth = cell.clientWidth - paddingLeft - paddingRight - avatarWidth;
+
+			if (availableWidth <= 0 || meta.scrollWidth > availableWidth + 1) {
+				this.tableElem.classList.add('committedHideTime');
+				return;
+			}
+		}
 	}
 
 	private getAuthorAvatarSeed(author: string, email: string) {
@@ -794,6 +796,74 @@ class GitGraphView {
 			attributes += ' data-procedural="true"';
 		}
 		return '<span class="avatar ' + shapeClass + ' ' + sizeClass + '"' + attributes + '><img class="avatarImg" src="' + visual.image + '"></span>';
+	}
+
+	private getAuthorInitials(author: string, email: string) {
+		const source = (author.trim() !== '' ? author : email).trim();
+		if (source === '') return '??';
+
+		const parts = source.match(/[0-9A-Za-z]+/g) || [];
+		let initials = '';
+		if (parts.length >= 2) {
+			initials = parts[0].charAt(0) + parts[1].charAt(0);
+		} else if (parts.length === 1) {
+			initials = parts[0].slice(0, 2);
+		} else {
+			initials = source.replace(/\s+/g, '').slice(0, 2);
+		}
+
+		initials = initials.toUpperCase();
+		if (initials.length === 1) initials += initials;
+		return initials.length > 0 ? initials : '??';
+	}
+
+	private getInitialsBackgroundColor(author: string, email: string) {
+		const seed = this.getAuthorAvatarSeed(author, email);
+		let hash = 0;
+		for (let i = 0; i < seed.length; i++) {
+			hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+		}
+		const hue = hash % 360;
+		return 'hsl(' + hue + ', 46%, 36%)';
+	}
+
+	private getCommittedVisualHtml(author: string, email: string) {
+		if (this.config.committedVisual === GG.CommittedVisualMode.Initials) {
+			const shapeClass = this.getAuthorAvatarShapeClass();
+			const sizeClass = this.getAuthorAvatarSizeClass();
+			const initials = this.getAuthorInitials(author, email);
+			const bg = this.getInitialsBackgroundColor(author, email);
+			return '<span class="avatar initials ' + shapeClass + ' ' + sizeClass + '" style="background-color:' + bg + ';" title="' + escapeHtml(author) + '">' + escapeHtml(initials) + '</span>';
+		}
+		return this.getCommitAuthorAvatarHtml(author, email);
+	}
+
+	private getCommittedDateParts(formatted: string) {
+		if (this.config.dateFormat.type !== GG.DateFormatType.DateAndTime) {
+			return { date: formatted, time: <string | null>null };
+		}
+		const lastSpaceIndex = formatted.lastIndexOf(' ');
+		if (lastSpaceIndex <= 0 || lastSpaceIndex >= formatted.length - 1) {
+			return { date: formatted, time: <string | null>null };
+		}
+		return {
+			date: formatted.substring(0, lastSpaceIndex),
+			time: formatted.substring(lastSpaceIndex + 1)
+		};
+	}
+
+	private getCommittedCellHtml(commit: GG.GitCommit) {
+		const date = formatShortDate(commit.date);
+		const dateParts = this.getCommittedDateParts(date.formatted);
+		const authorDisplay = commit.author.trim() !== '' ? commit.author : (commit.email.trim() !== '' ? commit.email : 'Unknown Author');
+		const title = escapeHtml(authorDisplay) + ' • ' + escapeHtml(date.title);
+		return '<td class="committedCol text" title="' + title + '">'
+			+ this.getCommittedVisualHtml(commit.author, commit.email)
+			+ '<span class="committedMeta">'
+			+ '<span class="committedDate">' + escapeHtml(dateParts.date) + '</span>'
+			+ (dateParts.time !== null ? '<span class="committedTime">' + escapeHtml(dateParts.time) + '</span>' : '')
+			+ '</span>'
+			+ '</td>';
 	}
 
 	private getCommitDetailsAvatarHtml(author: string, email: string, fetchedAvatar: string | null) {
@@ -1075,7 +1145,7 @@ class GitGraphView {
 	}
 
 	private saveColumnWidths(columnWidths: GG.ColumnWidth[]) {
-		this.gitRepos[this.currentRepo].columnWidths = [columnWidths[0], columnWidths[2], columnWidths[3], columnWidths[4]];
+		this.gitRepos[this.currentRepo].columnWidths = [columnWidths[0], columnWidths[2], columnWidths[3]];
 		this.saveRepoState();
 	}
 
@@ -1158,16 +1228,14 @@ class GitGraphView {
 		});
 
 		let html = '<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader" data-col="0">Graph</th><th class="tableColHeader" data-col="1">Description</th>' +
-			(colVisibility.date ? '<th class="tableColHeader dateCol" data-col="2">Date</th>' : '') +
-			(colVisibility.author ? '<th class="tableColHeader authorCol" data-col="3">Author</th>' : '') +
-			(colVisibility.commit ? '<th class="tableColHeader" data-col="4">Commit</th>' : '') +
+			(colVisibility.committed ? '<th class="tableColHeader committedCol" data-col="2">Committed</th>' : '') +
+			(colVisibility.id ? '<th class="tableColHeader" data-col="3">ID</th>' : '') +
 			'</tr>';
 
 		const selectedTags = new Set(this.currentTags);
 		for (let i = 0; i < this.commits.length; i++) {
 			let commit = this.commits[i];
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
-			let date = formatShortDate(commit.date);
 			let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.gitRemoteHeadTargets);
 			let refBranches = '', refTags = '', j, k, refName, remoteName, refActive, refHtml, branchCheckedOutAtCommit: string | null = null;
 
@@ -1217,15 +1285,14 @@ class GitGraphView {
 
 			html += '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
 				(this.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td><span class="description">' + commitDot : '<td></td><td><span class="description">' + commitDot + refBranches) + (this.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
-				(colVisibility.date ? '<td class="dateCol text" title="' + date.title + '">' + date.formatted + '</td>' : '') +
-				(colVisibility.author ? '<td class="authorCol text" title="' + escapeHtml(commit.author + ' <' + commit.email + '>') + '">' + this.getCommitAuthorAvatarHtml(commit.author, commit.email) + '<span class="authorName">' + escapeHtml(commit.author) + '</span></td>' : '') +
-				(colVisibility.commit ? '<td class="text" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
+				(colVisibility.committed ? this.getCommittedCellHtml(commit) : '') +
+				(colVisibility.id ? '<td class="text" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
 				'</tr>';
 		}
 		this.tableElem.innerHTML = '<table>' + html + '</table>';
 		this.footerElem.innerHTML = this.moreCommitsAvailable ? '<div id="loadMoreCommitsBtn" class="roundedBtn">Load More Commits</div>' : '';
 		this.makeTableResizable();
-		this.updateAuthorColumnDisplayMode();
+		this.updateCommittedColumnDisplayMode();
 		this.findWidget.refresh();
 		this.renderedGitBranchHead = this.gitBranchHead;
 
@@ -1275,10 +1342,10 @@ class GitGraphView {
 
 	private renderUncommittedChanges() {
 		const colVisibility = this.getColumnVisibility(), date = formatShortDate(this.commits[0].date);
+		const dateParts = this.getCommittedDateParts(date.formatted);
 		document.getElementById('uncommittedChanges')!.innerHTML = '<td></td><td><b>' + escapeHtml(this.commits[0].message) + '</b></td>' +
-			(colVisibility.date ? '<td class="dateCol text" title="' + date.title + '">' + date.formatted + '</td>' : '') +
-			(colVisibility.author ? '<td class="authorCol text" title="* <>*"><span class="authorName">*</span></td>' : '') +
-			(colVisibility.commit ? '<td class="text" title="*">*</td>' : '');
+			(colVisibility.committed ? '<td class="committedCol text" title="' + escapeHtml(date.title) + '"><span class="committedMeta"><span class="committedDate">' + escapeHtml(dateParts.date) + '</span>' + (dateParts.time !== null ? '<span class="committedTime">' + escapeHtml(dateParts.time) + '</span>' : '') + '</span></td>' : '') +
+			(colVisibility.id ? '<td class="text" title="*">*</td>' : '');
 	}
 
 	private renderFetchButton() {
@@ -2615,13 +2682,30 @@ class GitGraphView {
 		}
 
 		let cWidths = this.gitRepos[this.currentRepo].columnWidths;
-		if (cWidths === null) { // Initialise auto column layout if it is the first time viewing the repo.
-			let defaults = this.config.defaultColumnVisibility;
-			columnWidths = [COLUMN_AUTO, COLUMN_AUTO, defaults.date ? COLUMN_AUTO : COLUMN_HIDDEN, defaults.author ? COLUMN_AUTO : COLUMN_HIDDEN, defaults.commit ? COLUMN_AUTO : COLUMN_HIDDEN];
+		if (cWidths === null || cWidths.length === 0) {
+			// Initialise auto column layout if it is the first time viewing the repo.
+			columnWidths = [COLUMN_AUTO, COLUMN_AUTO, COLUMN_AUTO, COLUMN_AUTO];
+			this.saveColumnWidths(columnWidths);
+		} else if (cWidths.length >= 4) {
+			// Migrate legacy layout: [graph, date, author, commit] -> [graph, committed, id]
+			const dateWidth = cWidths[1], authorWidth = cWidths[2];
+			let committedWidth = COLUMN_AUTO;
+			if (dateWidth > 0 || authorWidth > 0) {
+				committedWidth = Math.max(dateWidth > 0 ? dateWidth : 0, authorWidth > 0 ? authorWidth : 0);
+			}
+			columnWidths = [cWidths[0] > COLUMN_HIDDEN ? cWidths[0] : COLUMN_AUTO, COLUMN_AUTO, committedWidth, cWidths[3] > COLUMN_HIDDEN ? cWidths[3] : COLUMN_AUTO];
 			this.saveColumnWidths(columnWidths);
 		} else {
-			columnWidths = [cWidths[0], COLUMN_AUTO, cWidths[1], cWidths[2], cWidths[3]];
+			columnWidths = [
+				cWidths[0] > COLUMN_HIDDEN ? cWidths[0] : COLUMN_AUTO,
+				COLUMN_AUTO,
+				cWidths[1] > COLUMN_HIDDEN ? cWidths[1] : COLUMN_AUTO,
+				cWidths[2] > COLUMN_HIDDEN ? cWidths[2] : COLUMN_AUTO
+			];
 		}
+		const colVisibility = this.getColumnVisibility();
+		if (!colVisibility.committed) columnWidths[2] = COLUMN_HIDDEN;
+		if (!colVisibility.id) columnWidths[3] = COLUMN_HIDDEN;
 
 		if (columnWidths[0] !== COLUMN_AUTO) {
 			// Table should have fixed layout
@@ -2673,7 +2757,7 @@ class GitGraphView {
 					cols[colIndex + 1].style.width = columnWidths[nextCol] + 'px';
 				}
 				mouseX = mouseEvent.clientX;
-				this.updateAuthorColumnDisplayMode();
+				this.updateCommittedColumnDisplayMode();
 			}
 		};
 		const stopResizingColumn: EventListener = () => {
@@ -2683,7 +2767,7 @@ class GitGraphView {
 				mouseX = -1;
 				eventOverlay.remove();
 				this.saveColumnWidths(columnWidths);
-				this.updateAuthorColumnDisplayMode();
+				this.updateCommittedColumnDisplayMode();
 			}
 		};
 
@@ -2706,9 +2790,13 @@ class GitGraphView {
 		colHeadersElem.addEventListener('contextmenu', (e: MouseEvent) => {
 			handledEvent(e);
 
-			const toggleColumnState = (col: number, defaultWidth: number) => {
-				columnWidths[col] = columnWidths[col] !== COLUMN_HIDDEN ? COLUMN_HIDDEN : columnWidths[0] === COLUMN_AUTO ? COLUMN_AUTO : defaultWidth - COLUMN_LEFT_RIGHT_PADDING;
-				this.saveColumnWidths(columnWidths);
+			const toggleColumnVisibility = (column: 'committed' | 'id') => {
+				const currentVisibility = this.getColumnVisibility();
+				const visibility = column === 'committed'
+					? { committed: !currentVisibility.committed, id: currentVisibility.id }
+					: { committed: currentVisibility.committed, id: !currentVisibility.id };
+				(<GG.DeepWriteable<Config>>this.config).commitsColumnVisibility = visibility;
+				sendMessage({ command: 'setColumnVisibility', visibility: visibility });
 				this.render();
 			};
 
@@ -2721,22 +2809,16 @@ class GitGraphView {
 			contextMenu.show([
 				[
 					{
-						title: 'Date',
+						title: 'Committed',
 						visible: true,
-						checked: columnWidths[2] !== COLUMN_HIDDEN,
-						onClick: () => toggleColumnState(2, 128)
+						checked: colVisibility.committed,
+						onClick: () => toggleColumnVisibility('committed')
 					},
 					{
-						title: 'Author',
+						title: 'ID',
 						visible: true,
-						checked: columnWidths[3] !== COLUMN_HIDDEN,
-						onClick: () => toggleColumnState(3, 128)
-					},
-					{
-						title: 'Commit',
-						visible: true,
-						checked: columnWidths[4] !== COLUMN_HIDDEN,
-						onClick: () => toggleColumnState(4, 80)
+						checked: colVisibility.id,
+						onClick: () => toggleColumnVisibility('id')
 					}
 				],
 				[
@@ -2762,22 +2844,16 @@ class GitGraphView {
 			], true, null, e, this.viewElem);
 		});
 
-		this.updateAuthorColumnDisplayMode();
+		this.updateCommittedColumnDisplayMode();
 	}
 
 	public getColumnVisibility() {
-		let colWidths = this.gitRepos[this.currentRepo].columnWidths;
-		if (colWidths !== null) {
-			return { date: colWidths[1] !== COLUMN_HIDDEN, author: colWidths[2] !== COLUMN_HIDDEN, commit: colWidths[3] !== COLUMN_HIDDEN };
-		} else {
-			let defaults = this.config.defaultColumnVisibility;
-			return { date: defaults.date, author: defaults.author, commit: defaults.commit };
-		}
+		return this.config.commitsColumnVisibility;
 	}
 
 	private getNumColumns() {
 		let colVisibility = this.getColumnVisibility();
-		return 2 + (colVisibility.date ? 1 : 0) + (colVisibility.author ? 1 : 0) + (colVisibility.commit ? 1 : 0);
+		return 2 + (colVisibility.committed ? 1 : 0) + (colVisibility.id ? 1 : 0);
 	}
 
 	/**
@@ -2861,7 +2937,7 @@ class GitGraphView {
 		let windowWidth = window.outerWidth, windowHeight = window.outerHeight;
 		window.addEventListener('resize', () => {
 			this.updateControlsLayout();
-			this.updateAuthorColumnDisplayMode();
+			this.updateCommittedColumnDisplayMode();
 			if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 				this.renderGraph();
 			} else {
@@ -4658,6 +4734,9 @@ window.addEventListener('load', () => {
 				break;
 			case 'setGlobalViewState':
 				finishOrDisplayError(msg.error, 'Unable to save the Global View State');
+				break;
+			case 'setColumnVisibility':
+				finishOrDisplayError(msg.error, 'Unable to save the Committed / ID column visibility');
 				break;
 			case 'setWorkspaceViewState':
 				finishOrDisplayError(msg.error, 'Unable to save the Workspace View State');

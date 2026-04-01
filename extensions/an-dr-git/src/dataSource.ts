@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { Logger } from './logger';
-import { CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -67,7 +67,6 @@ export class DataSource extends Disposable {
 		this.registerDisposables(
 			onDidChangeConfiguration((event) => {
 				if (
-					event.affectsConfiguration('an-dr-git.date.type') || event.affectsConfiguration('an-dr-git.dateType') ||
 					event.affectsConfiguration('an-dr-git.repository.commits.showSignatureStatus') || event.affectsConfiguration('an-dr-git.showSignatureStatus') ||
 					event.affectsConfiguration('an-dr-git.repository.useMailmap') || event.affectsConfiguration('an-dr-git.useMailmap')
 				) {
@@ -104,7 +103,6 @@ export class DataSource extends Disposable {
 	 */
 	private generateGitCommandFormats() {
 		const config = getConfig();
-		const dateType = config.dateType === DateType.Author ? '%at' : '%ct';
 		const useMailmap = config.useMailmap;
 
 		this.gitFormatCommitDetails = [
@@ -116,13 +114,13 @@ export class DataSource extends Disposable {
 
 		this.gitFormatLog = [
 			'%H', '%P', // Hash & Parent Information
-			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', dateType, // Author / Commit Information
+			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', '%ct', // Author / Commit Information
 			'%s' // Subject
 		].join(GIT_LOG_SEPARATOR);
 
 		this.gitFormatStash = [
 			'%H', '%P', '%gD', // Hash, Parent & Selector Information
-			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', dateType, // Author / Commit Information
+			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', '%ct', // Author / Commit Information
 			'%s' // Subject
 		].join(GIT_LOG_SEPARATOR);
 	}

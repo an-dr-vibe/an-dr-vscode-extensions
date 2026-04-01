@@ -500,43 +500,7 @@
 						"Show relative times (e.g. \"5 minutes ago\")"
 					],
 					"default": "Date & Time",
-					"description": "Specifies the date format to be used in the \"Date\" column on the Git Graph View."
-				},
-				"an-dr-git.date.type": {
-					"type": "string",
-					"enum": [
-						"Author Date",
-						"Commit Date"
-					],
-					"enumDescriptions": [
-						"Use the author date of a commit.",
-						"Use the committer date of a commit."
-					],
-					"default": "Author Date",
-					"description": "Specifies the date type to be displayed in the \"Date\" column on the Git Graph View."
-				},
-				"an-dr-git.defaultColumnVisibility": {
-					"type": "object",
-					"properties": {
-						"Date": {
-							"type": "boolean",
-							"title": "Visibility of the Date column"
-						},
-						"Author": {
-							"type": "boolean",
-							"title": "Visibility of the Author column"
-						},
-						"Commit": {
-							"type": "boolean",
-							"title": "Visibility of the Commit column"
-						}
-					},
-					"default": {
-						"Date": true,
-						"Author": true,
-						"Commit": true
-					},
-					"description": "An object specifying the default visibility of the Date, Author & Commit columns. Example: {\"Date\": true, \"Author\": true, \"Commit\": true}"
+					"description": "Specifies the date format to be used in the \"Committed\" column on the Git Graph View."
 				},
 				"an-dr-git.dialog.addTag.pushToRemote": {
 					"type": "boolean",
@@ -979,20 +943,36 @@
 					"default": false,
 					"description": "Fetch avatars of commit authors and committers. By enabling this setting, you consent to commit author and committer email addresses being sent GitHub, GitLab or Gravatar, depending on the repositories remote origin."
 				},
-				"an-dr-git.repository.commits.authorDisplay": {
+				"an-dr-git.repository.commits.columnVisibility": {
+					"type": "object",
+					"properties": {
+						"Committed": {
+							"type": "boolean",
+							"title": "Visibility of the Committed column"
+						},
+						"ID": {
+							"type": "boolean",
+							"title": "Visibility of the ID column"
+						}
+					},
+					"default": {
+						"Committed": true,
+						"ID": true
+					},
+					"description": "An object specifying the visibility of the Committed and ID columns. Example: {\"Committed\": true, \"ID\": true}"
+				},
+				"an-dr-git.repository.commits.committedVisual": {
 					"type": "string",
 					"enum": [
-						"Both",
-						"Avatar Only",
-						"Auto Compact"
+						"Avatar",
+						"Initials"
 					],
 					"enumDescriptions": [
-						"Show author visual and author text.",
-						"Show only the author visual in the Author column.",
-						"Show both when there is enough space, otherwise automatically switch to avatar-only."
+						"Render a visual avatar next to committed date/time.",
+						"Render deterministic 2-letter initials next to committed date/time."
 					],
-					"default": "Auto Compact",
-					"description": "Controls how the Author column is rendered."
+					"default": "Avatar",
+					"description": "Controls the visual shown in the Committed column."
 				},
 				"an-dr-git.repository.commits.avatar.mode": {
 					"type": "string",
@@ -1009,7 +989,7 @@
 						"Don't show any author visual."
 					],
 					"default": "Auto (Fetched then Pattern)",
-					"description": "Controls how author visuals are rendered in the Author column and Commit Details."
+					"description": "Controls how author visuals are rendered in the Committed column and Commit Details."
 				},
 				"an-dr-git.repository.commits.avatar.size": {
 					"type": "string",
@@ -1018,7 +998,7 @@
 						"Small"
 					],
 					"default": "Normal",
-					"description": "Controls avatar size in the Author column."
+					"description": "Controls avatar size in the Committed column."
 				},
 				"an-dr-git.repository.commits.avatar.shape": {
 					"type": "string",
@@ -1027,7 +1007,7 @@
 						"Square"
 					],
 					"default": "Circle",
-					"description": "Controls the shape of author visuals in the Author column and Commit Details."
+					"description": "Controls the shape of author visuals in the Committed column and Commit Details."
 				},
 				"an-dr-git.repository.commits.initialLoad": {
 					"type": "number",
@@ -1307,21 +1287,6 @@
 					"description": "Specifies the date format to be used in the \"Date\" column on the Git Graph View.",
 					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-git.date.format",
 					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-git.date.format#`"
-				},
-				"an-dr-git.dateType": {
-					"type": "string",
-					"enum": [
-						"Author Date",
-						"Commit Date"
-					],
-					"enumDescriptions": [
-						"Use the author date of a commit",
-						"Use the committer date of a commit"
-					],
-					"default": "Author Date",
-					"description": "Specifies the date type to be displayed in the \"Date\" column on the Git Graph View.",
-					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-git.date.type",
-					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-git.date.type#`"
 				},
 				"an-dr-git.defaultFileViewType": {
 					"type": "string",

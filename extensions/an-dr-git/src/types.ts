@@ -243,19 +243,19 @@ export interface GitGraphViewInitialState {
 }
 
 export interface GitGraphViewConfig {
-	readonly authorDisplay: AuthorDisplayMode;
 	readonly avatarMode: AuthorAvatarMode;
 	readonly avatarSize: AuthorAvatarSize;
 	readonly avatarShape: AuthorAvatarShape;
+	readonly committedVisual: CommittedVisualMode;
 	readonly branchPanel: BranchPanelConfig;
 	readonly commitDetailsView: CommitDetailsViewConfig;
 	readonly commitOrdering: CommitOrdering;
+	readonly commitsColumnVisibility: CommitsColumnVisibility;
 	readonly contextMenuActionsVisibility: ContextMenuActionsVisibility;
 	readonly customBranchGlobPatterns: ReadonlyArray<CustomBranchGlobPattern>;
 	readonly customEmojiShortcodeMappings: ReadonlyArray<CustomEmojiShortcodeMapping>;
 	readonly customPullRequestProviders: ReadonlyArray<CustomPullRequestProvider>;
 	readonly dateFormat: DateFormat;
-	readonly defaultColumnVisibility: DefaultColumnVisibility;
 	readonly dialogDefaults: DialogDefaults;
 	readonly enhancedAccessibility: boolean;
 	readonly fetchAndPrune: boolean;
@@ -379,15 +379,14 @@ export const enum AuthorAvatarShape {
 	Square = 'square'
 }
 
-export const enum AuthorDisplayMode {
-	Both = 'both',
-	AvatarOnly = 'avatar-only',
-	AutoCompact = 'auto-compact'
-}
-
 export const enum AuthorAvatarSize {
 	Normal = 'normal',
 	Small = 'small'
+}
+
+export const enum CommittedVisualMode {
+	Avatar = 'avatar',
+	Initials = 'initials'
 }
 
 export interface ContextMenuActionsVisibility {
@@ -485,21 +484,15 @@ export interface DateFormat {
 	readonly iso: boolean;
 }
 
+export interface CommitsColumnVisibility {
+	readonly committed: boolean;
+	readonly id: boolean;
+}
+
 export const enum DateFormatType {
 	DateAndTime,
 	DateOnly,
 	Relative
-}
-
-export const enum DateType {
-	Author,
-	Commit
-}
-
-export interface DefaultColumnVisibility {
-	readonly date: boolean;
-	readonly author: boolean;
-	readonly commit: boolean;
 }
 
 export interface DialogDefaults {
@@ -1221,6 +1214,14 @@ export interface ResponseSetGlobalViewState extends ResponseWithErrorInfo {
 	readonly command: 'setGlobalViewState';
 }
 
+export interface RequestSetColumnVisibility extends BaseMessage {
+	readonly command: 'setColumnVisibility';
+	readonly visibility: CommitsColumnVisibility;
+}
+export interface ResponseSetColumnVisibility extends ResponseWithErrorInfo {
+	readonly command: 'setColumnVisibility';
+}
+
 export interface RequestSetRepoState extends RepoRequest {
 	readonly command: 'setRepoState';
 	readonly state: GitRepoState;
@@ -1420,6 +1421,7 @@ export type RequestMessage =
 	| RequestResetFileToRevision
 	| RequestResetToCommit
 	| RequestRevertCommit
+	| RequestSetColumnVisibility
 	| RequestSetGlobalViewState
 	| RequestSetRepoState
 	| RequestSetRemoteDefaultBranch
@@ -1486,6 +1488,7 @@ export type ResponseMessage =
 	| ResponseResetFileToRevision
 	| ResponseResetToCommit
 	| ResponseRevertCommit
+	| ResponseSetColumnVisibility
 	| ResponseSetGlobalViewState
 	| ResponseSetRemoteDefaultBranch
 	| ResponseSidebarBatchRefAction

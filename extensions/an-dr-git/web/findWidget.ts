@@ -243,14 +243,15 @@ class FindWidget {
 				for (let i = 0; i < commits.length; i++) {
 					commit = commits[i];
 					let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.view.getRemoteHeadTargets());
+					const committedDate = formatShortDate(commit.date);
+					const committedSearchText = commit.author + ' ' + committedDate.formatted + ' ' + committedDate.title;
 					if (commit.hash !== UNCOMMITTED && (
-						(colVisibility.author && findPattern.test(commit.author))
-						|| (colVisibility.commit && (commit.hash.search(findPattern) === 0 || findPattern.test(abbrevCommit(commit.hash))))
+						(colVisibility.committed && findPattern.test(committedSearchText))
+						|| (colVisibility.id && (commit.hash.search(findPattern) === 0 || findPattern.test(abbrevCommit(commit.hash))))
 						|| findPattern.test(commit.message)
 						|| branchLabels.heads.some(head => findPattern!.test(head.name) || head.remotes.some(remote => findPattern!.test(remote)))
 						|| branchLabels.remotes.some(remote => findPattern!.test(remote.name))
 						|| commit.tags.some(tag => findPattern!.test(tag.name))
-						|| (colVisibility.date && findPattern.test(formatShortDate(commit.date).formatted))
 						|| (commit.stash !== null && findPattern.test(commit.stash.selector))
 					)) {
 						let idStr = i.toString();
@@ -298,7 +299,7 @@ class FindWidget {
 							}
 							if (zeroLengthMatch) break;
 						}
-						if (colVisibility.commit && commit.hash.search(findPattern) === 0 && !findPattern.test(abbrevCommit(commit.hash)) && textElems.length > 0) {
+						if (colVisibility.id && commit.hash.search(findPattern) === 0 && !findPattern.test(abbrevCommit(commit.hash)) && textElems.length > 0) {
 							// The commit matches on more than the abbreviated commit, so the commit should be highlighted
 							let commitNode = textElems[textElems.length - 1]; // Commit is always the last column if it is visible
 							commitNode.parentNode!.replaceChild(FindWidget.createMatchElem(commitNode.textContent!), commitNode);

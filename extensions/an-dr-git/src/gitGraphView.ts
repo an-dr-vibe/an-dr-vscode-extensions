@@ -103,12 +103,21 @@ export class GitGraphView extends Disposable {
 		this.registerDisposables(
 			// Dispose Git Graph View resources when disposed
 			toDisposable(() => {
+				this.logger.log('Disposing GitGraphView instance...');
 				GitGraphView.currentPanel = undefined;
 				this.repoFileWatcher.stop();
 			}),
 
 			// Dispose this Git Graph View when the Webview Panel is disposed
-			this.panel.onDidDispose(() => this.dispose()),
+			this.panel.onDidDispose(() => {
+				this.logger.log('Webview panel onDidDispose event fired.');
+				if (GitGraphView.currentPanel === this) {
+					this.logger.log('GitGraphView.currentPanel matches this instance, clearing it.');
+				} else {
+					this.logger.log('GitGraphView.currentPanel does NOT match this instance.');
+				}
+				this.dispose();
+			}),
 
 			// Register a callback that is called when the view is shown or hidden
 			this.panel.onDidChangeViewState(() => {
@@ -206,6 +215,7 @@ export class GitGraphView extends Disposable {
 				});
 				break;
 			case 'checkoutBranch':
+				this.logger.log('Processing checkoutBranch command for repo: ' + msg.repo + ', branch: ' + msg.branchName);
 				errorInfos = [await this.dataSource.checkoutBranch(msg.repo, msg.branchName, msg.remoteBranch)];
 				if (errorInfos[0] === null && msg.pullAfterwards !== null) {
 					errorInfos.push(await this.dataSource.pullBranch(msg.repo, msg.pullAfterwards.branchName, msg.pullAfterwards.remote, msg.pullAfterwards.createNewCommit, msg.pullAfterwards.squash));
@@ -215,13 +225,16 @@ export class GitGraphView extends Disposable {
 					pullAfterwards: msg.pullAfterwards,
 					errors: errorInfos
 				});
+				this.logger.log('Finished checkoutBranch command.');
 				break;
 			case 'checkoutCommit':
+				this.logger.log('Processing checkoutCommit command for repo: ' + msg.repo + ', commit: ' + msg.commitHash);
 				const checkoutCommitError = await this.dataSource.checkoutCommit(msg.repo, msg.commitHash);
 				this.sendMessage({
 					command: 'checkoutCommit',
 					error: checkoutCommitError
 				});
+				this.logger.log('Finished checkoutCommit command.');
 				break;
 			case 'cherrypickCommit':
 				errorInfos = [await this.dataSource.cherrypickCommit(msg.repo, msg.commitHash, msg.parentIndex, msg.recordOrigin, msg.noCommit)];
@@ -433,7 +446,16 @@ export class GitGraphView extends Disposable {
 				let repoInfo = await this.dataSource.getRepoInfo(msg.repo, msg.showRemoteBranches, msg.showStashes, msg.hideRemotes), isRepo = true;
 				if (repoInfo.error) {
 					// If an error occurred, check to make sure the repo still exists
-					isRepo = (await this.dataSource.repoRoot(msg.repo)) !== null;
+					let root = await this.dataSource.repoRoot(msg.repo);
+					if (root === null) {
+						// Retry if repoRoot returns null (could be transient during checkout)
+						for (let i = 0; i < 2; i++) {
+							await new Promise(resolve => setTimeout(resolve, 200));
+							root = await this.dataSource.repoRoot(msg.repo);
+							if (root !== null) break;
+						}
+					}
+					isRepo = root !== null;
 					if (!isRepo) repoInfo.error = null; // If the error is caused by the repo no longer existing, clear the error message
 				}
 				this.sendMessage({
@@ -452,6 +474,8 @@ export class GitGraphView extends Disposable {
 				if (!msg.check || !await this.repoManager.checkReposExist()) {
 					// If not required to check repos, or no changes were found when checking, respond with repos
 					this.respondLoadRepos(this.repoManager.getRepos(), null);
+				} else {
+					this.logger.log('RepoManager.checkReposExist() returned true during loadRepos command.');
 				}
 				break;
 			case 'merge':

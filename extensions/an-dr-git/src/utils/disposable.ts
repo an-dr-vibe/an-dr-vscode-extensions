@@ -8,6 +8,7 @@ export class Disposable implements vscode.Disposable {
 	 * Disposes the resources used by the subclass.
 	 */
 	public dispose() {
+		if (this.disposed) return;
 		this.disposed = true;
 		this.disposables.forEach((disposable) => {
 			try {

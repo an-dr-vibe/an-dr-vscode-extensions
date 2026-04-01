@@ -67,10 +67,10 @@ class BranchPanel {
 		document.body.appendChild(this.toggleBtn);
 		this.toggleBtn.addEventListener('click', () => this.toggleSidebar());
 
-		// Resize handle on the right edge of the sidebar
+		// Resize handle just outside the sidebar, next to the toggle button
 		const resizeHandle = document.createElement('div');
 		resizeHandle.id = 'sidebarResizeHandle';
-		this.sidebar.appendChild(resizeHandle);
+		document.body.appendChild(resizeHandle);
 		this.setupResize(resizeHandle);
 
 		// Filter input
@@ -146,6 +146,10 @@ class BranchPanel {
 
 	private updateTogglePosition() {
 		this.toggleBtn.style.left = (this.sidebarHidden ? 0 : this.sidebarWidth) + 'px';
+		const resizeHandle = document.getElementById('sidebarResizeHandle');
+		if (resizeHandle !== null) {
+			resizeHandle.style.left = (this.sidebarHidden ? 0 : this.sidebarWidth - 3) + 'px';
+		}
 	}
 
 	public setTags(tags: ReadonlyArray<string>) {

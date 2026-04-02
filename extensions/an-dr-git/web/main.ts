@@ -1193,7 +1193,7 @@ class GitGraphView {
 	}
 
 	private getRemoteDefaultCloudHtml(title: string) {
-		return '<span class="gitRefCloud" title="' + escapeHtml(title) + '">' + SVG_ICONS.cloud + '</span>';
+		return '<span class="gitRefCloud" title="' + escapeHtml(title) + '">' + SVG_ICONS.target + '</span>';
 	}
 
 	private getHeadRemoteSuffixHtml(remoteName: string, remoteRefName: string, isRemoteDefault: boolean, isGoneUpstream: boolean) {
@@ -1228,10 +1228,8 @@ class GitGraphView {
 
 		const descriptionElem = commitElem.querySelector('.description') as HTMLElement | null;
 		if (descriptionElem === null) return 0;
-		const commitDot = descriptionElem.querySelector('.commitHeadDot') as HTMLElement | null;
 		const minMessageWidth = 72;
-		const commitDotWidth = commitDot !== null ? this.getElemOuterWidth(commitDot) : 0;
-		return Math.max(0, descriptionElem.clientWidth - minMessageWidth - commitDotWidth);
+		return Math.max(0, descriptionElem.clientWidth - minMessageWidth);
 	}
 
 	private collapseReferenceBadgesToFit() {
@@ -1280,13 +1278,14 @@ class GitGraphView {
 			let commit = this.commits[i];
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
 			let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.gitRemoteHeadTargets);
-			let branchBadges: CommitRefBadge[] = [], tagBadges: CommitRefBadge[] = [], j, k, refName, refActive, refHtml, branchCheckedOutAtCommit: string | null = null;
+			let branchBadges: CommitRefBadge[] = [], tagBadges: CommitRefBadge[] = [], j, k, refName, refActive, refHtml;
 
 			for (j = 0; j < branchLabels.heads.length; j++) {
 				const headName = branchLabels.heads[j].name;
 				refName = escapeHtml(headName);
 				refActive = headName === this.gitBranchHead;
-				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true" title="Branch: ' + refName + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
+				const headIcon = refActive ? SVG_ICONS.target : SVG_ICONS.branch;
+				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true" title="Branch: ' + refName + '">' + headIcon + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
 				for (k = 0; k < branchLabels.heads[j].remotes.length; k++) {
 					const remoteName = branchLabels.heads[j].remotes[k];
 					const remoteRefName = remoteName + '/' + headName;
@@ -1297,7 +1296,6 @@ class GitGraphView {
 				refHtml += '</span>';
 				if (refActive) {
 					branchBadges.unshift({ type: 'head', html: refHtml });
-					branchCheckedOutAtCommit = headName;
 				} else {
 					branchBadges.push({ type: 'head', html: refHtml });
 				}
@@ -1307,12 +1305,9 @@ class GitGraphView {
 				refName = escapeHtml(remoteName);
 				const remoteRoot = branchLabels.remotes[j].remote;
 				const isRemoteDefault = remoteRoot !== null && this.gitRemoteHeadTargets[remoteRoot] === remoteName;
-				const cloud = isRemoteDefault && remoteRoot !== null
-					? this.getRemoteDefaultCloudHtml(remoteRoot + '/HEAD -> ' + remoteName)
-					: '';
 				branchBadges.push({
 					type: 'remote',
-					html: '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (remoteRoot !== null ? escapeHtml(remoteRoot) : '') + '" title="Remote Branch: ' + refName + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>' + cloud + '</span>'
+					html: '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (remoteRoot !== null ? escapeHtml(remoteRoot) : '') + '" title="Remote Branch: ' + refName + '">' + SVG_ICONS.cloud + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>'
 				});
 			}
 
@@ -1335,15 +1330,8 @@ class GitGraphView {
 			const refBranches = this.renderRefBadgeGroup(branchBadges);
 			const refTags = this.renderRefBadgeGroup(tagBadges);
 
-			const commitDot = commit.hash === this.commitHead
-				? '<span class="commitHeadDot" title="' + (branchCheckedOutAtCommit !== null
-					? 'The branch ' + escapeHtml('"' + branchCheckedOutAtCommit + '"') + ' is currently checked out at this commit'
-					: 'This commit is currently checked out'
-				) + '."></span>'
-				: '';
-
 			html += '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
-				(this.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td><span class="description">' + commitDot : '<td></td><td><span class="description">' + commitDot + refBranches) + (this.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
+				(this.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td><span class="description">' : '<td></td><td><span class="description">' + refBranches) + (this.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
 				(colVisibility.committed ? this.getCommittedCellHtml(commit) : '') +
 				(colVisibility.id ? '<td class="text" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
 				'</tr>';

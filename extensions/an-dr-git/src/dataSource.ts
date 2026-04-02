@@ -1738,23 +1738,179 @@ export class DataSource extends Disposable {
 			const hasRebaseMerge = await this.pathExists(rebaseMergePath);
 			const hasRebaseApply = hasRebaseMerge ? false : await this.pathExists(rebaseApplyPath);
 			if (hasRebaseMerge || hasRebaseApply) {
+				const rebasePath = hasRebaseMerge ? rebaseMergePath : rebaseApplyPath;
 				return {
 					type: GitRepoInProgressStateType.Rebase,
-					rebaseProgress: await this.getRebaseProgress(hasRebaseMerge ? rebaseMergePath : rebaseApplyPath)
+					rebaseProgress: await this.getRebaseProgress(rebasePath),
+					rebaseContext: await this.getRebaseContext(repo, rebasePath),
+					rebaseCommitStates: await this.getRebaseCommitStates(rebasePath),
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: await this.getRebaseSubject(rebasePath)
 				};
 			}
 
 			if (await this.pathExists(mergeHeadPath)) {
-				return { type: GitRepoInProgressStateType.Merge, rebaseProgress: null };
+				return {
+					type: GitRepoInProgressStateType.Merge,
+					rebaseProgress: null,
+					rebaseContext: null,
+					rebaseCommitStates: null,
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: null
+				};
 			}
 			if (await this.pathExists(cherryPickHeadPath)) {
-				return { type: GitRepoInProgressStateType.CherryPick, rebaseProgress: null };
+				return {
+					type: GitRepoInProgressStateType.CherryPick,
+					rebaseProgress: null,
+					rebaseContext: null,
+					rebaseCommitStates: null,
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: null
+				};
 			}
 			if (await this.pathExists(revertHeadPath)) {
-				return { type: GitRepoInProgressStateType.Revert, rebaseProgress: null };
+				return {
+					type: GitRepoInProgressStateType.Revert,
+					rebaseProgress: null,
+					rebaseContext: null,
+					rebaseCommitStates: null,
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: null
+				};
 			}
 			return null;
 		});
+	}
+
+	private async getRebaseContext(repo: string, rebasePath: string): Promise<{
+		branch: string | null;
+		onto: string | null;
+	}> {
+		const branchRef = await this.readTextFile(path.join(rebasePath, 'head-name'));
+		const ontoNameRef = await this.readTextFile(path.join(rebasePath, 'onto_name'));
+		const ontoHash = await this.readTextFile(path.join(rebasePath, 'onto'));
+
+		const branch = this.normaliseRefName(branchRef);
+		if (ontoNameRef !== null) {
+			return {
+				branch: branch,
+				onto: this.normaliseRefName(ontoNameRef)
+			};
+		}
+		if (ontoHash === null) {
+			return {
+				branch: branch,
+				onto: null
+			};
+		}
+
+		const ontoHashTrimmed = ontoHash.trim();
+		const ontoRef = await this.spawnGit(
+			['for-each-ref', '--format=%(refname:short)', '--points-at', ontoHashTrimmed, 'refs/heads', 'refs/remotes'],
+			repo,
+			(stdout) => stdout.split(EOL_REGEX).map((line) => line.trim()).filter((line) => line !== '')
+		).then((refs) => refs.length > 0 ? refs[0] : null, () => null);
+
+		return {
+			branch: branch,
+			onto: ontoRef !== null ? ontoRef : abbrevCommit(ontoHashTrimmed)
+		};
+	}
+
+	private async getRepoInProgressWorkingTreeStatus(repo: string): Promise<{
+		changed: number;
+		staged: number;
+		conflicts: number;
+		untracked: number;
+	} | null> {
+		const conflictStates = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
+		return this.spawnGit(['status', '--porcelain', '--untracked-files=all'], repo, (stdout) => {
+			const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
+			let changed = 0, staged = 0, conflicts = 0, untracked = 0;
+			for (let i = 0; i < lines.length; i++) {
+				if (lines[i].length < 2) continue;
+				const x = lines[i].substring(0, 1), y = lines[i].substring(1, 2), xy = x + y;
+				if (xy === '??') {
+					untracked++;
+					continue;
+				}
+				if (conflictStates.has(xy)) {
+					conflicts++;
+					continue;
+				}
+				if (x !== ' ' && x !== '?') staged++;
+				if (y !== ' ' && y !== '?') changed++;
+			}
+			return { changed, staged, conflicts, untracked };
+		}).catch(() => null);
+	}
+
+	private async getRebaseSubject(rebasePath: string): Promise<string | null> {
+		const candidates = ['message', 'final-commit', 'msg-clean'];
+		for (let i = 0; i < candidates.length; i++) {
+			const content = await this.readTextFile(path.join(rebasePath, candidates[i]));
+			if (content === null) continue;
+			const subjectLine = content
+				.split(EOL_REGEX)
+				.map((line) => line.trim())
+				.find((line) => line !== '' && !line.startsWith('#'));
+			if (typeof subjectLine === 'string') {
+				return subjectLine.length > 120 ? subjectLine.substring(0, 120) + '...' : subjectLine;
+			}
+		}
+		return null;
+	}
+
+	private async getRebaseCommitStates(rebasePath: string): Promise<Array<{
+		hash: string;
+		kind: 'todo' | 'done' | 'in-progress';
+		offset: number;
+	}>> {
+		const [todoContent, doneContent, stoppedShaContent] = await Promise.all([
+			this.readTextFile(path.join(rebasePath, 'git-rebase-todo')),
+			this.readTextFile(path.join(rebasePath, 'done')),
+			this.readTextFile(path.join(rebasePath, 'stopped-sha'))
+		]);
+
+		const parseHashes = (content: string | null) => {
+			if (content === null) return [];
+			return content
+				.split(EOL_REGEX)
+				.map((line) => line.trim())
+				.filter((line) => line !== '' && !line.startsWith('#'))
+				.map((line) => line.split(/\s+/))
+				.filter((tokens) => tokens.length >= 2 && /^(pick|reword|edit|squash|fixup|drop)$/i.test(tokens[0]))
+				.map((tokens) => tokens[1]);
+		};
+
+		const todoHashes = parseHashes(todoContent);
+		const doneHashes = parseHashes(doneContent);
+		const inProgressHash = stoppedShaContent !== null && stoppedShaContent.trim() !== '' ? stoppedShaContent.trim() : null;
+
+		const states: Array<{ hash: string; kind: 'todo' | 'done' | 'in-progress'; offset: number }> = [];
+		const seen: { [hash: string]: boolean } = {};
+		const addState = (hash: string, kind: 'todo' | 'done' | 'in-progress', offset: number) => {
+			const key = hash.toLowerCase();
+			if (seen[key]) return;
+			seen[key] = true;
+			states.push({ hash, kind, offset });
+		};
+
+		if (inProgressHash !== null) {
+			addState(inProgressHash, 'in-progress', 0);
+		}
+		for (let i = 0; i < todoHashes.length; i++) {
+			addState(todoHashes[i], 'todo', i + 1);
+		}
+		let doneOffset = 1;
+		for (let i = doneHashes.length - 1; i >= 0; i--) {
+			if (inProgressHash !== null && doneHashes[i].toLowerCase() === inProgressHash.toLowerCase()) continue;
+			addState(doneHashes[i], 'done', -doneOffset);
+			doneOffset++;
+		}
+
+		return states;
 	}
 
 	private async getRebaseProgress(rebasePath: string) {
@@ -1785,6 +1941,27 @@ export class DataSource extends Disposable {
 				resolve(Number.isFinite(parsed) ? parsed : null);
 			});
 		});
+	}
+
+	private async readTextFile(filePath: string): Promise<string | null> {
+		return new Promise((resolve) => {
+			fs.readFile(filePath, 'utf8', (error, content) => {
+				if (error !== null) {
+					resolve(null);
+					return;
+				}
+				resolve(content);
+			});
+		});
+	}
+
+	private normaliseRefName(ref: string | null): string | null {
+		if (ref === null) return null;
+		const trimmed = ref.trim();
+		if (trimmed === '') return null;
+		if (trimmed.startsWith('refs/heads/')) return trimmed.substring('refs/heads/'.length);
+		if (trimmed.startsWith('refs/remotes/')) return trimmed.substring('refs/remotes/'.length);
+		return trimmed;
 	}
 
 	private async pathExists(filePath: string): Promise<boolean> {

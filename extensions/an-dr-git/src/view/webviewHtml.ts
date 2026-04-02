@@ -80,6 +80,10 @@ function getBodyHtml(options: GitGraphWebviewHtmlRenderOptions, numRepos: number
 					<div id="branchPanel"></div>
 				</div>
 				<div id="content">
+					<div id="repoInProgressBanner">
+						<div id="repoInProgressBannerPrimary"></div>
+						<div id="repoInProgressBannerSecondary"></div>
+					</div>
 					<div id="commitGraph"></div>
 					<div id="commitTable"></div>
 				</div>

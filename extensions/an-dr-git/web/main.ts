@@ -79,6 +79,10 @@ class GitGraphView {
 	private readonly controlsElem: HTMLElement;
 	private readonly controlsLeftElem: HTMLElement;
 	private readonly controlsBtnsElem: HTMLElement;
+	private readonly commitGraphElem: HTMLElement;
+	private readonly repoInProgressBannerElem: HTMLElement;
+	private readonly repoInProgressBannerPrimaryElem: HTMLElement;
+	private readonly repoInProgressBannerSecondaryElem: HTMLElement;
 	private readonly tableElem: HTMLElement;
 	private readonly footerElem: HTMLElement;
 	private readonly scrollShadowElem: HTMLElement;
@@ -111,6 +115,10 @@ class GitGraphView {
 		this.controlsElem = document.getElementById('controls')!;
 		this.controlsLeftElem = document.getElementById('controlsLeft')!;
 		this.controlsBtnsElem = document.getElementById('controlsBtns')!;
+		this.commitGraphElem = document.getElementById('commitGraph')!;
+		this.repoInProgressBannerElem = document.getElementById('repoInProgressBanner')!;
+		this.repoInProgressBannerPrimaryElem = document.getElementById('repoInProgressBannerPrimary')!;
+		this.repoInProgressBannerSecondaryElem = document.getElementById('repoInProgressBannerSecondary')!;
 		this.tableElem = document.getElementById('commitTable')!;
 		this.footerElem = document.getElementById('footer')!;
 		this.scrollShadowElem = <HTMLInputElement>document.getElementById('scrollShadow')!;
@@ -302,10 +310,73 @@ class GitGraphView {
 		if (a === null && b === null) return true;
 		if (a === null || b === null) return false;
 		if (a.type !== b.type) return false;
-		if (a.rebaseProgress === null && b.rebaseProgress === null) return true;
-		if (a.rebaseProgress === null || b.rebaseProgress === null) return false;
-		return a.rebaseProgress.current === b.rebaseProgress.current
-			&& a.rebaseProgress.total === b.rebaseProgress.total;
+		const aRebaseProgress = typeof a.rebaseProgress === 'undefined' ? null : a.rebaseProgress;
+		const bRebaseProgress = typeof b.rebaseProgress === 'undefined' ? null : b.rebaseProgress;
+		const aRebaseContext = typeof a.rebaseContext === 'undefined' ? null : a.rebaseContext;
+		const bRebaseContext = typeof b.rebaseContext === 'undefined' ? null : b.rebaseContext;
+		const aWorkingTreeStatus = typeof a.workingTreeStatus === 'undefined' ? null : a.workingTreeStatus;
+		const bWorkingTreeStatus = typeof b.workingTreeStatus === 'undefined' ? null : b.workingTreeStatus;
+		const aSubject = typeof a.subject === 'undefined' ? null : a.subject;
+		const bSubject = typeof b.subject === 'undefined' ? null : b.subject;
+		const rebaseProgressEqual = (
+			(aRebaseProgress === null && bRebaseProgress === null)
+			|| (
+				aRebaseProgress !== null
+				&& bRebaseProgress !== null
+				&& aRebaseProgress.current === bRebaseProgress.current
+				&& aRebaseProgress.total === bRebaseProgress.total
+			)
+		);
+		const workingTreeStatusEqual = (
+			(aWorkingTreeStatus === null && bWorkingTreeStatus === null)
+			|| (
+				aWorkingTreeStatus !== null
+				&& bWorkingTreeStatus !== null
+				&& aWorkingTreeStatus.changed === bWorkingTreeStatus.changed
+				&& aWorkingTreeStatus.staged === bWorkingTreeStatus.staged
+				&& aWorkingTreeStatus.conflicts === bWorkingTreeStatus.conflicts
+				&& aWorkingTreeStatus.untracked === bWorkingTreeStatus.untracked
+			)
+		);
+		const rebaseCommitStatesEqual = (
+			(typeof a.rebaseCommitStates === 'undefined' ? null : a.rebaseCommitStates) === null
+			&& (typeof b.rebaseCommitStates === 'undefined' ? null : b.rebaseCommitStates) === null
+		) || (
+			(typeof a.rebaseCommitStates === 'undefined' ? null : a.rebaseCommitStates) !== null
+			&& (typeof b.rebaseCommitStates === 'undefined' ? null : b.rebaseCommitStates) !== null
+			&& arraysEqual(
+				(typeof a.rebaseCommitStates === 'undefined' ? null : a.rebaseCommitStates)!,
+				(typeof b.rebaseCommitStates === 'undefined' ? null : b.rebaseCommitStates)!,
+				(x, y) => x.hash === y.hash && x.kind === y.kind && x.offset === y.offset
+			)
+		);
+		return rebaseProgressEqual
+			&& (
+				(aRebaseContext === null && bRebaseContext === null)
+				|| (
+					aRebaseContext !== null
+					&& bRebaseContext !== null
+					&& aRebaseContext.branch === bRebaseContext.branch
+					&& aRebaseContext.onto === bRebaseContext.onto
+				)
+			)
+			&& rebaseCommitStatesEqual
+			&& workingTreeStatusEqual
+			&& aSubject === bSubject;
+	}
+
+	private getRebaseSequenceBadgeHtml(commitHash: string) {
+		if (this.gitRepoInProgressState === null || this.gitRepoInProgressState.type !== GG.GitRepoInProgressStateType.Rebase) return '';
+		const states = typeof this.gitRepoInProgressState.rebaseCommitStates === 'undefined' ? null : this.gitRepoInProgressState.rebaseCommitStates;
+		if (states === null) return '';
+
+		const match = states.find((state) => commitHash.toLowerCase().startsWith(state.hash.toLowerCase()));
+		if (typeof match === 'undefined') return '';
+
+		const label = match.kind === 'in-progress'
+			? 'in-progress'
+			: match.kind + ' ' + (match.offset > 0 ? '+' + match.offset : match.offset.toString());
+		return '<span class="rebaseSeqBadge ' + match.kind + '">' + escapeHtml(label) + '</span>';
 	}
 
 	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
@@ -882,12 +953,14 @@ class GitGraphView {
 		const options: DialogSelectInputOption[] = [];
 		if (includeShowAll) {
 			options.push({ name: 'Show All', value: SHOW_ALL_BRANCHES });
+			options.push({ name: 'HEAD', value: 'HEAD' });
 		}
 		for (let i = 0; i < this.config.customBranchGlobPatterns.length; i++) {
 			options.push({ name: 'Glob: ' + this.config.customBranchGlobPatterns[i].name, value: this.config.customBranchGlobPatterns[i].glob });
 		}
 		for (let i = 0; i < this.gitBranches.length; i++) {
 			const branch = this.gitBranches[i];
+			if (branch === 'HEAD') continue;
 			let isRemoteDefault = false, remoteDefaultHint: string | undefined;
 			if (branch.startsWith('remotes/')) {
 				const firstSlash = branch.indexOf('/', 8);
@@ -1203,6 +1276,7 @@ class GitGraphView {
 		this.config.graph.grid.offsetY = headerHeight + this.config.graph.grid.y / 2;
 
 		this.graph.setRemoteHeadTargets(this.gitRemoteHeadTargets);
+		this.graph.setRepoInProgressState(this.gitRepoInProgressState);
 		this.graph.render(expandedCommit);
 	}
 
@@ -1290,7 +1364,7 @@ class GitGraphView {
 		const selectedTags = new Set(this.currentTags);
 		for (let i = 0; i < this.commits.length; i++) {
 			let commit = this.commits[i];
-			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
+			let message = this.getRebaseSequenceBadgeHtml(commit.hash) + '<span class="text">' + textFormatter.format(commit.message) + '</span>';
 			let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.gitRemoteHeadTargets);
 			let branchBadges: CommitRefBadge[] = [], tagBadges: CommitRefBadge[] = [], j, k, refName, refActive, refHtml;
 
@@ -1425,6 +1499,82 @@ class GitGraphView {
 		return 'Repository Action';
 	}
 
+	private getRepoInProgressStateStatusVerb() {
+		if (this.gitRepoInProgressState === null) return 'processing';
+		switch (this.gitRepoInProgressState.type) {
+			case GG.GitRepoInProgressStateType.Rebase:
+				return 'rebasing';
+			case GG.GitRepoInProgressStateType.Merge:
+				return 'merging';
+			case GG.GitRepoInProgressStateType.CherryPick:
+				return 'cherry-pick';
+			case GG.GitRepoInProgressStateType.Revert:
+				return 'reverting';
+		}
+		return 'processing';
+	}
+
+	private formatRepoInProgressWorkingTreeStatus() {
+		const state = this.gitRepoInProgressState;
+		const workingTreeStatus = state !== null && typeof state.workingTreeStatus !== 'undefined' ? state.workingTreeStatus : null;
+		if (state === null || workingTreeStatus === null) {
+			return 'Working Tree/Index';
+		}
+
+		const parts: string[] = [];
+		if (workingTreeStatus.changed > 0) parts.push(workingTreeStatus.changed + ' changed');
+		if (workingTreeStatus.staged > 0) parts.push(workingTreeStatus.staged + ' staged');
+		if (workingTreeStatus.conflicts > 0) parts.push(workingTreeStatus.conflicts + ' conflicts');
+		if (workingTreeStatus.untracked > 0) parts.push(workingTreeStatus.untracked + ' untracked');
+
+		return 'Working Tree/Index (' + (parts.length > 0 ? parts.join(', ') : 'clean') + ')';
+	}
+
+	private updateRepoInProgressBannerOffset() {
+		const offset = this.repoInProgressBannerElem.classList.contains('active') ? this.repoInProgressBannerElem.offsetHeight : 0;
+		this.commitGraphElem.style.top = offset.toString() + 'px';
+	}
+
+	private renderRepoInProgressBanner() {
+		if (this.gitRepoInProgressState === null) {
+			alterClass(this.repoInProgressBannerElem, 'active', false);
+			alterClass(this.repoInProgressBannerElem, 'conflicted', false);
+			this.repoInProgressBannerPrimaryElem.textContent = '';
+			this.repoInProgressBannerSecondaryElem.textContent = '';
+			this.updateRepoInProgressBannerOffset();
+			return;
+		}
+
+		const stateVerb = this.getRepoInProgressStateStatusVerb();
+		const rebaseProgress = typeof this.gitRepoInProgressState.rebaseProgress === 'undefined' ? null : this.gitRepoInProgressState.rebaseProgress;
+		const progressText = rebaseProgress !== null ? ' (' + rebaseProgress.current + '/' + rebaseProgress.total + ')' : '';
+		this.repoInProgressBannerPrimaryElem.innerHTML =
+			'The working tree is in <b>' + escapeHtml(stateVerb) + '-state' + escapeHtml(progressText) + '</b>.';
+
+		let secondary = this.formatRepoInProgressWorkingTreeStatus();
+		const rebaseContext = typeof this.gitRepoInProgressState.rebaseContext === 'undefined' ? null : this.gitRepoInProgressState.rebaseContext;
+		if (rebaseContext !== null) {
+			const branch = rebaseContext.branch;
+			const onto = rebaseContext.onto;
+			if (branch !== null && onto !== null) {
+				secondary += ', rebasing ' + branch + ' onto ' + onto;
+			} else if (branch !== null) {
+				secondary += ', rebasing ' + branch;
+			} else if (onto !== null) {
+				secondary += ', rebasing onto ' + onto;
+			}
+		}
+		const subject = typeof this.gitRepoInProgressState.subject === 'undefined' ? null : this.gitRepoInProgressState.subject;
+		if (subject !== null) {
+			secondary += ', ' + stateVerb + ': ' + subject;
+		}
+		this.repoInProgressBannerSecondaryElem.textContent = secondary;
+		const workingTreeStatus = typeof this.gitRepoInProgressState.workingTreeStatus === 'undefined' ? null : this.gitRepoInProgressState.workingTreeStatus;
+		alterClass(this.repoInProgressBannerElem, 'conflicted', workingTreeStatus !== null && workingTreeStatus.conflicts > 0);
+		alterClass(this.repoInProgressBannerElem, 'active', true);
+		requestAnimationFrame(() => this.updateRepoInProgressBannerOffset());
+	}
+
 	public getRepoInProgressActionTitle(action: GG.GitRepoInProgressAction) {
 		const stateLabel = this.getRepoInProgressStateLabel();
 		if (action === GG.GitRepoInProgressAction.Continue) {
@@ -1485,6 +1635,7 @@ class GitGraphView {
 			this.pushBtnElem.title = 'Push Current Branch';
 			this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
 		}
+		this.renderRepoInProgressBanner();
 		this.updateControlsLayout();
 	}
 
@@ -3073,6 +3224,7 @@ class GitGraphView {
 			this.updateControlsLayout();
 			this.updateCommittedColumnDisplayMode();
 			this.collapseReferenceBadgesToFit();
+			this.updateRepoInProgressBannerOffset();
 			if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 				this.renderGraph();
 			} else {

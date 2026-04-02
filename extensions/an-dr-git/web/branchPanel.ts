@@ -592,6 +592,7 @@ class BranchPanel {
 
 		for (let i = 1; i < this.options.length; i++) {
 			const opt = this.options[i];
+			if (opt.value === 'HEAD') continue; // rendered separately after Show All
 			if (opt.name.startsWith('Glob: ')) {
 				globs.push({ opt, idx: i });
 			} else if (opt.value.startsWith('remotes/')) {
@@ -607,6 +608,12 @@ class BranchPanel {
 		// Show All
 		if (filter === '' || 'show all'.indexOf(filter) > -1) {
 			html += this.itemHtml(0, this.options[0].name, this.optionsSelected[0], 0, this.options[0].name);
+		}
+
+		// HEAD (right under Show All)
+		const headIdx = this.options.findIndex((o) => o.value === 'HEAD');
+		if (headIdx > -1 && (filter === '' || 'head'.indexOf(filter) > -1)) {
+			html += this.itemHtml(headIdx, this.options[headIdx].name, this.optionsSelected[headIdx], 0, this.options[headIdx].name);
 		}
 
 		// Glob patterns

@@ -256,6 +256,22 @@ export interface GitRepoInProgressState {
 		readonly current: number;
 		readonly total: number;
 	} | null;
+	readonly rebaseContext: {
+		readonly branch: string | null;
+		readonly onto: string | null;
+	} | null;
+	readonly rebaseCommitStates: ReadonlyArray<{
+		readonly hash: string;
+		readonly kind: 'todo' | 'done' | 'in-progress';
+		readonly offset: number;
+	}> | null;
+	readonly workingTreeStatus: {
+		readonly changed: number;
+		readonly staged: number;
+		readonly conflicts: number;
+		readonly untracked: number;
+	} | null;
+	readonly subject: string | null;
 }
 
 export interface GitGraphViewConfig {

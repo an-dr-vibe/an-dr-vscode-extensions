@@ -268,6 +268,10 @@ class Vertex {
 		return { x: this.nextX, y: this.id };
 	}
 
+	public getNextX(): number {
+		return this.nextX;
+	}
+
 	public getPointConnectingTo(vertex: VertexOrNull, onBranch: Branch) {
 		for (let i = 0; i < this.connections.length; i++) {
 			if (this.connections[i].connectsTo === vertex && this.connections[i].onBranch === onBranch) {
@@ -305,12 +309,21 @@ class Vertex {
 
 	/* Rendering */
 
-	public draw(svg: SVGElement, config: GG.GraphConfig, expandOffset: boolean, overListener: (event: MouseEvent) => void, outListener: (event: MouseEvent) => void) {
+	public draw(svg: SVGElement, config: GG.GraphConfig, expandOffset: boolean, overListener: (event: MouseEvent) => void, outListener: (event: MouseEvent) => void, rebaseKind: string | null = null) {
 		if (this.onBranch === null) return;
 
 		const colour = this.isCommitted ? config.colours[this.onBranch.getColour() % config.colours.length] : '#808080';
 		const cx = (this.x * config.grid.x + config.grid.offsetX).toString();
 		const cy = (this.id * config.grid.y + config.grid.offsetY + (expandOffset ? config.grid.expandY : 0)).toString();
+
+		if (rebaseKind !== null) {
+			const ring = document.createElementNS(SVG_NAMESPACE, 'circle');
+			ring.setAttribute('cx', cx);
+			ring.setAttribute('cy', cy);
+			ring.setAttribute('r', '7');
+			ring.setAttribute('class', 'rebaseRing ' + rebaseKind);
+			svg.appendChild(ring);
+		}
 
 		const circle = document.createElementNS(SVG_NAMESPACE, 'circle');
 		circle.dataset.id = this.id.toString();
@@ -356,6 +369,7 @@ class Graph {
 	private commitHead: string | null = null;
 	private commitLookup: { [hash: string]: number } = {};
 	private remoteHeadTargets: { readonly [remoteName: string]: string } = {};
+	private repoInProgressState: GG.GitRepoInProgressState | null = null;
 	private onlyFollowFirstParent: boolean = false;
 	private expandedCommitIndex: number = -1;
 
@@ -454,6 +468,10 @@ class Graph {
 		this.remoteHeadTargets = remoteHeadTargets;
 	}
 
+	public setRepoInProgressState(repoInProgressState: GG.GitRepoInProgressState | null) {
+		this.repoInProgressState = repoInProgressState;
+	}
+
 	public render(expandedCommit: ExpandedCommit | null) {
 		this.expandedCommitIndex = expandedCommit !== null ? expandedCommit.index : -1;
 		let group = document.createElementNS(SVG_NAMESPACE, 'g'), i, contentWidth = this.getContentWidth();
@@ -462,10 +480,14 @@ class Graph {
 		for (i = 0; i < this.branches.length; i++) {
 			this.branches[i].draw(group, this.config, this.expandedCommitIndex);
 		}
+		this.drawRebaseGuide(group);
 
+		const rebaseKinds = this.buildRebaseKindsMap();
 		const overListener = (e: MouseEvent) => this.vertexOver(e), outListener = (e: MouseEvent) => this.vertexOut(e);
 		for (i = 0; i < this.vertices.length; i++) {
-			this.vertices[i].draw(group, this.config, expandedCommit !== null && i > expandedCommit.index, overListener, outListener);
+			const hash = i < this.commits.length ? this.commits[i].hash : '';
+			const rebaseKind = this.getRebaseKindForCommit(hash, rebaseKinds);
+			this.vertices[i].draw(group, this.config, expandedCommit !== null && i > expandedCommit.index, overListener, outListener, rebaseKind);
 		}
 
 		if (this.group !== null) this.svg.removeChild(this.group);
@@ -712,6 +734,196 @@ class Graph {
 	private setSvgWidth(contentWidth: number) {
 		let width = this.maxWidth > -1 ? Math.min(contentWidth, this.maxWidth) : contentWidth;
 		this.svg.setAttribute('width', width.toString());
+	}
+
+	private buildRebaseKindsMap(): { [hash: string]: string } {
+		const map: { [hash: string]: string } = {};
+		if (this.repoInProgressState === null || this.repoInProgressState.type !== GG.GitRepoInProgressStateType.Rebase) return map;
+		const states = typeof this.repoInProgressState.rebaseCommitStates === 'undefined' ? null : this.repoInProgressState.rebaseCommitStates;
+		if (states === null) return map;
+		for (let i = 0; i < states.length; i++) {
+			map[states[i].hash.toLowerCase()] = states[i].kind;
+		}
+		return map;
+	}
+
+	private getRebaseKindForCommit(hash: string, map: { [hash: string]: string }): string | null {
+		if (hash === '' || hash === UNCOMMITTED) return null;
+		const lower = hash.toLowerCase();
+		if (typeof map[lower] !== 'undefined') return map[lower];
+		// Short-hash prefix match (rebase files store abbreviated hashes)
+		for (const key in map) {
+			if (lower.startsWith(key) || key.startsWith(lower)) return map[key];
+		}
+		return null;
+	}
+
+
+	/* Rebase Guide */
+
+	private drawRebaseGuide(group: SVGGElement) {
+		const state = this.repoInProgressState;
+		if (state === null || state.type !== GG.GitRepoInProgressStateType.Rebase) return;
+
+		const context = typeof state.rebaseContext !== 'undefined' ? state.rebaseContext : null;
+		if (context === null || context.onto === null) return;
+
+		const commitStates = typeof state.rebaseCommitStates !== 'undefined' ? state.rebaseCommitStates : null;
+		if (commitStates === null || commitStates.length === 0) return;
+
+		// Find the onto commit in the visible graph
+		const ontoIndex = this.findCommitIndex(context.onto);
+		if (ontoIndex < 0) return;
+
+		// The guide ends at the Uncommitted Changes row when present (that's
+		// where conflict resolution happens), otherwise at the onto commit.
+		const targetIndex = (this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED) ? 0 : ontoIndex;
+
+		// Find the current rebase frontier (in-progress first, then first todo)
+		let sourceIndex = -1;
+		for (let i = 0; i < commitStates.length; i++) {
+			if (commitStates[i].kind === 'in-progress') {
+				sourceIndex = this.findCommitIndexByHash(commitStates[i].hash);
+				break;
+			}
+		}
+		if (sourceIndex < 0) {
+			for (let i = 0; i < commitStates.length; i++) {
+				if (commitStates[i].kind === 'todo') {
+					const idx = this.findCommitIndexByHash(commitStates[i].hash);
+					if (idx >= 0) { sourceIndex = idx; break; }
+				}
+			}
+		}
+		if (sourceIndex < 0 || sourceIndex === targetIndex) return;
+
+		const source = this.getVertexPixel(sourceIndex);
+		const target = this.getVertexPixel(targetIndex);
+
+		// If both sit on the same lane the topology already shows the relationship
+		if (source.x === target.x) return;
+
+		const guideLaneX = this.findFreeGuideLaneX(sourceIndex, targetIndex);
+		const colour = this.config.colours[this.vertices[sourceIndex].getColour() % this.config.colours.length];
+		const pathD = this.buildRebaseGuidePath(source, target, guideLaneX);
+
+		const path = group.appendChild(document.createElementNS(SVG_NAMESPACE, 'path'));
+		path.setAttribute('class', 'rebaseGuide');
+		path.setAttribute('d', pathD);
+		path.setAttribute('stroke', colour);
+
+		if (context.branch !== null) {
+			const title = document.createElementNS(SVG_NAMESPACE, 'title');
+			title.textContent = 'Rebasing ' + context.branch + ' onto ' + context.onto;
+			path.appendChild(title);
+		}
+	}
+
+	private findCommitIndex(ref: string): number {
+		for (let i = 0; i < this.commits.length; i++) {
+			if (this.commits[i].heads.includes(ref) ||
+				this.commits[i].remotes.some((r) => r.name === ref || r.name.endsWith('/' + ref))) {
+				return i;
+			}
+		}
+		if (/^[0-9a-f]{4,40}$/i.test(ref)) {
+			return this.findCommitIndexByHash(ref);
+		}
+		return -1;
+	}
+
+	private findCommitIndexByHash(hash: string): number {
+		const lower = hash.toLowerCase();
+		for (let i = 0; i < this.commits.length; i++) {
+			const h = this.commits[i].hash.toLowerCase();
+			if (h === lower || h.startsWith(lower) || lower.startsWith(h)) return i;
+		}
+		return -1;
+	}
+
+	private getVertexPixel(index: number): Pixel {
+		const p = this.vertices[index].getPoint();
+		return {
+			x: p.x * this.config.grid.x + this.config.grid.offsetX,
+			y: p.y * this.config.grid.y + this.config.grid.offsetY +
+				(this.expandedCommitIndex > -1 && index > this.expandedCommitIndex ? this.config.grid.expandY : 0)
+		};
+	}
+
+	private findFreeGuideLaneX(sourceIndex: number, targetIndex: number): number {
+		const minIdx = Math.min(sourceIndex, targetIndex);
+		const maxIdx = Math.max(sourceIndex, targetIndex);
+		let maxNextX = 0;
+		for (let i = minIdx; i <= maxIdx; i++) {
+			const nx = this.vertices[i].getNextX();
+			if (nx > maxNextX) maxNextX = nx;
+		}
+		return maxNextX * this.config.grid.x + this.config.grid.offsetX;
+	}
+
+	private buildRebaseGuidePath(source: Pixel, target: Pixel, guideLaneX: number): string {
+		const gridY = this.config.grid.y;
+		const d = gridY * (this.config.style === GG.GraphStyle.Angular ? 0.38 : 0.8);
+		const dir = target.y > source.y ? 1 : -1;
+		const absDist = Math.abs(target.y - source.y);
+
+		let path = 'M' + source.x.toFixed(1) + ',' + source.y.toFixed(1);
+
+		// Short distance: direct one-transition path (no room for 3 segments)
+		if (absDist < gridY * 2.5) {
+			if (this.config.style === GG.GraphStyle.Angular) {
+				const bendY = target.y - dir * d;
+				if ((dir > 0 && bendY > source.y) || (dir < 0 && bendY < source.y)) {
+					path += 'L' + source.x.toFixed(1) + ',' + bendY.toFixed(1);
+				}
+				path += 'L' + target.x.toFixed(1) + ',' + target.y.toFixed(1);
+			} else {
+				let transY = target.y - dir * gridY;
+				if ((dir > 0 && transY < source.y) || (dir < 0 && transY > source.y)) transY = source.y;
+				if (Math.abs(transY - source.y) > 0.5) {
+					path += 'L' + source.x.toFixed(1) + ',' + transY.toFixed(1);
+				}
+				path += 'C' + source.x.toFixed(1) + ',' + (transY + dir * d).toFixed(1) +
+					' ' + target.x.toFixed(1) + ',' + (target.y - dir * d).toFixed(1) +
+					' ' + target.x.toFixed(1) + ',' + target.y.toFixed(1);
+			}
+			return path;
+		}
+
+		// 3-segment route through the free guide lane
+		const seg1EndY = source.y + dir * gridY;
+		const seg3StartY = target.y - dir * gridY;
+
+		// Segment 1: Source lane → Guide lane (one gridY transition)
+		if (source.x === guideLaneX) {
+			path += 'L' + guideLaneX.toFixed(1) + ',' + seg1EndY.toFixed(1);
+		} else if (this.config.style === GG.GraphStyle.Angular) {
+			path += 'L' + source.x.toFixed(1) + ',' + (source.y + dir * d).toFixed(1) +
+				'L' + guideLaneX.toFixed(1) + ',' + seg1EndY.toFixed(1);
+		} else {
+			path += 'C' + source.x.toFixed(1) + ',' + (source.y + dir * d).toFixed(1) +
+				' ' + guideLaneX.toFixed(1) + ',' + (seg1EndY - dir * d).toFixed(1) +
+				' ' + guideLaneX.toFixed(1) + ',' + seg1EndY.toFixed(1);
+		}
+
+		// Segment 2: Vertical run in guide lane
+		if (Math.abs(seg3StartY - seg1EndY) > 0.5) {
+			path += 'L' + guideLaneX.toFixed(1) + ',' + seg3StartY.toFixed(1);
+		}
+
+		// Segment 3: Guide lane → Target lane (one gridY transition)
+		if (guideLaneX === target.x) {
+			path += 'L' + target.x.toFixed(1) + ',' + target.y.toFixed(1);
+		} else if (this.config.style === GG.GraphStyle.Angular) {
+			path += 'L' + target.x.toFixed(1) + ',' + (target.y - dir * d).toFixed(1) +
+				'L' + target.x.toFixed(1) + ',' + target.y.toFixed(1);
+		} else {
+			path += 'C' + guideLaneX.toFixed(1) + ',' + (seg3StartY + dir * d).toFixed(1) +
+				' ' + target.x.toFixed(1) + ',' + (target.y - dir * d).toFixed(1) +
+				' ' + target.x.toFixed(1) + ',' + target.y.toFixed(1);
+		}
+
+		return path;
 	}
 
 

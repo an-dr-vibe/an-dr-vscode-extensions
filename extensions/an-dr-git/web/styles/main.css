@@ -53,6 +53,39 @@ code{
 	margin-left:var(--branch-panel-width);
 }
 
+#repoInProgressBanner{
+	display:none;
+	padding:6px 10px;
+	border-bottom:1px solid rgba(128,128,128,0.45);
+	background-color:rgba(183, 137, 76, 0.2);
+	color:var(--vscode-editor-foreground);
+}
+#repoInProgressBanner.conflicted{
+	background-color:rgba(170, 74, 74, 0.22);
+}
+#repoInProgressBanner.active{
+	display:block;
+}
+#repoInProgressBannerPrimary{
+	font-size:15px;
+	line-height:22px;
+}
+#repoInProgressBannerSecondary{
+	margin-top:1px;
+	font-size:13px;
+	line-height:18px;
+	font-weight:600;
+}
+
+body.vscode-light #repoInProgressBanner{
+	background-color:rgba(183, 137, 76, 0.25);
+	border-bottom-color:rgba(122, 88, 44, 0.35);
+}
+
+body.branchPanelHidden #content{
+	margin-left:0;
+}
+
 
 /* Overlays */
 
@@ -114,9 +147,49 @@ code{
 	fill:none;
 	stroke-width:1.5;
 }
+#commitGraph circle.rebaseRing{
+	fill:none;
+	stroke-width:1.8;
+	pointer-events:none;
+}
+#commitGraph circle.rebaseRing.done{
+	stroke:rgba(47,141,71,0.6);
+}
+#commitGraph circle.rebaseRing.in-progress{
+	stroke:rgba(22,126,120,0.85);
+}
+#commitGraph circle.rebaseRing.todo{
+	stroke:rgba(190,122,20,0.55);
+}
+#commitGraph path.rebaseGuide{
+	fill:none;
+	stroke-width:1.5;
+	stroke-dasharray:5 3;
+	stroke-linecap:round;
+	opacity:0.5;
+	pointer-events:none;
+}
 body.vscode-light #commitGraph path.line,
 body.vscode-light #commitGraph circle:not(.current):not(.stashInner){
 	filter:saturate(1.12) contrast(1.08) brightness(0.94);
+}
+body.vscode-light #commitGraph circle.rebaseRing.done{
+	stroke:rgba(30,108,51,0.7);
+}
+body.vscode-light #commitGraph circle.rebaseRing.in-progress{
+	stroke:rgba(15,105,100,0.9);
+}
+body.vscode-light #commitGraph circle.rebaseRing.todo{
+	stroke:rgba(143,93,15,0.65);
+}
+body.vscode-light .rebaseSeqBadge.todo{
+	color:#8f5d0f;
+}
+body.vscode-light .rebaseSeqBadge.done{
+	color:#1e6c33;
+}
+body.vscode-light .rebaseSeqBadge.in-progress{
+	color:#0f6964;
 }
 
 #graphTooltip{
@@ -242,6 +315,33 @@ body.vscode-light #commitGraph circle:not(.current):not(.stashInner){
 	white-space:nowrap;
 	overflow:hidden;
 	flex-grow:1;
+}
+.rebaseSeqBadge{
+	display:inline-block;
+	height:18px;
+	line-height:18px;
+	margin:3px 6px 0 0;
+	padding:0 6px;
+	border-radius:9px;
+	font-size:11px;
+	font-weight:700;
+	vertical-align:top;
+	flex-shrink:0;
+}
+.rebaseSeqBadge.todo{
+	color:#be7a14;
+	background-color:rgba(243,179,62,0.20);
+	border:1px solid rgba(243,179,62,0.55);
+}
+.rebaseSeqBadge.done{
+	color:#2f8d47;
+	background-color:rgba(97,174,166,0.20);
+	border:1px solid rgba(97,174,166,0.55);
+}
+.rebaseSeqBadge.in-progress{
+	color:#167e78;
+	background-color:rgba(97,174,166,0.24);
+	border:1px solid rgba(97,174,166,0.70);
 }
 
 #commitTable tr.commit.mute td.text, #commitTable tr.commit.mute span.description .text{

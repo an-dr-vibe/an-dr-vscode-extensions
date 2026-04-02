@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+// Refactor note: GitGraphView stays as the stable entrypoint while HTML rendering and message handling are extracted incrementally.
 import { AvatarManager } from './avatarManager';
 import { getConfig } from './config';
 import { DataSource, GitCommitDetailsData, GitConfigKey } from './dataSource';
@@ -10,6 +11,7 @@ import { RepoManager } from './repoManager';
 import { ErrorInfo, GitConfigLocation, GitGraphBranchPanelState, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestMessage, RequestSidebarBatchRefAction, ResponseMessage, SidebarBatchRefActionTarget, SidebarBatchRefActionType, SidebarBatchRefType, TabIconColourTheme } from './types';
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
+import { renderGitGraphWebviewHtml } from './view/webviewHtml';
 
 /**
  * Manages the Git Graph View.
@@ -897,76 +899,21 @@ export class GitGraphView extends Disposable {
 		};
 		const globalState = this.extensionState.getGlobalViewState();
 		const workspaceState = this.extensionState.getWorkspaceViewState();
-
-		let body, numRepos = Object.keys(initialState.repos).length, colorVars = '', colorParams = '';
-		for (let i = 0; i < initialState.config.graph.colours.length; i++) {
-			colorVars += '--git-graph-color' + i + ':' + initialState.config.graph.colours[i] + '; ';
-			colorParams += '[data-color="' + i + '"]{--git-graph-color:var(--git-graph-color' + i + ');} ';
-		}
-
-		if (this.dataSource.isGitExecutableUnknown()) {
-			body = `<body class="unableToLoad">
-			<h2>Unable to load ${GitGraphView.NAME}</h2>
-			<p class="unableToLoadMessage">${UNABLE_TO_FIND_GIT_MSG}</p>
-			</body>`;
-		} else if (numRepos > 0) {
-			body = `<body>
-			<div id="view" tabindex="-1">
-				<div id="topBar">
-					<div id="sidebarTop">
-						<div id="branchPanelFilterHost"></div>
-					</div>
-					<div id="controls">
-						<div id="controlsLeft">
-							<div id="findWidgetHost"></div>
-							<div id="findWidgetToggleBtn" title="Search Graph"></div>
-							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
-						</div>
-						<div id="controlsBtns">
-							<div id="pullBtn"></div>
-							<div id="pushBtn"></div>
-							<div id="settingsBtn" title="Repository Settings"></div>
-							<div id="moreBtn" title="More Actions"></div>
-						</div>
-					</div>
-				</div>
-				<div id="sidebar">
-					<div id="branchPanel"></div>
-				</div>
-				<div id="content">
-					<div id="commitGraph"></div>
-					<div id="commitTable"></div>
-				</div>
-				<div id="footer"></div>
-			</div>
-			<div id="scrollShadow"></div>
-			<script nonce="${nonce}">var initialState = ${JSON.stringify(initialState)}, globalState = ${JSON.stringify(globalState)}, workspaceState = ${JSON.stringify(workspaceState)};</script>
-			<script nonce="${nonce}" src="${this.getMediaUri('out.min.js')}"></script>
-			</body>`;
-		} else {
-			body = `<body class="unableToLoad">
-			<h2>Unable to load ${GitGraphView.NAME}</h2>
-			<p class="unableToLoadMessage">No Git repositories were found in the current workspace when it was last scanned by ${GitGraphView.NAME}.</p>
-			<p>If your repositories are in subfolders of the open workspace folder(s), make sure you have set the Git Graph Setting "git-graph.maxDepthOfRepoSearch" appropriately (read the <a href="https://github.com/mhutchie/vscode-git-graph/wiki/Extension-Settings#max-depth-of-repo-search" target="_blank">documentation</a> for more information).</p>
-			<p><div id="rescanForReposBtn" class="roundedBtn">Re-scan the current workspace for repositories</div></p>
-			<script nonce="${nonce}">(function(){ var api = acquireVsCodeApi(); document.getElementById('rescanForReposBtn').addEventListener('click', function(){ api.postMessage({command: 'rescanForRepos'}); }); })();</script>
-			</body>`;
-		}
-		this.isGraphViewLoaded = numRepos > 0;
+		const html = renderGitGraphWebviewHtml({
+			panel: this.panel,
+			nonce: nonce,
+			viewName: GitGraphView.NAME,
+			gitExecutableUnknown: this.dataSource.isGitExecutableUnknown(),
+			initialState: initialState,
+			globalState: globalState,
+			workspaceState: workspaceState,
+			unableToFindGitMessage: UNABLE_TO_FIND_GIT_MSG,
+			mediaCssUri: this.getMediaUri('out.min.css'),
+			mediaJsUri: this.getMediaUri('out.min.js')
+		});
+		this.isGraphViewLoaded = html.isGraphViewLoaded;
 		this.loadViewTo = null;
-
-		return `<!DOCTYPE html>
-		<html lang="en">
-			<head>
-				<meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${standardiseCspSource(this.panel.webview.cspSource)} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data:;">
-				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-				<link rel="stylesheet" type="text/css" href="${this.getMediaUri('out.min.css')}">
-				<title>${GitGraphView.NAME}</title>
-				<style>body{${colorVars}} ${colorParams}</style>
-			</head>
-			${body}
-		</html>`;
+		return html.html;
 	}
 
 
@@ -1030,19 +977,4 @@ export class GitGraphView extends Disposable {
 
 }
 
-/**
- * Standardise the CSP Source provided by Visual Studio Code for use with the Webview. It is idempotent unless called with http/https URI's, in which case it keeps only the authority portion of the http/https URI. This is necessary to be compatible with some web browser environments.
- * @param cspSource The value provide by Visual Studio Code.
- * @returns The standardised CSP Source.
- */
-export function standardiseCspSource(cspSource: string) {
-	if (cspSource.startsWith('http://') || cspSource.startsWith('https://')) {
-		const pathIndex = cspSource.indexOf('/', 8), queryIndex = cspSource.indexOf('?', 8), fragmentIndex = cspSource.indexOf('#', 8);
-		let endOfAuthorityIndex = pathIndex;
-		if (queryIndex > -1 && (queryIndex < endOfAuthorityIndex || endOfAuthorityIndex === -1)) endOfAuthorityIndex = queryIndex;
-		if (fragmentIndex > -1 && (fragmentIndex < endOfAuthorityIndex || endOfAuthorityIndex === -1)) endOfAuthorityIndex = fragmentIndex;
-		return endOfAuthorityIndex > -1 ? cspSource.substring(0, endOfAuthorityIndex) : cspSource;
-	} else {
-		return cspSource;
-	}
-}
+export { standardiseCspSource } from './view/webviewHtml';

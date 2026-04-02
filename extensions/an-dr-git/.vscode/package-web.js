@@ -15,14 +15,32 @@ const OUTPUT_TMP_JS_FILE = 'out.tmp.js';
 
 const DEBUG = process.argv.length > 2 && process.argv[2] === 'debug';
 
+function collectFilesRecursive(dir, suffix) {
+	const files = [];
+	const stack = [dir];
+	while (stack.length > 0) {
+		const cur = stack.pop();
+		fs.readdirSync(cur).forEach((entry) => {
+			const full = path.join(cur, entry);
+			if (fs.statSync(full).isDirectory()) {
+				stack.push(full);
+			} else if (entry.endsWith(suffix)) {
+				files.push(full);
+			}
+		});
+	}
+	return files;
+}
 
 // Determine the JS files to be packaged. The order is: utils.ts, *.ts, and then main.ts
 let packageJsFiles = [path.join(MEDIA_DIRECTORY, UTILS_JS_FILE)];
-fs.readdirSync(MEDIA_DIRECTORY).forEach((fileName) => {
-	if (fileName.endsWith('.js') && fileName !== OUTPUT_MIN_JS_FILE && fileName !== UTILS_JS_FILE && fileName !== MAIN_JS_FILE) {
-		packageJsFiles.push(path.join(MEDIA_DIRECTORY, fileName));
-	}
-});
+collectFilesRecursive(MEDIA_DIRECTORY, '.js')
+	.filter((filePath) => {
+		const relPath = path.relative(MEDIA_DIRECTORY, filePath).replace(/\\/g, '/');
+		return relPath !== OUTPUT_MIN_JS_FILE && relPath !== OUTPUT_TMP_JS_FILE && relPath !== UTILS_JS_FILE && relPath !== MAIN_JS_FILE;
+	})
+	.sort((a, b) => a.localeCompare(b))
+	.forEach((filePath) => packageJsFiles.push(filePath));
 packageJsFiles.push(path.join(MEDIA_DIRECTORY, MAIN_JS_FILE));
 
 // Determine the CSS files to be packaged. The order is: main.css, and then *.css

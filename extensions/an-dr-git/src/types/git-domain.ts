@@ -1,0 +1,20 @@
+export {
+	GitCommit,
+	GitCommitTag,
+	GitCommitRemote,
+	GitCommitStash,
+	GitCommitDetails,
+	GitSignatureStatus,
+	GitSignature,
+	GitConfigLocation,
+	GitFileChange,
+	GitFileStatus,
+	GitPushBranchMode,
+	GitRepoConfig,
+	GitRepoConfigBranches,
+	GitRepoConfigBranch,
+	GitRepoSettingsRemote,
+	GitResetMode,
+	GitStash,
+	GitTagDetails
+} from './legacy';

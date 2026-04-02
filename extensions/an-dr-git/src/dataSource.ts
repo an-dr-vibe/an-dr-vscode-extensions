@@ -1,6 +1,7 @@
 // Based on vscode-git-graph by Michael Hutchison
 // Original: https://github.com/mhutchie/vscode-git-graph
 // License: MIT
+// Refactor note: This file remains larger than the target size because DataSource is still the stable orchestration façade for all git operations.
 import * as cp from 'child_process';
 import * as fs from 'fs';
 import { decode, encodingExists } from 'iconv-lite';
@@ -8,8 +9,11 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
+import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
+import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GpgStatusCodeParsingDetails } from './data-source/models';
+import { applyBranchUpstreams, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
-import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -1417,63 +1421,20 @@ export class DataSource extends Disposable {
 		const showRemoteHeads = getConfig().showRemoteHeads;
 
 		return Promise.all([
-			this.spawnGit(args, repo, (stdout) => {
-				let branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, error: null };
-				let lines = stdout.split(EOL_REGEX);
-				for (let i = 0; i < lines.length - 1; i++) {
-					let lineContents = lines[i].substring(2);
-					let symbolicRefSplit = lineContents.split(' -> ');
-					let name = symbolicRefSplit[0];
-					const symbolicTarget = symbolicRefSplit.length > 1 ? symbolicRefSplit.slice(1).join(' -> ').trim() : null;
-
-					if (showRemoteHeads && symbolicTarget !== null && REMOTE_HEAD_BRANCH_REGEXP.test(name)) {
-						const remoteName = name.substring(8, name.length - 5);
-						if (remoteName !== '' && symbolicTarget !== '') {
-							branchData.remoteHeadTargets[remoteName] = symbolicTarget;
-						}
-					}
-
-					if (DETACHED_HEAD_BRANCH_REGEXP.test(name)) {
-						branchData.head = 'HEAD';
-						branchData.branches.unshift('HEAD');
-						continue;
-					}
-					if (INVALID_BRANCH_REGEXP.test(name) || hideRemotePatterns.some((pattern) => name.startsWith(pattern)) || (!showRemoteHeads && REMOTE_HEAD_BRANCH_REGEXP.test(name))) {
-						continue;
-					}
-
-					if (lines[i][0] === '*') {
-						branchData.head = name;
-						branchData.branches.unshift(name);
-					} else {
-						branchData.branches.push(name);
-					}
-				}
-				return branchData;
-			}),
-			this.spawnGit(['for-each-ref', 'refs/heads', '--format=%(refname:short)' + GIT_LOG_SEPARATOR + '%(upstream:short)' + GIT_LOG_SEPARATOR + '%(upstream:track)'], repo, (stdout) => {
-				let branchUpstreams: { [branchName: string]: string } = {};
-				let goneUpstreamBranches: string[] = [];
-				let lines = stdout.split(EOL_REGEX);
-				for (let i = 0; i < lines.length - 1; i++) {
-					const record = lines[i].split(GIT_LOG_SEPARATOR);
-					if (record.length >= 2 && record[1] !== '') {
-						branchUpstreams[record[0]] = record[1];
-					}
-					if (record.length >= 3 && record[2] === '[gone]') {
-						goneUpstreamBranches.push(record[0]);
-					}
-				}
-				return { branchUpstreams, goneUpstreamBranches };
-			})
+			this.spawnGit(args, repo, (stdout) => parseBranchesOutput(stdout, {
+				showRemoteHeads,
+				hideRemotePatterns,
+				detachedHeadRegex: DETACHED_HEAD_BRANCH_REGEXP,
+				invalidBranchRegex: INVALID_BRANCH_REGEXP,
+				remoteHeadRegex: REMOTE_HEAD_BRANCH_REGEXP
+			})),
+			this.spawnGit(
+				['for-each-ref', 'refs/heads', '--format=%(refname:short)' + GIT_LOG_SEPARATOR + '%(upstream:short)' + GIT_LOG_SEPARATOR + '%(upstream:track)'],
+				repo,
+				(stdout) => parseBranchUpstreamsOutput(stdout, GIT_LOG_SEPARATOR)
+			)
 		]).then(([branchData, upstreamData]) => {
-			Object.keys(upstreamData.branchUpstreams).forEach((branch) => {
-				if (branchData.branches.includes(branch)) {
-					branchData.branchUpstreams[branch] = upstreamData.branchUpstreams[branch];
-				}
-			});
-			branchData.goneUpstreamBranches = upstreamData.goneUpstreamBranches.filter((branch) => branchData.branches.includes(branch));
-			return branchData;
+			return applyBranchUpstreams(branchData, upstreamData);
 		});
 	}
 
@@ -1484,28 +1445,11 @@ export class DataSource extends Disposable {
 	 * @returns The base commit details.
 	 */
 	private getCommitDetailsBase(repo: string, commitHash: string) {
-		return this.spawnGit(['-c', 'log.showSignature=false', 'show', '--quiet', commitHash, '--format=' + this.gitFormatCommitDetails], repo, (stdout): DeepWriteable<GitCommitDetails> => {
-			const commitInfo = stdout.split(GIT_LOG_SEPARATOR);
-			return {
-				hash: commitInfo[0],
-				parents: commitInfo[1] !== '' ? commitInfo[1].split(' ') : [],
-				author: commitInfo[2],
-				authorEmail: commitInfo[3],
-				authorDate: parseInt(commitInfo[4]),
-				committer: commitInfo[5],
-				committerEmail: commitInfo[6],
-				committerDate: parseInt(commitInfo[7]),
-				signature: ['G', 'U', 'X', 'Y', 'R', 'E', 'B'].includes(commitInfo[8])
-					? {
-						key: commitInfo[10].trim(),
-						signer: commitInfo[9].trim(),
-						status: <GitSignatureStatus>commitInfo[8]
-					}
-					: null,
-				body: removeTrailingBlankLines(commitInfo.slice(11).join(GIT_LOG_SEPARATOR).split(EOL_REGEX)).join('\n'),
-				fileChanges: []
-			};
-		});
+		return this.spawnGit(
+			['-c', 'log.showSignature=false', 'show', '--quiet', commitHash, '--format=' + this.gitFormatCommitDetails],
+			repo,
+			(stdout) => parseCommitDetailsOutput(stdout, GIT_LOG_SEPARATOR)
+		);
 	}
 
 	/**
@@ -1553,25 +1497,7 @@ export class DataSource extends Disposable {
 	 * @returns An array of `--name-status` records.
 	 */
 	private getDiffNameStatus(repo: string, fromHash: string, toHash: string, filter: string = 'AMDR') {
-		return this.execDiff(repo, fromHash, toHash, '--name-status', filter).then((output) => {
-			let records: DiffNameStatusRecord[] = [], i = 0;
-			while (i < output.length && output[i] !== '') {
-				let type = <GitFileStatus>output[i][0];
-				if (type === GitFileStatus.Added || type === GitFileStatus.Deleted || type === GitFileStatus.Modified) {
-					// Add, Modify, or Delete
-					let p = getPathFromStr(output[i + 1]);
-					records.push({ type: type, oldFilePath: p, newFilePath: p });
-					i += 2;
-				} else if (type === GitFileStatus.Renamed) {
-					// Rename
-					records.push({ type: type, oldFilePath: getPathFromStr(output[i + 1]), newFilePath: getPathFromStr(output[i + 2]) });
-					i += 3;
-				} else {
-					break;
-				}
-			}
-			return records;
-		});
+		return this.execDiff(repo, fromHash, toHash, '--name-status', filter).then((output) => parseDiffNameStatusOutput(output));
 	}
 
 	/**
@@ -1583,23 +1509,7 @@ export class DataSource extends Disposable {
 	 * @returns An array of `--numstat` records.
 	 */
 	private getDiffNumStat(repo: string, fromHash: string, toHash: string, filter: string = 'AMDR') {
-		return this.execDiff(repo, fromHash, toHash, '--numstat', filter).then((output) => {
-			let records: DiffNumStatRecord[] = [], i = 0;
-			while (i < output.length && output[i] !== '') {
-				let fields = output[i].split('\t');
-				if (fields.length !== 3) break;
-				if (fields[2] !== '') {
-					// Add, Modify, or Delete
-					records.push({ filePath: getPathFromStr(fields[2]), additions: parseInt(fields[0]), deletions: parseInt(fields[1]) });
-					i += 1;
-				} else {
-					// Rename
-					records.push({ filePath: getPathFromStr(output[i + 2]), additions: parseInt(fields[0]), deletions: parseInt(fields[1]) });
-					i += 3;
-				}
-			}
-			return records;
-		});
+		return this.execDiff(repo, fromHash, toHash, '--numstat', filter).then((output) => parseDiffNumStatOutput(output));
 	}
 
 	/**
@@ -1649,16 +1559,7 @@ export class DataSource extends Disposable {
 		}
 		args.push('--');
 
-		return this.spawnGit(args, repo, (stdout) => {
-			let lines = stdout.split(EOL_REGEX);
-			let commits: GitCommitRecord[] = [];
-			for (let i = 0; i < lines.length - 1; i++) {
-				let line = lines[i].split(GIT_LOG_SEPARATOR);
-				if (line.length !== 6) break;
-				commits.push({ hash: line[0], parents: line[1] !== '' ? line[1].split(' ') : [], author: line[2], email: line[3], date: parseInt(line[4]), message: line[5] });
-			}
-			return commits;
-		});
+		return this.spawnGit(args, repo, (stdout) => parseLogOutput(stdout, GIT_LOG_SEPARATOR));
 	}
 
 	/**
@@ -1676,31 +1577,7 @@ export class DataSource extends Disposable {
 
 		const hideRemotePatterns = hideRemotes.map((remote) => 'refs/remotes/' + remote + '/');
 
-		return this.spawnGit(args, repo, (stdout) => {
-			let refData: GitRefData = { head: null, heads: [], tags: [], remotes: [] };
-			let lines = stdout.split(EOL_REGEX);
-			for (let i = 0; i < lines.length - 1; i++) {
-				let line = lines[i].split(' ');
-				if (line.length < 2) continue;
-
-				let hash = line.shift()!;
-				let ref = line.join(' ');
-
-				if (ref.startsWith('refs/heads/')) {
-					refData.heads.push({ hash: hash, name: ref.substring(11) });
-				} else if (ref.startsWith('refs/tags/')) {
-					let annotated = ref.endsWith('^{}');
-					refData.tags.push({ hash: hash, name: (annotated ? ref.substring(10, ref.length - 3) : ref.substring(10)), annotated: annotated });
-				} else if (ref.startsWith('refs/remotes/')) {
-					if (!hideRemotePatterns.some((pattern) => ref.startsWith(pattern)) && (showRemoteHeads || !ref.endsWith('/HEAD'))) {
-						refData.remotes.push({ hash: hash, name: ref.substring(13) });
-					}
-				} else if (ref === 'HEAD') {
-					refData.head = hash;
-				}
-			}
-			return refData;
-		});
+		return this.spawnGit(args, repo, (stdout) => parseRefsOutput(stdout, { showRemoteHeads, hideRemotePatterns }));
 	}
 
 	/**
@@ -1711,19 +1588,11 @@ export class DataSource extends Disposable {
 	 * @returns A promise resolving to a list of remote names.
 	 */
 	private getRemotesContainingCommit(repo: string, commitHash: string, knownRemotes: string[]) {
-		return this.spawnGit(['branch', '-r', '--no-color', '--contains=' + commitHash], repo, (stdout) => {
-			// Get the names of all known remote branches that contain commitHash
-			const branchNames = stdout.split(EOL_REGEX)
-				.filter((line) => line.length > 2)
-				.map((line) => line.substring(2).split(' -> ')[0])
-				.filter((branchName) => !INVALID_BRANCH_REGEXP.test(branchName));
-
-			// Get all the remotes that are the prefix of at least one remote branch name
-			return knownRemotes.filter((knownRemote) => {
-				const knownRemotePrefix = knownRemote + '/';
-				return branchNames.some((branchName) => branchName.startsWith(knownRemotePrefix));
-			});
-		});
+		return this.spawnGit(
+			['branch', '-r', '--no-color', '--contains=' + commitHash],
+			repo,
+			(stdout) => parseRemotesContainingCommitOutput(stdout, INVALID_BRANCH_REGEXP, knownRemotes)
+		);
 	}
 
 	/**
@@ -1732,26 +1601,11 @@ export class DataSource extends Disposable {
 	 * @returns An array of stashes.
 	 */
 	private getStashes(repo: string) {
-		return this.spawnGit(['reflog', '--format=' + this.gitFormatStash, 'refs/stash', '--'], repo, (stdout) => {
-			let lines = stdout.split(EOL_REGEX);
-			let stashes: GitStash[] = [];
-			for (let i = 0; i < lines.length - 1; i++) {
-				let line = lines[i].split(GIT_LOG_SEPARATOR);
-				if (line.length !== 7 || line[1] === '') continue;
-				let parentHashes = line[1].split(' ');
-				stashes.push({
-					hash: line[0],
-					baseHash: parentHashes[0],
-					untrackedFilesHash: parentHashes.length === 3 ? parentHashes[2] : null,
-					selector: line[2],
-					author: line[3],
-					email: line[4],
-					date: parseInt(line[5]),
-					message: line[6]
-				});
-			}
-			return stashes;
-		}).catch(() => <GitStash[]>[]);
+		return this.spawnGit(
+			['reflog', '--format=' + this.gitFormatStash, 'refs/stash', '--'],
+			repo,
+			(stdout) => parseStashesOutput(stdout, GIT_LOG_SEPARATOR)
+		).catch(() => <GitStash[]>[]);
 	}
 
 	/**
@@ -1831,27 +1685,11 @@ export class DataSource extends Disposable {
 	 * @returns The untracked and deleted files.
 	 */
 	private getStatus(repo: string) {
-		return this.spawnGit(['status', '-s', '--untracked-files=' + (getConfig().showUntrackedFiles ? 'all' : 'no'), '--porcelain', '-z'], repo, (stdout) => {
-			let output = stdout.split('\0'), i = 0;
-			let status: GitStatusFiles = { deleted: [], untracked: [] };
-			let path = '', c1 = '', c2 = '';
-			while (i < output.length && output[i] !== '') {
-				if (output[i].length < 4) break;
-				path = output[i].substring(3);
-				c1 = output[i].substring(0, 1);
-				c2 = output[i].substring(1, 2);
-				if (c1 === 'D' || c2 === 'D') status.deleted.push(path);
-				else if (c1 === '?' || c2 === '?') status.untracked.push(path);
-
-				if (c1 === 'R' || c2 === 'R' || c1 === 'C' || c2 === 'C') {
-					// Renames or copies
-					i += 2;
-				} else {
-					i += 1;
-				}
-			}
-			return status;
-		});
+		return this.spawnGit(
+			['status', '-s', '--untracked-files=' + (getConfig().showUntrackedFiles ? 'all' : 'no'), '--porcelain', '-z'],
+			repo,
+			(stdout) => parseStatusOutput(stdout)
+		);
 	}
 
 
@@ -1959,199 +1797,4 @@ export class DataSource extends Disposable {
 	}
 }
 
-
-/**
- * Generates the file changes from the diff output and status information.
- * @param nameStatusRecords The `--name-status` records.
- * @param numStatRecords The `--numstat` records.
- * @param status The deleted and untracked files.
- * @returns An array of file changes.
- */
-function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], numStatRecords: DiffNumStatRecord[], status: GitStatusFiles | null) {
-	let fileChanges: Writeable<GitFileChange>[] = [], fileLookup: { [file: string]: number } = {}, i = 0;
-
-	for (i = 0; i < nameStatusRecords.length; i++) {
-		fileLookup[nameStatusRecords[i].newFilePath] = fileChanges.length;
-		fileChanges.push({ oldFilePath: nameStatusRecords[i].oldFilePath, newFilePath: nameStatusRecords[i].newFilePath, type: nameStatusRecords[i].type, additions: null, deletions: null });
-	}
-
-	if (status !== null) {
-		let filePath;
-		for (i = 0; i < status.deleted.length; i++) {
-			filePath = getPathFromStr(status.deleted[i]);
-			if (typeof fileLookup[filePath] === 'number') {
-				fileChanges[fileLookup[filePath]].type = GitFileStatus.Deleted;
-			} else {
-				fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Deleted, additions: null, deletions: null });
-			}
-		}
-		for (i = 0; i < status.untracked.length; i++) {
-			filePath = getPathFromStr(status.untracked[i]);
-			fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Untracked, additions: null, deletions: null });
-		}
-	}
-
-	for (i = 0; i < numStatRecords.length; i++) {
-		if (typeof fileLookup[numStatRecords[i].filePath] === 'number') {
-			fileChanges[fileLookup[numStatRecords[i].filePath]].additions = numStatRecords[i].additions;
-			fileChanges[fileLookup[numStatRecords[i].filePath]].deletions = numStatRecords[i].deletions;
-		}
-	}
-
-	return fileChanges;
-}
-
-/**
- * Get the specified config value from a set of key-value config pairs.
- * @param configs A set key-value pairs of Git configuration records.
- * @param key The key of the desired config.
- * @returns The value for `key` if it exists, otherwise NULL.
- */
-function getConfigValue(configs: GitConfigSet, key: string) {
-	return typeof configs[key] !== 'undefined' ? configs[key] : null;
-}
-
-/**
- * Produce a suitable error message from a spawned Git command that terminated with an erroneous status code.
- * @param error An error generated by JavaScript (optional).
- * @param stdoutBuffer A buffer containing the data outputted to `stdout`.
- * @param stderr A string containing the data outputted to `stderr`.
- * @returns A suitable error message.
- */
-function getErrorMessage(error: Error | null, stdoutBuffer: Buffer, stderr: string) {
-	let stdout = stdoutBuffer.toString(), lines: string[];
-	if (stdout !== '' || stderr !== '') {
-		lines = (stderr + stdout).split(EOL_REGEX);
-		lines.pop();
-	} else if (error) {
-		lines = error.message.split(EOL_REGEX);
-	} else {
-		lines = [];
-	}
-	return lines.join('\n');
-}
-
-/**
- * Remove trailing blank lines from an array of lines.
- * @param lines The array of lines.
- * @returns The same array.
- */
-function removeTrailingBlankLines(lines: string[]) {
-	while (lines.length > 0 && lines[lines.length - 1] === '') {
-		lines.pop();
-	}
-	return lines;
-}
-
-/**
- * Get all the unique strings from an array of strings.
- * @param items The array of strings with duplicates.
- * @returns An array of unique strings.
- */
-function unique(items: ReadonlyArray<string>) {
-	const uniqueItems: { [item: string]: true } = {};
-	items.forEach((item) => uniqueItems[item] = true);
-	return Object.keys(uniqueItems);
-}
-
-
-/* Types */
-
-interface DiffNameStatusRecord {
-	type: GitFileStatus;
-	oldFilePath: string;
-	newFilePath: string;
-}
-
-interface DiffNumStatRecord {
-	filePath: string;
-	additions: number;
-	deletions: number;
-}
-
-interface GitBranchData {
-	branches: string[];
-	branchUpstreams: { [branchName: string]: string };
-	goneUpstreamBranches: string[];
-	remoteHeadTargets: { [remoteName: string]: string };
-	head: string | null;
-	error: ErrorInfo;
-}
-
-interface GitCommitRecord {
-	hash: string;
-	parents: string[];
-	author: string;
-	email: string;
-	date: number;
-	message: string;
-}
-
-interface GitCommitData {
-	commits: GitCommit[];
-	head: string | null;
-	tags: string[];
-	moreCommitsAvailable: boolean;
-	error: ErrorInfo;
-}
-
-export interface GitCommitDetailsData {
-	commitDetails: GitCommitDetails | null;
-	error: ErrorInfo;
-}
-
-interface GitCommitComparisonData {
-	fileChanges: GitFileChange[];
-	error: ErrorInfo;
-}
-
-type GitConfigSet = { [key: string]: string };
-
-interface GitRef {
-	hash: string;
-	name: string;
-}
-
-interface GitRefTag extends GitRef {
-	annotated: boolean;
-}
-
-interface GitRefData {
-	head: string | null;
-	heads: GitRef[];
-	tags: GitRefTag[];
-	remotes: GitRef[];
-}
-
-interface GitRepoInfo extends GitBranchData {
-	remotes: string[];
-	stashes: GitStash[];
-}
-
-interface GitRepoConfigData {
-	config: GitRepoConfig | null;
-	error: ErrorInfo;
-}
-
-interface GitStatusFiles {
-	deleted: string[];
-	untracked: string[];
-}
-
-interface GitTagDetailsData {
-	details: GitTagDetails | null;
-	error: ErrorInfo;
-}
-
-interface GitTagContextData {
-	context: {
-		hash: string;
-		annotated: boolean;
-	} | null;
-	error: ErrorInfo;
-}
-
-interface GpgStatusCodeParsingDetails {
-	readonly status: GitSignatureStatus,
-	readonly uid: boolean
-}
+export type { GitCommitDetailsData } from './data-source/models';

@@ -23,6 +23,26 @@ They communicate **only** via VS Code's webview message API (`postMessage` / `on
 
 ---
 
+## Refactor Guardrails (Maintainability Mode)
+
+- **Behavior freeze:** do not change command IDs, settings keys, request/response command names, or persisted state keys during structural refactors.
+- **Compatibility-first extraction:** prefer moving code behind existing public entrypoints (`DataSource`, `RepoManager`, `GitGraphView`) over changing call sites.
+- **File/function size targets:** aim for `<= 350` lines per file and `<= 60` lines per function. If a larger unit is intentionally retained, add a brief in-file justification comment.
+- **Topic directories:** place extracted logic under topic folders:
+  - backend: `src/data-source/`, `src/repo-manager/`, `src/view/`, `src/types/`
+  - webview: `web/main/` (requires recursive packaging in `.vscode/package-web.js`)
+- **No cross-world coupling:** never import `web/*` from `src/*` or vice versa.
+
+### Current hotspot audit list
+
+- `web/main.ts`
+- `src/dataSource.ts`
+- `src/repoManager.ts`
+- `src/gitGraphView.ts`
+- `src/types/legacy.ts` (compatibility source while grouped exports live in `src/types/*`)
+
+---
+
 ## Build
 
 ```bash
@@ -55,6 +75,13 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `repoFileWatcher.ts` | Watches `.git` for changes, triggers refresh |
 | `logger.ts` | Output channel logging |
 | `utils.ts` | General backend utilities |
+| `data-source/helpers.ts` | DataSource parsing helpers (diff/status/config/error formatting) |
+| `data-source/models.ts` | DataSource-internal model and response interfaces extracted from `dataSource.ts` |
+| `data-source/parsers.ts` | DataSource stdout parsing helpers for branches/refs/log/status/stashes |
+| `repo-manager/workspaceUtils.ts` | Workspace folder / path inclusion utilities |
+| `repo-manager/externalRepoConfig.ts` | External repo config read/write/validate/apply/export helpers |
+| `view/webviewHtml.ts` | Webview HTML + CSP rendering helpers |
+| `types/*` | Grouped contract exports by concern; `types.ts` is the public barrel |
 
 ---
 
@@ -72,6 +99,7 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `settingsWidget.ts` | Repository settings panel |
 | `textFormatter.ts` | Commit message formatting (issue links, etc.) |
 | `utils.ts` | Frontend globals: `SVG_ICONS` object, `escapeHtml`, `VSCODE_API`, helpers |
+| `main/*` | Extracted `main.ts` helper modules (committed column, controls layout, file tree rendering, repo-state helpers, misc helpers) |
 | `global.d.ts` | Type declarations for globals shared across web files |
 
 ### Styles (`web/styles/`)

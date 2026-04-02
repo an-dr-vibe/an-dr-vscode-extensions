@@ -299,6 +299,22 @@ body.vscode-light .rebaseSeqBadge.in-progress{
 #commitTable tr.commit.current td{
 	font-weight:bold;
 }
+#commitTable tr.commit.selected td{
+	background-color:rgba(0,120,215,0.18);
+}
+#commitTable tr.commit.selected:hover td,
+#commitTable tr.commit.selected.graphVertexActive td,
+#commitTable tr.commit.selected.contextMenuActive td{
+	background-color:rgba(0,120,215,0.28);
+}
+body.vscode-light #commitTable tr.commit.selected td{
+	background-color:rgba(0,90,180,0.14);
+}
+body.vscode-light #commitTable tr.commit.selected:hover td,
+body.vscode-light #commitTable tr.commit.selected.graphVertexActive td,
+body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
+	background-color:rgba(0,90,180,0.22);
+}
 #commitTable tr.commit.dropTarget td{
 	background-color:var(--vscode-list-dropBackground);
 }

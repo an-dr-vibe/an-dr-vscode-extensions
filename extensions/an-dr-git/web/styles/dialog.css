@@ -104,6 +104,34 @@ body.vscode-high-contrast .dialog{
 	opacity:0.4;
 }
 
+.dialogContent > table.dialogForm textarea{
+	width:100%;
+	padding:4px 6px;
+	box-sizing:border-box;
+	outline-style:none;
+	background-color:rgba(128,128,128,0.1);
+	border:1px solid rgba(128,128,128,0.5);
+	border-radius:4px;
+	color:var(--vscode-menu-foreground);
+	font-family:var(--vscode-font-family);
+	font-size:13px;
+	line-height:17px;
+	resize:vertical;
+	white-space:pre-wrap;
+}
+.dialogContent > table.dialogForm textarea:focus{
+	border-color:var(--vscode-focusBorder);
+}
+.dialogContent > table.dialogForm tr.largeField:has(textarea) td{
+	line-height:normal;
+}
+.dialogContent:has(textarea){
+	max-width:480px;
+}
+.dialogContent > table.dialogForm:has(textarea){
+	width:480px;
+}
+
 .dialog .roundedBtn{
 	display:inline-block;
 	line-height:22px;

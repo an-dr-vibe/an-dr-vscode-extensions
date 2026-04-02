@@ -911,6 +911,34 @@ export interface ResponseDropCommit extends ResponseWithErrorInfo {
 	readonly command: 'dropCommit';
 }
 
+export interface RequestRewordCommit extends RepoRequest {
+	readonly command: 'rewordCommit';
+	readonly commitHash: string;
+	readonly message: string;
+}
+export interface ResponseRewordCommit extends ResponseWithErrorInfo {
+	readonly command: 'rewordCommit';
+}
+
+export interface RequestEditCommitAuthor extends RepoRequest {
+	readonly command: 'editCommitAuthor';
+	readonly commitHash: string;
+	readonly name: string;
+	readonly email: string;
+}
+export interface ResponseEditCommitAuthor extends ResponseWithErrorInfo {
+	readonly command: 'editCommitAuthor';
+}
+
+export interface RequestSquashCommits extends RepoRequest {
+	readonly command: 'squashCommits';
+	readonly commitHashes: ReadonlyArray<string>;
+	readonly message: string;
+}
+export interface ResponseSquashCommits extends ResponseWithErrorInfo {
+	readonly command: 'squashCommits';
+}
+
 export interface RequestDropStash extends RepoRequest {
 	readonly command: 'dropStash';
 	readonly selector: string;
@@ -1447,6 +1475,9 @@ export type RequestMessage =
 	| RequestDeleteUserDetails
 	| RequestDropCommit
 	| RequestDropStash
+	| RequestRewordCommit
+	| RequestEditCommitAuthor
+	| RequestSquashCommits
 	| RequestEditRemote
 	| RequestEditUserDetails
 	| RequestEndCodeReview
@@ -1516,6 +1547,9 @@ export type ResponseMessage =
 	| ResponseDeleteUserDetails
 	| ResponseDropCommit
 	| ResponseDropStash
+	| ResponseRewordCommit
+	| ResponseEditCommitAuthor
+	| ResponseSquashCommits
 	| ResponseEditRemote
 	| ResponseEditUserDetails
 	| ResponseExportRepoConfig

@@ -61,6 +61,8 @@ class GitGraphView {
 
 	private moreCommitsAvailable: boolean = false;
 	private expandedCommit: ExpandedCommit | null = null;
+	private selectedCommits: Set<string> = new Set();
+	private lastSelectedIndex: number = -1;
 	private maxCommits: number;
 	private scrollTop = 0;
 	private renderedGitBranchHead: string | null = null;
@@ -1009,6 +1011,41 @@ class GitGraphView {
 	private getCommitOfElem(elem: HTMLElement) {
 		let id = parseInt(elem.dataset.id!);
 		return id < this.commits.length ? this.commits[id] : null;
+	}
+
+	private updateSelectionClasses() {
+		const elems = getCommitElems();
+		for (let i = 0; i < elems.length; i++) {
+			const id = parseInt(elems[i].dataset.id!);
+			const hash = id < this.commits.length ? this.commits[id].hash : null;
+			alterClass(elems[i], 'selected', hash !== null && this.selectedCommits.has(hash));
+		}
+	}
+
+	private selectCommit(hash: string, index: number) {
+		this.selectedCommits = new Set([hash]);
+		this.lastSelectedIndex = index;
+		this.updateSelectionClasses();
+	}
+
+	private toggleCommitSelection(hash: string, index: number) {
+		if (this.selectedCommits.has(hash)) {
+			this.selectedCommits.delete(hash);
+		} else {
+			this.selectedCommits.add(hash);
+		}
+		this.lastSelectedIndex = index;
+		this.updateSelectionClasses();
+	}
+
+	private rangeSelectCommits(toIndex: number) {
+		const from = this.lastSelectedIndex >= 0 ? this.lastSelectedIndex : toIndex;
+		const lo = Math.min(from, toIndex), hi = Math.max(from, toIndex);
+		for (let i = lo; i <= hi; i++) {
+			if (i < this.commits.length) this.selectedCommits.add(this.commits[i].hash);
+		}
+		this.lastSelectedIndex = toIndex;
+		this.updateSelectionClasses();
 	}
 
 	public getCommits(): ReadonlyArray<GG.GitCommit> {
@@ -2282,6 +2319,98 @@ class GitGraphView {
 				visible: visibility.copySubject,
 				onClick: () => {
 					sendMessage({ command: 'copyToClipboard', type: 'Commit Subject', data: commit.message });
+				}
+			}
+		], [
+			{
+				title: 'Reword Commit Message' + ELLIPSIS,
+				visible: true,
+				onClick: () => {
+					dialog.showForm('Reword commit <b><i>' + abbrevCommit(hash) + '</i></b>:', [{
+						type: DialogInputType.Text,
+						name: 'New Message',
+						default: commit.message,
+						placeholder: null
+					}], 'Reword', (values) => {
+						const newMessage = <string>values[0];
+						if (newMessage.trim() !== '') {
+							runAction({ command: 'rewordCommit', repo: this.currentRepo, commitHash: hash, message: newMessage }, 'Rewording Commit');
+						}
+					}, target);
+				}
+			}, {
+				title: 'Edit Author' + ELLIPSIS,
+				visible: true,
+				onClick: () => {
+					dialog.showForm('Edit author of commit <b><i>' + abbrevCommit(hash) + '</i></b>:', [{
+						type: DialogInputType.Text,
+						name: 'Name',
+						default: commit.author,
+						placeholder: null
+					}, {
+						type: DialogInputType.Text,
+						name: 'Email',
+						default: commit.email,
+						placeholder: null
+					}], 'Update', (values) => {
+						const name = (<string>values[0]).trim(), email = (<string>values[1]).trim();
+						if (name !== '' && email !== '') {
+							runAction({ command: 'editCommitAuthor', repo: this.currentRepo, commitHash: hash, name: name, email: email }, 'Editing Commit Author');
+						}
+					}, target);
+				}
+			}, {
+				title: 'Copy Commit Hash',
+				visible: true,
+				onClick: () => {
+					sendMessage({ command: 'copyToClipboard', type: 'Commit Hash', data: hash });
+				}
+			}
+		]];
+	}
+
+	private getMultiSelectContextMenuActions(target: DialogTarget & CommitTarget): ContextMenuActions {
+		const hashes = Array.from(this.selectedCommits);
+		// Sort by commit order (index in this.commits, oldest = highest index)
+		const sortedIndices = hashes
+			.map(h => ({ hash: h, idx: typeof this.commitLookup[h] === 'number' ? this.commitLookup[h] as number : -1 }))
+			.filter(x => x.idx >= 0)
+			.sort((a, b) => a.idx - b.idx);
+		const sortedHashes = sortedIndices.map(x => x.hash);
+
+		// Check if consecutive (no gaps in indices)
+		let consecutive = sortedIndices.length === hashes.length;
+		for (let i = 1; i < sortedIndices.length && consecutive; i++) {
+			if (sortedIndices[i].idx !== sortedIndices[i - 1].idx + 1) consecutive = false;
+		}
+
+		return [[
+			{
+				title: 'Squash ' + hashes.length + ' Commits' + ELLIPSIS,
+				visible: consecutive,
+				onClick: () => {
+					const combinedMessage = sortedHashes
+						.map(h => this.commits[this.commitLookup[h] as number].message)
+						.join('\n\n');
+					dialog.showForm('Squash <b>' + hashes.length + '</b> commits into one:', [{
+						type: DialogInputType.TextArea,
+						name: 'New Message',
+						default: combinedMessage,
+						rows: 8
+					}], 'Squash', (values) => {
+						const message = <string>values[0];
+						if (message.trim() !== '') {
+							runAction({ command: 'squashCommits', repo: this.currentRepo, commitHashes: sortedHashes, message: message }, 'Squashing Commits');
+						}
+					}, target);
+				}
+			}
+		], [
+			{
+				title: 'Copy Commit Hashes',
+				visible: true,
+				onClick: () => {
+					sendMessage({ command: 'copyToClipboard', type: 'Commit Hashes', data: sortedHashes.join('\n') });
 				}
 			}
 		]];
@@ -3667,24 +3796,16 @@ class GitGraphView {
 				}
 
 			} else if ((eventElem = eventTarget.closest('.commit')) !== null) {
-				// .commit was clicked
-				if (this.expandedCommit !== null) {
-					const commit = this.getCommitOfElem(eventElem);
-					if (commit === null) return;
-
-					if (this.expandedCommit.commitHash === commit.hash) {
-						this.closeCommitDetails(true);
-					} else if ((<MouseEvent>e).ctrlKey || (<MouseEvent>e).metaKey) {
-						if (this.expandedCommit.compareWithHash === commit.hash) {
-							this.closeCommitComparison(true);
-						} else if (this.expandedCommit.commitElem !== null) {
-							this.loadCommitComparison(this.expandedCommit.commitElem, eventElem);
-						}
-					} else {
-						this.loadCommitDetails(eventElem);
-					}
+				// .commit was clicked — selection only; expand is on double-click
+				const commit = this.getCommitOfElem(eventElem);
+				if (commit === null) return;
+				const index = parseInt(eventElem.dataset.id!);
+				if ((<MouseEvent>e).shiftKey) {
+					this.rangeSelectCommits(index);
+				} else if ((<MouseEvent>e).ctrlKey || (<MouseEvent>e).metaKey) {
+					this.toggleCommitSelection(commit.hash, index);
 				} else {
-					this.loadCommitDetails(eventElem);
+					this.selectCommit(commit.hash, index);
 				}
 			}
 		});
@@ -3724,6 +3845,15 @@ class GitGraphView {
 						elem: sourceElem
 					};
 					this.checkoutBranchAction(refName, isHead ? null : unescapeHtml(remoteRefElem.dataset.remote!), null, target);
+				}
+			} else if ((eventElem = eventTarget.closest('.commit')) !== null) {
+				// .commit was double-clicked — toggle expand
+				e.stopPropagation();
+				closeDialogAndContextMenu();
+				if (this.expandedCommit !== null && this.expandedCommit.commitHash === this.getCommitOfElem(eventElem)?.hash) {
+					this.closeCommitDetails(true);
+				} else {
+					this.loadCommitDetails(eventElem);
 				}
 			}
 		});
@@ -3837,6 +3967,12 @@ class GitGraphView {
 				const commit = this.getCommitOfElem(eventElem);
 				if (commit === null) return;
 
+				// If right-clicking outside the current selection, reset selection to this commit
+				if (!this.selectedCommits.has(commit.hash)) {
+					const index = parseInt(eventElem.dataset.id!);
+					this.selectCommit(commit.hash, index);
+				}
+
 				const target: ContextMenuTarget & DialogTarget & CommitTarget = {
 					type: TargetType.Commit,
 					hash: commit.hash,
@@ -3850,6 +3986,8 @@ class GitGraphView {
 				} else if (commit.stash !== null) {
 					target.ref = commit.stash.selector;
 					actions = this.getStashContextMenuActions(<RefTarget>target);
+				} else if (this.selectedCommits.size > 1) {
+					actions = this.getMultiSelectContextMenuActions(target);
 				} else {
 					actions = this.getCommitContextMenuActions(target);
 				}
@@ -4790,6 +4928,15 @@ window.addEventListener('load', () => {
 				break;
 			case 'dropCommit':
 				refreshOrDisplayError(msg.error, 'Unable to Drop Commit');
+				break;
+			case 'rewordCommit':
+				refreshOrDisplayError(msg.error, 'Unable to Reword Commit');
+				break;
+			case 'editCommitAuthor':
+				refreshOrDisplayError(msg.error, 'Unable to Edit Commit Author');
+				break;
+			case 'squashCommits':
+				refreshOrDisplayError(msg.error, 'Unable to Squash Commits');
 				break;
 			case 'dropStash':
 				refreshOrDisplayError(msg.error, 'Unable to Drop Stash');

@@ -11,6 +11,7 @@ const enum DialogType {
 const enum DialogInputType {
 	Text,
 	TextRef,
+	TextArea,
 	Select,
 	Radio,
 	Checkbox
@@ -28,6 +29,14 @@ interface DialogTextRefInput {
 	readonly type: DialogInputType.TextRef;
 	readonly name: string;
 	readonly default: string;
+	readonly info?: string;
+}
+
+interface DialogTextAreaInput {
+	readonly type: DialogInputType.TextArea;
+	readonly name: string;
+	readonly default: string;
+	readonly rows?: number;
 	readonly info?: string;
 }
 
@@ -76,7 +85,7 @@ interface DialogRadioInputOption {
 	readonly value: string;
 }
 
-type DialogInput = DialogTextInput | DialogTextRefInput | DialogSelectInput | DialogRadioInput | DialogCheckboxInput;
+type DialogInput = DialogTextInput | DialogTextRefInput | DialogTextAreaInput | DialogSelectInput | DialogRadioInput | DialogCheckboxInput;
 type DialogInputValue = string | string[] | boolean;
 
 type DialogTarget = {
@@ -217,6 +226,8 @@ class Dialog {
 					inputHtml = '<td class="inputCol"><div id="dialogFormSelect' + id + '"></div></td>' + (infoColRequired ? '<td>' + infoHtml + '</td>' : '');
 				} else if (input.type === DialogInputType.Checkbox) {
 					inputHtml = '<td class="inputCol"' + (infoColRequired ? ' colspan="2"' : '') + '><span class="dialogFormCheckbox"><label><input id="dialogInput' + id + '" type="checkbox"' + (input.value ? ' checked' : '') + ' tabindex="' + (id + 1) + '"/><span class="customCheckbox"></span>' + (multiElement && !multiCheckbox ? '' : input.name) + infoHtml + '</label></span></td>';
+				} else if (input.type === DialogInputType.TextArea) {
+					inputHtml = '<td class="inputCol"><textarea id="dialogInput' + id + '" rows="' + (input.rows ?? 6) + '" tabindex="' + (id + 1) + '">' + escapeHtml(input.default) + '</textarea></td>';
 				} else {
 					inputHtml = '<td class="inputCol"><input id="dialogInput' + id + '" type="text" value="' + escapeHtml(input.default) + '"' + (input.type === DialogInputType.Text && input.placeholder !== null ? ' placeholder="' + escapeHtml(input.placeholder) + '"' : '') + ' tabindex="' + (id + 1) + '"/></td>' + (infoColRequired ? '<td>' + infoHtml + '</td>' : '');
 				}

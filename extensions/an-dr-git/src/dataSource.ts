@@ -5,6 +5,7 @@
 import * as cp from 'child_process';
 import * as fs from 'fs';
 import { decode, encodingExists } from 'iconv-lite';
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
@@ -1176,6 +1177,186 @@ export class DataSource extends Disposable {
 		}
 		args.push('--onto', commitHash + '^', commitHash);
 		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Reword (change message of) a commit using a scripted interactive rebase.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to reword.
+	 * @param message The new commit message.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public rewordCommit(repo: string, commitHash: string, message: string): Promise<ErrorInfo> {
+		return this.runScriptedRebase(repo, commitHash + '^', {
+			transform: { reword: commitHash.slice(0, 7) },
+			commitMessage: message
+		});
+	}
+
+	/**
+	 * Edit the author of a commit using a scripted interactive rebase with an exec step.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit whose author to change.
+	 * @param name The new author name.
+	 * @param email The new author email.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public editCommitAuthor(repo: string, commitHash: string, name: string, email: string): Promise<ErrorInfo> {
+		const authorStr = name + ' <' + email + '>';
+		return this.runScriptedRebase(repo, commitHash + '^', {
+			transform: {
+				execAfter: [{ hash: commitHash.slice(0, 7), command: 'git commit --amend --author "' + authorStr + '" --no-edit' }]
+			}
+		});
+	}
+
+	/**
+	 * Squash a set of commits into one using a scripted interactive rebase.
+	 * commitHashes[0] = newest commit (lowest graph index), commitHashes[N-1] = oldest (first in rebase todo).
+	 * The oldest is kept as 'pick'; all newer ones are changed to 'squash'.
+	 * @param repo The path of the repository.
+	 * @param commitHashes Commit hashes sorted newest-first (as returned by the frontend).
+	 * @param message The squashed commit message.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public squashCommits(repo: string, commitHashes: ReadonlyArray<string>, message: string): Promise<ErrorInfo> {
+		// commitHashes[N-1] = oldest = the 'pick' anchor; squash all the newer ones
+		const squashShortHashes = commitHashes.slice(0, -1).map((h) => h.slice(0, 7));
+		return this.runScriptedRebase(repo, commitHashes[commitHashes.length - 1] + '^', {
+			transform: { squash: squashShortHashes },
+			commitMessage: message
+		});
+	}
+
+	/**
+	 * Find the Node.js executable by searching PATH directories.
+	 * Falls back to 'node' if not found (relies on it being in PATH at shell time).
+	 */
+	private findNodeExecutable(): string {
+		const pathDirs = (process.env.PATH || '').split(path.delimiter);
+		const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
+		for (const dir of pathDirs) {
+			if (!dir) continue;
+			const candidate = path.join(dir, nodeName);
+			try {
+				fs.accessSync(candidate, fs.constants.X_OK);
+				return candidate;
+			} catch (_) { /* not found here */ }
+		}
+		return 'node'; // fallback: hope it's in PATH for git's sh
+	}
+
+	/**
+	 * Quote a file path so that git's sh.exe (git-for-windows) treats it as a single token.
+	 * Converts backslashes to forward slashes and wraps in double quotes.
+	 */
+	private shQuotePath(p: string): string {
+		return '"' + p.replace(/\\/g, '/') + '"';
+	}
+
+	/**
+	 * Run a scripted interactive rebase by writing temp Node.js scripts that act as
+	 * GIT_SEQUENCE_EDITOR (and optionally GIT_EDITOR) so no terminal is needed.
+	 *
+	 * The transform is passed as plain JSON data to the script — no closure serialization —
+	 * so closed-over variables are always available at script runtime.
+	 */
+	private async runScriptedRebase(repo: string, base: string, opts: {
+		transform: {
+			/** Short hash of the commit whose verb should change from 'pick' to 'reword'. */
+			reword?: string;
+			/** Short hashes that should change from 'pick' to 'squash' (the anchor/oldest commit is NOT listed here). */
+			squash?: string[];
+			/** Exec lines to insert immediately after a matching pick line. */
+			execAfter?: Array<{ hash: string; command: string }>;
+		};
+		commitMessage?: string;
+	}): Promise<ErrorInfo> {
+		if (this.gitExecutable === null) {
+			return UNABLE_TO_FIND_GIT_MSG;
+		}
+
+		const nodeExe = this.findNodeExecutable();
+		const uid = Date.now() + '-' + Math.random().toString(36).slice(2);
+		const seqScript = path.join(os.tmpdir(), 'an-dr-git-seq-' + uid + '.js');
+		const msgScript = path.join(os.tmpdir(), 'an-dr-git-msg-' + uid + '.js');
+
+		// Embed transform data as JSON so the script needs no closure variables.
+		// Hash matching uses startsWith-style checks to handle git's variable abbreviation length.
+		const transformJson = JSON.stringify(opts.transform);
+		fs.writeFileSync(seqScript, [
+			"var fs = require('fs');",
+			'var data = ' + transformJson + ';',
+			'var file = process.argv[process.argv.length - 1];',
+			'var lines = fs.readFileSync(file, "utf8").split(/\\r?\\n/);',
+			'var out = [];',
+			'for (var i = 0; i < lines.length; i++) {',
+			'  var line = lines[i];',
+			'  var parts = line.split(" ");',
+			'  if (parts[0] === "pick" && parts[1]) {',
+			'    var h = parts[1];',
+			'    var rest = parts.slice(1).join(" ");',
+			'    if (data.reword && (h.indexOf(data.reword) === 0 || data.reword.indexOf(h) === 0)) {',
+			'      line = "reword " + rest;',
+			'    } else if (data.squash && data.squash.some(function(s){return h.indexOf(s)===0||s.indexOf(h)===0;})) {',
+			'      line = "squash " + rest;',
+			'    }',
+			'    out.push(line);',
+			'    if (data.execAfter) {',
+			'      data.execAfter.forEach(function(ea) {',
+			'        if (h.indexOf(ea.hash) === 0 || ea.hash.indexOf(h) === 0)',
+			'          out.push("exec " + ea.command);',
+			'      });',
+			'    }',
+			'  } else {',
+			'    out.push(line);',
+			'  }',
+			'}',
+			'fs.writeFileSync(file, out.join("\\n"));'
+		].join('\n'));
+
+		const env: NodeJS.ProcessEnv = Object.assign({}, process.env, this.askpassEnv, {
+			GIT_SEQUENCE_EDITOR: this.shQuotePath(nodeExe) + ' ' + this.shQuotePath(seqScript)
+		});
+
+		if (opts.commitMessage !== undefined) {
+			const escapedMsg = JSON.stringify(opts.commitMessage);
+			fs.writeFileSync(msgScript, [
+				"var fs = require('fs');",
+				'fs.writeFileSync(process.argv[process.argv.length - 1], ' + escapedMsg + ');'
+			].join('\n'));
+			env['GIT_EDITOR'] = this.shQuotePath(nodeExe) + ' ' + this.shQuotePath(msgScript);
+		}
+
+		const args = ['rebase', '-i'];
+		if (getConfig().signCommits) {
+			args.splice(1, 0, '-S');
+		}
+		args.push(base);
+
+		let result: ErrorInfo;
+		try {
+			await resolveSpawnOutput(cp.spawn(this.gitExecutable.path, args, {
+				cwd: repo,
+				env: env
+			})).then((values) => {
+				const status = values[0], stdout = values[1], stderr = values[2];
+				if (status.code === 0) {
+					result = null;
+				} else {
+					result = getErrorMessage(status.error, stdout, stderr);
+				}
+			});
+		} catch (e) {
+			result = getErrorMessage(e, Buffer.alloc(0), '');
+		}
+
+		try { fs.unlinkSync(seqScript); } catch (_) { /* ignore */ }
+		if (opts.commitMessage !== undefined) {
+			try { fs.unlinkSync(msgScript); } catch (_) { /* ignore */ }
+		}
+
+		return result!;
 	}
 
 	/**

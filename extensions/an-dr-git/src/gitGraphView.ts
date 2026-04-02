@@ -438,6 +438,24 @@ export class GitGraphView extends Disposable {
 					error: await this.dataSource.dropCommit(msg.repo, msg.commitHash)
 				});
 				break;
+			case 'rewordCommit':
+				this.sendMessage({
+					command: 'rewordCommit',
+					error: await this.dataSource.rewordCommit(msg.repo, msg.commitHash, msg.message)
+				});
+				break;
+			case 'editCommitAuthor':
+				this.sendMessage({
+					command: 'editCommitAuthor',
+					error: await this.dataSource.editCommitAuthor(msg.repo, msg.commitHash, msg.name, msg.email)
+				});
+				break;
+			case 'squashCommits':
+				this.sendMessage({
+					command: 'squashCommits',
+					error: await this.dataSource.squashCommits(msg.repo, msg.commitHashes, msg.message)
+				});
+				break;
 			case 'dropStash':
 				this.sendMessage({
 					command: 'dropStash',

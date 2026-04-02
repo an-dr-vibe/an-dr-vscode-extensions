@@ -26,6 +26,7 @@ class GitGraphView {
 	private gitBranchUpstreams: { readonly [branchName: string]: string } = {};
 	private gitGoneUpstreamBranches: ReadonlyArray<string> = [];
 	private gitRemoteHeadTargets: { readonly [remoteName: string]: string } = {};
+	private gitRepoInProgressState: GG.GitRepoInProgressState | null = null;
 	private gitBranchHead: string | null = null;
 	private gitConfig: GG.GitRepoConfig | null = null;
 	private gitRemotes: ReadonlyArray<string> = [];
@@ -170,7 +171,7 @@ class GitGraphView {
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
 			this.branchDropdown.setSelectedTags(this.currentTags);
-			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
+			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
 			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 			this.branchDropdown.restoreState(prevState.branchPanel);
 			this.findWidget.restoreState(prevState.findWidget);
@@ -288,6 +289,7 @@ class GitGraphView {
 		this.gitBranchUpstreams = {};
 		this.gitGoneUpstreamBranches = [];
 		this.gitRemoteHeadTargets = {};
+		this.gitRepoInProgressState = null;
 		this.currentBranches = null;
 		this.renderFetchButton();
 		this.closeCommitDetails(false);
@@ -296,11 +298,21 @@ class GitGraphView {
 		this.refresh(true);
 	}
 
-	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
+	private static isSameRepoInProgressState(a: GG.GitRepoInProgressState | null, b: GG.GitRepoInProgressState | null) {
+		if (a === null && b === null) return true;
+		if (a === null || b === null) return false;
+		if (a.type !== b.type) return false;
+		if (a.rebaseProgress === null && b.rebaseProgress === null) return true;
+		if (a.rebaseProgress === null || b.rebaseProgress === null) return false;
+		return a.rebaseProgress.current === b.rebaseProgress.current
+			&& a.rebaseProgress.total === b.rebaseProgress.total;
+	}
+
+	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
 		// Changes to this.gitStashes are reflected as changes to the commits when loadCommits is run
 		this.gitStashes = stashes;
 
-		if (!isRepo || (!this.currentRepoRefreshState.hard && arraysStrictlyEqual(this.gitBranches, branchOptions) && shallowStringMapEqual(this.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(this.gitGoneUpstreamBranches, goneUpstreamBranches) && shallowStringMapEqual(this.gitRemoteHeadTargets, remoteHeadTargets) && this.gitBranchHead === branchHead && arraysStrictlyEqual(this.gitRemotes, remotes))) {
+		if (!isRepo || (!this.currentRepoRefreshState.hard && arraysStrictlyEqual(this.gitBranches, branchOptions) && shallowStringMapEqual(this.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(this.gitGoneUpstreamBranches, goneUpstreamBranches) && shallowStringMapEqual(this.gitRemoteHeadTargets, remoteHeadTargets) && GitGraphView.isSameRepoInProgressState(this.gitRepoInProgressState, repoInProgressState) && this.gitBranchHead === branchHead && arraysStrictlyEqual(this.gitRemotes, remotes))) {
 			this.saveState();
 			this.finaliseLoadRepoInfo(false, isRepo);
 			return;
@@ -311,6 +323,7 @@ class GitGraphView {
 		this.gitBranchUpstreams = branchUpstreams;
 		this.gitGoneUpstreamBranches = goneUpstreamBranches;
 		this.gitRemoteHeadTargets = remoteHeadTargets;
+		this.gitRepoInProgressState = repoInProgressState;
 		this.gitBranchHead = branchHead;
 		this.gitRemotes = remotes;
 
@@ -567,7 +580,7 @@ class GitGraphView {
 		if (msg.error === null) {
 			const refreshState = this.currentRepoRefreshState;
 			if (refreshState.inProgress && refreshState.loadRepoInfoRefreshId === msg.refreshId) {
-				this.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.remoteHeadTargets, msg.head, msg.remotes, msg.stashes, msg.isRepo);
+				this.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.remoteHeadTargets, msg.repoInProgressState, msg.head, msg.remotes, msg.stashes, msg.isRepo);
 			}
 		} else {
 			this.displayLoadDataError('Unable to load Repository Info', msg.error);
@@ -1096,6 +1109,7 @@ class GitGraphView {
 			gitBranchUpstreams: this.gitBranchUpstreams,
 			gitGoneUpstreamBranches: this.gitGoneUpstreamBranches,
 			gitRemoteHeadTargets: this.gitRemoteHeadTargets,
+			gitRepoInProgressState: this.gitRepoInProgressState,
 			gitBranchHead: this.gitBranchHead,
 			gitConfig: this.gitConfig,
 			gitRemotes: this.gitRemotes,
@@ -1396,9 +1410,81 @@ class GitGraphView {
 			(colVisibility.id ? '<td class="text" title="*">*</td>' : '');
 	}
 
+	private getRepoInProgressStateLabel() {
+		if (this.gitRepoInProgressState === null) return 'Repository Action';
+		switch (this.gitRepoInProgressState.type) {
+			case GG.GitRepoInProgressStateType.Rebase:
+				return 'Rebase';
+			case GG.GitRepoInProgressStateType.Merge:
+				return 'Merge';
+			case GG.GitRepoInProgressStateType.CherryPick:
+				return 'Cherry-pick';
+			case GG.GitRepoInProgressStateType.Revert:
+				return 'Revert';
+		}
+		return 'Repository Action';
+	}
+
+	public getRepoInProgressActionTitle(action: GG.GitRepoInProgressAction) {
+		const stateLabel = this.getRepoInProgressStateLabel();
+		if (action === GG.GitRepoInProgressAction.Continue) {
+			if (this.gitRepoInProgressState !== null && this.gitRepoInProgressState.type === GG.GitRepoInProgressStateType.Rebase && this.gitRepoInProgressState.rebaseProgress !== null) {
+				return 'Continue ' + stateLabel + ' (' + this.gitRepoInProgressState.rebaseProgress.current + '/' + this.gitRepoInProgressState.rebaseProgress.total + ')';
+			}
+			return 'Continue ' + stateLabel;
+		}
+		return 'Abort ' + stateLabel;
+	}
+
+	private executeRepoInProgressAction(action: GG.GitRepoInProgressAction) {
+		if (this.gitRepoInProgressState === null) {
+			showErrorMessage('No repository in-progress action is currently available.');
+			return;
+		}
+
+		const run = () => {
+			runAction({
+				command: 'repoInProgressAction',
+				repo: this.currentRepo,
+				state: this.gitRepoInProgressState!.type,
+				action: action,
+				selectedBranches: this.currentBranches,
+				selectedTags: this.currentTags,
+				scrollTop: this.scrollTop,
+				branchPanelState: this.branchDropdown.getState()
+			}, this.getRepoInProgressActionTitle(action));
+		};
+
+		if (action === GG.GitRepoInProgressAction.Abort && this.config.dialogDefaults.repoInProgress.confirmAbort) {
+			dialog.showConfirmation(
+				'Are you sure you want to abort the current <b><i>' + escapeHtml(this.getRepoInProgressStateLabel()) + '</i></b> operation?',
+				'Yes, abort',
+				run,
+				{ type: TargetType.Repo }
+			);
+		} else {
+			run();
+		}
+	}
+
 	private renderFetchButton() {
 		const hasRemotes = this.gitRemotes.length > 0;
-		alterClass(this.controlsElem, 'pullPushSupported', hasRemotes && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD');
+		const hasRepoInProgressState = this.gitRepoInProgressState !== null;
+		alterClass(this.controlsElem, 'pullPushSupported', !hasRepoInProgressState && hasRemotes && this.gitBranchHead !== null && this.gitBranchHead !== 'HEAD');
+		alterClass(this.controlsElem, 'repoInProgressSupported', hasRepoInProgressState);
+		alterClass(this.pullBtnElem, 'textAction', hasRepoInProgressState);
+		alterClass(this.pushBtnElem, 'textAction', hasRepoInProgressState);
+		if (hasRepoInProgressState) {
+			this.pullBtnElem.textContent = 'Continue';
+			this.pushBtnElem.textContent = 'Abort';
+			this.pullBtnElem.title = this.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue);
+			this.pushBtnElem.title = this.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort);
+		} else {
+			this.pullBtnElem.title = 'Pull Current Branch';
+			this.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
+			this.pushBtnElem.title = 'Push Current Branch';
+			this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
+		}
 		this.updateControlsLayout();
 	}
 
@@ -3004,6 +3090,10 @@ class GitGraphView {
 	}
 
 	private pullCurrentBranchAction() {
+		if (this.gitRepoInProgressState !== null) {
+			this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Continue);
+			return;
+		}
 		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD') {
 			showErrorMessage('Unable to pull because there is no checked out local branch.');
 			return;
@@ -3022,6 +3112,10 @@ class GitGraphView {
 	}
 
 	private pushCurrentBranchAction(mode: GG.GitPushBranchMode = GG.GitPushBranchMode.Normal) {
+		if (this.gitRepoInProgressState !== null) {
+			this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Abort);
+			return;
+		}
 		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD') {
 			showErrorMessage('Unable to push because there is no checked out local branch.');
 			return;
@@ -3062,6 +3156,16 @@ class GitGraphView {
 	}
 
 	private showPushButtonContextMenu(event: MouseEvent) {
+		if (this.gitRepoInProgressState !== null) {
+			contextMenu.show([[
+				{
+					title: this.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort),
+					visible: true,
+					onClick: () => this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Abort)
+				}
+			]], false, null, event, this.viewElem);
+			return;
+		}
 		contextMenu.show([[
 			{
 				title: 'Push',
@@ -3082,6 +3186,16 @@ class GitGraphView {
 	}
 
 	private showPullButtonContextMenu(event: MouseEvent) {
+		if (this.gitRepoInProgressState !== null) {
+			contextMenu.show([[
+				{
+					title: this.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue),
+					visible: true,
+					onClick: () => this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Continue)
+				}
+			]], false, null, event, this.viewElem);
+			return;
+		}
 		const fetchTitle = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
 		contextMenu.show([[
 			{
@@ -4608,7 +4722,26 @@ window.addEventListener('load', () => {
 						gitGraph.refresh(false);
 					}
 				} else {
-					dialog.showError('Unable to Rebase current branch on ' + msg.actionOn, msg.error, null, null);
+					dialog.showError(
+						'Unable to Rebase current branch on ' + msg.actionOn,
+						msg.error,
+						null,
+						() => gitGraph.refresh(false)
+					);
+				}
+				break;
+			case 'repoInProgressAction':
+				if (msg.error === null) {
+					gitGraph.refresh(false);
+				} else {
+					dialog.showError(
+						msg.action === GG.GitRepoInProgressAction.Continue
+							? 'Unable to Continue Repository Operation'
+							: 'Unable to Abort Repository Operation',
+						msg.error,
+						null,
+						() => gitGraph.refresh(false)
+					);
 				}
 				break;
 			case 'refresh':

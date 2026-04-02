@@ -1,5 +1,7 @@
 export {
 	GitGraphViewInitialState,
+	GitRepoInProgressStateType,
+	GitRepoInProgressState,
 	GitGraphViewConfig,
 	GitGraphViewGlobalState,
 	GitGraphViewWorkspaceState,

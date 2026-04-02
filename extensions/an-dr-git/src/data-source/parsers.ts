@@ -17,7 +17,7 @@ type RefParserOptions = {
 };
 
 export function parseBranchesOutput(stdout: string, options: BranchParserOptions): GitBranchData {
-	const branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, error: null };
+	const branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, repoInProgressState: null, error: null };
 	const lines = stdout.split(/\r\n|\r|\n/g);
 	for (let i = 0; i < lines.length - 1; i++) {
 		const lineContents = lines[i].substring(2);

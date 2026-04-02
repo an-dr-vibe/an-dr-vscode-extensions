@@ -312,10 +312,23 @@ class Dialog {
 	 * @param actioned An optional callback to be invoked when the primary action is triggered.
 	 */
 	public showError(message: string, reason: GG.ErrorInfo, actionName: string | null, actioned: (() => void) | null) {
-		this.show(DialogType.Message, '<span class="dialogAlert">' + SVG_ICONS.alert + 'Error: ' + message + '</span>' + (reason !== null ? '<br><span class="messageContent errorContent">' + escapeHtml(reason).split('\n').join('<br>') + '</span>' : ''), actionName, 'Dismiss', () => {
+		const onPrimaryAction = actionName !== null ? () => {
 			this.close();
 			if (actioned !== null) actioned();
-		}, null, null);
+		} : null;
+		const onDismiss = () => {
+			this.close();
+			if (actionName === null && actioned !== null) actioned();
+		};
+		this.show(
+			DialogType.Message,
+			'<span class="dialogAlert">' + SVG_ICONS.alert + 'Error: ' + message + '</span>' + (reason !== null ? '<br><span class="messageContent errorContent">' + escapeHtml(reason).split('\n').join('<br>') + '</span>' : ''),
+			actionName,
+			'Dismiss',
+			onPrimaryAction,
+			onDismiss,
+			null
+		);
 	}
 
 	/**

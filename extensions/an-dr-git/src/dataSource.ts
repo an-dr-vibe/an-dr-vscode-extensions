@@ -13,7 +13,7 @@ import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfig
 import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GpgStatusCodeParsingDetails } from './data-source/models';
 import { applyBranchUpstreams, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
-import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -144,7 +144,8 @@ export class DataSource extends Disposable {
 		return Promise.all([
 			this.getBranches(repo, showRemoteBranches, hideRemotes),
 			this.getRemotes(repo),
-			showStashes ? this.getStashes(repo) : Promise.resolve([])
+			showStashes ? this.getStashes(repo) : Promise.resolve([]),
+			this.getRepoInProgressState(repo)
 		]).then((results) => {
 			return {
 				branches: results[0].branches,
@@ -154,10 +155,11 @@ export class DataSource extends Disposable {
 				head: results[0].head,
 				remotes: results[1],
 				stashes: results[2],
+				repoInProgressState: results[3],
 				error: null
 			};
 		}).catch((errorMessage) => {
-			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], stashes: [], error: errorMessage };
+			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], stashes: [], repoInProgressState: null, error: errorMessage };
 		});
 	}
 
@@ -1439,6 +1441,25 @@ export class DataSource extends Disposable {
 	}
 
 	/**
+	 * Continue or abort a repository in-progress state.
+	 * @param repo The path of the repository.
+	 * @param state The repository in-progress state type.
+	 * @param action The action to perform.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public repoInProgressAction(repo: string, state: GitRepoInProgressStateType, action: GitRepoInProgressAction) {
+		const gitAction = action === GitRepoInProgressAction.Continue ? '--continue' : '--abort';
+		const gitState = state === GitRepoInProgressStateType.Rebase
+			? 'rebase'
+			: state === GitRepoInProgressStateType.Merge
+				? 'merge'
+				: state === GitRepoInProgressStateType.CherryPick
+					? 'cherry-pick'
+					: 'revert';
+		return this.runGitCommand([gitState, gitAction], repo);
+	}
+
+	/**
 	 * Get the base commit details for the Commit Details View.
 	 * @param repo The path of the repository.
 	 * @param commitHash The hash of the commit open in the Commit Details View.
@@ -1690,6 +1711,88 @@ export class DataSource extends Disposable {
 			repo,
 			(stdout) => parseStatusOutput(stdout)
 		);
+	}
+
+	private getRepoInProgressState(repo: string): Promise<GitRepoInProgressState | null> {
+		return this.spawnGit([
+			'rev-parse',
+			'--git-path', 'rebase-merge',
+			'--git-path', 'rebase-apply',
+			'--git-path', 'MERGE_HEAD',
+			'--git-path', 'CHERRY_PICK_HEAD',
+			'--git-path', 'REVERT_HEAD'
+		], repo, (stdout) => stdout.split(EOL_REGEX).filter((line) => line.trim() !== '')).then(async (gitPaths) => {
+			if (gitPaths.length < 5) return null;
+
+			const resolveGitPath = (gitPath: string) =>
+				DRIVE_LETTER_PATH_REGEX.test(gitPath) || path.isAbsolute(gitPath)
+					? gitPath
+					: path.resolve(repo, gitPath);
+
+			const rebaseMergePath = resolveGitPath(gitPaths[0]);
+			const rebaseApplyPath = resolveGitPath(gitPaths[1]);
+			const mergeHeadPath = resolveGitPath(gitPaths[2]);
+			const cherryPickHeadPath = resolveGitPath(gitPaths[3]);
+			const revertHeadPath = resolveGitPath(gitPaths[4]);
+
+			const hasRebaseMerge = await this.pathExists(rebaseMergePath);
+			const hasRebaseApply = hasRebaseMerge ? false : await this.pathExists(rebaseApplyPath);
+			if (hasRebaseMerge || hasRebaseApply) {
+				return {
+					type: GitRepoInProgressStateType.Rebase,
+					rebaseProgress: await this.getRebaseProgress(hasRebaseMerge ? rebaseMergePath : rebaseApplyPath)
+				};
+			}
+
+			if (await this.pathExists(mergeHeadPath)) {
+				return { type: GitRepoInProgressStateType.Merge, rebaseProgress: null };
+			}
+			if (await this.pathExists(cherryPickHeadPath)) {
+				return { type: GitRepoInProgressStateType.CherryPick, rebaseProgress: null };
+			}
+			if (await this.pathExists(revertHeadPath)) {
+				return { type: GitRepoInProgressStateType.Revert, rebaseProgress: null };
+			}
+			return null;
+		});
+	}
+
+	private async getRebaseProgress(rebasePath: string) {
+		const candidates: Array<{ current: string; total: string }> = [
+			{ current: 'msgnum', total: 'end' },
+			{ current: 'next', total: 'last' }
+		];
+
+		for (let i = 0; i < candidates.length; i++) {
+			const current = await this.readIntFile(path.join(rebasePath, candidates[i].current));
+			const total = await this.readIntFile(path.join(rebasePath, candidates[i].total));
+			if (current !== null && total !== null && current > 0 && total > 0 && current <= total) {
+				return { current, total };
+			}
+		}
+
+		return null;
+	}
+
+	private async readIntFile(filePath: string): Promise<number | null> {
+		return new Promise((resolve) => {
+			fs.readFile(filePath, 'utf8', (error, content) => {
+				if (error !== null) {
+					resolve(null);
+					return;
+				}
+				const parsed = parseInt(content.trim(), 10);
+				resolve(Number.isFinite(parsed) ? parsed : null);
+			});
+		});
+	}
+
+	private async pathExists(filePath: string): Promise<boolean> {
+		return new Promise((resolve) => {
+			fs.access(filePath, fs.constants.F_OK, (error) => {
+				resolve(error === null);
+			});
+		});
 	}
 
 

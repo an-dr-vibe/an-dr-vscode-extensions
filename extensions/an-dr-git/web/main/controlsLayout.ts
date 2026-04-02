@@ -7,9 +7,23 @@ type GitGraphTopBarButton = {
 };
 
 function gitGraphGetTopBarButtons(view: any): GitGraphTopBarButton[] {
+	const repoInProgress = view.gitRepoInProgressState !== null;
+	const pullPushVisible = view.gitBranchHead !== null && view.gitBranchHead !== 'HEAD' && view.gitRemotes.length > 0;
 	return [
-		{ id: 'pullBtn', elem: view.pullBtnElem, visible: view.gitRemotes.length > 0 && view.gitBranchHead !== null && view.gitBranchHead !== 'HEAD', title: 'Pull Current Branch', onClick: () => view.pullCurrentBranchAction() },
-		{ id: 'pushBtn', elem: view.pushBtnElem, visible: view.gitRemotes.length > 0 && view.gitBranchHead !== null && view.gitBranchHead !== 'HEAD', title: 'Push Current Branch', onClick: () => view.pushCurrentBranchAction() },
+		{
+			id: 'pullBtn',
+			elem: view.pullBtnElem,
+			visible: repoInProgress || pullPushVisible,
+			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue) : 'Pull Current Branch',
+			onClick: () => view.pullCurrentBranchAction()
+		},
+		{
+			id: 'pushBtn',
+			elem: view.pushBtnElem,
+			visible: repoInProgress || pullPushVisible,
+			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push Current Branch',
+			onClick: () => view.pushCurrentBranchAction()
+		},
 		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => view.settingsBtnElem.click() }
 	];
 }
@@ -23,36 +37,56 @@ function gitGraphShowOverflowActions(view: any, event: MouseEvent) {
 	for (let i = 0; i < hiddenButtons.length; i++) {
 		const button = hiddenButtons[i];
 		if (button.id === 'pullBtn') {
-			actions.push([
-				{
-					title: 'Pull Current Branch',
-					visible: true,
-					onClick: () => view.pullCurrentBranchAction()
-				},
-				{
-					title: 'Fetch' + (view.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)',
-					visible: true,
-					onClick: () => view.fetchFromRemotesAction()
-				}
-			]);
+			if (view.gitRepoInProgressState !== null) {
+				actions.push([
+					{
+						title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue),
+						visible: true,
+						onClick: () => view.pullCurrentBranchAction()
+					}
+				]);
+			} else {
+				actions.push([
+					{
+						title: 'Pull Current Branch',
+						visible: true,
+						onClick: () => view.pullCurrentBranchAction()
+					},
+					{
+						title: 'Fetch' + (view.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)',
+						visible: true,
+						onClick: () => view.fetchFromRemotesAction()
+					}
+				]);
+			}
 		} else if (button.id === 'pushBtn') {
-			actions.push([
-				{
-					title: 'Push',
-					visible: true,
-					onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.Normal)
-				},
-				{
-					title: 'Push Force With Lease',
-					visible: true,
-					onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.ForceWithLease)
-				},
-				{
-					title: 'Push Force',
-					visible: true,
-					onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
-				}
-			]);
+			if (view.gitRepoInProgressState !== null) {
+				actions.push([
+					{
+						title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort),
+						visible: true,
+						onClick: () => view.pushCurrentBranchAction()
+					}
+				]);
+			} else {
+				actions.push([
+					{
+						title: 'Push',
+						visible: true,
+						onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.Normal)
+					},
+					{
+						title: 'Push Force With Lease',
+						visible: true,
+						onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.ForceWithLease)
+					},
+					{
+						title: 'Push Force',
+						visible: true,
+						onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
+					}
+				]);
+			}
 		} else if (button.id === 'settingsBtn') {
 			actions.push([
 				{

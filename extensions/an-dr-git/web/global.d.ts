@@ -52,6 +52,7 @@ declare global {
 		readonly gitBranchUpstreams: { readonly [branchName: string]: string };
 		readonly gitGoneUpstreamBranches: ReadonlyArray<string>;
 		readonly gitRemoteHeadTargets: { readonly [remoteName: string]: string };
+		readonly gitRepoInProgressState?: GG.GitRepoInProgressState | null;
 		readonly gitBranchHead: string | null;
 		readonly gitConfig: GG.GitRepoConfig | null;
 		readonly gitRemotes: ReadonlyArray<string>;

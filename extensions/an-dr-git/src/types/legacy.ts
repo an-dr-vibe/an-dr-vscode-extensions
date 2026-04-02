@@ -243,6 +243,21 @@ export interface GitGraphViewInitialState {
 	readonly loadCommitsRefreshId: number;
 }
 
+export const enum GitRepoInProgressStateType {
+	Rebase = 'rebase',
+	Merge = 'merge',
+	CherryPick = 'cherry-pick',
+	Revert = 'revert'
+}
+
+export interface GitRepoInProgressState {
+	readonly type: GitRepoInProgressStateType;
+	readonly rebaseProgress: {
+		readonly current: number;
+		readonly total: number;
+	} | null;
+}
+
 export interface GitGraphViewConfig {
 	readonly avatarMode: AuthorAvatarMode;
 	readonly avatarSize: AuthorAvatarSize;
@@ -539,6 +554,9 @@ export interface DialogDefaults {
 	readonly rebase: {
 		readonly ignoreDate: boolean,
 		readonly interactive: boolean
+	};
+	readonly repoInProgress: {
+		readonly confirmAbort: boolean
 	};
 	readonly resetCommit: {
 		readonly mode: GitResetMode
@@ -1006,6 +1024,7 @@ export interface ResponseLoadRepoInfo extends ResponseWithErrorInfo {
 	readonly head: string | null;
 	readonly remotes: ReadonlyArray<string>;
 	readonly stashes: ReadonlyArray<GitStash>;
+	readonly repoInProgressState: GitRepoInProgressState | null;
 	readonly isRepo: boolean;
 }
 
@@ -1161,6 +1180,24 @@ export interface ResponseRebase extends ResponseWithErrorInfo {
 	readonly command: 'rebase';
 	readonly actionOn: RebaseActionOn;
 	readonly interactive: boolean;
+}
+
+export const enum GitRepoInProgressAction {
+	Continue = 'continue',
+	Abort = 'abort'
+}
+export interface RequestRepoInProgressAction extends RepoRequest {
+	readonly command: 'repoInProgressAction';
+	readonly state: GitRepoInProgressStateType;
+	readonly action: GitRepoInProgressAction;
+	readonly selectedBranches?: string[] | null;
+	readonly selectedTags?: string[];
+	readonly scrollTop?: number;
+	readonly branchPanelState?: GitGraphBranchPanelState;
+}
+export interface ResponseRepoInProgressAction extends ResponseWithErrorInfo {
+	readonly command: 'repoInProgressAction';
+	readonly action: GitRepoInProgressAction;
 }
 
 export interface ResponseRefresh extends BaseMessage {
@@ -1417,6 +1454,7 @@ export type RequestMessage =
 	| RequestPushStash
 	| RequestPushTag
 	| RequestRebase
+	| RequestRepoInProgressAction
 	| RequestRenameBranch
 	| RequestRescanForRepos
 	| RequestResetFileToRevision
@@ -1484,6 +1522,7 @@ export type ResponseMessage =
 	| ResponsePushStash
 	| ResponsePushTag
 	| ResponseRebase
+	| ResponseRepoInProgressAction
 	| ResponseRefresh
 	| ResponseRenameBranch
 	| ResponseResetFileToRevision

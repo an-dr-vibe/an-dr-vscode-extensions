@@ -1,4 +1,4 @@
-import { CommitOrdering, DeepWriteable, ErrorInfo, GitCommit, GitCommitDetails, GitFileChange, GitRepoConfig, GitSignatureStatus, GitStash, GitTagDetails } from '../types';
+import { CommitOrdering, DeepWriteable, ErrorInfo, GitCommit, GitCommitDetails, GitFileChange, GitRepoConfig, GitRepoInProgressState, GitSignatureStatus, GitStash, GitTagDetails } from '../types';
 
 export interface GitBranchData {
 	branches: string[];
@@ -6,6 +6,7 @@ export interface GitBranchData {
 	goneUpstreamBranches: string[];
 	remoteHeadTargets: { [remoteName: string]: string };
 	head: string | null;
+	repoInProgressState: GitRepoInProgressState | null;
 	error: ErrorInfo;
 }
 

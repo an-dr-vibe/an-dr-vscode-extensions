@@ -225,6 +225,9 @@ class Config {
 				ignoreDate: !!this.config.get('dialog.rebase.ignoreDate', true),
 				interactive: !!this.config.get('dialog.rebase.launchInteractiveRebase', false)
 			},
+			repoInProgress: {
+				confirmAbort: !!this.config.get('dialog.repoInProgress.confirmAbort', true)
+			},
 			resetCommit: {
 				mode: resetCommitMode === 'Soft' ? GitResetMode.Soft : (resetCommitMode === 'Hard' ? GitResetMode.Hard : GitResetMode.Mixed)
 			},

@@ -631,6 +631,14 @@ export class GitGraphView extends Disposable {
 					error: await this.dataSource.rebase(msg.repo, msg.obj, msg.actionOn, msg.ignoreDate, msg.interactive)
 				});
 				break;
+			case 'repoInProgressAction':
+				this.scheduleReopenAfterUnexpectedClose(msg.repo, msg.selectedBranches, msg.selectedTags, msg.scrollTop, msg.branchPanelState);
+				this.sendMessage({
+					command: 'repoInProgressAction',
+					action: msg.action,
+					error: await this.dataSource.repoInProgressAction(msg.repo, msg.state, msg.action)
+				});
+				break;
 			case 'renameBranch':
 				this.sendMessage({
 					command: 'renameBranch',

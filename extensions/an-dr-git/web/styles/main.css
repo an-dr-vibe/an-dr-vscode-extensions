@@ -1136,6 +1136,33 @@ body.compactSearch #findWidgetToggleBtn{
 #controls.pullPushSupported #pushBtn{
 	display:block;
 }
+#controls.repoInProgressSupported #pullBtn,
+#controls.repoInProgressSupported #pushBtn{
+	display:flex;
+}
+
+#pullBtn.textAction,
+#pushBtn.textAction{
+	width:auto;
+	min-width:62px;
+	height:22px;
+	padding:0 10px;
+	border-radius:11px;
+	border:1px solid rgba(128,128,128,0.55);
+	background-color:rgba(128,128,128,0.16);
+	color:var(--vscode-editor-foreground);
+	font-size:12px;
+	line-height:20px;
+	font-weight:600;
+	align-items:center;
+	justify-content:center;
+	box-sizing:border-box;
+}
+#pullBtn.textAction:hover,
+#pushBtn.textAction:hover{
+	background-color:rgba(128,128,128,0.26);
+	border-color:rgba(128,128,128,0.75);
+}
 
 #controlsBtns .overflowHidden{
 	display:none !important;

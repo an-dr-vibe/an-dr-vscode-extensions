@@ -637,6 +637,11 @@
 					"default": false,
 					"description": "Default state of the \"Launch Interactive Rebase in new Terminal\" checkbox."
 				},
+				"an-dr-git.dialog.repoInProgress.confirmAbort": {
+					"type": "boolean",
+					"default": true,
+					"description": "When true, confirm before aborting an in-progress repository operation from the top bar."
+				},
 				"an-dr-git.dialog.resetCurrentBranchToCommit.mode": {
 					"type": "string",
 					"enum": [

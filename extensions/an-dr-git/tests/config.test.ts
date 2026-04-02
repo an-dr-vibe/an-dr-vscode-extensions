@@ -1710,7 +1710,7 @@ describe('Config', () => {
 
 				// Assert
 				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
-				expect(value).toStrictEqual(['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00']);
+				expect(value).toStrictEqual(['#6ba2f2', '#ca3a7d', '#f3b33e', '#61aea6', '#ac70f7']);
 			});
 
 			it('Should return the default value when the configuration value is invalid (an empty array)', () => {
@@ -1722,7 +1722,7 @@ describe('Config', () => {
 
 				// Assert
 				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
-				expect(value).toStrictEqual(['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00']);
+				expect(value).toStrictEqual(['#6ba2f2', '#ca3a7d', '#f3b33e', '#61aea6', '#ac70f7']);
 			});
 
 			it('Should return the default value when the configuration value is unknown', () => {
@@ -1731,7 +1731,7 @@ describe('Config', () => {
 
 				// Assert
 				expectRenamedExtensionSettingToHaveBeenCalled('graph.colours', 'graphColours');
-				expect(value).toStrictEqual(['#0085d9', '#d9008f', '#00d90a', '#d98500', '#a300d9', '#ff0000', '#00d9cc', '#e138e8', '#85d900', '#dc5b23', '#6f24d6', '#ffcc00']);
+				expect(value).toStrictEqual(['#6ba2f2', '#ca3a7d', '#f3b33e', '#61aea6', '#ac70f7']);
 			});
 		});
 

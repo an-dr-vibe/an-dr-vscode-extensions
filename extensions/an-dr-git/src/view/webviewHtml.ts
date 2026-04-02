@@ -1,6 +1,35 @@
 import * as vscode from 'vscode';
 import { GitGraphViewGlobalState, GitGraphViewInitialState, GitGraphViewWorkspaceState } from '../types';
 
+const LEGACY_DEFAULT_GRAPH_COLOURS = [
+	'#0085d9',
+	'#d9008f',
+	'#00d90a',
+	'#d98500',
+	'#a300d9',
+	'#ff0000',
+	'#00d9cc',
+	'#e138e8',
+	'#85d900',
+	'#dc5b23',
+	'#6f24d6',
+	'#ffcc00'
+];
+
+const VSCODE_GRAPH_BLUE = '#6ba2f2';
+const VSCODE_GRAPH_PINK = '#ca3a7d';
+const VSCODE_GRAPH_GOLD = '#f3b33e';
+const VSCODE_GRAPH_TEAL = '#61aea6';
+const VSCODE_GRAPH_PURPLE = '#ac70f7';
+
+const NATIVE_VSCODE_GRAPH_COLOURS = [
+	VSCODE_GRAPH_BLUE,
+	VSCODE_GRAPH_PINK,
+	VSCODE_GRAPH_GOLD,
+	VSCODE_GRAPH_TEAL,
+	VSCODE_GRAPH_PURPLE
+];
+
 export interface GitGraphWebviewHtmlRenderResult {
 	readonly html: string;
 	readonly isGraphViewLoaded: boolean;
@@ -19,11 +48,19 @@ export interface GitGraphWebviewHtmlRenderOptions {
 	readonly mediaJsUri: vscode.Uri;
 }
 
+function isLegacyDefaultGraphPalette(colours: ReadonlyArray<string>): boolean {
+	return colours.length === LEGACY_DEFAULT_GRAPH_COLOURS.length
+		&& colours.every((colour, i) => colour.trim().toLowerCase() === LEGACY_DEFAULT_GRAPH_COLOURS[i].toLowerCase());
+}
+
 export function renderGitGraphWebviewHtml(options: GitGraphWebviewHtmlRenderOptions): GitGraphWebviewHtmlRenderResult {
 	const numRepos = Object.keys(options.initialState.repos).length;
+	const graphColours = isLegacyDefaultGraphPalette(options.initialState.config.graph.colours)
+		? NATIVE_VSCODE_GRAPH_COLOURS
+		: options.initialState.config.graph.colours;
 	let colorVars = '', colorParams = '';
-	for (let i = 0; i < options.initialState.config.graph.colours.length; i++) {
-		colorVars += '--git-graph-color' + i + ':' + options.initialState.config.graph.colours[i] + '; ';
+	for (let i = 0; i < graphColours.length; i++) {
+		colorVars += '--git-graph-color' + i + ':' + graphColours[i] + '; ';
 		colorParams += '[data-color="' + i + '"]{--git-graph-color:var(--git-graph-color' + i + ');} ';
 	}
 

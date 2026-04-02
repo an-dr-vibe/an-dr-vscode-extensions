@@ -3,6 +3,13 @@
 // License: MIT
 const CLASS_GRAPH_VERTEX_ACTIVE = 'graphVertexActive';
 const NULL_VERTEX_ID = -1;
+const GRAPH_VERTEX_RADIUS = '4.4';
+const GRAPH_CURRENT_VERTEX_RADIUS = '4.9';
+const GRAPH_STASH_OUTER_RADIUS = '4.9';
+const GRAPH_STASH_INNER_RADIUS = '2.2';
+const GRAPH_VERTEX_TOOLTIP_RADIUS = '5';
+const GRAPH_CURRENT_VERTEX_TOOLTIP_RADIUS = '5.5';
+const GRAPH_STASH_OUTER_TOOLTIP_RADIUS = '5.5';
 
 
 /* Types */
@@ -309,7 +316,7 @@ class Vertex {
 		circle.dataset.id = this.id.toString();
 		circle.setAttribute('cx', cx);
 		circle.setAttribute('cy', cy);
-		circle.setAttribute('r', '4');
+		circle.setAttribute('r', this.isCurrent ? GRAPH_CURRENT_VERTEX_RADIUS : GRAPH_VERTEX_RADIUS);
 		if (this.isCurrent) {
 			circle.setAttribute('class', 'current');
 			circle.setAttribute('stroke', colour);
@@ -319,12 +326,12 @@ class Vertex {
 		svg.appendChild(circle);
 
 		if (this.isStash && !this.isCurrent) {
-			circle.setAttribute('r', '4.5');
+			circle.setAttribute('r', GRAPH_STASH_OUTER_RADIUS);
 			circle.setAttribute('class', 'stashOuter');
 			const innerCircle = document.createElementNS(SVG_NAMESPACE, 'circle');
 			innerCircle.setAttribute('cx', cx);
 			innerCircle.setAttribute('cy', cy);
-			innerCircle.setAttribute('r', '2');
+			innerCircle.setAttribute('r', GRAPH_STASH_INNER_RADIUS);
 			innerCircle.setAttribute('class', 'stashInner');
 			svg.appendChild(innerCircle);
 		}
@@ -814,7 +821,11 @@ class Graph {
 
 	private showTooltip(id: number, vertexScreenY: number) {
 		if (this.tooltipVertex !== null) {
-			this.tooltipVertex.setAttribute('r', this.tooltipVertex.classList.contains('stashOuter') ? '5.5' : '5');
+			this.tooltipVertex.setAttribute('r', this.tooltipVertex.classList.contains('stashOuter')
+				? GRAPH_STASH_OUTER_TOOLTIP_RADIUS
+				: this.tooltipVertex.classList.contains('current')
+					? GRAPH_CURRENT_VERTEX_TOOLTIP_RADIUS
+					: GRAPH_VERTEX_TOOLTIP_RADIUS);
 		}
 
 		const children = this.getAllChildren(id);
@@ -914,7 +925,11 @@ class Graph {
 		}
 
 		if (this.tooltipVertex !== null) {
-			this.tooltipVertex.setAttribute('r', this.tooltipVertex.classList.contains('stashOuter') ? '4.5' : '4');
+			this.tooltipVertex.setAttribute('r', this.tooltipVertex.classList.contains('stashOuter')
+				? GRAPH_STASH_OUTER_RADIUS
+				: this.tooltipVertex.classList.contains('current')
+					? GRAPH_CURRENT_VERTEX_RADIUS
+					: GRAPH_VERTEX_RADIUS);
 			this.tooltipVertex = null;
 		}
 	}

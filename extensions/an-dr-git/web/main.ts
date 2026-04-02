@@ -14,6 +14,11 @@ type SidebarResolvedRef =
 	| { kind: 'tag'; name: string; displayName: string; hash: string | null; annotated: boolean | null };
 
 type SidebarTagContextResolver = (result: { hash: string; annotated: boolean } | null) => void;
+type CommitRefBadgeType = 'head' | 'remote' | 'tag' | 'stash';
+type CommitRefBadge = {
+	type: CommitRefBadgeType;
+	html: string;
+};
 
 class GitGraphView {
 	private gitRepos: GG.GitRepoSet;
@@ -1187,6 +1192,72 @@ class GitGraphView {
 		this.graph.render(expandedCommit);
 	}
 
+	private getRemoteDefaultCloudHtml(title: string) {
+		return '<span class="gitRefCloud" title="' + escapeHtml(title) + '">' + SVG_ICONS.cloud + '</span>';
+	}
+
+	private getHeadRemoteSuffixHtml(remoteName: string, remoteRefName: string, isRemoteDefault: boolean, isGoneUpstream: boolean) {
+		const cloud = isRemoteDefault ? this.getRemoteDefaultCloudHtml(remoteName + '/HEAD -> ' + remoteRefName) : '';
+		return '<span class="gitRefHeadRemote' + (isRemoteDefault ? ' default' : '') + (isGoneUpstream ? ' gone' : '') + '" data-remote="' + escapeHtml(remoteName) + '" data-fullref="' + escapeHtml(remoteRefName) + '">' + cloud + '<span class="gitRefHeadRemoteName">' + escapeHtml(remoteName) + '</span></span>';
+	}
+
+	private renderRefBadgeGroup(badges: CommitRefBadge[]) {
+		return badges.map((badge) => badge.html).join('');
+	}
+
+	private getElemOuterWidth(elem: HTMLElement) {
+		const style = getComputedStyle(elem);
+		return elem.getBoundingClientRect().width
+			+ (parseFloat(style.marginLeft) || 0)
+			+ (parseFloat(style.marginRight) || 0);
+	}
+
+	private getBadgesTotalWidth(badges: ReadonlyArray<HTMLElement>) {
+		let width = 0;
+		for (let i = 0; i < badges.length; i++) {
+			width += this.getElemOuterWidth(badges[i]);
+		}
+		return width;
+	}
+
+	private getAvailableRefBadgeWidth(commitElem: HTMLElement) {
+		if (this.config.referenceLabels.branchLabelsAlignedToGraph) {
+			const refCell = commitElem.children.length > 0 ? <HTMLElement>commitElem.children[0] : null;
+			return refCell !== null ? Math.max(0, refCell.clientWidth - 4) : 0;
+		}
+
+		const descriptionElem = commitElem.querySelector('.description') as HTMLElement | null;
+		if (descriptionElem === null) return 0;
+		const commitDot = descriptionElem.querySelector('.commitHeadDot') as HTMLElement | null;
+		const minMessageWidth = 72;
+		const commitDotWidth = commitDot !== null ? this.getElemOuterWidth(commitDot) : 0;
+		return Math.max(0, descriptionElem.clientWidth - minMessageWidth - commitDotWidth);
+	}
+
+	private collapseReferenceBadgesToFit() {
+		const commitElems = getCommitElems();
+		for (let i = 0; i < commitElems.length; i++) {
+			const badges = <HTMLElement[]>Array.from(commitElems[i].querySelectorAll('.gitRef'));
+			if (badges.length < 2) continue;
+
+			for (let j = 0; j < badges.length; j++) {
+				badges[j].classList.remove('compact');
+			}
+
+			const maxWidth = this.getAvailableRefBadgeWidth(commitElems[i]);
+			if (maxWidth <= 0) {
+				for (let j = 0; j < badges.length; j++) badges[j].classList.add('compact');
+				continue;
+			}
+
+			let width = this.getBadgesTotalWidth(badges);
+			for (let j = badges.length - 1; j >= 0 && width > maxWidth; j--) {
+				badges[j].classList.add('compact');
+				width = this.getBadgesTotalWidth(badges);
+			}
+		}
+	}
+
 	private renderTable() {
 		const colVisibility = this.getColumnVisibility();
 		const currentHash = this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED ? UNCOMMITTED : this.commitHead;
@@ -1209,44 +1280,60 @@ class GitGraphView {
 			let commit = this.commits[i];
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
 			let branchLabels = getBranchLabels(commit.heads, commit.remotes, this.gitRemoteHeadTargets);
-			let refBranches = '', refTags = '', j, k, refName, remoteName, refActive, refHtml, branchCheckedOutAtCommit: string | null = null;
+			let branchBadges: CommitRefBadge[] = [], tagBadges: CommitRefBadge[] = [], j, k, refName, refActive, refHtml, branchCheckedOutAtCommit: string | null = null;
 
 			for (j = 0; j < branchLabels.heads.length; j++) {
-				refName = escapeHtml(branchLabels.heads[j].name);
-				refActive = branchLabels.heads[j].name === this.gitBranchHead;
-				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
+				const headName = branchLabels.heads[j].name;
+				refName = escapeHtml(headName);
+				refActive = headName === this.gitBranchHead;
+				refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true" title="Branch: ' + refName + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
 				for (k = 0; k < branchLabels.heads[j].remotes.length; k++) {
-					remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
-					const remoteRefName = branchLabels.heads[j].remotes[k] + '/' + branchLabels.heads[j].name;
-					const isRemoteDefault = this.gitRemoteHeadTargets[branchLabels.heads[j].remotes[k]] === remoteRefName;
-					const defaultBadge = isRemoteDefault
-						? '<span class="gitRefRemoteDefaultBadge" title="' + escapeHtml(branchLabels.heads[j].remotes[k] + '/HEAD -> ' + remoteRefName) + '">default</span>'
-						: '';
-					refHtml += '<span class="gitRefHeadRemote' + (isRemoteDefault ? ' default' : '') + '" data-remote="' + remoteName + '" data-fullref="' + escapeHtml(remoteRefName) + '">' + remoteName + defaultBadge + '</span>';
+					const remoteName = branchLabels.heads[j].remotes[k];
+					const remoteRefName = remoteName + '/' + headName;
+					const isRemoteDefault = this.gitRemoteHeadTargets[remoteName] === remoteRefName;
+					const isGoneUpstream = this.gitGoneUpstreamBranches.includes(headName);
+					refHtml += this.getHeadRemoteSuffixHtml(remoteName, remoteRefName, isRemoteDefault, isGoneUpstream);
 				}
 				refHtml += '</span>';
-				refBranches = refActive ? refHtml + refBranches : refBranches + refHtml;
-				if (refActive) branchCheckedOutAtCommit = this.gitBranchHead;
+				if (refActive) {
+					branchBadges.unshift({ type: 'head', html: refHtml });
+					branchCheckedOutAtCommit = headName;
+				} else {
+					branchBadges.push({ type: 'head', html: refHtml });
+				}
 			}
 			for (j = 0; j < branchLabels.remotes.length; j++) {
-				refName = escapeHtml(branchLabels.remotes[j].name);
-				const isRemoteDefault = branchLabels.remotes[j].remote !== null && this.gitRemoteHeadTargets[branchLabels.remotes[j].remote!] === branchLabels.remotes[j].name;
-				const defaultBadge = isRemoteDefault && branchLabels.remotes[j].remote !== null
-					? '<span class="gitRefRemoteDefaultBadge" title="' + escapeHtml(branchLabels.remotes[j].remote! + '/HEAD -> ' + branchLabels.remotes[j].name) + '">default</span>'
+				const remoteName = branchLabels.remotes[j].name;
+				refName = escapeHtml(remoteName);
+				const remoteRoot = branchLabels.remotes[j].remote;
+				const isRemoteDefault = remoteRoot !== null && this.gitRemoteHeadTargets[remoteRoot] === remoteName;
+				const cloud = isRemoteDefault && remoteRoot !== null
+					? this.getRemoteDefaultCloudHtml(remoteRoot + '/HEAD -> ' + remoteName)
 					: '';
-				refBranches += '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (branchLabels.remotes[j].remote !== null ? escapeHtml(branchLabels.remotes[j].remote!) : '') + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>' + defaultBadge + '</span>';
+				branchBadges.push({
+					type: 'remote',
+					html: '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (remoteRoot !== null ? escapeHtml(remoteRoot) : '') + '" title="Remote Branch: ' + refName + '">' + SVG_ICONS.branch + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>' + cloud + '</span>'
+				});
 			}
 
 			for (j = 0; j < commit.tags.length; j++) {
 				if (selectedTags.size > 0 && !selectedTags.has(commit.tags[j].name)) continue;
 				refName = escapeHtml(commit.tags[j].name);
-				refTags += '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '" data-drag-ref-type="tag" data-drag-ref-name="' + refName + '" draggable="true">' + SVG_ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>';
+				tagBadges.push({
+					type: 'tag',
+					html: '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '" data-drag-ref-type="tag" data-drag-ref-name="' + refName + '" draggable="true" title="Tag: ' + refName + '">' + SVG_ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>'
+				});
 			}
 
 			if (commit.stash !== null) {
 				refName = escapeHtml(commit.stash.selector);
-				refBranches = '<span class="gitRef stash" data-name="' + refName + '">' + SVG_ICONS.stash + '<span class="gitRefName" data-fullref="' + refName + '">' + escapeHtml(commit.stash.selector.substring(5)) + '</span></span>' + refBranches;
+				branchBadges.unshift({
+					type: 'stash',
+					html: '<span class="gitRef stash" data-name="' + refName + '" title="Stash: ' + escapeHtml(commit.stash.selector.substring(5)) + '">' + SVG_ICONS.stash + '<span class="gitRefName" data-fullref="' + refName + '">' + escapeHtml(commit.stash.selector.substring(5)) + '</span></span>'
+				});
 			}
+			const refBranches = this.renderRefBadgeGroup(branchBadges);
+			const refTags = this.renderRefBadgeGroup(tagBadges);
 
 			const commitDot = commit.hash === this.commitHead
 				? '<span class="commitHeadDot" title="' + (branchCheckedOutAtCommit !== null
@@ -1265,6 +1352,7 @@ class GitGraphView {
 		this.footerElem.innerHTML = this.moreCommitsAvailable ? '<div id="loadMoreCommitsBtn" class="roundedBtn">Load More Commits</div>' : '';
 		this.makeTableResizable();
 		this.updateCommittedColumnDisplayMode();
+		this.collapseReferenceBadgesToFit();
 		this.findWidget.refresh();
 		this.renderedGitBranchHead = this.gitBranchHead;
 
@@ -2910,6 +2998,7 @@ class GitGraphView {
 		window.addEventListener('resize', () => {
 			this.updateControlsLayout();
 			this.updateCommittedColumnDisplayMode();
+			this.collapseReferenceBadgesToFit();
 			if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 				this.renderGraph();
 			} else {

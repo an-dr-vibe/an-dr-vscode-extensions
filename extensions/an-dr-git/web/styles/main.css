@@ -760,13 +760,14 @@ body.vscode-high-contrast #commitTable tr.commit.findCurrentCommit{
 
 .gitRef{
 	display:inline-block;
-	height:18px;
-	line-height:18px;
+	height:19px;
+	line-height:19px;
 	margin-top:2px;
 	margin-right:5px;
-	background-color:rgba(128,128,128,0.15);
-	border-radius:5px;
-	border:1px solid rgba(128,128,128,0.75);
+	background-color:var(--git-graph-color);
+	border-radius:999px;
+	border:0;
+	color:var(--vscode-editor-background);
 	vertical-align:top;
 	font-size:12px;
 	cursor:default;
@@ -776,30 +777,86 @@ body.vscode-high-contrast #commitTable tr.commit.findCurrentCommit{
 	cursor:grab;
 }
 .gitRef.active{
-	border-color:var(--git-graph-color);
+	box-shadow:inset 0 0 0 1px rgba(255,255,255,0.45);
 }
 .gitRef.active .gitRefName{
 	font-weight:bold;
 }
 .gitRef > svg{
-	background-color:var(--git-graph-color);
-	fill:var(--vscode-editor-background);
-	width:14px;
-	height:14px;
-	padding:2px;
+	fill:currentColor;
+	width:12px;
+	height:12px;
+	padding:3px 2px 4px 6px;
 	vertical-align:top;
 }
 
-.gitRefName, .gitRefHeadRemote{
+.gitRefName{
 	display:inline-block;
-	height:18px;
-	line-height:18px;
-	padding:0 5px;
+	height:19px;
+	line-height:19px;
+	padding:0 7px 0 4px;
+	font-weight:600;
 }
 .gitRefHeadRemote{
-	border-left:1px solid rgba(128,128,128,0.45);
-	font-style:italic;
+	display:inline-flex;
+	align-items:center;
+	gap:3px;
+	height:19px;
+	line-height:19px;
+	padding:0 7px 0 6px;
+	border-left:1px solid rgba(255,255,255,0.3);
+	color:inherit;
+	background-color:rgba(0,0,0,0.14);
 }
+.gitRefHeadRemote.gone{
+	color:rgba(255,220,150,0.95);
+}
+.gitRefHeadRemoteName{
+	display:inline-block;
+	max-width:140px;
+	text-overflow:ellipsis;
+	overflow:hidden;
+	white-space:nowrap;
+	font-size:11px;
+	font-weight:600;
+}
+.gitRefCloud{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	width:11px;
+	height:11px;
+	flex:0 0 11px;
+	opacity:0.95;
+}
+.gitRefCloud svg{
+	width:11px;
+	height:11px;
+	fill:currentColor;
+}
+
+.gitRef.compact{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	width:19px;
+	min-width:19px;
+	height:19px;
+	padding:0;
+	border-radius:50%;
+	margin-right:4px;
+}
+.gitRef.compact .gitRefName,
+.gitRef.compact .gitRefHeadRemote{
+	display:none;
+}
+.gitRef.compact > svg{
+	padding:0;
+	width:12px;
+	height:12px;
+	vertical-align:middle;
+}
+
 .gitRefRemoteDefaultBadge{
 	display:inline-block;
 	margin-left:4px;
@@ -818,11 +875,11 @@ body.vscode-high-contrast #commitTable tr.commit.findCurrentCommit{
 }
 
 #commitTable tr.commit.commitDetailsOpen:hover .gitRef, #commitTable tr.commit.commitDetailsOpen.contextMenuActive .gitRef, #commitTable tr.commit.commitDetailsOpen.dialogActive .gitRef, #commitTable tr.commit.commitDetailsOpen.graphVertexActive .gitRef{
-	background-color:rgba(128,128,128,0.05);
+	filter:brightness(1.06);
 }
 
 .gitRef .contextMenuActive, .gitRef .dialogActive, .gitRef .gitRefName:hover, .gitRef .gitRefHeadRemote:hover{
-	background-color:rgba(128,128,128,0.1);
+	background-color:rgba(0,0,0,0.12);
 }
 
 body.branchLabelsAlignedToGraph tr.commit td:first-child .gitRef:last-child{
@@ -831,6 +888,10 @@ body.branchLabelsAlignedToGraph tr.commit td:first-child .gitRef:last-child{
 body.tagLabelsRightAligned .gitRef.tag{
 	margin-left:5px;
 	margin-right:0;
+}
+body.tagLabelsRightAligned .gitRef.compact.tag{
+	margin-left:5px;
+	margin-right:4px;
 }
 
 

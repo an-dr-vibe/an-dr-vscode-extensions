@@ -4,7 +4,7 @@ const path = require('path');
 
 const SRC_DIRECTORY = './src';
 const OUT_DIRECTORY = './out';
-const ASKPASS_DIRECTORY = 'askpass';
+const SHELL_SCRIPT_DIRECTORIES = ['askpass', 'gitEditor'];
 
 // Adjust any scripts that require the Node.js File System Module to use the Node.js version (as Electron overrides the fs module with its own version of the module)
 fs.readdirSync(OUT_DIRECTORY).forEach((fileName) => {
@@ -26,11 +26,12 @@ fs.readdirSync(OUT_DIRECTORY).forEach((fileName) => {
 	}
 });
 
-// Copy the askpass shell scripts to the output directory
-fs.readdirSync(path.join(SRC_DIRECTORY, ASKPASS_DIRECTORY)).forEach((fileName) => {
-	if (fileName.endsWith('.sh')) {
-		// If the file is a shell script, read its contents and write it to the output directory
-		const scriptContents = fs.readFileSync(path.join(SRC_DIRECTORY, ASKPASS_DIRECTORY, fileName)).toString();
-		fs.writeFileSync(path.join(OUT_DIRECTORY, ASKPASS_DIRECTORY, fileName), scriptContents);
-	}
+// Copy shell scripts to the output directory
+SHELL_SCRIPT_DIRECTORIES.forEach((directory) => {
+	fs.readdirSync(path.join(SRC_DIRECTORY, directory)).forEach((fileName) => {
+		if (fileName.endsWith('.sh')) {
+			const scriptContents = fs.readFileSync(path.join(SRC_DIRECTORY, directory, fileName)).toString();
+			fs.writeFileSync(path.join(OUT_DIRECTORY, directory, fileName), scriptContents);
+		}
+	});
 });

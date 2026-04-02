@@ -20,6 +20,8 @@ export class GitGraphView extends Disposable {
 	public static currentPanel: GitGraphView | undefined;
 	private static readonly NAME = 'an-dr: Git';
 	private static readonly VIEW_TYPE = 'an-dr-git';
+	private static readonly DEFAULT_REOPEN_AFTER_UNEXPECTED_CLOSE_MS = 5000;
+	private static readonly REBASE_REOPEN_AFTER_COMMIT_MESSAGE_CLOSE_MS = 30000;
 	private static nextInstanceId = 1;
 
 	private readonly panel: vscode.WebviewPanel;
@@ -439,9 +441,18 @@ export class GitGraphView extends Disposable {
 				});
 				break;
 			case 'rewordCommit':
+				const rewordCommitMessage = await this.dataSource.promptForRewordCommitMessage(msg.repo, msg.commitHash);
+				if (rewordCommitMessage.error !== null || rewordCommitMessage.message === null) {
+					this.sendMessage({
+						command: 'rewordCommit',
+						error: rewordCommitMessage.error
+					});
+					break;
+				}
+				this.scheduleReopenAfterUnexpectedClose(msg.repo, msg.selectedBranches, msg.selectedTags, msg.scrollTop, msg.branchPanelState, GitGraphView.REBASE_REOPEN_AFTER_COMMIT_MESSAGE_CLOSE_MS);
 				this.sendMessage({
 					command: 'rewordCommit',
-					error: await this.dataSource.rewordCommit(msg.repo, msg.commitHash, msg.message)
+					error: await this.dataSource.rewordCommit(msg.repo, msg.commitHash, rewordCommitMessage.message)
 				});
 				break;
 			case 'editCommitAuthor':
@@ -451,9 +462,18 @@ export class GitGraphView extends Disposable {
 				});
 				break;
 			case 'squashCommits':
+				const squashCommitMessage = await this.dataSource.promptForSquashCommitMessage(msg.repo, msg.commitHashes);
+				if (squashCommitMessage.error !== null || squashCommitMessage.message === null) {
+					this.sendMessage({
+						command: 'squashCommits',
+						error: squashCommitMessage.error
+					});
+					break;
+				}
+				this.scheduleReopenAfterUnexpectedClose(msg.repo, msg.selectedBranches, msg.selectedTags, msg.scrollTop, msg.branchPanelState, GitGraphView.REBASE_REOPEN_AFTER_COMMIT_MESSAGE_CLOSE_MS);
 				this.sendMessage({
 					command: 'squashCommits',
-					error: await this.dataSource.squashCommits(msg.repo, msg.commitHashes, msg.message)
+					error: await this.dataSource.squashCommits(msg.repo, msg.commitHashes, squashCommitMessage.message)
 				});
 				break;
 			case 'dropStash':
@@ -989,8 +1009,8 @@ export class GitGraphView extends Disposable {
 		});
 	}
 
-	private scheduleReopenAfterUnexpectedClose(repo: string, selectedBranches?: string[] | null, selectedTags?: string[], scrollTop?: number, branchPanelState?: GitGraphBranchPanelState) {
-		this.reopenAfterUnexpectedCloseUntil = (new Date()).getTime() + 5000;
+	private scheduleReopenAfterUnexpectedClose(repo: string, selectedBranches?: string[] | null, selectedTags?: string[], scrollTop?: number, branchPanelState?: GitGraphBranchPanelState, timeoutMs: number = GitGraphView.DEFAULT_REOPEN_AFTER_UNEXPECTED_CLOSE_MS) {
+		this.reopenAfterUnexpectedCloseUntil = (new Date()).getTime() + timeoutMs;
 		this.reopenViewTo = {
 			repo: repo,
 			selectedBranches: typeof selectedBranches === 'undefined' ? undefined : selectedBranches,
@@ -998,7 +1018,7 @@ export class GitGraphView extends Disposable {
 			scrollTop: scrollTop,
 			branchPanelState: branchPanelState
 		};
-		this.logger.log('GitGraphView[' + this.instanceId + '] scheduled auto-reopen window for repo: ' + repo);
+		this.logger.log('GitGraphView[' + this.instanceId + '] scheduled auto-reopen window for repo: ' + repo + ' (' + timeoutMs + 'ms)');
 	}
 
 }

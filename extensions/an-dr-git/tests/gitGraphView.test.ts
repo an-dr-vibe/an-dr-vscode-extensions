@@ -1783,6 +1783,143 @@ describe('GitGraphView', () => {
 			});
 		});
 
+		describe('rewordCommit', () => {
+			it('Should reword a commit', async () => {
+				// Setup
+				const promptForRewordCommitMessageResolvedValue = { message: 'Reworded subject\n', error: null };
+				const rewordCommitResolvedValue = null;
+				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
+				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
+				const spyOnScheduleReopen = jest.spyOn<any, any>(GitGraphView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce(promptForRewordCommitMessageResolvedValue);
+				spyOnRewordCommit.mockResolvedValueOnce(rewordCommitResolvedValue);
+
+				// Run
+				onDidReceiveMessage({
+					command: 'rewordCommit',
+					repo: '/path/to/repo',
+					commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
+					selectedBranches: ['master'],
+					selectedTags: ['v1.0.0'],
+					scrollTop: 123,
+					branchPanelState: {
+						filterValue: '',
+						localCollapsed: false,
+						remoteCollapsed: false,
+						tagsCollapsed: false,
+						folderCollapsed: {},
+						sidebarWidth: 280,
+						sidebarHidden: false,
+						scrollTop: 12
+					}
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnPromptForRewordCommitMessage).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
+					expect(spyOnScheduleReopen).toHaveBeenCalledWith('/path/to/repo', ['master'], ['v1.0.0'], 123, {
+						filterValue: '',
+						localCollapsed: false,
+						remoteCollapsed: false,
+						tagsCollapsed: false,
+						folderCollapsed: {},
+						sidebarWidth: 280,
+						sidebarHidden: false,
+						scrollTop: 12
+					}, 30000);
+					expect(spyOnRewordCommit).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'Reworded subject\n');
+					expect(messages).toStrictEqual([
+						{
+							command: 'rewordCommit',
+							error: rewordCommitResolvedValue
+						}
+					]);
+				});
+			});
+
+			it('Should not reword a commit when the editor is cancelled', async () => {
+				// Setup
+				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
+				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
+				const spyOnScheduleReopen = jest.spyOn<any, any>(GitGraphView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce({ message: null, error: null });
+
+				// Run
+				onDidReceiveMessage({
+					command: 'rewordCommit',
+					repo: '/path/to/repo',
+					commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnScheduleReopen).not.toHaveBeenCalled();
+					expect(spyOnRewordCommit).not.toHaveBeenCalled();
+					expect(messages).toStrictEqual([
+						{
+							command: 'rewordCommit',
+							error: null
+						}
+					]);
+				});
+			});
+		});
+
+		describe('squashCommits', () => {
+			it('Should squash commits', async () => {
+				// Setup
+				const promptForSquashCommitMessageResolvedValue = { message: 'Squashed subject\n', error: null };
+				const squashCommitsResolvedValue = null;
+				const spyOnPromptForSquashCommitMessage = jest.spyOn(dataSource, 'promptForSquashCommitMessage');
+				const spyOnSquashCommits = jest.spyOn(dataSource, 'squashCommits');
+				const spyOnScheduleReopen = jest.spyOn<any, any>(GitGraphView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				spyOnPromptForSquashCommitMessage.mockResolvedValueOnce(promptForSquashCommitMessageResolvedValue);
+				spyOnSquashCommits.mockResolvedValueOnce(squashCommitsResolvedValue);
+
+				// Run
+				onDidReceiveMessage({
+					command: 'squashCommits',
+					repo: '/path/to/repo',
+					commitHashes: ['1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c'],
+					selectedBranches: ['master'],
+					selectedTags: ['v1.0.0'],
+					scrollTop: 123,
+					branchPanelState: {
+						filterValue: '',
+						localCollapsed: false,
+						remoteCollapsed: false,
+						tagsCollapsed: false,
+						folderCollapsed: {},
+						sidebarWidth: 280,
+						sidebarHidden: false,
+						scrollTop: 12
+					}
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnPromptForSquashCommitMessage).toHaveBeenCalledWith('/path/to/repo', ['1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c']);
+					expect(spyOnScheduleReopen).toHaveBeenCalledWith('/path/to/repo', ['master'], ['v1.0.0'], 123, {
+						filterValue: '',
+						localCollapsed: false,
+						remoteCollapsed: false,
+						tagsCollapsed: false,
+						folderCollapsed: {},
+						sidebarWidth: 280,
+						sidebarHidden: false,
+						scrollTop: 12
+					}, 30000);
+					expect(spyOnSquashCommits).toHaveBeenCalledWith('/path/to/repo', ['1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c'], 'Squashed subject\n');
+					expect(messages).toStrictEqual([
+						{
+							command: 'squashCommits',
+							error: squashCommitsResolvedValue
+						}
+					]);
+				});
+			});
+		});
+
 		describe('editRemote', () => {
 			it('Should edit a remote', async () => {
 				// Setup
@@ -2357,6 +2494,8 @@ describe('GitGraphView', () => {
 					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
+					remoteHeadTargets: {},
+					repoInProgressState: null,
 					stashes: [],
 					error: null
 				};
@@ -2411,6 +2550,8 @@ describe('GitGraphView', () => {
 					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
+					remoteHeadTargets: {},
+					repoInProgressState: null,
 					stashes: [],
 					error: null
 				};
@@ -2464,6 +2605,8 @@ describe('GitGraphView', () => {
 					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
+					remoteHeadTargets: {},
+					repoInProgressState: null,
 					stashes: [],
 					error: 'error message'
 				};
@@ -2518,6 +2661,8 @@ describe('GitGraphView', () => {
 					goneUpstreamBranches: [],
 					head: 'master',
 					remotes: ['origin', 'upstream'],
+					remoteHeadTargets: {},
+					repoInProgressState: null,
 					stashes: [],
 					error: 'error message'
 				};
@@ -2871,7 +3016,7 @@ describe('GitGraphView', () => {
 				spyOnOpenGitTerminal.mockResolvedValueOnce(openGitTerminalResolvedValue);
 
 				// Run
-				onDidReceiveMessage({
+				onDidReceiveMessage(<any>{
 					command: 'openTerminal',
 					repo: '/path/to/repo',
 					name: 'repo-name'

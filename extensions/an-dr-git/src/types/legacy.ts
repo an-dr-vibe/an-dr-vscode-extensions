@@ -914,7 +914,10 @@ export interface ResponseDropCommit extends ResponseWithErrorInfo {
 export interface RequestRewordCommit extends RepoRequest {
 	readonly command: 'rewordCommit';
 	readonly commitHash: string;
-	readonly message: string;
+	readonly selectedBranches?: string[] | null;
+	readonly selectedTags?: string[];
+	readonly scrollTop?: number;
+	readonly branchPanelState?: GitGraphBranchPanelState;
 }
 export interface ResponseRewordCommit extends ResponseWithErrorInfo {
 	readonly command: 'rewordCommit';
@@ -933,7 +936,10 @@ export interface ResponseEditCommitAuthor extends ResponseWithErrorInfo {
 export interface RequestSquashCommits extends RepoRequest {
 	readonly command: 'squashCommits';
 	readonly commitHashes: ReadonlyArray<string>;
-	readonly message: string;
+	readonly selectedBranches?: string[] | null;
+	readonly selectedTags?: string[];
+	readonly scrollTop?: number;
+	readonly branchPanelState?: GitGraphBranchPanelState;
 }
 export interface ResponseSquashCommits extends ResponseWithErrorInfo {
 	readonly command: 'squashCommits';

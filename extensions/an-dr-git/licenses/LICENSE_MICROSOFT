@@ -3,6 +3,8 @@ Git Extension, which was used as the base for the following components of this
 Git Graph extension:
 - Askpass (./src/askpass/* in the source code, and ./out/askpass/* in the 
   distributed code).
+- Git Editor (./src/gitEditor/* in the source code, and ./out/gitEditor/* in
+  the distributed code).
 - Find Git Executable methods (in ./src/utils.ts in the source code, and in 
   ./out/utils.js in the distributed code).
 

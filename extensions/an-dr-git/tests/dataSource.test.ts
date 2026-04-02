@@ -3,6 +3,19 @@ import { mockSpyOnSpawn } from './mocks/spawn';
 import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 jest.mock('../src/askpass/askpassManager');
+jest.mock('../src/gitEditor/gitEditorManager', () => ({
+	GitEditorManager: jest.fn().mockImplementation(() => ({
+		dispose: jest.fn(),
+		getEnv: jest.fn(() => ({
+			GIT_EDITOR: '/path/to/git-editor.sh',
+			VSCODE_GIT_GRAPH_EDITOR_NODE: '/path/to/node',
+			VSCODE_GIT_GRAPH_EDITOR_MAIN: '/path/to/gitEditorMain.js',
+			VSCODE_GIT_GRAPH_EDITOR_HANDLE: '/path/to/git-editor.sock'
+		})),
+		isEnabled: jest.fn(() => true),
+		showCommitMessageEditor: jest.fn((initialContent: string) => Promise.resolve(initialContent))
+	}))
+}));
 jest.mock('../src/logger');
 
 import * as cp from 'child_process';
@@ -6261,6 +6274,79 @@ describe('DataSource', () => {
 
 			// Assert
 			expect(result).toBe('error message');
+		});
+	});
+
+	describe('rewordCommit', () => {
+		it('Should prepare a reword commit message in the editor', async () => {
+			// Setup
+			mockGitSuccessOnce('Reworded subject\n\nReworded body\n');
+
+			// Run
+			const result = await dataSource.promptForRewordCommitMessage('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
+
+			// Assert
+			expect(result).toStrictEqual({
+				message: 'Reworded subject\n\nReworded body\n',
+				error: null
+			});
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show', '-s', '--format=%B', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+
+		it('Should reword a commit using the Git editor', async () => {
+			// Setup
+			mockGitSuccessOnce();
+			vscode.mockExtensionSettingReturnValue('repository.sign.commits', false);
+
+			// Run
+			const result = await dataSource.rewordCommit('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'Reworded subject\n');
+
+			// Assert
+			expect(result).toBe(null);
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['rebase', '-i', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^'], expect.objectContaining({
+				cwd: '/path/to/repo',
+				env: expect.objectContaining({
+					GIT_EDITOR: expect.any(String),
+					GIT_SEQUENCE_EDITOR: expect.any(String)
+				})
+			}));
+		});
+	});
+
+	describe('squashCommits', () => {
+		it('Should prepare a squash commit message in the editor', async () => {
+			// Setup
+			mockGitSuccessOnce('Oldest commit\n');
+			mockGitSuccessOnce('Middle commit\n');
+			mockGitSuccessOnce('Newest commit\n');
+
+			// Run
+			const result = await dataSource.promptForSquashCommitMessage('/path/to/repo', ['3333333333333333333333333333333333333333', '2222222222222222222222222222222222222222', '1111111111111111111111111111111111111111']);
+
+			// Assert
+			expect(result).toStrictEqual({
+				message: '# This is a combination of 3 commits.\n\n# Commit message #1:\n\nOldest commit\n\n# Commit message #2:\n\nMiddle commit\n\n# Commit message #3:\n\nNewest commit',
+				error: null
+			});
+		});
+
+		it('Should squash commits using the Git editor', async () => {
+			// Setup
+			mockGitSuccessOnce();
+			vscode.mockExtensionSettingReturnValue('repository.sign.commits', false);
+
+			// Run
+			const result = await dataSource.squashCommits('/path/to/repo', ['3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], 'Squashed subject\n');
+
+			// Assert
+			expect(result).toBe(null);
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['rebase', '-i', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^'], expect.objectContaining({
+				cwd: '/path/to/repo',
+				env: expect.objectContaining({
+					GIT_EDITOR: expect.any(String),
+					GIT_SEQUENCE_EDITOR: expect.any(String)
+				})
+			}));
 		});
 	});
 

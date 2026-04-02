@@ -15,6 +15,7 @@ import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommit
 import { applyBranchUpstreams, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { GitEditorManager } from './gitEditor/gitEditorManager';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -49,6 +50,7 @@ const GPG_STATUS_CODE_PARSING_DETAILS: Readonly<{ [statusCode: string]: GpgStatu
 export class DataSource extends Disposable {
 	private readonly logger: Logger;
 	private readonly askpassEnv: AskpassEnvironment;
+	private readonly gitEditorManager: GitEditorManager;
 	private gitExecutable!: GitExecutable | null;
 	private gitExecutableSupportsGpgInfo!: boolean;
 	private gitFormatCommitDetails!: string;
@@ -67,7 +69,9 @@ export class DataSource extends Disposable {
 		this.setGitExecutable(gitExecutable);
 
 		const askpassManager = new AskpassManager();
+		const gitEditorManager = new GitEditorManager();
 		this.askpassEnv = askpassManager.getEnv();
+		this.gitEditorManager = gitEditorManager;
 
 		this.registerDisposables(
 			onDidChangeConfiguration((event) => {
@@ -81,7 +85,8 @@ export class DataSource extends Disposable {
 			onDidChangeGitExecutable((gitExecutable) => {
 				this.setGitExecutable(gitExecutable);
 			}),
-			askpassManager
+			askpassManager,
+			gitEditorManager
 		);
 	}
 
@@ -1183,13 +1188,35 @@ export class DataSource extends Disposable {
 	 * Reword (change message of) a commit using a scripted interactive rebase.
 	 * @param repo The path of the repository.
 	 * @param commitHash The hash of the commit to reword.
-	 * @param message The new commit message.
 	 * @returns The ErrorInfo from the executed command.
 	 */
-	public rewordCommit(repo: string, commitHash: string, message: string): Promise<ErrorInfo> {
+	public async promptForRewordCommitMessage(repo: string, commitHash: string): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			return await this.openCommitMessageEditor(await this.getCommitMessage(repo, commitHash));
+		} catch (error) {
+			return {
+				message: null,
+				error: error instanceof Error ? error.message : <ErrorInfo>error
+			};
+		}
+	}
+
+	/**
+	 * Reword (change message of) a commit using a scripted interactive rebase.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to reword.
+	 * @param commitMessage The commit message to use, or undefined to prompt in the editor.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async rewordCommit(repo: string, commitHash: string, commitMessage?: string): Promise<ErrorInfo> {
+		if (typeof commitMessage === 'undefined') {
+			const result = await this.promptForRewordCommitMessage(repo, commitHash);
+			if (result.error !== null || result.message === null) return result.error;
+			commitMessage = result.message;
+		}
 		return this.runScriptedRebase(repo, commitHash + '^', {
 			transform: { reword: commitHash.slice(0, 7) },
-			commitMessage: message
+			commitMessage: commitMessage
 		});
 	}
 
@@ -1216,15 +1243,40 @@ export class DataSource extends Disposable {
 	 * The oldest is kept as 'pick'; all newer ones are changed to 'squash'.
 	 * @param repo The path of the repository.
 	 * @param commitHashes Commit hashes sorted newest-first (as returned by the frontend).
-	 * @param message The squashed commit message.
 	 * @returns The ErrorInfo from the executed command.
 	 */
-	public squashCommits(repo: string, commitHashes: ReadonlyArray<string>, message: string): Promise<ErrorInfo> {
+	public async promptForSquashCommitMessage(repo: string, commitHashes: ReadonlyArray<string>): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			const commitMessages = await Promise.all(commitHashes.slice().reverse().map((commitHash) => this.getCommitMessage(repo, commitHash)));
+			return await this.openCommitMessageEditor(this.createDefaultSquashCommitMessage(commitMessages));
+		} catch (error) {
+			return {
+				message: null,
+				error: error instanceof Error ? error.message : <ErrorInfo>error
+			};
+		}
+	}
+
+	/**
+	 * Squash a set of commits into one using a scripted interactive rebase.
+	 * commitHashes[0] = newest commit (lowest graph index), commitHashes[N-1] = oldest (first in rebase todo).
+	 * The oldest is kept as 'pick'; all newer ones are changed to 'squash'.
+	 * @param repo The path of the repository.
+	 * @param commitHashes Commit hashes sorted newest-first (as returned by the frontend).
+	 * @param commitMessage The commit message to use, or undefined to prompt in the editor.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async squashCommits(repo: string, commitHashes: ReadonlyArray<string>, commitMessage?: string): Promise<ErrorInfo> {
+		if (typeof commitMessage === 'undefined') {
+			const result = await this.promptForSquashCommitMessage(repo, commitHashes);
+			if (result.error !== null || result.message === null) return result.error;
+			commitMessage = result.message;
+		}
 		// commitHashes[N-1] = oldest = the 'pick' anchor; squash all the newer ones
 		const squashShortHashes = commitHashes.slice(0, -1).map((h) => h.slice(0, 7));
 		return this.runScriptedRebase(repo, commitHashes[commitHashes.length - 1] + '^', {
 			transform: { squash: squashShortHashes },
-			commitMessage: message
+			commitMessage: commitMessage
 		});
 	}
 
@@ -1334,7 +1386,7 @@ export class DataSource extends Disposable {
 		}
 		args.push(base);
 
-		let result: ErrorInfo;
+		let result: ErrorInfo = null;
 		try {
 			await resolveSpawnOutput(cp.spawn(this.gitExecutable.path, args, {
 				cwd: repo,
@@ -1357,6 +1409,35 @@ export class DataSource extends Disposable {
 		}
 
 		return result!;
+	}
+
+	private async openCommitMessageEditor(initialContent: string): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			const commitMessage = await this.gitEditorManager.showCommitMessageEditor(initialContent);
+			if (commitMessage === null || commitMessage.trim() === '') {
+				return { message: null, error: null };
+			}
+			return { message: commitMessage, error: null };
+		} catch (error) {
+			return {
+				message: null,
+				error: error instanceof Error ? error.message : 'Unable to open the Git commit editor.'
+			};
+		}
+	}
+
+	private getCommitMessage(repo: string, commitHash: string): Promise<string> {
+		return this.spawnGit(['show', '-s', '--format=%B', commitHash], repo, (stdout) => stdout);
+	}
+
+	private createDefaultSquashCommitMessage(commitMessages: ReadonlyArray<string>): string {
+		const lines = ['# This is a combination of ' + commitMessages.length + ' commits.', ''];
+		for (let i = 0; i < commitMessages.length; i++) {
+			lines.push('# Commit message #' + (i + 1) + ':', '');
+			lines.push(...removeTrailingBlankLines(commitMessages[i].replace(/\r\n/g, '\n').split('\n')));
+			lines.push('');
+		}
+		return removeTrailingBlankLines(lines).join('\n');
 	}
 
 	/**

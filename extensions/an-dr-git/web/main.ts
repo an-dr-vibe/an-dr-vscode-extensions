@@ -2326,17 +2326,15 @@ class GitGraphView {
 				title: 'Reword Commit Message' + ELLIPSIS,
 				visible: true,
 				onClick: () => {
-					dialog.showForm('Reword commit <b><i>' + abbrevCommit(hash) + '</i></b>:', [{
-						type: DialogInputType.Text,
-						name: 'New Message',
-						default: commit.message,
-						placeholder: null
-					}], 'Reword', (values) => {
-						const newMessage = <string>values[0];
-						if (newMessage.trim() !== '') {
-							runAction({ command: 'rewordCommit', repo: this.currentRepo, commitHash: hash, message: newMessage }, 'Rewording Commit');
-						}
-					}, target);
+					runAction({
+						command: 'rewordCommit',
+						repo: this.currentRepo,
+						commitHash: hash,
+						selectedBranches: this.currentBranches,
+						selectedTags: this.currentTags,
+						scrollTop: this.scrollTop,
+						branchPanelState: this.branchDropdown.getState()
+					}, 'Rewording Commit');
 				}
 			}, {
 				title: 'Edit Author' + ELLIPSIS,
@@ -2369,7 +2367,7 @@ class GitGraphView {
 		]];
 	}
 
-	private getMultiSelectContextMenuActions(target: DialogTarget & CommitTarget): ContextMenuActions {
+	private getMultiSelectContextMenuActions(_target: DialogTarget & CommitTarget): ContextMenuActions {
 		const hashes = Array.from(this.selectedCommits);
 		// Sort by commit order (index in this.commits, oldest = highest index)
 		const sortedIndices = hashes
@@ -2389,20 +2387,15 @@ class GitGraphView {
 				title: 'Squash ' + hashes.length + ' Commits' + ELLIPSIS,
 				visible: consecutive,
 				onClick: () => {
-					const combinedMessage = sortedHashes
-						.map(h => this.commits[this.commitLookup[h] as number].message)
-						.join('\n\n');
-					dialog.showForm('Squash <b>' + hashes.length + '</b> commits into one:', [{
-						type: DialogInputType.TextArea,
-						name: 'New Message',
-						default: combinedMessage,
-						rows: 8
-					}], 'Squash', (values) => {
-						const message = <string>values[0];
-						if (message.trim() !== '') {
-							runAction({ command: 'squashCommits', repo: this.currentRepo, commitHashes: sortedHashes, message: message }, 'Squashing Commits');
-						}
-					}, target);
+					runAction({
+						command: 'squashCommits',
+						repo: this.currentRepo,
+						commitHashes: sortedHashes,
+						selectedBranches: this.currentBranches,
+						selectedTags: this.currentTags,
+						scrollTop: this.scrollTop,
+						branchPanelState: this.branchDropdown.getState()
+					}, 'Squashing Commits');
 				}
 			}
 		], [

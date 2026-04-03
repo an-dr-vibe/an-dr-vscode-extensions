@@ -220,14 +220,14 @@ class CommitsView {
 		this.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
 		this.findWidgetToggleBtnElem.addEventListener('click', () => this.showFindWidgetFromToggle());
 		this.findWidgetToggleBtnElem.addEventListener('contextmenu', (event) => handledEvent(event));
-		this.pullBtnElem.title = 'Pull Current Branch';
+		this.pullBtnElem.title = 'Pull Current Branch (Right-Click for More Actions)';
 		this.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
 		this.pullBtnElem.addEventListener('click', () => this.pullCurrentBranchAction());
 		this.pullBtnElem.addEventListener('contextmenu', (event) => {
 			handledEvent(event);
 			this.showPullButtonContextMenu(event);
 		});
-		this.pushBtnElem.title = 'Push Current Branch';
+		this.pushBtnElem.title = 'Push Current Branch (Right-Click for More Actions)';
 		this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
 		this.pushBtnElem.addEventListener('click', () => this.pushCurrentBranchAction());
 		this.pushBtnElem.addEventListener('contextmenu', (event) => {
@@ -1666,9 +1666,9 @@ class CommitsView {
 			this.pullBtnElem.title = this.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue);
 			this.pushBtnElem.title = this.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort);
 		} else {
-			this.pullBtnElem.title = 'Pull Current Branch';
+			this.pullBtnElem.title = 'Pull Current Branch (Right-Click for More Actions)';
 			this.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
-			this.pushBtnElem.title = 'Push Current Branch';
+			this.pushBtnElem.title = 'Push Current Branch (Right-Click for More Actions)';
 			this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
 		}
 		this.renderRepoInProgressBanner();
@@ -3362,7 +3362,35 @@ class CommitsView {
 		return this.gitRemotes.includes(branchConfig.remote) ? branchConfig.remote : null;
 	}
 
+	private runPullCurrentBranchAction(remote: string, createNewCommit: boolean, squash: boolean) {
+		runAction({
+			command: 'pullBranch',
+			repo: this.currentRepo,
+			branchName: this.gitBranchHead!,
+			remote: remote,
+			createNewCommit: createNewCommit,
+			squash: squash
+		}, 'Pulling Branch');
+	}
+
 	private pullCurrentBranchAction() {
+		if (this.gitRepoInProgressState !== null) {
+			this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Continue);
+			return;
+		}
+		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD') {
+			showErrorMessage('Unable to pull because there is no checked out local branch.');
+			return;
+		}
+		const remote = this.getCurrentPullRemote();
+		if (remote === null) {
+			showErrorMessage('Unable to pull because the current branch has no configured remote.');
+			return;
+		}
+		this.runPullCurrentBranchAction(remote, false, false);
+	}
+
+	private showPullCurrentBranchDialog() {
 		if (this.gitRepoInProgressState !== null) {
 			this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Continue);
 			return;
@@ -3380,11 +3408,56 @@ class CommitsView {
 			{ type: DialogInputType.Checkbox, name: 'Create a new commit even if fast-forward is possible', value: this.config.dialogDefaults.pullBranch.noFastForward },
 			{ type: DialogInputType.Checkbox, name: 'Squash Commits', value: this.config.dialogDefaults.pullBranch.squash, info: 'Create a single commit on the current branch whose effect is the same as merging this remote branch.' }
 		], 'Yes, pull', (values) => {
-			runAction({ command: 'pullBranch', repo: this.currentRepo, branchName: this.gitBranchHead!, remote: remote, createNewCommit: <boolean>values[0], squash: <boolean>values[1] }, 'Pulling Branch');
+			this.runPullCurrentBranchAction(remote, <boolean>values[0], <boolean>values[1]);
 		}, null);
 	}
 
-	private pushCurrentBranchAction(mode: GG.GitPushBranchMode = GG.GitPushBranchMode.Normal) {
+	private getDefaultPushRemotes(branchName: string) {
+		return [this.getPushRemote(branchName)];
+	}
+
+	private shouldSetUpstreamForPush(branchName: string) {
+		if (this.gitConfig === null || typeof this.gitConfig.branches[branchName] === 'undefined') return true;
+		const branchConfig = this.gitConfig.branches[branchName];
+		return branchConfig.remote === null;
+	}
+
+	private willPushUpdateBranchConfig(branchName: string, remotes: string[], setUpstream: boolean) {
+		return setUpstream && remotes.length > 0 && (this.gitConfig === null || typeof this.gitConfig.branches[branchName] === 'undefined' || this.gitConfig.branches[branchName].remote !== remotes[remotes.length - 1]);
+	}
+
+	private runPushCurrentBranchAction(branchName: string, remotes: string[], setUpstream: boolean, mode: GG.GitPushBranchMode) {
+		runAction({
+			command: 'pushBranch',
+			repo: this.currentRepo,
+			branchName: branchName,
+			remotes: remotes,
+			setUpstream: setUpstream,
+			mode: mode,
+			willUpdateBranchConfig: this.willPushUpdateBranchConfig(branchName, remotes, setUpstream)
+		}, 'Pushing Branch');
+	}
+
+	private pushCurrentBranchAction() {
+		if (this.gitRepoInProgressState !== null) {
+			this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Abort);
+			return;
+		}
+		if (this.gitBranchHead === null || this.gitBranchHead === 'HEAD') {
+			showErrorMessage('Unable to push because there is no checked out local branch.');
+			return;
+		}
+		if (this.gitRemotes.length === 0) {
+			showErrorMessage('Unable to push because this repository has no remotes.');
+			return;
+		}
+		const branchName = this.gitBranchHead;
+		const remotes = this.getDefaultPushRemotes(branchName);
+		const setUpstream = this.shouldSetUpstreamForPush(branchName);
+		this.runPushCurrentBranchAction(branchName, remotes, setUpstream, GG.GitPushBranchMode.Normal);
+	}
+
+	private showPushCurrentBranchDialog(defaultMode: GG.GitPushBranchMode = GG.GitPushBranchMode.Normal) {
 		if (this.gitRepoInProgressState !== null) {
 			this.executeRepoInProgressAction(GG.GitRepoInProgressAction.Abort);
 			return;
@@ -3399,32 +3472,35 @@ class CommitsView {
 		}
 		const branchName = this.gitBranchHead;
 		const multipleRemotes = this.gitRemotes.length > 1;
+		const defaultRemotes = this.getDefaultPushRemotes(branchName);
 		const inputs: DialogInput[] = [
-			{ type: DialogInputType.Checkbox, name: 'Set Upstream', value: true }
+			{ type: DialogInputType.Checkbox, name: 'Set Upstream', value: this.shouldSetUpstreamForPush(branchName) },
+			{
+				type: DialogInputType.Radio,
+				name: 'Push Mode',
+				options: [
+					{ name: 'Normal', value: GG.GitPushBranchMode.Normal },
+					{ name: 'Force With Lease', value: GG.GitPushBranchMode.ForceWithLease },
+					{ name: 'Force', value: GG.GitPushBranchMode.Force }
+				],
+				default: defaultMode
+			}
 		];
 
 		if (multipleRemotes) {
 			inputs.unshift({
 				type: DialogInputType.Select,
 				name: 'Push to Remote(s)',
-				defaults: [this.getPushRemote(branchName)],
+				defaults: defaultRemotes,
 				options: this.gitRemotes.map((remote) => ({ name: remote, value: remote })),
 				multiple: true
 			});
 		}
 
 		dialog.showForm('Are you sure you want to push the branch <b><i>' + escapeHtml(branchName) + '</i></b>' + (multipleRemotes ? '' : ' to the remote <b><i>' + escapeHtml(this.gitRemotes[0]) + '</i></b>') + '?', inputs, 'Yes, push', (values) => {
-			const remotes = multipleRemotes ? <string[]>values.shift() : [this.gitRemotes[0]];
+			const remotes = multipleRemotes ? <string[]>values.shift() : defaultRemotes;
 			const setUpstream = <boolean>values[0];
-			runAction({
-				command: 'pushBranch',
-				repo: this.currentRepo,
-				branchName: branchName,
-				remotes: remotes,
-				setUpstream: setUpstream,
-				mode: mode,
-				willUpdateBranchConfig: setUpstream && remotes.length > 0 && (this.gitConfig === null || typeof this.gitConfig.branches[branchName] === 'undefined' || this.gitConfig.branches[branchName].remote !== remotes[remotes.length - 1])
-			}, 'Pushing Branch');
+			this.runPushCurrentBranchAction(branchName, remotes, setUpstream, <GG.GitPushBranchMode>values[1]);
 		}, null);
 	}
 
@@ -3441,19 +3517,9 @@ class CommitsView {
 		}
 		contextMenu.show([[
 			{
-				title: 'Push',
+				title: 'Push Advanced...',
 				visible: true,
-				onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Normal)
-			},
-			{
-				title: 'Push Force With Lease',
-				visible: true,
-				onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.ForceWithLease)
-			},
-			{
-				title: 'Push Force',
-				visible: true,
-				onClick: () => this.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
+				onClick: () => this.showPushCurrentBranchDialog()
 			}
 		]], false, null, event, this.viewElem);
 	}
@@ -3472,14 +3538,14 @@ class CommitsView {
 		const fetchTitle = 'Fetch' + (this.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)';
 		contextMenu.show([[
 			{
-				title: 'Pull Current Branch',
-				visible: true,
-				onClick: () => this.pullCurrentBranchAction()
-			},
-			{
 				title: fetchTitle,
 				visible: true,
 				onClick: () => this.fetchFromRemotesAction()
+			},
+			{
+				title: 'Pull Advanced...',
+				visible: true,
+				onClick: () => this.showPullCurrentBranchDialog()
 			}
 		]], false, null, event, this.viewElem);
 	}

@@ -14,14 +14,14 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 			id: 'pullBtn',
 			elem: view.pullBtnElem,
 			visible: repoInProgress || pullPushVisible,
-			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue) : 'Pull Current Branch',
+			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue) : 'Pull Current Branch (Right-Click for More Actions)',
 			onClick: () => view.pullCurrentBranchAction()
 		},
 		{
 			id: 'pushBtn',
 			elem: view.pushBtnElem,
 			visible: repoInProgress || pullPushVisible,
-			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push Current Branch',
+			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push Current Branch (Right-Click for More Actions)',
 			onClick: () => view.pushCurrentBranchAction()
 		},
 		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => view.settingsBtnElem.click() }
@@ -48,14 +48,14 @@ function commitsShowOverflowActions(view: any, event: MouseEvent) {
 			} else {
 				actions.push([
 					{
-						title: 'Pull Current Branch',
-						visible: true,
-						onClick: () => view.pullCurrentBranchAction()
-					},
-					{
 						title: 'Fetch' + (view.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)',
 						visible: true,
 						onClick: () => view.fetchFromRemotesAction()
+					},
+					{
+						title: 'Pull Advanced...',
+						visible: true,
+						onClick: () => view.showPullCurrentBranchDialog()
 					}
 				]);
 			}
@@ -71,19 +71,9 @@ function commitsShowOverflowActions(view: any, event: MouseEvent) {
 			} else {
 				actions.push([
 					{
-						title: 'Push',
+						title: 'Push Advanced...',
 						visible: true,
-						onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.Normal)
-					},
-					{
-						title: 'Push Force With Lease',
-						visible: true,
-						onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.ForceWithLease)
-					},
-					{
-						title: 'Push Force',
-						visible: true,
-						onClick: () => view.pushCurrentBranchAction(GG.GitPushBranchMode.Force)
+						onClick: () => view.showPushCurrentBranchDialog()
 					}
 				]);
 			}

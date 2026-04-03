@@ -35,77 +35,37 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 	];
 }
 
+function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButton): ContextMenuAction[] {
+	if (button.id === 'pullBtn') {
+		if (view.gitRepoInProgressState !== null) {
+			return [{ title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue), visible: true, onClick: () => view.pullCurrentBranchAction() }];
+		} else {
+			return [
+				{ title: 'Fetch' + (view.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)', visible: true, onClick: () => view.fetchFromRemotesAction() },
+				{ title: 'Pull Advanced...', visible: true, onClick: () => view.showPullCurrentBranchDialog() }
+			];
+		}
+	} else if (button.id === 'pushBtn') {
+		if (view.gitRepoInProgressState !== null) {
+			return [{ title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort), visible: true, onClick: () => view.pushCurrentBranchAction() }];
+		} else {
+			return [{ title: 'Push Advanced...', visible: true, onClick: () => view.showPushCurrentBranchDialog() }];
+		}
+	} else if (button.id === 'settingsBtn') {
+		return [
+			{ title: 'Repository Settings', visible: true, onClick: () => view.settingsWidget.show(view.currentRepo) },
+			{ title: 'Refresh', visible: true, onClick: () => view.refresh(true, true) }
+		];
+	} else {
+		return [{ title: button.title, visible: true, onClick: button.onClick }];
+	}
+}
+
 function commitsShowOverflowActions(view: any, event: MouseEvent) {
 	handledEvent(event);
 	const hiddenButtons = commitsGetTopBarButtons(view).filter((button) => button.visible && button.elem.classList.contains('overflowHidden'));
 	if (hiddenButtons.length === 0) return;
-
-	const actions: ContextMenuAction[][] = [];
-	for (let i = 0; i < hiddenButtons.length; i++) {
-		const button = hiddenButtons[i];
-		if (button.id === 'pullBtn') {
-			if (view.gitRepoInProgressState !== null) {
-				actions.push([
-					{
-						title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue),
-						visible: true,
-						onClick: () => view.pullCurrentBranchAction()
-					}
-				]);
-			} else {
-				actions.push([
-					{
-						title: 'Fetch' + (view.config.fetchAndPrune ? ' & Prune' : '') + ' from Remote(s)',
-						visible: true,
-						onClick: () => view.fetchFromRemotesAction()
-					},
-					{
-						title: 'Pull Advanced...',
-						visible: true,
-						onClick: () => view.showPullCurrentBranchDialog()
-					}
-				]);
-			}
-		} else if (button.id === 'pushBtn') {
-			if (view.gitRepoInProgressState !== null) {
-				actions.push([
-					{
-						title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort),
-						visible: true,
-						onClick: () => view.pushCurrentBranchAction()
-					}
-				]);
-			} else {
-				actions.push([
-					{
-						title: 'Push Advanced...',
-						visible: true,
-						onClick: () => view.showPushCurrentBranchDialog()
-					}
-				]);
-			}
-		} else if (button.id === 'settingsBtn') {
-			actions.push([
-				{
-					title: 'Repository Settings',
-					visible: true,
-					onClick: () => view.settingsWidget.show(view.currentRepo)
-				},
-				{
-					title: 'Refresh',
-					visible: true,
-					onClick: () => view.refresh(true, true)
-				}
-			]);
-		} else {
-			actions.push([{
-				title: button.title,
-				visible: true,
-				onClick: button.onClick
-			}]);
-		}
-	}
-
+	const actions: ContextMenuAction[][] = hiddenButtons.map((button) => commitsGetOverflowActionForButton(view, button));
 	contextMenu.show(actions, false, null, event, view.viewElem);
 }
 

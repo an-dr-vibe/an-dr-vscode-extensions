@@ -14,42 +14,37 @@ function abbrevCommit(commitHash: string) {
 	return commitHash.substring(0, 8);
 }
 
+function resolveAmbiguousRepoNames(distinctNames: string[], paths: string[], firstSep: number[], indexes: number[]) {
+	let firstOccurrence: { [name: string]: number } = {}, ambiguous: { [name: string]: number[] } = {};
+	for (let i = 0; i < indexes.length; i++) {
+		let name = distinctNames[indexes[i]];
+		if (typeof firstOccurrence[name] === 'number') {
+			if (typeof ambiguous[name] === 'undefined') ambiguous[name] = [firstOccurrence[name]];
+			ambiguous[name].push(indexes[i]);
+		} else {
+			firstOccurrence[name] = indexes[i];
+		}
+	}
+	let ambiguousNames = Object.keys(ambiguous);
+	for (let i = 0; i < ambiguousNames.length; i++) {
+		let ambiguousIndexes = ambiguous[ambiguousNames[i]], retestIndexes = [];
+		for (let j = 0; j < ambiguousIndexes.length; j++) {
+			let ambiguousIndex = ambiguousIndexes[j];
+			let nextSep = paths[ambiguousIndex].lastIndexOf('/', paths[ambiguousIndex].length - distinctNames[ambiguousIndex].length - 2);
+			if (firstSep[ambiguousIndex] < nextSep) {
+				distinctNames[ambiguousIndex] = paths[ambiguousIndex].substring(nextSep + 1);
+				retestIndexes.push(ambiguousIndex);
+			} else {
+				distinctNames[ambiguousIndex] = paths[ambiguousIndex];
+			}
+		}
+		if (retestIndexes.length > 1) resolveAmbiguousRepoNames(distinctNames, paths, firstSep, retestIndexes);
+	}
+}
+
 function getRepoDropdownOptions(repos: Readonly<GG.GitRepoSet>) {
 	const repoPaths = getSortedRepositoryPaths(repos, initialState.config.repoDropdownOrder);
 	const paths: string[] = [], names: string[] = [], distinctNames: string[] = [], firstSep: number[] = [];
-	const resolveAmbiguous = (indexes: number[]) => {
-		let firstOccurrence: { [name: string]: number } = {}, ambiguous: { [name: string]: number[] } = {};
-		for (let i = 0; i < indexes.length; i++) {
-			let name = distinctNames[indexes[i]];
-			if (typeof firstOccurrence[name] === 'number') {
-				if (typeof ambiguous[name] === 'undefined') {
-					ambiguous[name] = [firstOccurrence[name]];
-				}
-				ambiguous[name].push(indexes[i]);
-			} else {
-				firstOccurrence[name] = indexes[i];
-			}
-		}
-
-		let ambiguousNames = Object.keys(ambiguous);
-		for (let i = 0; i < ambiguousNames.length; i++) {
-			let ambiguousIndexes = ambiguous[ambiguousNames[i]], retestIndexes = [];
-			for (let j = 0; j < ambiguousIndexes.length; j++) {
-				let ambiguousIndex = ambiguousIndexes[j];
-				let nextSep = paths[ambiguousIndex].lastIndexOf('/', paths[ambiguousIndex].length - distinctNames[ambiguousIndex].length - 2);
-				if (firstSep[ambiguousIndex] < nextSep) {
-					distinctNames[ambiguousIndex] = paths[ambiguousIndex].substring(nextSep + 1);
-					retestIndexes.push(ambiguousIndex);
-				} else {
-					distinctNames[ambiguousIndex] = paths[ambiguousIndex];
-				}
-			}
-			if (retestIndexes.length > 1) {
-				resolveAmbiguous(retestIndexes);
-			}
-		}
-	};
-
 	const indexes = [];
 	for (let i = 0; i < repoPaths.length; i++) {
 		firstSep.push(repoPaths[i].indexOf('/'));
@@ -70,8 +65,7 @@ function getRepoDropdownOptions(repos: Readonly<GG.GitRepoSet>) {
 			indexes.push(i);
 		}
 	}
-	resolveAmbiguous(indexes);
-
+	resolveAmbiguousRepoNames(distinctNames, paths, firstSep, indexes);
 	const options: DropdownOption[] = [];
 	for (let i = 0; i < repoPaths.length; i++) {
 		let hint;

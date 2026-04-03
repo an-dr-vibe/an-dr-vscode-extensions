@@ -1,677 +1,8 @@
-// Refactor note: This compatibility source intentionally preserves original contracts while grouped exports are exposed via `src/types/*`.
-/* Git Interfaces / Types */
-
-export interface GitCommit {
-	readonly hash: string;
-	readonly parents: ReadonlyArray<string>;
-	readonly author: string;
-	readonly email: string;
-	readonly date: number;
-	readonly message: string;
-	readonly heads: ReadonlyArray<string>;
-	readonly tags: ReadonlyArray<GitCommitTag>;
-	readonly remotes: ReadonlyArray<GitCommitRemote>;
-	readonly stash: GitCommitStash | null; // null => not a stash, otherwise => stash info
-}
-
-export interface GitCommitTag {
-	readonly name: string;
-	readonly annotated: boolean;
-}
-
-export interface GitCommitRemote {
-	readonly name: string;
-	readonly remote: string | null; // null => remote not found, otherwise => remote name
-}
-
-export interface GitCommitStash {
-	readonly selector: string;
-	readonly baseHash: string;
-	readonly untrackedFilesHash: string | null;
-}
-
-export interface GitCommitDetails {
-	readonly hash: string;
-	readonly parents: ReadonlyArray<string>;
-	readonly author: string;
-	readonly authorEmail: string;
-	readonly authorDate: number;
-	readonly committer: string;
-	readonly committerEmail: string;
-	readonly committerDate: number;
-	readonly signature: GitSignature | null;
-	readonly body: string;
-	readonly fileChanges: ReadonlyArray<GitFileChange>;
-}
-
-export const enum GitSignatureStatus {
-	GoodAndValid = 'G',
-	GoodWithUnknownValidity = 'U',
-	GoodButExpired = 'X',
-	GoodButMadeByExpiredKey = 'Y',
-	GoodButMadeByRevokedKey = 'R',
-	CannotBeChecked = 'E',
-	Bad = 'B'
-}
-
-export interface GitSignature {
-	readonly key: string;
-	readonly signer: string;
-	readonly status: GitSignatureStatus;
-}
-
-export const enum GitConfigLocation {
-	Local = 'local',
-	Global = 'global',
-	System = 'system'
-}
-
-export interface GitFileChange {
-	readonly oldFilePath: string;
-	readonly newFilePath: string;
-	readonly type: GitFileStatus;
-	readonly additions: number | null;
-	readonly deletions: number | null;
-}
-
-export const enum GitFileStatus {
-	Added = 'A',
-	Modified = 'M',
-	Deleted = 'D',
-	Renamed = 'R',
-	Untracked = 'U'
-}
-
-export const enum GitPushBranchMode {
-	Normal = '',
-	Force = 'force',
-	ForceWithLease = 'force-with-lease'
-}
-
-export interface GitRepoConfig {
-	readonly branches: GitRepoConfigBranches;
-	readonly diffTool: string | null;
-	readonly guiDiffTool: string | null;
-	readonly pushDefault: string | null;
-	readonly remotes: ReadonlyArray<GitRepoSettingsRemote>;
-	readonly user: {
-		readonly name: {
-			readonly local: string | null,
-			readonly global: string | null
-		},
-		readonly email: {
-			readonly local: string | null,
-			readonly global: string | null
-		}
-	};
-}
-
-export type GitRepoConfigBranches = { [branchName: string]: GitRepoConfigBranch };
-
-export interface GitRepoConfigBranch {
-	readonly pushRemote: string | null;
-	readonly remote: string | null;
-}
-
-export interface GitRepoSettingsRemote {
-	readonly name: string;
-	readonly url: string | null;
-	readonly pushUrl: string | null;
-}
-
-export const enum GitResetMode {
-	Soft = 'soft',
-	Mixed = 'mixed',
-	Hard = 'hard'
-}
-
-export interface GitStash {
-	readonly hash: string;
-	readonly baseHash: string;
-	readonly untrackedFilesHash: string | null;
-	readonly selector: string;
-	readonly author: string;
-	readonly email: string;
-	readonly date: number;
-	readonly message: string;
-}
-
-export interface GitTagDetails {
-	readonly hash: string;
-	readonly taggerName: string;
-	readonly taggerEmail: string;
-	readonly taggerDate: number;
-	readonly message: string;
-	readonly signature: GitSignature | null;
-}
-
-
-/* Git Repo State */
-
-export interface CodeReview {
-	id: string;
-	lastActive: number;
-	lastViewedFile: string | null;
-	remainingFiles: string[];
-}
-
-export type ColumnWidth = number;
-
-export type GitRepoSet = { [repo: string]: GitRepoState };
-
-export interface IssueLinkingConfig {
-	readonly issue: string;
-	readonly url: string;
-}
-
-export interface PullRequestConfigBase {
-	readonly hostRootUrl: string;
-	readonly sourceRemote: string;
-	readonly sourceOwner: string;
-	readonly sourceRepo: string;
-	readonly destRemote: string | null;
-	readonly destOwner: string;
-	readonly destRepo: string;
-	readonly destProjectId: string; // Only used by GitLab
-	readonly destBranch: string;
-}
-
-export const enum PullRequestProvider {
-	Bitbucket,
-	Custom,
-	GitHub,
-	GitLab
-}
-
-interface PullRequestConfigBuiltIn extends PullRequestConfigBase {
-	readonly provider: Exclude<PullRequestProvider, PullRequestProvider.Custom>;
-	readonly custom: null;
-}
-
-interface PullRequestConfigCustom extends PullRequestConfigBase {
-	readonly provider: PullRequestProvider.Custom;
-	readonly custom: {
-		readonly name: string,
-		readonly templateUrl: string
-	};
-}
-
-export type PullRequestConfig = PullRequestConfigBuiltIn | PullRequestConfigCustom;
-
-export interface GitRepoState {
-	cdvDivider: number;
-	cdvHeight: number;
-	cdvTopRowRatio: number;
-	fullDiffCompact: boolean;
-	fullDiffPanelHeight: number;
-	columnWidths: ColumnWidth[] | null;
-	commitOrdering: RepoCommitOrdering;
-	fileViewType: FileViewType;
-	hideRemotes: string[];
-	includeCommitsMentionedByReflogs: BooleanOverride;
-	issueLinkingConfig: IssueLinkingConfig | null;
-	lastImportAt: number;
-	name: string | null;
-	onlyFollowFirstParent: BooleanOverride;
-	onRepoLoadShowCheckedOutBranch: BooleanOverride;
-	onRepoLoadShowSpecificBranches: string[] | null;
-	pullRequestConfig: PullRequestConfig | null;
-	showRemoteBranches: boolean;
-	showRemoteBranchesV2: BooleanOverride;
-	showStashes: BooleanOverride;
-	showTags: BooleanOverride;
-	workspaceFolderIndex: number | null;
-}
-
-export interface CommitsBranchPanelState {
-	readonly filterValue: string;
-	readonly localCollapsed: boolean;
-	readonly remoteCollapsed: boolean;
-	readonly tagsCollapsed: boolean;
-	readonly folderCollapsed: { readonly [path: string]: boolean };
-	readonly sidebarWidth: number;
-	readonly sidebarHidden: boolean;
-	readonly scrollTop: number;
-}
-
-
-/* Commits View Types */
-
-export interface CommitsViewInitialState {
-	readonly config: CommitsViewConfig;
-	readonly lastActiveRepo: string | null;
-	readonly loadViewTo: LoadCommitsViewTo;
-	readonly repos: GitRepoSet;
-	readonly loadRepoInfoRefreshId: number;
-	readonly loadCommitsRefreshId: number;
-}
-
-export const enum GitRepoInProgressStateType {
-	Rebase = 'rebase',
-	Merge = 'merge',
-	CherryPick = 'cherry-pick',
-	Revert = 'revert'
-}
-
-export interface GitRepoInProgressState {
-	readonly type: GitRepoInProgressStateType;
-	readonly rebaseProgress: {
-		readonly current: number;
-		readonly total: number;
-	} | null;
-	readonly rebaseContext: {
-		readonly branch: string | null;
-		readonly onto: string | null;
-	} | null;
-	readonly rebaseCommitStates: ReadonlyArray<{
-		readonly hash: string;
-		readonly kind: 'todo' | 'done' | 'in-progress';
-		readonly offset: number;
-	}> | null;
-	readonly workingTreeStatus: {
-		readonly changed: number;
-		readonly staged: number;
-		readonly conflicts: number;
-		readonly untracked: number;
-	} | null;
-	readonly subject: string | null;
-}
-
-export interface CommitsViewConfig {
-	readonly avatarMode: AuthorAvatarMode;
-	readonly avatarSize: AuthorAvatarSize;
-	readonly avatarShape: AuthorAvatarShape;
-	readonly committedVisual: CommittedVisualMode;
-	readonly branchPanel: BranchPanelConfig;
-	readonly commitDetailsView: CommitDetailsViewConfig;
-	readonly commitOrdering: CommitOrdering;
-	readonly commitsColumnVisibility: CommitsColumnVisibility;
-	readonly contextMenuActionsVisibility: ContextMenuActionsVisibility;
-	readonly customBranchGlobPatterns: ReadonlyArray<CustomBranchGlobPattern>;
-	readonly customEmojiShortcodeMappings: ReadonlyArray<CustomEmojiShortcodeMapping>;
-	readonly customPullRequestProviders: ReadonlyArray<CustomPullRequestProvider>;
-	readonly dateFormat: DateFormat;
-	readonly dialogDefaults: DialogDefaults;
-	readonly enhancedAccessibility: boolean;
-	readonly fetchAndPrune: boolean;
-	readonly fetchAndPruneTags: boolean;
-	readonly fetchAvatars: boolean;
-	readonly graph: GraphConfig;
-	readonly includeCommitsMentionedByReflogs: boolean;
-	readonly initialLoadCommits: number;
-	readonly keybindings: KeybindingConfig
-	readonly loadMoreCommits: number;
-	readonly loadMoreCommitsAutomatically: boolean;
-	readonly markdown: boolean;
-	readonly mute: MuteCommitsConfig;
-	readonly onlyFollowFirstParent: boolean;
-	readonly onRepoLoad: OnRepoLoadConfig;
-	readonly referenceLabels: ReferenceLabelsConfig;
-	readonly repoDropdownOrder: RepoDropdownOrder;
-	readonly showRemoteBranches: boolean;
-	readonly showStashes: boolean;
-	readonly showTags: boolean;
-}
-
-export interface CommitsViewGlobalState {
-	alwaysAcceptCheckoutCommit: boolean;
-	fullDiffViewMode: 'unified' | 'sideBySide';
-	issueLinkingConfig: IssueLinkingConfig | null;
-	pushTagSkipRemoteCheck: boolean;
-}
-
-export interface CommitsViewWorkspaceState {
-	findIsCaseSensitive: boolean;
-	findIsRegex: boolean;
-	findOpenCommitDetailsView: boolean;
-}
-
-export interface CommitDetailsViewConfig {
-	readonly autoCenter: boolean;
-	readonly fileTreeCompactFolders: boolean;
-	readonly fileViewType: FileViewType;
-	readonly location: CommitDetailsViewLocation;
-}
-
-export interface BranchPanelConfig {
-	readonly flattenSingleChildGroups: boolean;
-	readonly groupsFirst: boolean;
-	readonly showLocalBranchUpstream: boolean;
-}
-
-export interface GraphConfig {
-	readonly colours: ReadonlyArray<string>;
-	readonly style: GraphStyle;
-	readonly grid: { x: number, y: number, offsetX: number, offsetY: number, expandY: number };
-	readonly uncommittedChanges: GraphUncommittedChangesStyle;
-}
-
-export interface KeybindingConfig {
-	readonly find: string | null;
-	readonly refresh: string | null;
-	readonly scrollToHead: string | null;
-	readonly scrollToStash: string | null;
-}
-
-export type LoadCommitsViewTo = {
-	readonly repo: string,
-	readonly selectedBranches?: string[] | null,
-	readonly selectedTags?: string[],
-	readonly scrollTop?: number,
-	readonly branchPanelState?: CommitsBranchPanelState,
-	readonly commitDetails?: {
-		readonly commitHash: string,
-		readonly compareWithHash: string | null
-	},
-	readonly runCommandOnLoad?: 'fetch'
-} | null;
-
-export interface MuteCommitsConfig {
-	readonly commitsNotAncestorsOfHead: boolean;
-	readonly mergeCommits: boolean;
-}
-
-export interface OnRepoLoadConfig {
-	readonly scrollToHead: boolean;
-	readonly showCheckedOutBranch: boolean;
-	readonly showSpecificBranches: ReadonlyArray<string>;
-}
-
-export interface ReferenceLabelsConfig {
-	readonly branchLabelsAlignedToGraph: boolean;
-	readonly combineLocalAndRemoteBranchLabels: boolean;
-	readonly tagLabelsOnRight: boolean;
-}
-
-
-/* Extension Settings Types */
-
-export const enum BooleanOverride {
-	Default,
-	Enabled,
-	Disabled
-}
-
-export const enum CommitDetailsViewLocation {
-	Inline,
-	DockedToBottom
-}
-
-export const enum CommitOrdering {
-	Date = 'date',
-	AuthorDate = 'author-date',
-	Topological = 'topo'
-}
-
-export const enum AuthorAvatarMode {
-	Auto = 'auto',
-	FetchedOnly = 'fetched-only',
-	ProceduralPattern = 'procedural-pattern',
-	Disabled = 'disabled'
-}
-
-export const enum AuthorAvatarShape {
-	Circle = 'circle',
-	Square = 'square'
-}
-
-export const enum AuthorAvatarSize {
-	Normal = 'normal',
-	Small = 'small'
-}
-
-export const enum CommittedVisualMode {
-	Avatar = 'avatar',
-	Initials = 'initials'
-}
-
-export interface ContextMenuActionsVisibility {
-	readonly branch: {
-		readonly checkout: boolean;
-		readonly rename: boolean;
-		readonly delete: boolean;
-		readonly merge: boolean;
-		readonly rebase: boolean;
-		readonly push: boolean;
-		readonly viewIssue: boolean;
-		readonly createPullRequest: boolean;
-		readonly createArchive: boolean;
-		readonly selectInBranchesDropdown: boolean;
-		readonly unselectInBranchesDropdown: boolean;
-		readonly copyName: boolean;
-	};
-	readonly commit: {
-		readonly addTag: boolean;
-		readonly createBranch: boolean;
-		readonly checkout: boolean;
-		readonly cherrypick: boolean;
-		readonly revert: boolean;
-		readonly drop: boolean;
-		readonly merge: boolean;
-		readonly rebase: boolean;
-		readonly reset: boolean;
-		readonly copyHash: boolean;
-		readonly copySubject: boolean;
-	};
-	readonly commitDetailsViewFile: {
-		readonly viewDiff: boolean;
-		readonly viewFileAtThisRevision: boolean;
-		readonly viewDiffWithWorkingFile: boolean;
-		readonly openFile: boolean;
-		readonly markAsReviewed: boolean;
-		readonly markAsNotReviewed: boolean;
-		readonly resetFileToThisRevision: boolean;
-		readonly copyAbsoluteFilePath: boolean;
-		readonly copyRelativeFilePath: boolean;
-	};
-	readonly remoteBranch: {
-		readonly checkout: boolean;
-		readonly delete: boolean;
-		readonly fetch: boolean;
-		readonly merge: boolean;
-		readonly pull: boolean;
-		readonly viewIssue: boolean;
-		readonly createPullRequest: boolean;
-		readonly createArchive: boolean;
-		readonly selectInBranchesDropdown: boolean;
-		readonly unselectInBranchesDropdown: boolean;
-		readonly copyName: boolean;
-	};
-	readonly stash: {
-		readonly apply: boolean;
-		readonly createBranch: boolean;
-		readonly pop: boolean;
-		readonly drop: boolean;
-		readonly copyName: boolean;
-		readonly copyHash: boolean;
-	};
-	readonly tag: {
-		readonly viewDetails: boolean;
-		readonly delete: boolean;
-		readonly push: boolean;
-		readonly createArchive: boolean;
-		readonly copyName: boolean;
-	};
-	readonly uncommittedChanges: {
-		readonly stash: boolean;
-		readonly reset: boolean;
-		readonly clean: boolean;
-		readonly openSourceControlView: boolean;
-	};
-}
-
-export interface CustomBranchGlobPattern {
-	readonly name: string;
-	readonly glob: string;
-}
-
-export interface CustomEmojiShortcodeMapping {
-	readonly shortcode: string;
-	readonly emoji: string;
-}
-
-export interface CustomPullRequestProvider {
-	readonly name: string;
-	readonly templateUrl: string;
-}
-
-export interface DateFormat {
-	readonly type: DateFormatType;
-	readonly iso: boolean;
-}
-
-export interface CommitsColumnVisibility {
-	readonly committed: boolean;
-	readonly id: boolean;
-}
-
-export const enum DateFormatType {
-	DateAndTime,
-	DateOnly,
-	Relative
-}
-
-export interface DialogDefaults {
-	readonly addTag: {
-		readonly pushToRemote: boolean,
-		readonly type: TagType
-	};
-	readonly applyStash: {
-		readonly reinstateIndex: boolean
-	};
-	readonly cherryPick: {
-		readonly noCommit: boolean,
-		readonly recordOrigin: boolean
-	};
-	readonly createBranch: {
-		readonly checkout: boolean
-	};
-	readonly deleteBranch: {
-		readonly forceDelete: boolean
-	};
-	readonly fetchIntoLocalBranch: {
-		readonly forceFetch: boolean
-	};
-	readonly fetchRemote: {
-		readonly prune: boolean,
-		readonly pruneTags: boolean
-	};
-	readonly general: {
-		readonly referenceInputSpaceSubstitution: string | null
-	};
-	readonly merge: {
-		readonly noCommit: boolean,
-		readonly noFastForward: boolean,
-		readonly squash: boolean
-	};
-	readonly popStash: {
-		readonly reinstateIndex: boolean
-	};
-	readonly pullBranch: {
-		readonly noFastForward: boolean,
-		readonly squash: boolean
-	};
-	readonly rebase: {
-		readonly ignoreDate: boolean,
-		readonly interactive: boolean
-	};
-	readonly repoInProgress: {
-		readonly confirmAbort: boolean
-	};
-	readonly resetCommit: {
-		readonly mode: GitResetMode
-	};
-	readonly resetUncommitted: {
-		readonly mode: Exclude<GitResetMode, GitResetMode.Soft>
-	};
-	readonly stashUncommittedChanges: {
-		readonly includeUntracked: boolean
-	};
-}
-
-export const enum FileViewType {
-	Default,
-	Tree,
-	List
-}
-
-export const enum GraphStyle {
-	Rounded,
-	Angular
-}
-
-export const enum GraphUncommittedChangesStyle {
-	OpenCircleAtTheUncommittedChanges,
-	OpenCircleAtTheCheckedOutCommit
-}
-
-export const enum RefLabelAlignment {
-	Normal,
-	BranchesOnLeftAndTagsOnRight,
-	BranchesAlignedToGraphAndTagsOnRight
-}
-
-export const enum RepoCommitOrdering {
-	Default = 'default',
-	Date = 'date',
-	AuthorDate = 'author-date',
-	Topological = 'topo'
-}
-
-export const enum RepoDropdownOrder {
-	FullPath,
-	Name,
-	WorkspaceFullPath
-}
-
-export const enum LogLevel {
-	Debug,
-	Info,
-	Warning,
-	Error
-}
-
-export const enum SquashMessageFormat {
-	Default,
-	GitSquashMsg
-}
-
-export const enum TabIconColourTheme {
-	Colour,
-	Grey
-}
-
-export const enum TagType {
-	Annotated,
-	Lightweight
-}
-
-
-/* Base Interfaces for Request / Response Messages */
-
-export interface BaseMessage {
-	readonly command: string;
-}
-
-export interface RepoRequest extends BaseMessage {
-	readonly repo: string;
-}
-
-export interface ResponseWithErrorInfo extends BaseMessage {
-	readonly error: ErrorInfo;
-}
-
-export interface ResponseWithMultiErrorInfo extends BaseMessage {
-	readonly errors: ErrorInfo[];
-}
-
-export type ErrorInfo = string | null; // null => no error, otherwise => error message
-
-export const enum ErrorInfoExtensionPrefix {
-	PushTagCommitNotOnRemote = 'VSCODE_GIT_GRAPH:PUSH_TAG:COMMIT_NOT_ON_REMOTE:'
-}
-
-/* Request / Response Messages */
+import { BaseMessage, ErrorInfo, RepoRequest, ResponseWithErrorInfo, ResponseWithMultiErrorInfo, DeepReadonly, DeepWriteable, Writeable } from './base';
+import { GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitResetMode, GitStash, GitTagDetails } from './git-domain';
+import { CodeReview, CommitsBranchPanelState, GitRepoSet, GitRepoState, PullRequestConfig } from './repo-state';
+import { CommitOrdering, CommitsColumnVisibility, TagType } from './settings';
+import { CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoInProgressState, GitRepoInProgressStateType, LoadCommitsViewTo } from './view-state';
 
 export interface RequestAddRemote extends RepoRequest {
 	readonly command: 'addRemote';
@@ -690,7 +21,7 @@ export interface RequestAddTag extends RepoRequest {
 	readonly tagName: string;
 	readonly type: TagType;
 	readonly message: string;
-	readonly pushToRemote: string | null; // string => name of the remote to push the tag to, null => don't push to a remote
+	readonly pushToRemote: string | null;
 	readonly pushSkipRemoteCheck: boolean;
 	readonly force: boolean;
 }
@@ -733,14 +64,14 @@ export interface RequestCheckoutBranch extends RepoRequest {
 		readonly remote: string;
 		readonly createNewCommit: boolean;
 		readonly squash: boolean;
-	} | null; // NULL => Don't pull after checking out
+	} | null;
 }
 export interface ResponseCheckoutBranch extends ResponseWithMultiErrorInfo {
 	readonly command: 'checkoutBranch';
 	readonly pullAfterwards: {
 		readonly branchName: string;
 		readonly remote: string;
-	} | null; // NULL => Don't pull after checking out
+	} | null;
 }
 
 export interface RequestCheckoutCommit extends RepoRequest {
@@ -774,8 +105,8 @@ export interface RequestCommitDetails extends RepoRequest {
 	readonly command: 'commitDetails';
 	readonly commitHash: string;
 	readonly hasParents: boolean;
-	readonly stash: GitCommitStash | null; // null => request is for a commit, otherwise => request is for a stash
-	readonly avatarEmail: string | null; // string => fetch avatar with the given email, null => don't fetch avatar
+	readonly stash: GitCommitStash | null;
+	readonly avatarEmail: string | null;
 	readonly refresh: boolean;
 }
 export interface ResponseCommitDetails extends ResponseWithErrorInfo {
@@ -898,7 +229,7 @@ export interface ResponseDeleteRemoteBranch extends ResponseWithErrorInfo {
 export interface RequestDeleteTag extends RepoRequest {
 	readonly command: 'deleteTag';
 	readonly tagName: string;
-	readonly deleteOnRemote: string | null; // null => don't delete on remote, otherwise => remote to delete on
+	readonly deleteOnRemote: string | null;
 }
 export interface ResponseDeleteTag extends ResponseWithErrorInfo {
 	readonly command: 'deleteTag';
@@ -906,8 +237,8 @@ export interface ResponseDeleteTag extends ResponseWithErrorInfo {
 
 export interface RequestDeleteUserDetails extends RepoRequest {
 	readonly command: 'deleteUserDetails';
-	readonly name: boolean; // TRUE => Delete Name, FALSE => Don't Delete Name
-	readonly email: boolean; // TRUE => Delete Email, FALSE => Don't Delete Email
+	readonly name: boolean;
+	readonly email: boolean;
 	readonly location: GitConfigLocation.Global | GitConfigLocation.Local;
 }
 export interface ResponseDeleteUserDetails extends ResponseWithMultiErrorInfo {
@@ -982,8 +313,8 @@ export interface RequestEditUserDetails extends RepoRequest {
 	readonly name: string;
 	readonly email: string;
 	readonly location: GitConfigLocation.Global | GitConfigLocation.Local;
-	readonly deleteLocalName: boolean; // TRUE => Delete Local Name, FALSE => Don't Delete Local Name
-	readonly deleteLocalEmail: boolean; // TRUE => Delete Local Email, FALSE => Don't Delete Local Email
+	readonly deleteLocalName: boolean;
+	readonly deleteLocalEmail: boolean;
 }
 export interface ResponseEditUserDetails extends ResponseWithMultiErrorInfo {
 	readonly command: 'editUserDetails';
@@ -1003,7 +334,7 @@ export interface ResponseExportRepoConfig extends ResponseWithErrorInfo {
 
 export interface RequestFetch extends RepoRequest {
 	readonly command: 'fetch';
-	readonly name: string | null; // null => Fetch all remotes
+	readonly name: string | null;
 	readonly prune: boolean;
 	readonly pruneTags: boolean;
 }
@@ -1037,7 +368,7 @@ export interface ResponseFetchIntoLocalBranch extends ResponseWithErrorInfo {
 export interface RequestLoadCommits extends RepoRequest {
 	readonly command: 'loadCommits';
 	readonly refreshId: number;
-	readonly branches: ReadonlyArray<string> | null; // null => Show All
+	readonly branches: ReadonlyArray<string> | null;
 	readonly maxCommits: number;
 	readonly showTags: boolean;
 	readonly showRemoteBranches: boolean;
@@ -1645,30 +976,4 @@ export type ResponseMessage =
 	| ResponseViewFileAtRevision
 	| ResponseViewScm;
 
-
-/** Helper Types */
-
-type PrimitiveTypes = string | number | boolean | symbol | bigint | undefined | null;
-
-/**
- * Make all properties in T writeable
- */
-export type Writeable<T> = { -readonly [K in keyof T]: T[K] };
-
-/**
- * Make all properties in T recursively readonly
- */
-export type DeepReadonly<T> = T extends PrimitiveTypes
-	? T
-	: T extends (Array<infer U> | ReadonlyArray<infer U>)
-	? ReadonlyArray<DeepReadonly<U>>
-	: { readonly [K in keyof T]: DeepReadonly<T[K]> };
-
-/**
- * Make all properties in T recursively writeable
- */
-export type DeepWriteable<T> = T extends PrimitiveTypes
-	? T
-	: T extends (Array<infer U> | ReadonlyArray<infer U>)
-	? Array<DeepWriteable<U>>
-	: { -readonly [K in keyof T]: DeepWriteable<T[K]> };
+export { DeepReadonly, DeepWriteable, Writeable };

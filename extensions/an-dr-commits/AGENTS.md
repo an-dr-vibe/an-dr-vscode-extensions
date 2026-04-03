@@ -39,7 +39,7 @@ They communicate **only** via VS Code's webview message API (`postMessage` / `on
 - `src/dataSource.ts`
 - `src/repoManager.ts`
 - `src/commitsView.ts`
-- `src/types/legacy.ts` (compatibility source while grouped exports live in `src/types/*`)
+- `src/types/message-protocol.ts`
 
 ---
 
@@ -91,15 +91,20 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 |---|---|
 | `main.ts` | **Core UI class `CommitsView`** — owns all state, renders commit table + graph, handles all user interactions, sends/receives messages |
 | `branchPanel.ts` | Left sidebar: branch + tag list with checkboxes, folder grouping by `/`, resize handle, hide/show toggle. Class `BranchPanel`. |
-| `graph.ts` | SVG commit graph visualization — `Branch` and `Vertex` classes |
+| `graph.ts` | SVG commit graph controller / rendering orchestration |
+| `aGraphModels.ts` | Graph constants, geometry types, and `Branch` / `Vertex` models |
+| `graphRebase.ts` | Rebase-guide lookup and path helpers for the graph |
 | `dropdown.ts` | Repo selector dropdown (top bar). Class `Dropdown`. |
 | `dialog.ts` | Modal dialogs for Git operations |
+| `customSelect.ts` | Dialog multi/single select widget used by `dialog.ts` |
 | `contextMenu.ts` | Right-click context menus on commits/refs |
 | `findWidget.ts` | Ctrl+F find bar |
 | `settingsWidget.ts` | Repository settings panel |
+| `settingsWidgetDialogs.ts` | Settings widget issue-linking and pull-request dialog flows |
 | `textFormatter.ts` | Commit message formatting (issue links, etc.) |
 | `utils.ts` | Frontend globals: `SVG_ICONS` object, `escapeHtml`, `VSCODE_API`, helpers |
-| `main/*` | Extracted `main.ts` helper modules (committed column, controls layout, file tree rendering, repo-state helpers, misc helpers) |
+| `branchPanelRender.ts` | Branch panel tree building and HTML rendering helpers |
+| `main/*` | Extracted `main.ts` helper modules (committed column, controls layout, quick diff rendering, file tree rendering, full diff panel rendering, repo-state helpers, misc helpers) |
 | `global.d.ts` | Type declarations for globals shared across web files |
 
 ### Styles (`web/styles/`)
@@ -161,7 +166,8 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 | Want to change… | Go to |
 |---|---|
 | Top toolbar button order / overflow | `web/main/controlsLayout.ts` + `src/view/webviewHtml.ts` |
-| Full diff bottom panel rendering | `web/main.ts` (`renderFullDiffContent`, `buildFull*FileView`) + `web/styles/main.css` |
+| Quick diff rendering / switching | `web/main/diffPreview.ts` + `web/styles/main.css` |
+| Full diff bottom panel rendering | `web/main/fullDiffPanel.ts` + `web/styles/main.css` |
 | Git command execution | `src/dataSource.ts` |
 | Branch/tag sidebar UI | `web/branchPanel.ts` + `web/styles/branchPanel.css` |
 | Commit table rendering | `web/main.ts` → `renderTable()` (~line 812) |

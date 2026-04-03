@@ -37,7 +37,9 @@
       "Bash(sort -k6,7)",
       "Bash(grep -n \"interface DropdownOption\\\\|type DropdownOption\\\\|interface DialogSelectInputOption\" ./extensions/an-dr-git/web/*.ts ./extensions/an-dr-git/src/*.ts)",
       "Bash(grep -B 5 -A 5 \"branchData.head = ''HEAD''\\\\|branchData.branches.unshift\\\\\\(''HEAD''\\\\\\)\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/src/data-source/parsers.ts)",
-      "Bash(grep -E \"\\\\.ts$\")"
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(ls /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/tsconfig*.json)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''scripts'''',{}\\)\\)\")"
     ]
   }
 }

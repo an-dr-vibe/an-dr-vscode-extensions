@@ -51,6 +51,12 @@ export async function activate(context: vscode.ExtensionContext) {
 	const diffDocProvider = new DiffDocProvider(dataSource);
 
 	context.subscriptions.push(
+		vscode.window.registerWebviewPanelSerializer(GitGraphView.VIEW_TYPE, {
+			async deserializeWebviewPanel(panel: vscode.WebviewPanel, _state: any) {
+				logger.log('Deserializing Git Graph webview panel...');
+				GitGraphView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
+			}
+		}),
 		vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
 		vscode.window.onDidChangeActiveTextEditor((editor) => {
 			logger.log('VS Code active editor changed: ' + (editor ? editor.document.uri.toString() + ' (column ' + editor.viewColumn + ')' : 'undefined'));

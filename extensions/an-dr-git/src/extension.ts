@@ -23,6 +23,18 @@ import { EventEmitter } from './utils/event';
 export async function activate(context: vscode.ExtensionContext) {
 	const logger = new Logger();
 	logger.log('Starting Git Graph ...');
+	const gitGraphTabViewTypes = new Set([GitGraphView.VIEW_TYPE, 'mainThreadWebview-' + GitGraphView.VIEW_TYPE]);
+	const gitGraphTabLabel = 'an-dr: Git';
+	let orphanCheckTimeout: ReturnType<typeof setTimeout> | null = null;
+	let suppressOrphanChecksUntil = 0;
+
+	const delayOrphanChecks = (reason: string, durationMs: number) => {
+		const nextSuppressionTime = Date.now() + durationMs;
+		if (nextSuppressionTime > suppressOrphanChecksUntil) {
+			suppressOrphanChecksUntil = nextSuppressionTime;
+		}
+		logger.log('Suppressing Git Graph orphan checks for ' + durationMs + 'ms (' + reason + ').');
+	};
 
 	const gitExecutableEmitter = new EventEmitter<GitExecutable>();
 	const onDidChangeGitExecutable = gitExecutableEmitter.subscribe;
@@ -52,8 +64,22 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.window.registerWebviewPanelSerializer(GitGraphView.VIEW_TYPE, {
-			async deserializeWebviewPanel(panel: vscode.WebviewPanel, _state: any) {
-				logger.log('Deserializing Git Graph webview panel...');
+			async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: any) {
+				let stateSummary = 'state unavailable';
+				try {
+					if (state === null || typeof state === 'undefined') {
+						stateSummary = 'state=' + String(state);
+					} else if (typeof state === 'object') {
+						const keys = Object.keys(state);
+						stateSummary = 'stateKeys=' + keys.join(',') + '; jsonLength=' + JSON.stringify(state).length;
+					} else {
+						stateSummary = 'stateType=' + typeof state + '; value=' + String(state);
+					}
+				} catch (error) {
+					stateSummary = 'state summary failed: ' + String(error);
+				}
+				logger.log('Deserializing Git Graph webview panel... ' + stateSummary + '; visible=' + panel.visible + '; active=' + panel.active);
+				delayOrphanChecks('webview serializer restore', 750);
 				GitGraphView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
 			}
 		}),
@@ -104,6 +130,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	const tabGroups = (vscode.window as any).tabGroups;
 	if (tabGroups && typeof tabGroups.onDidChangeTabs === 'function') {
+		const isGitGraphTab = (tab: any) => {
+			const input = tab && tab.input;
+			const viewType = input && typeof input.viewType === 'string' ? input.viewType : '';
+			return gitGraphTabViewTypes.has(viewType) || tab.label === gitGraphTabLabel;
+		};
+
 		const describeTab = (tab: any) => {
 			const input = tab.input;
 			const inputName = input && input.constructor ? input.constructor.name : typeof input;
@@ -123,9 +155,36 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		const doesGitGraphTabExist = () => {
 			return tabGroups.all.some((group: any) => group.tabs.some((tab: any) => {
-				const input = tab.input;
-				return !!input && input.viewType === 'mainThreadWebview-an-dr-git';
+				return isGitGraphTab(tab);
 			}));
+		};
+
+		const cancelPendingOrphanCheck = (reason: string) => {
+			if (orphanCheckTimeout === null) return;
+			clearTimeout(orphanCheckTimeout);
+			orphanCheckTimeout = null;
+			logger.log('Cancelled pending Git Graph orphan check (' + reason + ').');
+		};
+
+		const scheduleOrphanCheck = (reason: string) => {
+			cancelPendingOrphanCheck('rescheduled');
+			orphanCheckTimeout = setTimeout(() => {
+				orphanCheckTimeout = null;
+				if (!GitGraphView.currentPanel) return;
+				const remainingSuppressionMs = suppressOrphanChecksUntil - Date.now();
+				if (remainingSuppressionMs > 0) {
+					logger.log('Deferring Git Graph orphan check for ' + remainingSuppressionMs + 'ms because restore suppression is active.');
+					scheduleOrphanCheck('restore suppression elapsed');
+					return;
+				}
+				if (doesGitGraphTabExist()) {
+					logger.log('Git Graph orphan check found the tab after revalidation, keeping currentPanel.');
+					return;
+				}
+				logger.log('VS Code tab tracking still found no Git Graph tab after revalidation.');
+				GitGraphView.recoverOrphanedPanelIfNeeded(logger);
+			}, 250);
+			logger.log('Scheduled Git Graph orphan check (' + reason + ').');
 		};
 
 		context.subscriptions.push(tabGroups.onDidChangeTabs((event: any) => {
@@ -144,7 +203,9 @@ export async function activate(context: vscode.ExtensionContext) {
 				if (changed) logger.log('VS Code tabs changed payload: ' + changed);
 				if (GitGraphView.currentPanel && !doesGitGraphTabExist()) {
 					logger.log('VS Code tab tracking found no Git Graph tab, but currentPanel still exists.');
-					GitGraphView.recoverOrphanedPanelIfNeeded(logger);
+					scheduleOrphanCheck('tab change missing Git Graph tab');
+				} else if (doesGitGraphTabExist()) {
+					cancelPendingOrphanCheck('Git Graph tab present');
 				}
 			} catch (error) {
 				logger.logError('Unable to summarize VS Code tabs changed event: ' + String(error));

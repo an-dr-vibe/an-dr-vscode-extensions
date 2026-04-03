@@ -180,7 +180,6 @@ class GitGraphView {
 			this.expandedCommit = prevState.expandedCommit;
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
-			this.branchDropdown.setSelectedTags(this.currentTags);
 			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
 			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 			this.branchDropdown.restoreState(prevState.branchPanel);
@@ -4820,18 +4819,49 @@ class GitGraphView {
 
 const contextMenu = new ContextMenu(), dialog = new Dialog(), eventOverlay = new EventOverlay();
 let loaded = false;
+debugWebviewLog('info', 'webview main script loaded', 'readyState=' + document.readyState);
 
-window.addEventListener('load', () => {
+function bootstrap() {
 	if (loaded) return;
 	loaded = true;
+	debugWebviewLog('info', 'bootstrap started', 'readyState=' + document.readyState);
 
 	TextFormatter.registerCustomEmojiMappings(initialState.config.customEmojiShortcodeMappings);
+	debugWebviewLog('info', 'custom emoji mappings registered', 'mappingCount=' + initialState.config.customEmojiShortcodeMappings.length);
 
 	const viewElem = document.getElementById('view');
-	if (viewElem === null) return;
+	if (viewElem === null) {
+		debugWebviewLog('error', 'bootstrap could not find #view element');
+		return;
+	}
 
-	const gitGraph = new GitGraphView(viewElem, VSCODE_API.getState());
+	let prevState: WebViewState | null = null;
+	try {
+		prevState = VSCODE_API.getState() || null;
+		debugWebviewLog('info', 'retrieved VS Code webview state', prevState === null
+			? 'state=' + String(VSCODE_API.getState())
+			: 'currentRepo=' + prevState.currentRepo + '; commits=' + prevState.commits.length + '; currentRepoLoading=' + prevState.currentRepoLoading + '; scrollTop=' + prevState.scrollTop);
+	} catch (error) {
+		debugWebviewLog('error', 'failed to retrieve VS Code webview state', error instanceof Error ? error.stack || error.message : String(error));
+		throw error;
+	}
+
+	let gitGraph: GitGraphView;
+	try {
+		debugWebviewLog('info', 'constructing GitGraphView', prevState === null ? 'prevState=null' : 'prevState present');
+		gitGraph = new GitGraphView(viewElem, prevState);
+		debugWebviewLog('info', 'constructed GitGraphView successfully');
+		VSCODE_API.postMessage(<GG.RequestMessage><unknown>{
+			command: 'webviewReady',
+			details: 'readyState=' + document.readyState + '; prevState=' + (prevState === null ? 'null' : 'present')
+		});
+	} catch (error) {
+		debugWebviewLog('error', 'GitGraphView construction failed', error instanceof Error ? error.stack || error.message : String(error));
+		throw error;
+	}
+
 	const imageResizer = new ImageResizer();
+	debugWebviewLog('info', 'ImageResizer constructed');
 
 	/* Command Processing */
 	window.addEventListener('message', event => {
@@ -5218,5 +5248,12 @@ window.addEventListener('load', () => {
 	function parseExtensionErrorInfo(error: string, prefix: GG.ErrorInfoExtensionPrefix) {
 		return JSON.parse(error.substring(prefix.length));
 	}
-});
+}
+
+if (document.readyState === 'loading') {
+	window.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+	window.addEventListener('load', bootstrap, { once: true });
+} else {
+	bootstrap();
+}
 

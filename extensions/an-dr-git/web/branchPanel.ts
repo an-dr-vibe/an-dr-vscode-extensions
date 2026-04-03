@@ -586,6 +586,14 @@ class BranchPanel {
 	}
 
 	private render() {
+		if (this.options.length === 0) {
+			this.listElem.innerHTML = '';
+			this.updateActionSelectionStyles();
+			this.updateHintLayout();
+			this.scheduleScrollRestore();
+			return;
+		}
+
 		const locals: { opt: DropdownOption; idx: number }[] = [];
 		const remotes: { opt: DropdownOption; idx: number }[] = [];
 		const globs: { opt: DropdownOption; idx: number }[] = [];

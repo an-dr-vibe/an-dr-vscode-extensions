@@ -36,9 +36,6 @@ export class GitGraphView extends Disposable {
 	private isPanelVisible: boolean = true;
 	private currentRepo: string | null = null;
 	private loadViewTo: LoadGitGraphViewTo = null; // Is used by the next call to getHtmlForWebview, and is then reset to null
-	private hasReceivedBootstrapConfirmationSinceLoad: boolean = false;
-	private restoreBootstrapCheckTimeout: ReturnType<typeof setTimeout> | null = null;
-	private restoreBootstrapReloadAttemptsRemaining: number = 0;
 
 	private loadRepoInfoRefreshId: number = 0;
 	private loadCommitsRefreshId: number = 0;
@@ -57,7 +54,6 @@ export class GitGraphView extends Disposable {
 		const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
 
 		if (GitGraphView.currentPanel) {
-			logger.log('GitGraphView.createOrShow reusing existing panel [' + GitGraphView.currentPanel.instanceId + '] visible=' + GitGraphView.currentPanel.panel.visible + ', active=' + GitGraphView.currentPanel.panel.active);
 			// If Git Graph panel already exists
 			if (GitGraphView.currentPanel.isPanelVisible) {
 				// If the Git Graph panel is visible
@@ -77,16 +73,9 @@ export class GitGraphView extends Disposable {
 
 	public static revive(panel: vscode.WebviewPanel, extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger) {
 		if (GitGraphView.currentPanel) {
-			logger.log('GitGraphView.revive disposing existing currentPanel [' + GitGraphView.currentPanel.instanceId + '] before restoring webview panel.');
 			GitGraphView.currentPanel.dispose();
 		}
 		GitGraphView.currentPanel = new GitGraphView(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, null, panel.viewColumn, panel, true);
-	}
-
-	public static disposeCurrentPanelIfOrphaned(logger: Logger) {
-		if (!GitGraphView.currentPanel) return;
-		logger.log('GitGraphView detected orphaned panel [' + GitGraphView.currentPanel.instanceId + '], disposing stale panel handle.');
-		GitGraphView.currentPanel.dispose();
 	}
 
 	public static recoverOrphanedPanelIfNeeded(logger: Logger) {
@@ -116,8 +105,6 @@ export class GitGraphView extends Disposable {
 		this.repoManager = repoManager;
 		this.logger = logger;
 		this.loadViewTo = loadViewTo;
-		this.restoreBootstrapReloadAttemptsRemaining = restoredFromSerializer ? 2 : 0;
-		this.logger.log('GitGraphView[' + this.instanceId + '] constructor: restoredFromSerializer=' + restoredFromSerializer + ', existingPanel=' + (typeof existingPanel !== 'undefined') + ', visible=' + (existingPanel ? existingPanel.visible : true) + ', active=' + (existingPanel ? existingPanel.active : true));
 
 		const config = getConfig();
 		if (existingPanel) {
@@ -126,7 +113,6 @@ export class GitGraphView extends Disposable {
 				enableScripts: true,
 				localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))]
 			};
-			this.logger.log('GitGraphView[' + this.instanceId + '] reapplied webview options on restored panel.');
 		} else {
 			this.panel = vscode.window.createWebviewPanel(GitGraphView.VIEW_TYPE, GitGraphView.NAME, column || vscode.ViewColumn.One, {
 				enableScripts: true,
@@ -134,10 +120,7 @@ export class GitGraphView extends Disposable {
 				retainContextWhenHidden: config.retainContextWhenHidden
 			});
 			// Keep the Git Graph tab pinned so branch checkouts that reload editors don't replace it.
-			void vscode.commands.executeCommand('workbench.action.keepEditor').then(
-				() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command succeeded.'),
-				() => this.logger.log('GitGraphView[' + this.instanceId + '] keepEditor command failed.')
-			);
+			void vscode.commands.executeCommand('workbench.action.keepEditor');
 		}
 		this.extensionState.setReopenGitGraphOnStartup(true);
 		this.isPanelVisible = this.panel.visible;
@@ -152,30 +135,18 @@ export class GitGraphView extends Disposable {
 		this.registerDisposables(
 			// Dispose Git Graph View resources when disposed
 			toDisposable(() => {
-				this.logger.log('Disposing GitGraphView[' + this.instanceId + '] instance...');
-				if (this.restoreBootstrapCheckTimeout !== null) {
-					clearTimeout(this.restoreBootstrapCheckTimeout);
-					this.restoreBootstrapCheckTimeout = null;
-				}
 				GitGraphView.currentPanel = undefined;
 				this.repoFileWatcher.stop();
 			}),
 
 			// Dispose this Git Graph View when the Webview Panel is disposed
 			this.panel.onDidDispose(() => {
-				this.logger.log('GitGraphView[' + this.instanceId + '] webview panel onDidDispose fired. visible=' + this.panel.visible + ', active=' + this.panel.active);
 				this.extensionState.setReopenGitGraphOnStartup(false);
-				if (GitGraphView.currentPanel === this) {
-					this.logger.log('GitGraphView[' + this.instanceId + '] currentPanel matches this instance.');
-				} else {
-					this.logger.log('GitGraphView[' + this.instanceId + '] currentPanel does NOT match this instance.');
-				}
 				this.dispose();
 			}),
 
 			// Register a callback that is called when the view is shown or hidden
 			this.panel.onDidChangeViewState(() => {
-				this.logger.log('GitGraphView[' + this.instanceId + '] onDidChangeViewState: visible=' + this.panel.visible + ', active=' + this.panel.active + ', trackedVisible=' + this.isPanelVisible);
 				if (this.panel.visible !== this.isPanelVisible) {
 					if (this.panel.visible) {
 						if (this.panel.webview.html.trim().length === 0) {
@@ -214,16 +185,7 @@ export class GitGraphView extends Disposable {
 			}),
 
 			// Respond to messages sent from the Webview
-			this.panel.webview.onDidReceiveMessage((msg) => {
-				if (msg.command !== 'webviewLog') {
-					this.hasReceivedBootstrapConfirmationSinceLoad = true;
-					if (this.restoreBootstrapCheckTimeout !== null) {
-						clearTimeout(this.restoreBootstrapCheckTimeout);
-						this.restoreBootstrapCheckTimeout = null;
-					}
-				}
-				this.respondToMessage(msg);
-			}),
+			this.panel.webview.onDidReceiveMessage((msg) => this.respondToMessage(msg)),
 
 			// Dispose the Webview Panel when disposed
 			this.panel
@@ -238,29 +200,8 @@ export class GitGraphView extends Disposable {
 
 		// Render the content of the Webview
 		this.update();
-		if (restoredFromSerializer) {
-			this.scheduleRestoreBootstrapCheck();
-		}
 
 		this.logger.log((restoredFromSerializer ? 'Restored' : 'Created') + ' Git Graph View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
-	}
-
-	private scheduleRestoreBootstrapCheck() {
-		if (this.restoreBootstrapCheckTimeout !== null) {
-			clearTimeout(this.restoreBootstrapCheckTimeout);
-		}
-		this.restoreBootstrapCheckTimeout = setTimeout(() => {
-			this.restoreBootstrapCheckTimeout = null;
-			if (this.isDisposed() || this.hasReceivedBootstrapConfirmationSinceLoad) return;
-			if (this.restoreBootstrapReloadAttemptsRemaining <= 0) {
-				this.logger.logError('GitGraphView[' + this.instanceId + '] restored webview did not bootstrap after retrying.');
-				return;
-			}
-			this.restoreBootstrapReloadAttemptsRemaining--;
-			this.logger.log('GitGraphView[' + this.instanceId + '] restored webview did not bootstrap, forcing HTML reload. Remaining retries: ' + this.restoreBootstrapReloadAttemptsRemaining);
-			this.update();
-			this.scheduleRestoreBootstrapCheck();
-		}, 700);
 	}
 
 	/**
@@ -272,16 +213,6 @@ export class GitGraphView extends Disposable {
 		let errorInfos: ErrorInfo[];
 
 		switch (msg.command) {
-			case 'webviewLog':
-				if (msg.level === 'error') {
-					this.logger.logError('Webview[' + this.instanceId + '] ' + msg.message + (typeof msg.details === 'string' ? ' | ' + msg.details : ''));
-				} else {
-					this.logger.log('Webview[' + this.instanceId + '][' + msg.level.toUpperCase() + '] ' + msg.message + (typeof msg.details === 'string' ? ' | ' + msg.details : ''));
-				}
-				break;
-			case 'webviewReady':
-				this.logger.log('Webview[' + this.instanceId + '] reported ready' + (typeof msg.details === 'string' ? ': ' + msg.details : '.'));
-				break;
 			case 'addRemote':
 				this.sendMessage({
 					command: 'addRemote',
@@ -920,10 +851,7 @@ export class GitGraphView extends Disposable {
 	 * Update the HTML document loaded in the Webview.
 	 */
 	private update() {
-		const html = this.getHtmlForWebview();
-		this.hasReceivedBootstrapConfirmationSinceLoad = false;
-		this.logger.log('GitGraphView[' + this.instanceId + '] updating webview HTML. length=' + html.length);
-		this.panel.webview.html = html;
+		this.panel.webview.html = this.getHtmlForWebview();
 	}
 
 	/**

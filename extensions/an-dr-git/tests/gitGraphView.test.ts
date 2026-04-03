@@ -114,20 +114,22 @@ describe('GitGraphView', () => {
 			expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.action.keepEditor');
 		});
 
-		it('Should preserve existing webview options when reviving a restored WebviewPanel', () => {
+		it('Should reapply required webview options when reviving a restored WebviewPanel', () => {
 			// Setup
 			const panel = vscode.window.createWebviewPanel('an-dr-git', 'an-dr: Git', vscode.ViewColumn.One, {
 				enableScripts: true,
 				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))]
 			});
-			const originalOptions = { preserved: true } as any;
-			panel.webview.options = originalOptions;
+			panel.webview.options = {} as any;
 
 			// Run
 			GitGraphView.revive(panel, '/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger);
 
 			// Assert
-			expect(panel.webview.options).toBe(originalOptions);
+			expect(panel.webview.options).toStrictEqual({
+				enableScripts: true,
+				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))]
+			});
 			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Restored Git Graph View \[\d+\]$/));
 		});
 

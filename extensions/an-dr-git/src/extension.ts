@@ -64,38 +64,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.window.registerWebviewPanelSerializer(GitGraphView.VIEW_TYPE, {
-			async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: any) {
-				let stateSummary = 'state unavailable';
-				try {
-					if (state === null || typeof state === 'undefined') {
-						stateSummary = 'state=' + String(state);
-					} else if (typeof state === 'object') {
-						const keys = Object.keys(state);
-						stateSummary = 'stateKeys=' + keys.join(',') + '; jsonLength=' + JSON.stringify(state).length;
-					} else {
-						stateSummary = 'stateType=' + typeof state + '; value=' + String(state);
-					}
-				} catch (error) {
-					stateSummary = 'state summary failed: ' + String(error);
-				}
-				logger.log('Deserializing Git Graph webview panel... ' + stateSummary + '; visible=' + panel.visible + '; active=' + panel.active);
+			async deserializeWebviewPanel(panel: vscode.WebviewPanel, _state: any) {
+				logger.log('Deserializing Git Graph webview panel...');
 				delayOrphanChecks('webview serializer restore', 750);
 				GitGraphView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
 			}
 		}),
 		vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
-		vscode.window.onDidChangeActiveTextEditor((editor) => {
-			logger.log('VS Code active editor changed: ' + (editor ? editor.document.uri.toString() + ' (column ' + editor.viewColumn + ')' : 'undefined'));
-		}),
-		vscode.window.onDidChangeVisibleTextEditors((editors) => {
-			logger.log('VS Code visible text editors changed: [' + editors.map((editor) => editor.document.uri.toString()).join(', ') + ']');
-		}),
-		vscode.workspace.onDidOpenTextDocument((doc) => {
-			logger.log('VS Code opened document: ' + doc.uri.toString());
-		}),
-		vscode.workspace.onDidCloseTextDocument((doc) => {
-			logger.log('VS Code closed document: ' + doc.uri.toString());
-		}),
 		vscode.workspace.onDidChangeConfiguration((event) => {
 			if (event.affectsConfiguration('an-dr-git')) {
 				configurationEmitter.emit(event);
@@ -136,91 +111,43 @@ export async function activate(context: vscode.ExtensionContext) {
 			return gitGraphTabViewTypes.has(viewType) || tab.label === gitGraphTabLabel;
 		};
 
-		const describeTab = (tab: any) => {
-			const input = tab.input;
-			const inputName = input && input.constructor ? input.constructor.name : typeof input;
-			const uri = input && input.uri ? input.uri.toString() : '';
-			const viewType = input && input.viewType ? input.viewType : '';
-			const flags = [
-				tab.isActive ? 'active' : null,
-				tab.isDirty ? 'dirty' : null,
-				tab.isPinned ? 'pinned' : null,
-				tab.isPreview ? 'preview' : null
-			].filter(Boolean).join(',');
-			return tab.label + '<' + inputName + '>' +
-				(viewType ? '[viewType=' + viewType + ']' : '') +
-				(uri ? '[uri=' + uri + ']' : '') +
-				(flags ? '[' + flags + ']' : '');
-		};
-
 		const doesGitGraphTabExist = () => {
 			return tabGroups.all.some((group: any) => group.tabs.some((tab: any) => {
 				return isGitGraphTab(tab);
 			}));
 		};
 
-		const cancelPendingOrphanCheck = (reason: string) => {
+		const cancelPendingOrphanCheck = () => {
 			if (orphanCheckTimeout === null) return;
 			clearTimeout(orphanCheckTimeout);
 			orphanCheckTimeout = null;
-			logger.log('Cancelled pending Git Graph orphan check (' + reason + ').');
 		};
 
-		const scheduleOrphanCheck = (reason: string) => {
-			cancelPendingOrphanCheck('rescheduled');
+		const scheduleOrphanCheck = () => {
+			cancelPendingOrphanCheck();
 			orphanCheckTimeout = setTimeout(() => {
 				orphanCheckTimeout = null;
 				if (!GitGraphView.currentPanel) return;
 				const remainingSuppressionMs = suppressOrphanChecksUntil - Date.now();
 				if (remainingSuppressionMs > 0) {
-					logger.log('Deferring Git Graph orphan check for ' + remainingSuppressionMs + 'ms because restore suppression is active.');
-					scheduleOrphanCheck('restore suppression elapsed');
+					scheduleOrphanCheck();
 					return;
 				}
-				if (doesGitGraphTabExist()) {
-					logger.log('Git Graph orphan check found the tab after revalidation, keeping currentPanel.');
-					return;
-				}
-				logger.log('VS Code tab tracking still found no Git Graph tab after revalidation.');
+				if (doesGitGraphTabExist()) return;
 				GitGraphView.recoverOrphanedPanelIfNeeded(logger);
 			}, 250);
-			logger.log('Scheduled Git Graph orphan check (' + reason + ').');
 		};
 
-		context.subscriptions.push(tabGroups.onDidChangeTabs((event: any) => {
+		context.subscriptions.push(tabGroups.onDidChangeTabs(() => {
 			try {
-				const summary = tabGroups.all.map((group: any, groupIndex: number) =>
-					'group ' + groupIndex + (group.isActive ? '*' : '') + ': [' + group.tabs.map((tab: any) => {
-						return describeTab(tab);
-					}).join(', ') + ']'
-				).join(' | ');
-				const opened = Array.isArray(event.opened) ? event.opened.map((tab: any) => describeTab(tab)).join(' | ') : '';
-				const closed = Array.isArray(event.closed) ? event.closed.map((tab: any) => describeTab(tab)).join(' | ') : '';
-				const changed = Array.isArray(event.changed) ? event.changed.map((tab: any) => describeTab(tab)).join(' | ') : '';
-				logger.log('VS Code tabs changed: ' + summary);
-				if (opened) logger.log('VS Code tabs opened: ' + opened);
-				if (closed) logger.log('VS Code tabs closed: ' + closed);
-				if (changed) logger.log('VS Code tabs changed payload: ' + changed);
-				if (GitGraphView.currentPanel && !doesGitGraphTabExist()) {
-					logger.log('VS Code tab tracking found no Git Graph tab, but currentPanel still exists.');
-					scheduleOrphanCheck('tab change missing Git Graph tab');
-				} else if (doesGitGraphTabExist()) {
-					cancelPendingOrphanCheck('Git Graph tab present');
+				const hasGitGraphTab = doesGitGraphTabExist();
+				if (GitGraphView.currentPanel && !hasGitGraphTab) {
+					scheduleOrphanCheck();
+				} else if (hasGitGraphTab) {
+					cancelPendingOrphanCheck();
 				}
 			} catch (error) {
-				logger.logError('Unable to summarize VS Code tabs changed event: ' + String(error));
-			}
-		}));
-	}
-	if (tabGroups && typeof tabGroups.onDidChangeTabGroups === 'function') {
-		context.subscriptions.push(tabGroups.onDidChangeTabGroups((event: any) => {
-			try {
-				const opened = Array.isArray(event.opened) ? event.opened.length : 0;
-				const closed = Array.isArray(event.closed) ? event.closed.length : 0;
-				const changed = Array.isArray(event.changed) ? event.changed.length : 0;
-				logger.log('VS Code tab groups changed: opened=' + opened + ', closed=' + closed + ', changed=' + changed + ', total=' + tabGroups.all.length);
-			} catch (error) {
-				logger.logError('Unable to summarize VS Code tab groups changed event: ' + String(error));
+				logger.logError('Unable to evaluate Git Graph tab tracking: ' + String(error));
 			}
 		}));
 	}

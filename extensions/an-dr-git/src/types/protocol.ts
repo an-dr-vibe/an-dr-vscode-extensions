@@ -136,8 +136,6 @@ export {
 	ResponseViewFileAtRevision,
 	RequestViewScm,
 	ResponseViewScm,
-	RequestWebviewLog,
-	RequestWebviewReady,
 	RequestMessage,
 	ResponseMessage,
 	Writeable,

@@ -1457,18 +1457,6 @@ export interface ResponseViewScm extends ResponseWithErrorInfo {
 	readonly command: 'viewScm';
 }
 
-export interface RequestWebviewLog extends BaseMessage {
-	readonly command: 'webviewLog';
-	readonly level: 'debug' | 'info' | 'warn' | 'error';
-	readonly message: string;
-	readonly details?: string;
-}
-
-export interface RequestWebviewReady extends BaseMessage {
-	readonly command: 'webviewReady';
-	readonly details?: string;
-}
-
 export type RequestMessage =
 	RequestAddRemote
 	| RequestAddTag
@@ -1539,9 +1527,7 @@ export type RequestMessage =
 	| RequestViewDiff
 	| RequestViewDiffWithWorkingFile
 	| RequestViewFileAtRevision
-	| RequestViewScm
-	| RequestWebviewLog
-	| RequestWebviewReady;
+	| RequestViewScm;
 
 export type ResponseMessage =
 	ResponseAddRemote

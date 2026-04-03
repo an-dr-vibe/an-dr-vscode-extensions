@@ -4819,49 +4819,18 @@ class GitGraphView {
 
 const contextMenu = new ContextMenu(), dialog = new Dialog(), eventOverlay = new EventOverlay();
 let loaded = false;
-debugWebviewLog('info', 'webview main script loaded', 'readyState=' + document.readyState);
 
 function bootstrap() {
 	if (loaded) return;
 	loaded = true;
-	debugWebviewLog('info', 'bootstrap started', 'readyState=' + document.readyState);
 
 	TextFormatter.registerCustomEmojiMappings(initialState.config.customEmojiShortcodeMappings);
-	debugWebviewLog('info', 'custom emoji mappings registered', 'mappingCount=' + initialState.config.customEmojiShortcodeMappings.length);
 
 	const viewElem = document.getElementById('view');
-	if (viewElem === null) {
-		debugWebviewLog('error', 'bootstrap could not find #view element');
-		return;
-	}
+	if (viewElem === null) return;
 
-	let prevState: WebViewState | null = null;
-	try {
-		prevState = VSCODE_API.getState() || null;
-		debugWebviewLog('info', 'retrieved VS Code webview state', prevState === null
-			? 'state=' + String(VSCODE_API.getState())
-			: 'currentRepo=' + prevState.currentRepo + '; commits=' + prevState.commits.length + '; currentRepoLoading=' + prevState.currentRepoLoading + '; scrollTop=' + prevState.scrollTop);
-	} catch (error) {
-		debugWebviewLog('error', 'failed to retrieve VS Code webview state', error instanceof Error ? error.stack || error.message : String(error));
-		throw error;
-	}
-
-	let gitGraph: GitGraphView;
-	try {
-		debugWebviewLog('info', 'constructing GitGraphView', prevState === null ? 'prevState=null' : 'prevState present');
-		gitGraph = new GitGraphView(viewElem, prevState);
-		debugWebviewLog('info', 'constructed GitGraphView successfully');
-		VSCODE_API.postMessage(<GG.RequestMessage><unknown>{
-			command: 'webviewReady',
-			details: 'readyState=' + document.readyState + '; prevState=' + (prevState === null ? 'null' : 'present')
-		});
-	} catch (error) {
-		debugWebviewLog('error', 'GitGraphView construction failed', error instanceof Error ? error.stack || error.message : String(error));
-		throw error;
-	}
-
+	const gitGraph = new GitGraphView(viewElem, VSCODE_API.getState() || null);
 	const imageResizer = new ImageResizer();
-	debugWebviewLog('info', 'ImageResizer constructed');
 
 	/* Command Processing */
 	window.addEventListener('message', event => {

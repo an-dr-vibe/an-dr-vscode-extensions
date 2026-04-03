@@ -1,0 +1,1585 @@
+{
+	"name": "an-dr-commits",
+	"displayName": "Commits",
+	"version": "1.30.0",
+	"publisher": "an-dr",
+	"author": {
+		"name": "an-dr (based on work by Michael Hutchison)",
+		"email": ""
+	},
+	"description": "View the Git graph of your repository, and perform Git actions from it.",
+	"keywords": [
+		"git",
+		"graph",
+		"visualise",
+		"diff",
+		"action"
+	],
+	"categories": [
+		"Other"
+	],
+	"homepage": "https://github.com/an-dr/an-dr-vscode-extensions/tree/main/extensions/an-dr-commits",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/an-dr/an-dr-vscode-extensions.git"
+	},
+	"license": "SEE LICENSE IN 'LICENSE'",
+	"icon": "resources/icon.png",
+	"engines": {
+		"vscode": "^1.38.0"
+	},
+	"extensionKind": [
+		"workspace"
+	],
+	"activationEvents": [
+		"*"
+	],
+	"extensionDependencies": [
+		"vscode.git"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.view",
+				"title": "View Commits",
+				"icon": {
+					"light": "resources/cmd-icon-light.svg",
+					"dark": "resources/cmd-icon-dark.svg"
+				}
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.addGitRepository",
+				"title": "Add Git Repository..."
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.clearAvatarCache",
+				"title": "Clear Avatar Cache"
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.endAllWorkspaceCodeReviews",
+				"title": "End All Code Reviews in Workspace"
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.endSpecificWorkspaceCodeReview",
+				"title": "End a specific Code Review in Workspace..."
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.fetch",
+				"title": "Fetch from Remote(s)"
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.removeGitRepository",
+				"title": "Remove Git Repository..."
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.resumeWorkspaceCodeReview",
+				"title": "Resume a specific Code Review in Workspace..."
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.version",
+				"title": "Get Version Information"
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.openFile",
+				"title": "Open File",
+				"icon": "$(go-to-file)",
+				"enablement": "isInDiffEditor && resourceScheme == an-dr-commits && an-dr-commits:codiconsSupported"
+			}
+		],
+		"configuration": {
+			"type": "object",
+			"title": "an-dr-commits",
+			"properties": {
+				"an-dr-commits.commitDetailsView.autoCenter": {
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically center the Commit Details View when it is opened."
+				},
+				"an-dr-commits.commitDetailsView.fileView.fileTree.compactFolders": {
+					"type": "boolean",
+					"default": true,
+					"description": "Render the File Tree in the Commit Details View in a compacted form, such that folders with a single child folder are compressed into a single combined folder element."
+				},
+				"an-dr-commits.commitDetailsView.fileView.type": {
+					"type": "string",
+					"enum": [
+						"File Tree",
+						"File List"
+					],
+					"enumDescriptions": [
+						"Display files in a tree structure.",
+						"Display files in a list (useful for repositories with deep folder structures)."
+					],
+					"default": "File Tree",
+					"description": "Sets the default type of File View used in the Commit Details View. This can be overridden per repository using the controls on the right side of the Commit Details View."
+				},
+				"an-dr-commits.commitDetailsView.location": {
+					"type": "string",
+					"enum": [
+						"Inline",
+						"Docked to Bottom"
+					],
+					"enumDescriptions": [
+						"Show the Commit Details View inline with the graph & commits.",
+						"Show the Commit Details View docked to the bottom of the Commits View."
+					],
+					"default": "Inline",
+					"description": "Specifies where the Commit Details View is rendered in the Commits View."
+				},
+				"an-dr-commits.contextMenuActionsVisibility": {
+					"type": "object",
+					"default": {},
+					"properties": {
+						"branch": {
+							"type": "object",
+							"properties": {
+								"checkout": {
+									"type": "boolean",
+									"title": "Checkout Branch"
+								},
+								"rename": {
+									"type": "boolean",
+									"title": "Rename Branch..."
+								},
+								"delete": {
+									"type": "boolean",
+									"title": "Delete Branch..."
+								},
+								"merge": {
+									"type": "boolean",
+									"title": "Merge into current branch..."
+								},
+								"rebase": {
+									"type": "boolean",
+									"title": "Rebase current branch on Branch..."
+								},
+								"push": {
+									"type": "boolean",
+									"title": "Push Branch..."
+								},
+								"viewIssue": {
+									"type": "boolean",
+									"title": "View Issue"
+								},
+								"createPullRequest": {
+									"type": "boolean",
+									"title": "Create Pull Request..."
+								},
+								"createArchive": {
+									"type": "boolean",
+									"title": "Create Archive"
+								},
+								"selectInBranchesDropdown": {
+									"type": "boolean",
+									"title": "Select in Branches Dropdown"
+								},
+								"unselectInBranchesDropdown": {
+									"type": "boolean",
+									"title": "Unselect in Branches Dropdown"
+								},
+								"copyName": {
+									"type": "boolean",
+									"title": "Copy Branch Name to Clipboard"
+								}
+							}
+						},
+						"commit": {
+							"type": "object",
+							"properties": {
+								"addTag": {
+									"type": "boolean",
+									"title": "Add Tag..."
+								},
+								"createBranch": {
+									"type": "boolean",
+									"title": "Create Branch..."
+								},
+								"checkout": {
+									"type": "boolean",
+									"title": "Checkout..."
+								},
+								"cherrypick": {
+									"type": "boolean",
+									"title": "Cherry Pick..."
+								},
+								"revert": {
+									"type": "boolean",
+									"title": "Revert..."
+								},
+								"drop": {
+									"type": "boolean",
+									"title": "Drop..."
+								},
+								"merge": {
+									"type": "boolean",
+									"title": "Merge into current branch..."
+								},
+								"rebase": {
+									"type": "boolean",
+									"title": "Rebase current branch on this Commit..."
+								},
+								"reset": {
+									"type": "boolean",
+									"title": "Reset current branch to this Commit..."
+								},
+								"copyHash": {
+									"type": "boolean",
+									"title": "Copy Commit Hash to Clipboard"
+								},
+								"copySubject": {
+									"type": "boolean",
+									"title": "Copy Commit Subject to Clipboard"
+								}
+							}
+						},
+						"commitDetailsViewFile": {
+							"type": "object",
+							"properties": {
+								"viewDiff": {
+									"type": "boolean",
+									"title": "View Diff"
+								},
+								"viewFileAtThisRevision": {
+									"type": "boolean",
+									"title": "View File at this Revision"
+								},
+								"viewDiffWithWorkingFile": {
+									"type": "boolean",
+									"title": "View Diff with Working File"
+								},
+								"openFile": {
+									"type": "boolean",
+									"title": "Open File"
+								},
+								"markAsReviewed": {
+									"type": "boolean",
+									"title": "Mark as Reviewed"
+								},
+								"markAsNotReviewed": {
+									"type": "boolean",
+									"title": "Mark as Not Reviewed"
+								},
+								"resetFileToThisRevision": {
+									"type": "boolean",
+									"title": "Reset File to this Revision..."
+								},
+								"copyAbsoluteFilePath": {
+									"type": "boolean",
+									"title": "Copy Absolute File Path to Clipboard"
+								},
+								"copyRelativeFilePath": {
+									"type": "boolean",
+									"title": "Copy Relative File Path to Clipboard"
+								}
+							}
+						},
+						"remoteBranch": {
+							"type": "object",
+							"properties": {
+								"checkout": {
+									"type": "boolean",
+									"title": "Checkout Branch..."
+								},
+								"delete": {
+									"type": "boolean",
+									"title": "Delete Remote Branch..."
+								},
+								"fetch": {
+									"type": "boolean",
+									"title": "Fetch into local branch..."
+								},
+								"merge": {
+									"type": "boolean",
+									"title": "Merge into current branch..."
+								},
+								"pull": {
+									"type": "boolean",
+									"title": "Pull into current branch..."
+								},
+								"viewIssue": {
+									"type": "boolean",
+									"title": "View Issue"
+								},
+								"createPullRequest": {
+									"type": "boolean",
+									"title": "Create Pull Request"
+								},
+								"createArchive": {
+									"type": "boolean",
+									"title": "Create Archive"
+								},
+								"selectInBranchesDropdown": {
+									"type": "boolean",
+									"title": "Select in Branches Dropdown"
+								},
+								"unselectInBranchesDropdown": {
+									"type": "boolean",
+									"title": "Unselect in Branches Dropdown"
+								},
+								"copyName": {
+									"type": "boolean",
+									"title": "Copy Branch Name to Clipboard"
+								}
+							}
+						},
+						"stash": {
+							"type": "object",
+							"properties": {
+								"apply": {
+									"type": "boolean",
+									"title": "Apply Stash..."
+								},
+								"createBranch": {
+									"type": "boolean",
+									"title": "Create Branch from Stash..."
+								},
+								"pop": {
+									"type": "boolean",
+									"title": "Pop Stash..."
+								},
+								"drop": {
+									"type": "boolean",
+									"title": "Drop Stash..."
+								},
+								"copyName": {
+									"type": "boolean",
+									"title": "Copy Stash Name to Clipboard"
+								},
+								"copyHash": {
+									"type": "boolean",
+									"title": "Copy Stash Hash to Clipboard"
+								}
+							}
+						},
+						"tag": {
+							"type": "object",
+							"properties": {
+								"viewDetails": {
+									"type": "boolean",
+									"title": "View Details"
+								},
+								"delete": {
+									"type": "boolean",
+									"title": "Delete Tag..."
+								},
+								"push": {
+									"type": "boolean",
+									"title": "Push Tag..."
+								},
+								"createArchive": {
+									"type": "boolean",
+									"title": "Create Archive"
+								},
+								"copyName": {
+									"type": "boolean",
+									"title": "Copy Tag Name to Clipboard"
+								}
+							}
+						},
+						"uncommittedChanges": {
+							"type": "object",
+							"properties": {
+								"stash": {
+									"type": "boolean",
+									"title": "Stash uncommitted changes..."
+								},
+								"reset": {
+									"type": "boolean",
+									"title": "Reset uncommitted changes..."
+								},
+								"clean": {
+									"type": "boolean",
+									"title": "Clean untracked files..."
+								},
+								"openSourceControlView": {
+									"type": "boolean",
+									"title": "Open Source Control View"
+								}
+							}
+						}
+					},
+					"markdownDescription": "Customise which context menu actions are visible. For example, if you want to hide the rebase action from the branch context menu, a suitable value for this setting is `{ \"branch\": { \"rebase\": false } }`. For more information of how to configure this setting, view the documentation [here](https://github.com/mhutchie/vscode-an-dr-commits/wiki/Extension-Settings#context-menu-actions-visibility)."
+				},
+				"an-dr-commits.customBranchGlobPatterns": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"title": "Branch Glob Pattern",
+						"required": [
+							"name",
+							"glob"
+						],
+						"properties": {
+							"name": {
+								"type": "string",
+								"title": "Name of pattern",
+								"description": "Name used to reference the pattern in the 'Branches' dropdown"
+							},
+							"glob": {
+								"type": "string",
+								"title": "Glob pattern",
+								"description": "The Glob Pattern <glob-pattern>, as used in 'git log --glob=<glob-pattern>'. For example: heads/feature/*"
+							}
+						}
+					},
+					"default": [],
+					"description": "An array of Custom Branch Glob Patterns to be shown in the 'Branches' dropdown. Example: [{\"name\": \"Feature Requests\", \"glob\": \"heads/feature/*\"}]"
+				},
+				"an-dr-commits.customEmojiShortcodeMappings": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"title": "Custom Emoji Shortcode Mapping",
+						"required": [
+							"shortcode",
+							"emoji"
+						],
+						"properties": {
+							"shortcode": {
+								"type": "string",
+								"title": "Emoji Shortcode",
+								"description": "Emoji Shortcode (e.g. \":sparkles:\")"
+							},
+							"emoji": {
+								"type": "string",
+								"title": "Emoji",
+								"description": "Emoji (e.g. \"\u2728\")"
+							}
+						}
+					},
+					"default": [],
+					"description": "An array of custom Emoji Shortcode mappings. Example: [{\"shortcode\": \":sparkles:\", \"emoji\":\"\u2728\"}]"
+				},
+				"an-dr-commits.customPullRequestProviders": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"title": "Pull Request Provider",
+						"required": [
+							"name",
+							"templateUrl"
+						],
+						"properties": {
+							"name": {
+								"type": "string",
+								"title": "Name of the Provider",
+								"description": "A unique, identifying, display name for the provider."
+							},
+							"templateUrl": {
+								"type": "string",
+								"title": "Template URL",
+								"markdownDescription": "A template URL that can be used to create a Pull Request, after the $1 - $8 variables have been substituted to construct the final URL. For information on how to configure this setting, see the documentation [here](https://github.com/mhutchie/vscode-an-dr-commits/wiki/Configuring-a-custom-Pull-Request-Provider)."
+							}
+						}
+					},
+					"default": [],
+					"markdownDescription": "An array of custom Pull Request providers that can be used in the \"Pull Request Creation\" Integration. For information on how to configure this setting, see the documentation [here](https://github.com/mhutchie/vscode-an-dr-commits/wiki/Configuring-a-custom-Pull-Request-Provider)."
+				},
+				"an-dr-commits.date.format": {
+					"type": "string",
+					"enum": [
+						"Date & Time",
+						"Date Only",
+						"ISO Date & Time",
+						"ISO Date Only",
+						"Relative"
+					],
+					"enumDescriptions": [
+						"Show the date and time (e.g. \"24 Mar 2019 21:34\")",
+						"Show the date only (e.g. \"24 Mar 2019\")",
+						"Show the ISO date and time (e.g. \"2019-03-24 21:34\")",
+						"Show the ISO date only (e.g. \"2019-03-24\")",
+						"Show relative times (e.g. \"5 minutes ago\")"
+					],
+					"default": "Date & Time",
+					"description": "Specifies the date format to be used in the \"Committed\" column on the Commits View."
+				},
+				"an-dr-commits.dialog.addTag.pushToRemote": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the field indicating whether the tag should be pushed to a remote once it is added."
+				},
+				"an-dr-commits.dialog.addTag.type": {
+					"type": "string",
+					"enum": [
+						"Annotated",
+						"Lightweight"
+					],
+					"default": "Annotated",
+					"description": "Default type of the tag being added."
+				},
+				"an-dr-commits.dialog.applyStash.reinstateIndex": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Reinstate Index\" checkbox."
+				},
+				"an-dr-commits.dialog.cherryPick.noCommit": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"No Commit\" checkbox."
+				},
+				"an-dr-commits.dialog.cherryPick.recordOrigin": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Record Origin\" checkbox."
+				},
+				"an-dr-commits.dialog.createBranch.checkOut": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Check out\" checkbox."
+				},
+				"an-dr-commits.dialog.deleteBranch.forceDelete": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Force Delete\" checkbox."
+				},
+				"an-dr-commits.dialog.fetchIntoLocalBranch.forceFetch": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Force Fetch\" checkbox."
+				},
+				"an-dr-commits.dialog.fetchRemote.prune": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Prune\" checkbox."
+				},
+				"an-dr-commits.dialog.fetchRemote.pruneTags": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Prune Tags\" checkbox."
+				},
+				"an-dr-commits.dialog.general.referenceInputSpaceSubstitution": {
+					"type": "string",
+					"enum": [
+						"None",
+						"Hyphen",
+						"Underscore"
+					],
+					"enumDescriptions": [
+						"Don't replace spaces.",
+						"Replace space characters with hyphens, for example: \"new branch\" -> \"new-branch\".",
+						"Replace space characters with underscores, for example: \"new branch\" -> \"new_branch\"."
+					],
+					"default": "None",
+					"description": "Specifies a substitution that is automatically performed when space characters are entered or pasted into reference inputs on dialogs (e.g. Create Branch, Add Tag, etc.)."
+				},
+				"an-dr-commits.dialog.merge.noCommit": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"No Commit\" checkbox."
+				},
+				"an-dr-commits.dialog.merge.noFastForward": {
+					"type": "boolean",
+					"default": true,
+					"description": "Default state of the \"Create a new commit even if fast-forward is possible\" checkbox."
+				},
+				"an-dr-commits.dialog.merge.squashCommits": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Squash Commits\" checkbox."
+				},
+				"an-dr-commits.dialog.merge.squashMessageFormat": {
+					"type": "string",
+					"enum": [
+						"Default",
+						"Git SQUASH_MSG"
+					],
+					"enumDescriptions": [
+						"Use the squash message generated by Commits.",
+						"Use the detailed squash message generated by Git (stored in .git/SQUASH_MSG)."
+					],
+					"default": "Default",
+					"description": "Specifies the message format used for the squashed commit (when the \"Squash Commits\" option is selected)."
+				},
+				"an-dr-commits.dialog.popStash.reinstateIndex": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Reinstate Index\" checkbox."
+				},
+				"an-dr-commits.dialog.pullBranch.noFastForward": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Create a new commit even if fast-forward is possible\" checkbox."
+				},
+				"an-dr-commits.dialog.pullBranch.squashCommits": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Squash Commits\" checkbox."
+				},
+				"an-dr-commits.dialog.pullBranch.squashMessageFormat": {
+					"type": "string",
+					"enum": [
+						"Default",
+						"Git SQUASH_MSG"
+					],
+					"enumDescriptions": [
+						"Use the squash message generated by Commits.",
+						"Use the detailed squash message generated by Git (stored in .git/SQUASH_MSG)."
+					],
+					"default": "Default",
+					"description": "Specifies the message format used for the squashed commit (when the \"Squash Commits\" option is selected)."
+				},
+				"an-dr-commits.dialog.rebase.ignoreDate": {
+					"type": "boolean",
+					"default": true,
+					"description": "Default state of the \"Ignore Date (non-interactive rebase only)\" checkbox."
+				},
+				"an-dr-commits.dialog.rebase.launchInteractiveRebase": {
+					"type": "boolean",
+					"default": false,
+					"description": "Default state of the \"Launch Interactive Rebase in new Terminal\" checkbox."
+				},
+				"an-dr-commits.dialog.repoInProgress.confirmAbort": {
+					"type": "boolean",
+					"default": true,
+					"description": "When true, confirm before aborting an in-progress repository operation from the top bar."
+				},
+				"an-dr-commits.dialog.resetCurrentBranchToCommit.mode": {
+					"type": "string",
+					"enum": [
+						"Soft",
+						"Mixed",
+						"Hard"
+					],
+					"enumDescriptions": [
+						"Soft - Keep all changes, but reset head",
+						"Mixed - Keep working tree, but reset index",
+						"Hard - Discard all changes"
+					],
+					"default": "Mixed",
+					"description": "Default mode to be used for the reset action."
+				},
+				"an-dr-commits.dialog.resetUncommittedChanges.mode": {
+					"type": "string",
+					"enum": [
+						"Mixed",
+						"Hard"
+					],
+					"enumDescriptions": [
+						"Mixed - Keep working tree, but reset index",
+						"Hard - Discard all changes"
+					],
+					"default": "Mixed",
+					"description": "Default mode to be used for the reset action."
+				},
+				"an-dr-commits.dialog.stashUncommittedChanges.includeUntracked": {
+					"type": "boolean",
+					"default": true,
+					"description": "Default state of the \"Include Untracked\" checkbox."
+				},
+				"an-dr-commits.enhancedAccessibility": {
+					"type": "boolean",
+					"default": false,
+					"description": "Visual file change A|M|D|R|U indicators in the Commit Details View for users with colour blindness. In the future, this setting will enable any additional accessibility related features of Commits that aren't enabled by default."
+				},
+				"an-dr-commits.fileEncoding": {
+					"type": "string",
+					"default": "utf8",
+					"markdownDescription": "The character set encoding used when retrieving a specific version of repository files (e.g. in the Diff View). A list of all supported encodings can be found [here](https://github.com/ashtuchkin/iconv-lite/wiki/Supported-Encodings).",
+					"scope": "resource"
+				},
+				"an-dr-commits.graph.colours": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"description": "Colour (HEX or RGB)",
+						"pattern": "^\\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{8}|rgb[a]?\\s*\\(\\d{1,3},\\s*\\d{1,3},\\s*\\d{1,3}\\))\\s*$"
+					},
+					"default": [
+						"#6ba2f2",
+						"#ca3a7d",
+						"#f3b33e",
+						"#61aea6",
+						"#ac70f7"
+					],
+					"description": "Specifies the colours used on the graph."
+				},
+				"an-dr-commits.graph.style": {
+					"type": "string",
+					"enum": [
+						"rounded",
+						"angular"
+					],
+					"enumDescriptions": [
+						"Use smooth curves when transitioning between branches on the graph.",
+						"Use angular lines when transitioning between branches on the graph."
+					],
+					"default": "rounded",
+					"description": "Specifies the style of the graph."
+				},
+				"an-dr-commits.graph.uncommittedChanges": {
+					"type": "string",
+					"enum": [
+						"Open Circle at the Uncommitted Changes",
+						"Open Circle at the Checked Out Commit"
+					],
+					"enumDescriptions": [
+						"Display the Uncommitted Changes as a grey open circle, connected to the commit referenced by HEAD with a solid grey line. The current file system's state is therefore always displayed as an open circle.",
+						"Display the Uncommitted Changes as a grey closed circle, connected to the commit referenced by HEAD with a dotted grey line. The commit referenced by HEAD is therefore always displayed as an open circle."
+					],
+					"default": "Open Circle at the Uncommitted Changes",
+					"description": "Specifies how the Uncommitted Changes are displayed on the graph."
+				},
+				"an-dr-commits.integratedTerminalShell": {
+					"type": "string",
+					"default": "",
+					"description": "Specifies the path and filename of the Shell executable to be used by the Visual Studio Code Integrated Terminal, when it is opened by Commits. For example, to use Git Bash on Windows this setting would commonly be set to \"C:\\Program Files\\Git\\bin\\bash.exe\". If this setting is left blank, the default Shell is used.",
+					"scope": "machine"
+				},
+				"an-dr-commits.keyboardShortcut.find": {
+					"type": "string",
+					"enum": [
+						"UNASSIGNED",
+						"CTRL/CMD + A",
+						"CTRL/CMD + B",
+						"CTRL/CMD + C",
+						"CTRL/CMD + D",
+						"CTRL/CMD + E",
+						"CTRL/CMD + F",
+						"CTRL/CMD + G",
+						"CTRL/CMD + H",
+						"CTRL/CMD + I",
+						"CTRL/CMD + J",
+						"CTRL/CMD + K",
+						"CTRL/CMD + L",
+						"CTRL/CMD + M",
+						"CTRL/CMD + N",
+						"CTRL/CMD + O",
+						"CTRL/CMD + P",
+						"CTRL/CMD + Q",
+						"CTRL/CMD + R",
+						"CTRL/CMD + S",
+						"CTRL/CMD + T",
+						"CTRL/CMD + U",
+						"CTRL/CMD + V",
+						"CTRL/CMD + W",
+						"CTRL/CMD + X",
+						"CTRL/CMD + Y",
+						"CTRL/CMD + Z"
+					],
+					"default": "CTRL/CMD + F",
+					"description": "The keybinding for the keyboard shortcut that opens the Find Widget in the Commits View."
+				},
+				"an-dr-commits.keyboardShortcut.refresh": {
+					"type": "string",
+					"enum": [
+						"UNASSIGNED",
+						"CTRL/CMD + A",
+						"CTRL/CMD + B",
+						"CTRL/CMD + C",
+						"CTRL/CMD + D",
+						"CTRL/CMD + E",
+						"CTRL/CMD + F",
+						"CTRL/CMD + G",
+						"CTRL/CMD + H",
+						"CTRL/CMD + I",
+						"CTRL/CMD + J",
+						"CTRL/CMD + K",
+						"CTRL/CMD + L",
+						"CTRL/CMD + M",
+						"CTRL/CMD + N",
+						"CTRL/CMD + O",
+						"CTRL/CMD + P",
+						"CTRL/CMD + Q",
+						"CTRL/CMD + R",
+						"CTRL/CMD + S",
+						"CTRL/CMD + T",
+						"CTRL/CMD + U",
+						"CTRL/CMD + V",
+						"CTRL/CMD + W",
+						"CTRL/CMD + X",
+						"CTRL/CMD + Y",
+						"CTRL/CMD + Z"
+					],
+					"default": "CTRL/CMD + R",
+					"description": "The keybinding for the keyboard shortcut that refreshes the Commits View."
+				},
+				"an-dr-commits.keyboardShortcut.scrollToHead": {
+					"type": "string",
+					"enum": [
+						"UNASSIGNED",
+						"CTRL/CMD + A",
+						"CTRL/CMD + B",
+						"CTRL/CMD + C",
+						"CTRL/CMD + D",
+						"CTRL/CMD + E",
+						"CTRL/CMD + F",
+						"CTRL/CMD + G",
+						"CTRL/CMD + H",
+						"CTRL/CMD + I",
+						"CTRL/CMD + J",
+						"CTRL/CMD + K",
+						"CTRL/CMD + L",
+						"CTRL/CMD + M",
+						"CTRL/CMD + N",
+						"CTRL/CMD + O",
+						"CTRL/CMD + P",
+						"CTRL/CMD + Q",
+						"CTRL/CMD + R",
+						"CTRL/CMD + S",
+						"CTRL/CMD + T",
+						"CTRL/CMD + U",
+						"CTRL/CMD + V",
+						"CTRL/CMD + W",
+						"CTRL/CMD + X",
+						"CTRL/CMD + Y",
+						"CTRL/CMD + Z"
+					],
+					"default": "CTRL/CMD + H",
+					"description": "The keybinding for the keyboard shortcut that scrolls the Commits View to be centered on the commit referenced by HEAD."
+				},
+				"an-dr-commits.keyboardShortcut.scrollToStash": {
+					"type": "string",
+					"enum": [
+						"UNASSIGNED",
+						"CTRL/CMD + A",
+						"CTRL/CMD + B",
+						"CTRL/CMD + C",
+						"CTRL/CMD + D",
+						"CTRL/CMD + E",
+						"CTRL/CMD + F",
+						"CTRL/CMD + G",
+						"CTRL/CMD + H",
+						"CTRL/CMD + I",
+						"CTRL/CMD + J",
+						"CTRL/CMD + K",
+						"CTRL/CMD + L",
+						"CTRL/CMD + M",
+						"CTRL/CMD + N",
+						"CTRL/CMD + O",
+						"CTRL/CMD + P",
+						"CTRL/CMD + Q",
+						"CTRL/CMD + R",
+						"CTRL/CMD + S",
+						"CTRL/CMD + T",
+						"CTRL/CMD + U",
+						"CTRL/CMD + V",
+						"CTRL/CMD + W",
+						"CTRL/CMD + X",
+						"CTRL/CMD + Y",
+						"CTRL/CMD + Z"
+					],
+					"default": "CTRL/CMD + S",
+					"description": "The keybinding for the keyboard shortcut that scrolls the Commits View to the first (or next) stash in the loaded commits. The Shift Key Modifier can be applied to this keybinding to scroll the Commits View to the last (or previous) stash in the loaded commits."
+				},
+				"an-dr-commits.markdown": {
+					"type": "boolean",
+					"default": true,
+					"description": "Parse and render a frequently used subset of inline Markdown formatting rules in commit messages and tag details (bold, italics, bold & italics, and inline code blocks)."
+				},
+				"an-dr-commits.maxDepthOfRepoSearch": {
+					"type": "number",
+					"default": 0,
+					"description": "Specifies the maximum depth of subfolders to search when discovering repositories in the workspace. Note: Sub-repos are not automatically detected when searching subfolders, however they can be manually added by running the command \"Commits: Add Git Repository\" in the Command Palette."
+				},
+				"an-dr-commits.logLevel": {
+					"type": "string",
+					"enum": [
+						"Debug",
+						"Info",
+						"Warning",
+						"Error"
+					],
+					"enumDescriptions": [
+						"Log detailed internal activity, including Git commands and watcher events.",
+						"Log normal extension activity and anything more severe.",
+						"Log only warnings and errors.",
+						"Log only errors."
+					],
+					"default": "Info",
+					"description": "Controls how much Commits writes to the an-dr-commits output channel."
+				},
+				"an-dr-commits.openNewTabEditorGroup": {
+					"type": "string",
+					"enum": [
+						"Active",
+						"Beside",
+						"One",
+						"Two",
+						"Three",
+						"Four",
+						"Five",
+						"Six",
+						"Seven",
+						"Eight",
+						"Nine"
+					],
+					"enumDescriptions": [
+						"Open the new tab in the Active Editor Group.",
+						"Open the new tab beside the Active Editor Group.",
+						"Open the new tab in the First Editor Group.",
+						"Open the new tab in the Second Editor Group.",
+						"Open the new tab in the Third Editor Group.",
+						"Open the new tab in the Fourth Editor Group.",
+						"Open the new tab in the Fifth Editor Group.",
+						"Open the new tab in the Sixth Editor Group.",
+						"Open the new tab in the Seventh Editor Group.",
+						"Open the new tab in the Eighth Editor Group.",
+						"Open the new tab in the Ninth Editor Group."
+					],
+					"default": "Active",
+					"description": "Specifies the Editor Group where Commits should open new tabs, when performing the following actions from the Commits View: Viewing the Visual Studio Code Diff View, Opening a File, Viewing a File at a Specific Revision."
+				},
+				"an-dr-commits.openToTheRepoOfTheActiveTextEditorDocument": {
+					"type": "boolean",
+					"default": false,
+					"description": "Open the Commits View to the repository containing the active Text Editor document."
+				},
+				"an-dr-commits.referenceLabels.alignment": {
+					"type": "string",
+					"enum": [
+						"Normal",
+						"Branches (on the left) & Tags (on the right)",
+						"Branches (aligned to the graph) & Tags (on the right)"
+					],
+					"enumDescriptions": [
+						"Show branch & tag labels on the left of the commit message in the 'Description' column.",
+						"Show branch labels on the left of the commit message in the 'Description' column, and tag labels on the right.",
+						"Show branch labels aligned to the graph in the 'Graph' column, and tag labels on the right in the 'Description' column."
+					],
+					"default": "Normal",
+					"description": "Specifies how branch and tag reference labels are aligned for each commit."
+				},
+				"an-dr-commits.referenceLabels.combineLocalAndRemoteBranchLabels": {
+					"type": "boolean",
+					"default": true,
+					"description": "Combine local and remote branch labels if they refer to the same branch, and are on the same commit."
+				},
+				"an-dr-commits.repository.commits.fetchAvatars": {
+					"type": "boolean",
+					"default": true,
+					"description": "Fetch avatars of commit authors and committers. By enabling this setting, you consent to commit author and committer email addresses being sent GitHub, GitLab or Gravatar, depending on the repositories remote origin."
+				},
+				"an-dr-commits.repository.commits.columnVisibility": {
+					"type": "object",
+					"properties": {
+						"Committed": {
+							"type": "boolean",
+							"title": "Visibility of the Committed column"
+						},
+						"ID": {
+							"type": "boolean",
+							"title": "Visibility of the ID column"
+						}
+					},
+					"default": {
+						"Committed": true,
+						"ID": true
+					},
+					"description": "An object specifying the visibility of the Committed and ID columns. Example: {\"Committed\": true, \"ID\": true}"
+				},
+				"an-dr-commits.repository.commits.committedVisual": {
+					"type": "string",
+					"enum": [
+						"Avatar",
+						"Initials"
+					],
+					"enumDescriptions": [
+						"Render a visual avatar next to committed date/time.",
+						"Render deterministic 2-letter initials next to committed date/time."
+					],
+					"default": "Avatar",
+					"description": "Controls the visual shown in the Committed column."
+				},
+				"an-dr-commits.repository.commits.avatar.mode": {
+					"type": "string",
+					"enum": [
+						"Auto (Fetched then Pattern)",
+						"Fetched Only",
+						"Procedural Pattern",
+						"Disabled"
+					],
+					"enumDescriptions": [
+						"Show fetched avatars when available, otherwise show deterministic procedural patterns.",
+						"Show only fetched avatars (no fallback visual).",
+						"Always show deterministic procedural patterns.",
+						"Don't show any author visual."
+					],
+					"default": "Auto (Fetched then Pattern)",
+					"description": "Controls how author visuals are rendered in the Committed column and Commit Details."
+				},
+				"an-dr-commits.repository.commits.avatar.size": {
+					"type": "string",
+					"enum": [
+						"Normal",
+						"Small"
+					],
+					"default": "Normal",
+					"description": "Controls avatar size in the Committed column."
+				},
+				"an-dr-commits.repository.commits.avatar.shape": {
+					"type": "string",
+					"enum": [
+						"Circle",
+						"Square"
+					],
+					"default": "Circle",
+					"description": "Controls the shape of author visuals in the Committed column and Commit Details."
+				},
+				"an-dr-commits.repository.commits.initialLoad": {
+					"type": "number",
+					"default": 300,
+					"description": "Specifies the number of commits to initially load."
+				},
+				"an-dr-commits.repository.commits.loadMore": {
+					"type": "number",
+					"default": 100,
+					"description": "Specifies the number of additional commits to load when the \"Load More Commits\" button is pressed, or more commits are automatically loaded."
+				},
+				"an-dr-commits.repository.commits.loadMoreAutomatically": {
+					"type": "boolean",
+					"default": true,
+					"description": "When the view has been scrolled to the bottom, automatically load more commits if they exist (instead of having to press the \"Load More Commits\" button)."
+				},
+				"an-dr-commits.repository.commits.mute.commitsThatAreNotAncestorsOfHead": {
+					"type": "boolean",
+					"default": false,
+					"description": "Display commits that aren't ancestors of the checked-out branch / commit with a muted text color. Muting will only occur if the commit referenced by HEAD is within the loaded commits on the Commits View."
+				},
+				"an-dr-commits.repository.commits.mute.mergeCommits": {
+					"type": "boolean",
+					"default": true,
+					"description": "Display merge commits with a muted text color."
+				},
+				"an-dr-commits.repository.commits.order": {
+					"type": "string",
+					"enum": [
+						"date",
+						"author-date",
+						"topo"
+					],
+					"enumDescriptions": [
+						"Show commits in the commit timestamp order.",
+						"Show commits in the author timestamp order.",
+						"Avoid showing commits on multiple lines of history intermixed."
+					],
+					"default": "date",
+					"markdownDescription": "Specifies the order of commits on the Commits View. See [git log](https://git-scm.com/docs/git-log#_commit_ordering) for more information on each order option. This can be overridden per repository via the Commits View's Column Header Context Menu."
+				},
+				"an-dr-commits.repository.commits.showSignatureStatus": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show the commit's signature status to the right of the Committer in the Commit Details View (only for signed commits). Hovering over the signature icon displays a tooltip with the signature details. Requires Git (>= 2.4.0) & GPG (or equivalent) to be installed on the same machine that is running Visual Studio Code."
+				},
+				"an-dr-commits.repository.fetchAndPrune": {
+					"type": "boolean",
+					"default": false,
+					"description": "Before fetching from remote(s) using the Fetch button on the Commits View Control Bar, remove any remote-tracking references that no longer exist on the remote(s)."
+				},
+				"an-dr-commits.repository.fetchAndPruneTags": {
+					"type": "boolean",
+					"default": false,
+					"description": "Before fetching from remote(s) using the Fetch button on the Commits View Control Bar, remove any local tags that no longer exist on the remote(s). Requires Git >= 2.17.0, and the \"Repository: Fetch And Prune\" setting to be enabled. Caution: If you work in repositories that have multiple remotes, it is not recommended to use this setting (instead you can prune tags for a specific remote via \"Fetch Remote\" Dialog from the Repository Settings Widget on the Commits View)."
+				},
+				"an-dr-commits.repository.includeCommitsMentionedByReflogs": {
+					"type": "boolean",
+					"default": false,
+					"description": "Include commits only mentioned by reflogs in the Commits View (only applies when showing all branches). This can be overridden per repository in the Commits View's Repository Settings Widget."
+				},
+				"an-dr-commits.repository.onLoad.scrollToHead": {
+					"type": "boolean",
+					"default": false,
+					"description": "Automatically scroll the Commits View to be centered on the commit referenced by HEAD. This will only occur if the commit referenced by HEAD is within the loaded commits on the Commits View."
+				},
+				"an-dr-commits.repository.onLoad.showCheckedOutBranch": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show the checked out branch when a repository is loaded in the Commits View. This setting can be used in conjunction with \"Repository > On Load: Show Specific Branches\". Default: false (show all branches)"
+				},
+				"an-dr-commits.repository.onLoad.showSpecificBranches": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"description": "A local branch name (e.g. \"master\"), a remote-tracking branch name prefixed with \"remotes/\" (e.g. \"remotes/origin/master\"), or a glob pattern defined in an-dr-commits.customBranchGlobPatterns prefixed with \"--glob=\" (e.g. \"--glob=heads/feature/*\")."
+					},
+					"default": [],
+					"markdownDescription": "Show specific branches when a repository is loaded in the Commits View. Branches can be specified as follows: A local branch name (e.g. `master`), a remote-tracking branch name prefixed with \"remotes/\" (e.g. `remotes/origin/master`), or a glob pattern defined in `an-dr-commits.customBranchGlobPatterns` prefixed with \"--glob=\" (e.g. `--glob=heads/feature/*`). This setting can be used in conjunction with \"Repository > On Load: Show Checked Out Branch\". Default: [] (show all branches)"
+				},
+				"an-dr-commits.repository.onlyFollowFirstParent": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Only follow the first parent of commits when discovering the commits to load in the Commits View. See [--first-parent](https://git-scm.com/docs/git-log#Documentation/git-log.txt---first-parent) to find out more about this setting. This can be overridden per repository in the Commits View's Repository Settings Widget."
+				},
+				"an-dr-commits.repository.showCommitsOnlyReferencedByTags": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show Commits that are only referenced by tags in Commits."
+				},
+				"an-dr-commits.repository.showRemoteBranches": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show Remote Branches in Commits by default. This can be overridden per repository from the Commits View's Control Bar."
+				},
+				"an-dr-commits.repository.showRemoteHeads": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show Remote HEAD Symbolic References in Commits (e.g. \"origin/HEAD\")."
+				},
+				"an-dr-commits.repository.showStashes": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show Stashes in Commits by default. This can be overridden per repository in the Commits View's Repository Settings Widget."
+				},
+				"an-dr-commits.repository.showTags": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show Tags in Commits by default. This can be overridden per repository in the Commits View's Repository Settings Widget."
+				},
+				"an-dr-commits.repository.showUncommittedChanges": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show uncommitted changes. If you work on large repositories, disabling this setting can reduce the load time of the Commits View."
+				},
+				"an-dr-commits.repository.showUntrackedFiles": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show untracked files when viewing the uncommitted changes. If you work on large repositories, disabling this setting can reduce the load time of the Commits View."
+				},
+				"an-dr-commits.repository.sign.commits": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enables commit signing with GPG or X.509."
+				},
+				"an-dr-commits.repository.sign.tags": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enables tag signing with GPG or X.509."
+				},
+				"an-dr-commits.repository.useMailmap": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Respect [.mailmap](https://git-scm.com/docs/git-check-mailmap#_mapping_authors) files when displaying author & committer names and email addresses."
+				},
+				"an-dr-commits.repositoryDropdownOrder": {
+					"type": "string",
+					"enum": [
+						"Full Path",
+						"Name",
+						"Workspace Full Path"
+					],
+					"enumDescriptions": [
+						"Sort repositories alphabetically by the full path of the repository.",
+						"Sort repositories alphabetically by the name of the repository.",
+						"Sort repositories according to the Visual Studio Code Workspace Folder order, then alphabetically by the full path of the repository."
+					],
+					"default": "Workspace Full Path",
+					"description": "Specifies the order that repositories are sorted in the repository dropdown on the Commits View (only visible when more than one repository exists in the current Visual Studio Code Workspace)."
+				},
+				"an-dr-commits.retainContextWhenHidden": {
+					"type": "boolean",
+					"default": true,
+					"description": "Specifies if the Commits View's Visual Studio Code context is kept when the panel is no longer visible (e.g. moved to background tab). Enabling this setting will make Commits load significantly faster when switching back to the Commits tab, however has a higher memory overhead."
+				},
+				"an-dr-commits.branchPanel.flattenSingleChildGroups": {
+					"type": "boolean",
+					"default": true,
+					"description": "Flatten single-child groups in the sidebar tree, so a single grouped ref can appear as e.g. \"release/7.0\" instead of nested folders."
+				},
+				"an-dr-commits.branchPanel.groupsFirst": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show grouped refs above plain refs in the sidebar tree, like directories before files."
+				},
+				"an-dr-commits.branchPanel.showLocalBranchUpstream": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show each local branch's upstream as subtle trailing text in the sidebar, similar to SmartGit."
+				},
+				"an-dr-commits.showStatusBarItem": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show a status bar item that opens Commits when clicked."
+				},
+				"an-dr-commits.statusBarIconOnly": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show only the icon in the status bar item. The full name is still shown in the tooltip."
+				},
+				"an-dr-commits.sourceCodeProviderIntegrationLocation": {
+					"type": "string",
+					"enum": [
+						"Inline",
+						"More Actions"
+					],
+					"enumDescriptions": [
+						"Show the 'View Commits' action on the title of SCM Providers",
+						"Show the 'View Commits' action in the 'More Actions...' menu on the title of SCM Providers"
+					],
+					"default": "Inline",
+					"description": "Specifies where the \"View Commits\" action appears on the title of SCM Providers."
+				},
+				"an-dr-commits.tabIconColourTheme": {
+					"type": "string",
+					"enum": [
+						"colour",
+						"grey"
+					],
+					"enumDescriptions": [
+						"Show a colour icon which suits most Visual Studio Code colour themes",
+						"Show a grey icon which suits Visual Studio Code colour themes that are predominantly grayscale"
+					],
+					"default": "colour",
+					"description": "Specifies the colour theme of the icon displayed on the Commits tab."
+				},
+				"an-dr-commits.autoCenterCommitDetailsView": {
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically center the commit details view when it is opened.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.commitDetailsView.autoCenter",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.commitDetailsView.autoCenter#`"
+				},
+				"an-dr-commits.combineLocalAndRemoteBranchLabels": {
+					"type": "boolean",
+					"default": true,
+					"description": "Combine local and remote branch labels if they refer to the same branch, and are on the same commit.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.referenceLabels.combineLocalAndRemoteBranchLabels",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.referenceLabels.combineLocalAndRemoteBranchLabels#`"
+				},
+				"an-dr-commits.commitDetailsViewFileTreeCompactFolders": {
+					"type": "boolean",
+					"default": true,
+					"description": "Render the File Tree in the Commit Details / Comparison View in a compacted form, such that folders with a single child folder are compressed into a single combined folder element.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.commitDetailsView.fileView.fileTree.compactFolders",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.commitDetailsView.fileView.fileTree.compactFolders#`"
+				},
+				"an-dr-commits.commitDetailsViewLocation": {
+					"type": "string",
+					"enum": [
+						"Inline",
+						"Docked to Bottom"
+					],
+					"enumDescriptions": [
+						"Show the Commit Details View inline with the graph",
+						"Show the Commit Details View docked to the bottom of the Commits view"
+					],
+					"default": "Inline",
+					"description": "Specifies where the Commit Details View is rendered in the Commits view.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.commitDetailsView.location",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.commitDetailsView.location#`"
+				},
+				"an-dr-commits.commitOrdering": {
+					"type": "string",
+					"enum": [
+						"date",
+						"author-date",
+						"topo"
+					],
+					"enumDescriptions": [
+						"Show commits in the commit timestamp order.",
+						"Show commits in the author timestamp order.",
+						"Avoid showing commits on multiple lines of history intermixed."
+					],
+					"default": "date",
+					"markdownDescription": "Specifies the order of commits on the Commits view. See [git log](https://git-scm.com/docs/git-log#_commit_ordering) for more information on each order option.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.order",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.order#`"
+				},
+				"an-dr-commits.dateFormat": {
+					"type": "string",
+					"enum": [
+						"Date & Time",
+						"Date Only",
+						"ISO Date & Time",
+						"ISO Date Only",
+						"Relative"
+					],
+					"enumDescriptions": [
+						"Show the date and time, for example \"24 Mar 2019 21:34\"",
+						"Show the date only, for example \"24 Mar 2019\"",
+						"Show the ISO date and time, for example \"2019-03-24 21:34\"",
+						"Show the ISO date only, for example \"2019-03-24\"",
+						"Show relative times, for example \"5 minutes ago\""
+					],
+					"default": "Date & Time",
+					"description": "Specifies the date format to be used in the \"Date\" column on the Commits View.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.date.format",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.date.format#`"
+				},
+				"an-dr-commits.defaultFileViewType": {
+					"type": "string",
+					"enum": [
+						"File Tree",
+						"File List"
+					],
+					"enumDescriptions": [
+						"Display files in a tree structure",
+						"Display files in a list (useful for repositories with deep folder structures)"
+					],
+					"default": "File Tree",
+					"description": "Sets the default type of File View used in the Commit Details / Comparison Views. This can be overridden per repository using the controls on the right side of the Commit Details / Comparison Views.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.commitDetailsView.fileView.type",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.commitDetailsView.fileView.type#`"
+				},
+				"an-dr-commits.fetchAndPrune": {
+					"type": "boolean",
+					"default": false,
+					"description": "Before fetching from remote(s) using the Fetch button on the Commits View Control Bar, remove any remote-tracking references that no longer exist on the remote(s).",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.fetchAndPrune",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.fetchAndPrune#`"
+				},
+				"an-dr-commits.fetchAvatars": {
+					"type": "boolean",
+					"default": false,
+					"description": "Fetch avatars of commit authors and committers. By enabling this setting, you consent to commit author and committer email addresses being sent GitHub, GitLab or Gravatar, depending on the repositories remote origin.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.fetchAvatars",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.fetchAvatars#`"
+				},
+				"an-dr-commits.graphColours": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"description": "Colour (HEX or RGB)",
+						"pattern": "^\\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{8}|rgb[a]?\\s*\\(\\d{1,3},\\s*\\d{1,3},\\s*\\d{1,3}\\))\\s*$"
+					},
+					"default": [
+						"#6ba2f2",
+						"#ca3a7d",
+						"#f3b33e",
+						"#61aea6",
+						"#ac70f7"
+					],
+					"description": "Specifies the colours used on the graph.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.graph.colours",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.graph.colours#`"
+				},
+				"an-dr-commits.graphStyle": {
+					"type": "string",
+					"enum": [
+						"rounded",
+						"angular"
+					],
+					"enumDescriptions": [
+						"Use smooth curves when transitioning between branches on the graph",
+						"Use angular lines when transitioning between branches on the graph"
+					],
+					"default": "rounded",
+					"description": "Specifies the style of the graph.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.graph.style",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.graph.style#`"
+				},
+				"an-dr-commits.includeCommitsMentionedByReflogs": {
+					"type": "boolean",
+					"default": false,
+					"description": "Include commits only mentioned by reflogs in the Commits View (only applies when showing all branches). This can be overridden per repository in the Commits View's Repository Settings Widget.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.includeCommitsMentionedByReflogs",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.includeCommitsMentionedByReflogs#`"
+				},
+				"an-dr-commits.initialLoadCommits": {
+					"type": "number",
+					"default": 300,
+					"description": "Specifies the number of commits to initially load.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.initialLoad",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.initialLoad#`"
+				},
+				"an-dr-commits.loadMoreCommits": {
+					"type": "number",
+					"default": 100,
+					"description": "Specifies the number of additional commits to load when the \"Load More Commits\" button is pressed, or more commits are automatically loaded.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.loadMore",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.loadMore#`"
+				},
+				"an-dr-commits.loadMoreCommitsAutomatically": {
+					"type": "boolean",
+					"default": true,
+					"description": "When the view has been scrolled to the bottom, automatically load more commits if they exist (instead of having to press the \"Load More Commits\" button).",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.loadMoreAutomatically",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.loadMoreAutomatically#`"
+				},
+				"an-dr-commits.muteCommitsThatAreNotAncestorsOfHead": {
+					"type": "boolean",
+					"default": false,
+					"description": "Display commits that aren't ancestors of the checked-out branch / commit with a muted text color. Muting will only occur if the commit referenced by HEAD is within the loaded commits on the Commits View.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.mute.commitsThatAreNotAncestorsOfHead",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.mute.commitsThatAreNotAncestorsOfHead#`"
+				},
+				"an-dr-commits.muteMergeCommits": {
+					"type": "boolean",
+					"default": true,
+					"description": "Display merge commits with a muted text color.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.mute.mergeCommits",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.mute.mergeCommits#`"
+				},
+				"an-dr-commits.onlyFollowFirstParent": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Only follow the first parent of commits when discovering the commits to load in the Commits View. See [--first-parent](https://git-scm.com/docs/git-log#Documentation/git-log.txt---first-parent) to find out more about this setting.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.onlyFollowFirstParent",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.onlyFollowFirstParent#`"
+				},
+				"an-dr-commits.openDiffTabLocation": {
+					"type": "string",
+					"enum": [
+						"Active",
+						"Beside",
+						"One",
+						"Two",
+						"Three",
+						"Four",
+						"Five",
+						"Six",
+						"Seven",
+						"Eight",
+						"Nine"
+					],
+					"enumDescriptions": [
+						"Open the Visual Studio Code Diff View in the Active Editor Group.",
+						"Open the Visual Studio Code Diff View beside the Active Editor Group.",
+						"Open the Visual Studio Code Diff View in the First Editor Group.",
+						"Open the Visual Studio Code Diff View in the Second Editor Group.",
+						"Open the Visual Studio Code Diff View in the Third Editor Group.",
+						"Open the Visual Studio Code Diff View in the Fourth Editor Group.",
+						"Open the Visual Studio Code Diff View in the Fifth Editor Group.",
+						"Open the Visual Studio Code Diff View in the Sixth Editor Group.",
+						"Open the Visual Studio Code Diff View in the Seventh Editor Group.",
+						"Open the Visual Studio Code Diff View in the Eighth Editor Group.",
+						"Open the Visual Studio Code Diff View in the Ninth Editor Group."
+					],
+					"default": "Active",
+					"description": "Specifies which Editor Group the Visual Studio Code Diff View is opened in.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.openNewTabEditorGroup",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.openNewTabEditorGroup#`"
+				},
+				"an-dr-commits.openRepoToHead": {
+					"type": "boolean",
+					"default": false,
+					"description": "When opening or switching repositories in the Commits View, automatically scroll the view to be centered on the commit referenced by HEAD. This will only occur if the commit referenced by HEAD is within the loaded commits on the Commits View.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.onLoad.scrollToHead",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.onLoad.scrollToHead#`"
+				},
+				"an-dr-commits.referenceLabelAlignment": {
+					"type": "string",
+					"enum": [
+						"Normal",
+						"Branches (on the left) & Tags (on the right)",
+						"Branches (aligned to the graph) & Tags (on the right)"
+					],
+					"enumDescriptions": [
+						"Show branch & tag labels on the left of the commit message in the 'Description' column.",
+						"Show branch labels on the left of the commit message in the 'Description' column, and tag labels on the right.",
+						"Show branch labels aligned to the graph in the 'Graph' column, and tag labels on the right in the 'Description' column."
+					],
+					"default": "Normal",
+					"description": "Specifies how branch and tag reference labels are aligned for each commit.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.referenceLabels.alignment",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.referenceLabels.alignment#`"
+				},
+				"an-dr-commits.showCommitsOnlyReferencedByTags": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show commits that are only referenced by tags in Commits.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.showCommitsOnlyReferencedByTags",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.showCommitsOnlyReferencedByTags#`"
+				},
+				"an-dr-commits.showCurrentBranchByDefault": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show the current branch by default when Commits is opened. Default: false (show all branches)",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.onLoad.showCheckedOutBranch",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.onLoad.showCheckedOutBranch#`"
+				},
+				"an-dr-commits.showSignatureStatus": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show the commit's signature status to the right of the Committer in the Commit Details View (only for signed commits). Hovering over the signature icon displays a tooltip with the signature details. Requires Git (>= 2.4.0) & GPG (or equivalent) to be installed on the same machine that is running Visual Studio Code.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.commits.showSignatureStatus",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.commits.showSignatureStatus#`"
+				},
+				"an-dr-commits.showTags": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show Tags in Commits by default. This can be overridden per repository in the Commits View's Repository Settings Widget.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.showTags",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.showTags#`"
+				},
+				"an-dr-commits.showUncommittedChanges": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show uncommitted changes. If you work on large repositories, disabling this setting can reduce the load time of the Commits View.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.showUncommittedChanges",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.showUncommittedChanges#`"
+				},
+				"an-dr-commits.showUntrackedFiles": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show untracked files when viewing the uncommitted changes. If you work on large repositories, disabling this setting can reduce the load time of the Commits View.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.showUntrackedFiles",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.showUntrackedFiles#`"
+				},
+				"an-dr-commits.useMailmap": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Respect [.mailmap](https://git-scm.com/docs/git-check-mailmap#_mapping_authors) files when displaying author & committer names and email addresses.",
+					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.repository.useMailmap",
+					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.useMailmap#`"
+				}
+			}
+		},
+		"menus": {
+			"commandPalette": [
+				{
+					"command": "an-dr-commits.openFile",
+					"when": "isInDiffEditor && resourceScheme == an-dr-commits && an-dr-commits:codiconsSupported"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "an-dr-commits.openFile",
+					"group": "navigation",
+					"when": "isInDiffEditor && resourceScheme == an-dr-commits && an-dr-commits:codiconsSupported"
+				}
+			],
+			"scm/title": [
+				{
+					"when": "scmProvider == git && config.an-dr-commits.sourceCodeProviderIntegrationLocation == 'Inline'",
+					"command": "an-dr-commits.view",
+					"group": "navigation"
+				},
+				{
+					"when": "scmProvider == git && config.an-dr-commits.sourceCodeProviderIntegrationLocation == 'More Actions'",
+					"command": "an-dr-commits.view",
+					"group": "inline"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"vscode:uninstall": "node ./out/life-cycle/uninstall.js",
+		"clean": "node ./.vscode/clean.js",
+		"compile": "npm run clean && npm run compile-src && npm run compile-web",
+		"compile-src": "tsc -p ./src && node ./.vscode/package-src.js",
+		"compile-web": "tsc -p ./web && node ./.vscode/package-web.js",
+		"compile-web-debug": "tsc -p ./web && node ./.vscode/package-web.js debug",
+		"lint": "eslint -c .eslintrc.json --max-warnings 0 --ext .ts ./src ./tests ./web",
+		"package": "vsce package",
+		"package-and-install": "npm run package && node ./.vscode/install-package.js",
+		"test": "jest --verbose",
+		"test-and-report-coverage": "jest --verbose --coverage"
+	},
+	"dependencies": {
+		"iconv-lite": "0.5.0"
+	},
+	"devDependencies": {
+		"@types/jest": "26.0.19",
+		"@types/node": "8.10.62",
+		"@types/vscode": "1.38.0",
+		"@typescript-eslint/eslint-plugin": "4.10.0",
+		"@typescript-eslint/parser": "4.10.0",
+		"eslint": "7.15.0",
+		"jest": "26.6.3",
+		"ts-jest": "26.4.4",
+		"typescript": "4.0.2",
+		"uglify-js": "3.10.0"
+	}
+}

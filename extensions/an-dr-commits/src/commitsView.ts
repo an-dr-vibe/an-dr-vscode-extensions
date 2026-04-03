@@ -741,6 +741,13 @@ export class CommitsView extends Disposable {
 					error: await viewDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath, msg.type)
 				});
 				break;
+			case 'getFileDiff':
+				this.sendMessage({
+					command: 'getFileDiff',
+					diff: await this.dataSource.getFileDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath),
+					error: null
+				});
+				break;
 			case 'viewDiffWithWorkingFile':
 				this.sendMessage({
 					command: 'viewDiffWithWorkingFile',

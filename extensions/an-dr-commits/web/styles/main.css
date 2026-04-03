@@ -671,6 +671,60 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	border-top:2px solid rgba(128,128,128,0.2);
 }
 
+#cdvTopRow{
+	position:absolute;
+	left:0;
+	right:0;
+	top:0;
+	overflow:hidden;
+}
+#cdvRowDivider{
+	display:none;
+	position:absolute;
+	left:0;
+	right:0;
+	height:6px;
+	cursor:row-resize;
+	border-top:2px solid rgba(128,128,128,0.25);
+	z-index:1;
+}
+#cdvDiffPreview{
+	display:none;
+	position:absolute;
+	left:0;
+	right:0;
+	bottom:0;
+	overflow-x:auto;
+	overflow-y:auto;
+	font-family:var(--vscode-editor-font-family,monospace);
+	font-size:12px;
+	padding:4px 0;
+}
+.cdvDiffMessage{
+	color:rgba(128,128,128,0.6);
+	text-align:center;
+	padding-top:20px;
+	user-select:none;
+	-webkit-user-select:none;
+}
+.diffUnifiedView div{
+	white-space:pre;
+	padding:0 8px;
+	min-width:100%;
+	box-sizing:border-box;
+}
+.diffAdded{background:rgba(0,160,0,0.15);}
+.diffRemoved{background:rgba(200,0,0,0.15);}
+.diffHunk{color:rgba(100,150,255,0.9);font-style:italic;}
+.diffFileHeader{color:rgba(128,128,128,0.7);font-size:11px;}
+.diffNoNewline{color:rgba(128,128,128,0.6);font-style:italic;}
+.diffSideBySide{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--vscode-editor-font-family,monospace);}
+.diffSideBySide td{width:50%;vertical-align:top;white-space:pre;padding:0 8px;box-sizing:border-box;}
+.diffSideBySide td span{display:block;}
+.diffSbsLeft{border-right:1px solid rgba(128,128,128,0.2);}
+.diffSbsAdded{background:rgba(0,160,0,0.15);}
+.diffSbsRemoved{background:rgba(200,0,0,0.15);}
+
 
 /* File Tree */
 

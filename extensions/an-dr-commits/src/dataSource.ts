@@ -472,6 +472,35 @@ export class DataSource extends Disposable {
 		});
 	}
 
+	/**
+	 * Get the unified diff of a file between two commits, for inline display.
+	 * @param repo The path of the repository.
+	 * @param fromHash The commit hash the diff is from.
+	 * @param toHash The commit hash the diff is to.
+	 * @param oldFilePath The old file path.
+	 * @param newFilePath The new file path (may differ from oldFilePath for renames).
+	 * @returns The unified diff string, or null on error.
+	 */
+	public getFileDiff(repo: string, fromHash: string, toHash: string, oldFilePath: string, newFilePath: string): Promise<string | null> {
+		let args: string[];
+		if (fromHash === toHash) {
+			if (toHash === UNCOMMITTED) {
+				args = ['diff', 'HEAD', '--', oldFilePath];
+			} else {
+				args = ['show', '--format=', '--patch', toHash, '--', oldFilePath];
+				if (newFilePath !== oldFilePath) args.push(newFilePath);
+			}
+		} else {
+			if (toHash === UNCOMMITTED) {
+				args = ['diff', fromHash, '--', oldFilePath];
+			} else {
+				args = ['diff', fromHash, toHash, '--', oldFilePath];
+				if (newFilePath !== oldFilePath) args.push(newFilePath);
+			}
+		}
+		return this.spawnGit(args, repo, (stdout) => stdout).catch(() => null);
+	}
+
 
 	/* Get Data Methods - General */
 

@@ -201,6 +201,7 @@ export type PullRequestConfig = PullRequestConfigBuiltIn | PullRequestConfigCust
 export interface GitRepoState {
 	cdvDivider: number;
 	cdvHeight: number;
+	cdvTopRowRatio: number;
 	columnWidths: ColumnWidth[] | null;
 	commitOrdering: RepoCommitOrdering;
 	fileViewType: FileViewType;
@@ -1439,6 +1440,19 @@ export interface ResponseViewDiff extends ResponseWithErrorInfo {
 	readonly command: 'viewDiff';
 }
 
+export interface RequestGetFileDiff extends RepoRequest {
+	readonly command: 'getFileDiff';
+	readonly fromHash: string;
+	readonly toHash: string;
+	readonly oldFilePath: string;
+	readonly newFilePath: string;
+}
+export interface ResponseGetFileDiff extends BaseMessage {
+	readonly command: 'getFileDiff';
+	readonly diff: string | null;
+	readonly error: ErrorInfo;
+}
+
 export interface RequestViewDiffWithWorkingFile extends RepoRequest {
 	readonly command: 'viewDiffWithWorkingFile';
 	readonly hash: string;
@@ -1532,6 +1546,7 @@ export type RequestMessage =
 	| RequestTagDetails
 	| RequestUpdateCodeReview
 	| RequestViewDiff
+	| RequestGetFileDiff
 	| RequestViewDiffWithWorkingFile
 	| RequestViewFileAtRevision
 	| RequestViewScm;
@@ -1601,6 +1616,7 @@ export type ResponseMessage =
 	| ResponseTagDetails
 	| ResponseUpdateCodeReview
 	| ResponseViewDiff
+	| ResponseGetFileDiff
 	| ResponseViewDiffWithWorkingFile
 	| ResponseViewFileAtRevision
 	| ResponseViewScm;

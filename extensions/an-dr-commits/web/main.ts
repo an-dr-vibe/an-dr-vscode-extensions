@@ -61,6 +61,9 @@ class CommitsView {
 
 	private moreCommitsAvailable: boolean = false;
 	private expandedCommit: ExpandedCommit | null = null;
+	private diffViewMode: 'unified' | 'sideBySide' = 'unified';
+	private currentDiffText: string | null = null;
+	private diffPaneVisible: boolean = false;
 	private selectedCommits: Set<string> = new Set();
 	private lastSelectedIndex: number = -1;
 	private maxCommits: number;
@@ -3743,7 +3746,11 @@ class CommitsView {
 					this.updateCompactFindWidgetState();
 					handledEvent(e);
 				} else if (this.expandedCommit !== null) {
-					this.closeCommitDetails(true);
+					if (this.diffPaneVisible) {
+						this.hideDiffPane();
+					} else {
+						this.closeCommitDetails(true);
+					}
 					handledEvent(e);
 				}
 			}
@@ -4224,7 +4231,12 @@ class CommitsView {
 		const expandedCommit = this.expandedCommit;
 		if (expandedCommit === null || expandedCommit.commitElem === null) return;
 
-		let elem = document.getElementById('cdv'), html = '<div id="cdvContent">', isDocked = this.isCdvDocked();
+		if (!refresh) {
+			this.currentDiffText = null;
+			this.diffPaneVisible = false;
+		}
+
+		let elem = document.getElementById('cdv'), html = '<div id="cdvContent"><div id="cdvTopRow">', isDocked = this.isCdvDocked();
 		const commitOrder = this.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
 		const codeReviewPossible = !expandedCommit.loading && commitOrder.to !== UNCOMMITTED;
 		const externalDiffPossible = !expandedCommit.loading && (expandedCommit.compareWithHash !== null || this.commits[this.commitLookup[expandedCommit.commitHash]].parents.length > 0);
@@ -4285,14 +4297,17 @@ class CommitsView {
 			}
 			html += '</div><div id="cdvFiles">' + generateFileViewHtml(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, this.getFileViewType(), commitOrder.to === UNCOMMITTED) + '</div><div id="cdvDivider"></div>';
 		}
-		html += '</div><div id="cdvControls"><div id="cdvClose" class="cdvControlBtn" title="Close">' + SVG_ICONS.close + '</div>' +
+		html += '</div><div id="cdvRowDivider"></div><div id="cdvDiffPreview"></div></div>' +
+			'<div id="cdvControls"><div id="cdvClose" class="cdvControlBtn" title="Close">' + SVG_ICONS.close + '</div>' +
 			(codeReviewPossible ? '<div id="cdvCodeReview" class="cdvControlBtn">' + SVG_ICONS.review + '</div>' : '') +
-			(!expandedCommit.loading ? '<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div><div id="cdvFileViewTypeList" class="cdvControlBtn cdvFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' : '') +
+			(!expandedCommit.loading ? '<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div><div id="cdvFileViewTypeList" class="cdvControlBtn cdvFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
+				'<div id="cdvDiffViewUnified" class="cdvControlBtn cdvDiffViewBtn" title="Unified Diff">' + SVG_ICONS.diffUnified + '</div><div id="cdvDiffViewSideBySide" class="cdvControlBtn cdvDiffViewBtn" title="Side by Side Diff">' + SVG_ICONS.diffSideBySide + '</div>' : '') +
 			(externalDiffPossible ? '<div id="cdvExternalDiff" class="cdvControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '') +
 			'</div><div class="cdvHeightResize"></div>';
 
 		elem.innerHTML = isDocked ? html : '<td><div class="cdvHeightResize"></div></td><td colspan="' + (this.getNumColumns() - 1) + '">' + html + '</td>';
 		if (!expandedCommit.loading) this.setCdvDivider();
+		this.setCdvRowSplit();
 		if (!isDocked) this.renderGraph();
 
 		if (!refresh) {
@@ -4328,9 +4343,12 @@ class CommitsView {
 			this.closeCommitDetails(true);
 		});
 
+		this.makeCdvRowDividerDraggable();
+
 		if (!expandedCommit.loading) {
 			this.makeCdvFileViewInteractive();
 			this.renderCdvFileViewTypeBtns();
+			this.renderCdvDiffViewBtns();
 			this.renderCdvExternalDiffBtn();
 			this.makeCdvDividerDraggable();
 
@@ -4358,6 +4376,14 @@ class CommitsView {
 
 			document.getElementById('cdvFileViewTypeList')!.addEventListener('click', () => {
 				this.changeFileViewType(GG.FileViewType.List);
+			});
+
+			document.getElementById('cdvDiffViewUnified')!.addEventListener('click', () => {
+				this.changeDiffViewMode('unified');
+			});
+
+			document.getElementById('cdvDiffViewSideBySide')!.addEventListener('click', () => {
+				this.changeDiffViewMode('sideBySide');
 			});
 
 			if (codeReviewPossible) {
@@ -4415,6 +4441,180 @@ class CommitsView {
 		let heightPx = height + 'px';
 		elem.style.height = heightPx;
 		if (isDocked) this.viewElem.style.bottom = heightPx;
+		this.setCdvRowSplit();
+	}
+
+	private setCdvRowSplit() {
+		const topRowElem = document.getElementById('cdvTopRow');
+		if (!topRowElem) return;
+
+		if (!this.diffPaneVisible) {
+			topRowElem.style.height = '100%';
+			return;
+		}
+
+		const contentElem = document.getElementById('cdvContent');
+		const rowDividerElem = document.getElementById('cdvRowDivider');
+		const diffPreviewElem = document.getElementById('cdvDiffPreview');
+		if (!contentElem || !rowDividerElem || !diffPreviewElem) return;
+
+		const ratio = this.gitRepos[this.currentRepo].cdvTopRowRatio;
+		const totalH = contentElem.clientHeight;
+		const topH = Math.round(totalH * ratio);
+		topRowElem.style.height = topH + 'px';
+		rowDividerElem.style.top = topH + 'px';
+		diffPreviewElem.style.top = (topH + 6) + 'px';
+	}
+
+	private showDiffPane() {
+		this.diffPaneVisible = true;
+		const rowDividerElem = document.getElementById('cdvRowDivider');
+		const diffPreviewElem = document.getElementById('cdvDiffPreview');
+		if (rowDividerElem) rowDividerElem.style.display = 'block';
+		if (diffPreviewElem) diffPreviewElem.style.display = 'block';
+		this.setCdvRowSplit();
+	}
+
+	private hideDiffPane() {
+		this.diffPaneVisible = false;
+		this.currentDiffText = null;
+		const topRowElem = document.getElementById('cdvTopRow');
+		const rowDividerElem = document.getElementById('cdvRowDivider');
+		const diffPreviewElem = document.getElementById('cdvDiffPreview');
+		if (topRowElem) topRowElem.style.height = '100%';
+		if (rowDividerElem) rowDividerElem.style.display = 'none';
+		if (diffPreviewElem) diffPreviewElem.style.display = 'none';
+	}
+
+	private makeCdvRowDividerDraggable() {
+		let prevY = -1;
+
+		const processResizingRowDivider: EventListener = (e) => {
+			if (prevY < 0) return;
+			const contentElem = document.getElementById('cdvContent');
+			if (!contentElem) return;
+			const delta = (<MouseEvent>e).pageY - prevY;
+			prevY = (<MouseEvent>e).pageY;
+			const totalH = contentElem.clientHeight;
+			if (totalH === 0) return;
+			let ratio = this.gitRepos[this.currentRepo].cdvTopRowRatio + delta / totalH;
+			if (ratio < 0.15) ratio = 0.15;
+			else if (ratio > 0.85) ratio = 0.85;
+			if (this.gitRepos[this.currentRepo].cdvTopRowRatio !== ratio) {
+				this.gitRepos[this.currentRepo].cdvTopRowRatio = ratio;
+				this.setCdvRowSplit();
+			}
+		};
+		const stopResizingRowDivider: EventListener = (e) => {
+			if (prevY < 0) return;
+			processResizingRowDivider(e);
+			this.saveRepoState();
+			prevY = -1;
+			eventOverlay.remove();
+		};
+
+		const rowDividerElem = document.getElementById('cdvRowDivider');
+		if (rowDividerElem !== null) {
+			rowDividerElem.addEventListener('mousedown', (e) => {
+				prevY = (<MouseEvent>e).pageY;
+				eventOverlay.create('rowResize', processResizingRowDivider, stopResizingRowDivider);
+			});
+		}
+	}
+
+	private renderCdvDiffViewBtns() {
+		const unifiedBtn = document.getElementById('cdvDiffViewUnified');
+		const sbsBtn = document.getElementById('cdvDiffViewSideBySide');
+		if (!unifiedBtn || !sbsBtn) return;
+		const isSbs = this.diffViewMode === 'sideBySide';
+		alterClass(unifiedBtn, CLASS_ACTIVE, !isSbs);
+		alterClass(sbsBtn, CLASS_ACTIVE, isSbs);
+	}
+
+	private changeDiffViewMode(mode: 'unified' | 'sideBySide') {
+		this.diffViewMode = mode;
+		this.renderCdvDiffViewBtns();
+		if (this.currentDiffText !== null) {
+			this.renderDiffPreview(this.currentDiffText);
+		}
+	}
+
+	public renderDiffPreview(diff: string | null) {
+		this.currentDiffText = diff;
+		const previewElem = document.getElementById('cdvDiffPreview');
+		if (!previewElem) return;
+
+		if (diff === null) {
+			previewElem.innerHTML = '<div class="cdvDiffMessage">Unable to load diff</div>';
+		} else if (diff === '') {
+			previewElem.innerHTML = '<div class="cdvDiffMessage">No changes</div>';
+		} else if (this.diffViewMode === 'sideBySide') {
+			previewElem.innerHTML = this.buildSideBySideDiff(diff);
+		} else {
+			previewElem.innerHTML = this.buildUnifiedDiff(diff);
+		}
+		this.showDiffPane();
+		previewElem.scrollTop = 0;
+	}
+
+	private buildUnifiedDiff(diff: string): string {
+		const lines = diff.split('\n');
+		let html = '<div class="diffUnifiedView">';
+		for (const line of lines) {
+			if (line.startsWith('+++ ') || line.startsWith('--- ')) {
+				html += '<div class="diffFileHeader">' + escapeHtml(line) + '</div>';
+			} else if (line.startsWith('@@')) {
+				html += '<div class="diffHunk">' + escapeHtml(line) + '</div>';
+			} else if (line.startsWith('+')) {
+				html += '<div class="diffAdded">' + escapeHtml(line) + '</div>';
+			} else if (line.startsWith('-')) {
+				html += '<div class="diffRemoved">' + escapeHtml(line) + '</div>';
+			} else if (line === '\\ No newline at end of file') {
+				html += '<div class="diffNoNewline">' + escapeHtml(line) + '</div>';
+			} else {
+				html += '<div class="diffContext">' + escapeHtml(line) + '</div>';
+			}
+		}
+		return html + '</div>';
+	}
+
+	private buildSideBySideDiff(diff: string): string {
+		// Parse hunks out of the unified diff and pair removed/added lines
+		const lines = diff.split('\n');
+		let html = '<table class="diffSideBySide"><tbody>';
+
+		let removed: string[] = [], added: string[] = [];
+
+		const flushPair = () => {
+			const len = Math.max(removed.length, added.length);
+			for (let i = 0; i < len; i++) {
+				const l = i < removed.length ? '<td class="diffSbsLeft diffSbsRemoved"><span>' + escapeHtml(removed[i].slice(1)) + '</span></td>' : '<td class="diffSbsLeft"></td>';
+				const r = i < added.length ? '<td class="diffSbsRight diffSbsAdded"><span>' + escapeHtml(added[i].slice(1)) + '</span></td>' : '<td class="diffSbsRight"></td>';
+				html += '<tr>' + l + r + '</tr>';
+			}
+			removed = [];
+			added = [];
+		};
+
+		for (const line of lines) {
+			if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+				flushPair();
+				html += '<tr><td colspan="2" class="diffFileHeader">' + escapeHtml(line) + '</td></tr>';
+			} else if (line.startsWith('@@')) {
+				flushPair();
+				html += '<tr><td colspan="2" class="diffHunk">' + escapeHtml(line) + '</td></tr>';
+			} else if (line.startsWith('+')) {
+				added.push(line);
+			} else if (line.startsWith('-')) {
+				removed.push(line);
+			} else {
+				flushPair();
+				html += '<tr><td class="diffSbsLeft diffContext"><span>' + escapeHtml(line.startsWith(' ') ? line.slice(1) : line) + '</span></td><td class="diffSbsRight diffContext"><span>' + escapeHtml(line.startsWith(' ') ? line.slice(1) : line) + '</span></td></tr>';
+			}
+		}
+		flushPair();
+
+		return html + '</tbody></table>';
 	}
 
 	private setCdvDivider() {
@@ -4623,13 +4823,12 @@ class CommitsView {
 
 			this.cdvUpdateFileState(file, fileElem, true, true);
 			sendMessage({
-				command: 'viewDiff',
+				command: 'getFileDiff',
 				repo: this.currentRepo,
 				fromHash: fromHash,
 				toHash: toHash,
 				oldFilePath: file.oldFilePath,
-				newFilePath: file.newFilePath,
-				type: fileStatus
+				newFilePath: file.newFilePath
 			});
 		};
 
@@ -5152,6 +5351,9 @@ function bootstrap() {
 				break;
 			case 'viewDiff':
 				finishOrDisplayError(msg.error, 'Unable to View Diff');
+				break;
+			case 'getFileDiff':
+				commits.renderDiffPreview(msg.error !== null ? null : msg.diff);
 				break;
 			case 'viewDiffWithWorkingFile':
 				finishOrDisplayError(msg.error, 'Unable to View Diff with Working File');

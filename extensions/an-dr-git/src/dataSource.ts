@@ -1631,9 +1631,9 @@ export class DataSource extends Disposable {
 					}
 				}
 				if (isGui) {
-					this.logger.log('External diff tool is being opened (' + args[args.length - 1] + ')');
+					this.logger.logDebug('External diff tool is being opened (' + args[args.length - 1] + ')');
 					this.runGitCommand(args, repo).then((errorInfo) => {
-						this.logger.log('External diff tool has exited (' + args[args.length - 1] + ')');
+						this.logger.logDebug('External diff tool has exited (' + args[args.length - 1] + ')');
 						if (errorInfo !== null) {
 							const errorMessage = errorInfo.replace(EOL_REGEX, ' ');
 							this.logger.logError(errorMessage);

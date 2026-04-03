@@ -17,6 +17,7 @@ export {
 	FileViewType,
 	GraphStyle,
 	GraphUncommittedChangesStyle,
+	LogLevel,
 	RefLabelAlignment,
 	RepoCommitOrdering,
 	RepoDropdownOrder,

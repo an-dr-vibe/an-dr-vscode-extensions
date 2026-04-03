@@ -210,7 +210,7 @@ export class AvatarManager extends Disposable {
 			return;
 		}
 
-		this.logger.log('Requesting Avatar for ' + maskEmail(avatarRequest.email) + ' from GitHub');
+		this.logger.logDebug('Requesting Avatar for ' + maskEmail(avatarRequest.email) + ' from GitHub');
 
 		const commitIndex = avatarRequest.commits.length < 5
 			? avatarRequest.commits.length - 1 - avatarRequest.attempts
@@ -237,7 +237,7 @@ export class AvatarManager extends Disposable {
 				if (res.headers['x-ratelimit-remaining'] === '0') {
 					// If the GitHub Api rate limit was reached, store the github timeout to prevent subsequent requests
 					this.githubTimeout = parseInt(<string>res.headers['x-ratelimit-reset']) * 1000;
-					this.logger.log('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
+					this.logger.logWarning('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
 				}
 
 				if (res.statusCode === 200) { // Success
@@ -247,7 +247,7 @@ export class AvatarManager extends Disposable {
 						if (img !== null) {
 							this.saveAvatar(avatarRequest.email, img, false);
 						} else {
-							this.logger.log('Failed to download avatar from GitHub for ' + maskEmail(avatarRequest.email));
+							this.logger.logWarning('Failed to download avatar from GitHub for ' + maskEmail(avatarRequest.email));
 						}
 						return;
 					}
@@ -284,7 +284,7 @@ export class AvatarManager extends Disposable {
 			return;
 		}
 
-		this.logger.log('Requesting Avatar for ' + maskEmail(avatarRequest.email) + ' from GitLab');
+		this.logger.logDebug('Requesting Avatar for ' + maskEmail(avatarRequest.email) + ' from GitLab');
 
 		let triggeredOnError = false;
 		const onError = () => {
@@ -307,7 +307,7 @@ export class AvatarManager extends Disposable {
 				if (res.headers['ratelimit-remaining'] === '0') {
 					// If the GitLab Api rate limit was reached, store the gitlab timeout to prevent subsequent requests
 					this.gitLabTimeout = parseInt(<string>res.headers['ratelimit-reset']) * 1000;
-					this.logger.log('GitLab API Rate Limit Reached - Paused fetching from GitLab until the Rate Limit is reset');
+					this.logger.logWarning('GitLab API Rate Limit Reached - Paused fetching from GitLab until the Rate Limit is reset');
 				}
 
 				if (res.statusCode === 200) { // Success
@@ -317,7 +317,7 @@ export class AvatarManager extends Disposable {
 						if (img !== null) {
 							this.saveAvatar(avatarRequest.email, img, false);
 						} else {
-							this.logger.log('Failed to download avatar from GitLab for ' + maskEmail(avatarRequest.email));
+							this.logger.logWarning('Failed to download avatar from GitLab for ' + maskEmail(avatarRequest.email));
 						}
 						return;
 					}
@@ -342,7 +342,7 @@ export class AvatarManager extends Disposable {
 	 * @param avatarRequest The avatar request to fetch.
 	 */
 	private async fetchFromGravatar(avatarRequest: AvatarRequestItem) {
-		this.logger.log('Requesting Avatar for ' + maskEmail(avatarRequest.email) + ' from Gravatar');
+		this.logger.logDebug('Requesting Avatar for ' + maskEmail(avatarRequest.email) + ' from Gravatar');
 		const hash: string = crypto.createHash('md5').update(avatarRequest.email.trim().toLowerCase()).digest('hex');
 
 		let img = await this.downloadAvatarImage(avatarRequest.email, 'https://secure.gravatar.com/avatar/' + hash + '?s=162&d=404'), identicon = false;
@@ -354,7 +354,7 @@ export class AvatarManager extends Disposable {
 		if (img !== null) {
 			this.saveAvatar(avatarRequest.email, img, identicon);
 		} else {
-			this.logger.log('No Avatar could be found for ' + maskEmail(avatarRequest.email));
+			this.logger.logDebug('No Avatar could be found for ' + maskEmail(avatarRequest.email));
 		}
 	}
 
@@ -441,13 +441,13 @@ export class AvatarManager extends Disposable {
 			this.avatars[email] = { image: image, timestamp: (new Date()).getTime(), identicon: identicon };
 		}
 		this.extensionState.saveAvatar(email, this.avatars[email]);
-		this.logger.log('Saved Avatar for ' + maskEmail(email));
+		this.logger.logDebug('Saved Avatar for ' + maskEmail(email));
 		this.emitAvatar(email).then(
-			(sent) => this.logger.log(sent
+			(sent) => this.logger.logDebug(sent
 				? 'Sent Avatar for ' + maskEmail(email) + ' to the Git Graph View'
 				: 'Avatar for ' + maskEmail(email) + ' is ready to be used the next time the Git Graph View is opened'
 			),
-			() => this.logger.log('Failed to Send Avatar for ' + maskEmail(email) + ' to the Git Graph View')
+			() => this.logger.logWarning('Failed to Send Avatar for ' + maskEmail(email) + ' to the Git Graph View')
 		);
 	}
 }

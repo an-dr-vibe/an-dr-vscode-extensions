@@ -883,6 +883,23 @@
 					"default": 0,
 					"description": "Specifies the maximum depth of subfolders to search when discovering repositories in the workspace. Note: Sub-repos are not automatically detected when searching subfolders, however they can be manually added by running the command \"Git Graph: Add Git Repository\" in the Command Palette."
 				},
+				"an-dr-git.logLevel": {
+					"type": "string",
+					"enum": [
+						"Debug",
+						"Info",
+						"Warning",
+						"Error"
+					],
+					"enumDescriptions": [
+						"Log detailed internal activity, including Git commands and watcher events.",
+						"Log normal extension activity and anything more severe.",
+						"Log only warnings and errors.",
+						"Log only errors."
+					],
+					"default": "Info",
+					"description": "Controls how much an-dr: Git writes to the Git Graph output channel."
+				},
 				"an-dr-git.openNewTabEditorGroup": {
 					"type": "string",
 					"enum": [

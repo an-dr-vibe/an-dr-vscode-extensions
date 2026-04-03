@@ -80,7 +80,7 @@ export class GitGraphView extends Disposable {
 
 	public static recoverOrphanedPanelIfNeeded(logger: Logger) {
 		if (!GitGraphView.currentPanel) return;
-		logger.log('GitGraphView detected orphaned panel [' + GitGraphView.currentPanel.instanceId + '], disposing stale panel handle.');
+		logger.logWarning('GitGraphView detected orphaned panel [' + GitGraphView.currentPanel.instanceId + '], disposing stale panel handle.');
 		GitGraphView.currentPanel.dispose();
 	}
 
@@ -540,7 +540,7 @@ export class GitGraphView extends Disposable {
 					// If not required to check repos, or no changes were found when checking, respond with repos
 					this.respondLoadRepos(this.repoManager.getRepos(), null);
 				} else {
-					this.logger.log('RepoManager.checkReposExist() returned true during loadRepos command.');
+					this.logger.logDebug('RepoManager.checkReposExist() returned true during loadRepos command.');
 				}
 				break;
 			case 'merge':
@@ -832,13 +832,13 @@ export class GitGraphView extends Disposable {
 	 */
 	private sendMessage(msg: ResponseMessage) {
 		if (this.isDisposed()) {
-			this.logger.log('The Git Graph View has already been disposed, ignored sending "' + msg.command + '" message.');
+			this.logger.logDebug('The Git Graph View has already been disposed, ignored sending "' + msg.command + '" message.');
 		} else {
 			this.panel.webview.postMessage(msg).then(
 				() => { },
 				() => {
 					if (this.isDisposed()) {
-						this.logger.log('The Git Graph View was disposed while sending "' + msg.command + '" message.');
+						this.logger.logDebug('The Git Graph View was disposed while sending "' + msg.command + '" message.');
 					} else {
 						this.logger.logError('Unable to send "' + msg.command + '" message to the Git Graph View.');
 					}

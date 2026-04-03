@@ -620,6 +620,13 @@ export const enum RepoDropdownOrder {
 	WorkspaceFullPath
 }
 
+export const enum LogLevel {
+	Debug,
+	Info,
+	Warning,
+	Error
+}
+
 export const enum SquashMessageFormat {
 	Default,
 	GitSquashMsg

@@ -22,6 +22,7 @@ import {
 	GraphStyle,
 	GraphUncommittedChangesStyle,
 	KeybindingConfig,
+	LogLevel,
 	MuteCommitsConfig,
 	OnRepoLoadConfig,
 	RefLabelAlignment,
@@ -322,6 +323,20 @@ class Config {
 	 */
 	get markdown() {
 		return !!this.config.get('markdown', true);
+	}
+
+	/**
+	 * Get the value of the `an-dr-git.logLevel` Extension Setting.
+	 */
+	get logLevel(): LogLevel {
+		const level = this.config.get<string>('logLevel', 'Info');
+		return level === 'Debug'
+			? LogLevel.Debug
+			: level === 'Warning'
+				? LogLevel.Warning
+				: level === 'Error'
+					? LogLevel.Error
+					: LogLevel.Info;
 	}
 
 	/**

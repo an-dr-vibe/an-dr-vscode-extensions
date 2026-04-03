@@ -328,7 +328,7 @@ export class RepoManager extends Disposable {
 	 * @param repo The path of the repository.
 	 */
 	private removeRepo(repo: string) {
-		this.logger.log('Attempting to remove repo: ' + repo);
+		this.logger.logDebug('Attempting to remove repo: ' + repo);
 		delete this.repos[repo];
 		this.extensionState.saveRepos(this.repos);
 		this.logger.log('Removed repo: ' + repo);
@@ -459,7 +459,7 @@ export class RepoManager extends Disposable {
 		this.extensionState.saveRepos(this.repos);
 		this.extensionState.transferRepo(oldRepo, newRepo);
 
-		this.logger.log('Transferred repo state: ' + oldRepo + ' -> ' + newRepo);
+		this.logger.logDebug('Transferred repo state: ' + oldRepo + ' -> ' + newRepo);
 	}
 
 
@@ -470,14 +470,14 @@ export class RepoManager extends Disposable {
 	 * @returns TRUE => At least one repository was added, FALSE => No repositories were added.
 	 */
 	public async searchWorkspaceForRepos() {
-		this.logger.log('Searching workspace for new repos ...');
+		this.logger.logDebug('Searching workspace for new repos ...');
 		let rootFolders = vscode.workspace.workspaceFolders, changes = false;
 		if (typeof rootFolders !== 'undefined') {
 			for (let i = 0; i < rootFolders.length; i++) {
 				if (await this.searchDirectoryForRepos(getPathFromUri(rootFolders[i].uri), this.maxDepthOfRepoSearch)) changes = true;
 			}
 		}
-		this.logger.log('Completed searching workspace for new repos');
+		this.logger.logDebug('Completed searching workspace for new repos');
 		if (changes) this.sendRepos();
 		return changes;
 	}
@@ -609,7 +609,7 @@ export class RepoManager extends Disposable {
 	 */
 	private async onWatcherDelete(uri: vscode.Uri) {
 		let path = getPathFromUri(uri);
-		this.logger.log('Watcher Delete Event: ' + path);
+		this.logger.logDebug('Watcher Delete Event: ' + path);
 		if (path.indexOf('/.git/') > -1) return;
 		if (path.endsWith('/.git')) path = path.slice(0, -5);
 
@@ -653,7 +653,7 @@ export class RepoManager extends Disposable {
 				if (await doesPathExist(path)) return false;
 			}
 
-			this.logger.log('Watcher Change Event: path does not exist: ' + path);
+			this.logger.logDebug('Watcher Change Event: path does not exist: ' + path);
 			if (this.removeReposWithinFolder(path)) {
 				this.logger.log('Removed one or more repos due to watcher change event at: ' + path);
 				return true;

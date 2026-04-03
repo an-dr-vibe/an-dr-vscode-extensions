@@ -79,7 +79,7 @@ export class CommandManager extends Disposable {
 	private registerCommand(command: string, callback: (...args: any[]) => any) {
 		this.registerDisposable(
 			vscode.commands.registerCommand(command, (...args: any[]) => {
-				this.logger.log('Command Invoked: ' + command);
+				this.logger.logDebug('Command Invoked: ' + command);
 				callback(...args);
 			})
 		);
@@ -92,7 +92,7 @@ export class CommandManager extends Disposable {
 	 */
 	private registerContext(key: string, value: any) {
 		return vscode.commands.executeCommand('setContext', key, value).then(
-			() => this.logger.log('Successfully set Visual Studio Code Context "' + key + '" to "' + JSON.stringify(value) + '"'),
+			() => this.logger.logDebug('Successfully set Visual Studio Code Context "' + key + '" to "' + JSON.stringify(value) + '"'),
 			() => this.logger.logError('Failed to set Visual Studio Code Context "' + key + '" to "' + JSON.stringify(value) + '"')
 		);
 	}

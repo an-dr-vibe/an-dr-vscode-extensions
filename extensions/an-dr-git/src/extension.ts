@@ -33,7 +33,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (nextSuppressionTime > suppressOrphanChecksUntil) {
 			suppressOrphanChecksUntil = nextSuppressionTime;
 		}
-		logger.log('Suppressing Git Graph orphan checks for ' + durationMs + 'ms (' + reason + ').');
+		logger.logDebug('Suppressing Git Graph orphan checks for ' + durationMs + 'ms (' + reason + ').');
 	};
 
 	const gitExecutableEmitter = new EventEmitter<GitExecutable>();
@@ -65,7 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.window.registerWebviewPanelSerializer(GitGraphView.VIEW_TYPE, {
 			async deserializeWebviewPanel(panel: vscode.WebviewPanel, _state: any) {
-				logger.log('Deserializing Git Graph webview panel...');
+				logger.logDebug('Deserializing Git Graph webview panel...');
 				delayOrphanChecks('webview serializer restore', 750);
 				GitGraphView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
 			}

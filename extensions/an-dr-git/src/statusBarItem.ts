@@ -67,10 +67,10 @@ export class StatusBarItem extends Disposable {
 		if (this.isVisible !== shouldBeVisible) {
 			if (shouldBeVisible) {
 				this.statusBarItem.show();
-				this.logger.log('Showing "' + StatusBarItem.NAME + '" Status Bar Item');
+				this.logger.logDebug('Showing "' + StatusBarItem.NAME + '" Status Bar Item');
 			} else {
 				this.statusBarItem.hide();
-				this.logger.log('Hiding "' + StatusBarItem.NAME + '" Status Bar Item');
+				this.logger.logDebug('Hiding "' + StatusBarItem.NAME + '" Status Bar Item');
 			}
 			this.isVisible = shouldBeVisible;
 		}

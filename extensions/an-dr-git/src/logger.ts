@@ -1,7 +1,15 @@
 import * as vscode from 'vscode';
+import { getConfig } from './config';
+import { LogLevel } from './types';
 import { Disposable } from './utils/disposable';
 
 const DOUBLE_QUOTE_REGEXP = /"/g;
+const LOG_LEVEL_LABELS: { [level in LogLevel]: string } = {
+	[LogLevel.Debug]: 'DEBUG',
+	[LogLevel.Info]: 'INFO',
+	[LogLevel.Warning]: 'WARN',
+	[LogLevel.Error]: 'ERROR'
+};
 
 /**
  * Manages the Git Graph Logger, which writes log information to the Git Graph Output Channel.
@@ -23,9 +31,31 @@ export class Logger extends Disposable {
 	 * @param message The string to be logged.
 	 */
 	public log(message: string) {
-		const date = new Date();
-		const timestamp = date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate()) + ' ' + pad2(date.getHours()) + ':' + pad2(date.getMinutes()) + ':' + pad2(date.getSeconds()) + '.' + pad3(date.getMilliseconds());
-		this.channel.appendLine('[' + timestamp + '] ' + message);
+		this.logInfo(message);
+	}
+
+	/**
+	 * Log an informational message to the Output Channel.
+	 * @param message The string to be logged.
+	 */
+	public logInfo(message: string) {
+		this.write(LogLevel.Info, message);
+	}
+
+	/**
+	 * Log a debug message to the Output Channel.
+	 * @param message The string to be logged.
+	 */
+	public logDebug(message: string) {
+		this.write(LogLevel.Debug, message);
+	}
+
+	/**
+	 * Log a warning message to the Output Channel.
+	 * @param message The string to be logged.
+	 */
+	public logWarning(message: string) {
+		this.write(LogLevel.Warning, message);
 	}
 
 	/**
@@ -34,7 +64,7 @@ export class Logger extends Disposable {
 	 * @param args The arguments passed to the command.
 	 */
 	public logCmd(cmd: string, args: string[]) {
-		this.log('> ' + cmd + ' ' + args.map((arg) => arg === ''
+		this.logDebug('> ' + cmd + ' ' + args.map((arg) => arg === ''
 			? '""'
 			: arg.startsWith('--format=')
 				? '--format=...'
@@ -49,7 +79,15 @@ export class Logger extends Disposable {
 	 * @param message The string to be logged.
 	 */
 	public logError(message: string) {
-		this.log('ERROR: ' + message);
+		this.write(LogLevel.Error, message);
+	}
+
+	private write(level: LogLevel, message: string) {
+		if (level < getConfig().logLevel) return;
+
+		const date = new Date();
+		const timestamp = date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate()) + ' ' + pad2(date.getHours()) + ':' + pad2(date.getMinutes()) + ':' + pad2(date.getSeconds()) + '.' + pad3(date.getMilliseconds());
+		this.channel.appendLine('[' + timestamp + '] ' + LOG_LEVEL_LABELS[level] + ': ' + message);
 	}
 }
 

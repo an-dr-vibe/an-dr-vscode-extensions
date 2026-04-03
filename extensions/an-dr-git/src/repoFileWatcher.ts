@@ -42,7 +42,7 @@ export class RepoFileWatcher {
 		this.fsWatcher.onDidCreate(uri => this.refresh(uri));
 		this.fsWatcher.onDidChange(uri => this.refresh(uri));
 		this.fsWatcher.onDidDelete(uri => this.refresh(uri));
-		this.logger.log('Started watching repo: ' + repo);
+		this.logger.logDebug('Started watching repo: ' + repo);
 	}
 
 	/**
@@ -53,7 +53,7 @@ export class RepoFileWatcher {
 			// If there is an existing File System Watcher, stop it
 			this.fsWatcher.dispose();
 			this.fsWatcher = null;
-			this.logger.log('Stopped watching repo: ' + this.repo);
+			this.logger.logDebug('Stopped watching repo: ' + this.repo);
 		}
 		if (this.refreshTimeout !== null) {
 			// If a timeout is active, clear it

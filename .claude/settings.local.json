@@ -36,7 +36,8 @@
       "Bash(ls -la c:/Users/mail/.vscode-an-dr/extensions/an-dr-git/web/*.ts)",
       "Bash(sort -k6,7)",
       "Bash(grep -n \"interface DropdownOption\\\\|type DropdownOption\\\\|interface DialogSelectInputOption\" ./extensions/an-dr-git/web/*.ts ./extensions/an-dr-git/src/*.ts)",
-      "Bash(grep -B 5 -A 5 \"branchData.head = ''HEAD''\\\\|branchData.branches.unshift\\\\\\(''HEAD''\\\\\\)\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/src/data-source/parsers.ts)"
+      "Bash(grep -B 5 -A 5 \"branchData.head = ''HEAD''\\\\|branchData.branches.unshift\\\\\\(''HEAD''\\\\\\)\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/src/data-source/parsers.ts)",
+      "Bash(grep -E \"\\\\.ts$\")"
     ]
   }
 }

@@ -10,7 +10,7 @@ import { Event } from './utils/event';
  */
 export class StatusBarItem extends Disposable {
 	private static readonly NAME = 'Commits';
-	private static readonly ICON = '$(git-branch)';
+	private static readonly ICON = '$(git-commit)';
 
 	private readonly logger: Logger;
 	private readonly statusBarItem: vscode.StatusBarItem;

@@ -1,11 +1,11 @@
 {
 	"name": "an-dr-commits",
 	"displayName": "Commits",
-	"version": "1.30.0",
+	"version": "2.0.0",
 	"publisher": "an-dr",
 	"author": {
 		"name": "an-dr (based on work by Michael Hutchison)",
-		"email": ""
+		"email": "mail@agramakov.me"
 	},
 	"description": "View the Git graph of your repository, and perform Git actions from it.",
 	"keywords": [
@@ -26,7 +26,7 @@
 	"license": "SEE LICENSE IN 'LICENSE'",
 	"icon": "resources/icon.png",
 	"engines": {
-		"vscode": "^1.38.0"
+		"vscode": "^1.90.0"
 	},
 	"extensionKind": [
 		"workspace"

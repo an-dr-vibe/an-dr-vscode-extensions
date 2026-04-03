@@ -130,6 +130,8 @@ export {
 	ResponseUpdateCodeReview,
 	RequestViewDiff,
 	ResponseViewDiff,
+	RequestGetFullDiffContent,
+	ResponseGetFullDiffContent,
 	RequestViewDiffWithWorkingFile,
 	ResponseViewDiffWithWorkingFile,
 	RequestViewFileAtRevision,

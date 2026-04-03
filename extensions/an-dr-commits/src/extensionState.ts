@@ -22,6 +22,8 @@ export const DEFAULT_REPO_STATE: GitRepoState = {
 	cdvDivider: 0.5,
 	cdvHeight: 250,
 	cdvTopRowRatio: 0.45,
+	fullDiffCompact: false,
+	fullDiffPanelHeight: 250,
 	columnWidths: null,
 	commitOrdering: RepoCommitOrdering.Default,
 	fileViewType: FileViewType.Default,
@@ -43,6 +45,7 @@ export const DEFAULT_REPO_STATE: GitRepoState = {
 
 const DEFAULT_GIT_GRAPH_VIEW_GLOBAL_STATE: CommitsViewGlobalState = {
 	alwaysAcceptCheckoutCommit: false,
+	fullDiffViewMode: 'sideBySide',
 	issueLinkingConfig: null,
 	pushTagSkipRemoteCheck: false
 };

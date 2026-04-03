@@ -126,7 +126,7 @@ Each CSS file corresponds 1:1 to its component. All get concatenated into `media
 │   ├── #repoDropdown
 │   ├── #showRemoteBranchesCheckbox
 │   ├── #findWidget / #findWidgetToggleBtn
-│   ├── #pullBtn, #pushBtn, #settingsBtn, #moreBtn
+│   ├── #topFullDiffBtn, #pullBtn, #pushBtn, #settingsBtn, #moreBtn
 │   ├── Pull right-click menu includes Fetch
 ├── #sidebar (fixed left, resizable via JS)
 │   ├── #branchPanel  ← BranchPanel mounts here
@@ -160,6 +160,8 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 
 | Want to change… | Go to |
 |---|---|
+| Top toolbar button order / overflow | `web/main/controlsLayout.ts` + `src/view/webviewHtml.ts` |
+| Full diff bottom panel rendering | `web/main.ts` (`renderFullDiffContent`, `buildFull*FileView`) + `web/styles/main.css` |
 | Git command execution | `src/dataSource.ts` |
 | Branch/tag sidebar UI | `web/branchPanel.ts` + `web/styles/branchPanel.css` |
 | Commit table rendering | `web/main.ts` → `renderTable()` (~line 812) |

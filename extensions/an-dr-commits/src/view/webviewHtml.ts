@@ -69,6 +69,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
 						</div>
 						<div id="controlsBtns">
+							<div id="topFullDiffBtn" title="Full Diff Panel"></div>
 							<div id="pullBtn"></div>
 							<div id="pushBtn"></div>
 							<div id="settingsBtn" title="Repository Settings"></div>

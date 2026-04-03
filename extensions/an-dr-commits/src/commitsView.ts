@@ -738,7 +738,8 @@ export class CommitsView extends Disposable {
 			case 'viewDiff':
 				this.sendMessage({
 					command: 'viewDiff',
-					error: await viewDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath, msg.type)
+					error: await viewDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath, msg.type,
+						msg.viewColumn !== undefined ? msg.viewColumn as vscode.ViewColumn : undefined)
 				});
 				break;
 			case 'getFileDiff':
@@ -748,6 +749,67 @@ export class CommitsView extends Disposable {
 					error: null
 				});
 				break;
+			case 'getFullDiffContent': {
+				const readCommitFile = async (commitHash: string, filePath: string) => {
+					try {
+						return { exists: true, content: await this.dataSource.getCommitFile(msg.repo, commitHash, filePath) };
+					} catch {
+						return { exists: false, content: null };
+					}
+				};
+				const readWorkingTreeFile = async (filePath: string) => {
+					try {
+						return { exists: true, content: await this.dataSource.getWorkingTreeFile(msg.repo, filePath) };
+					} catch {
+						return { exists: false, content: null };
+					}
+				};
+
+				let oldFile: { exists: boolean; content: string | null };
+				let newFile: { exists: boolean; content: string | null };
+				if (msg.fromHash === msg.toHash) {
+					if (msg.toHash === UNCOMMITTED) {
+						oldFile = msg.type === 'A' || msg.type === 'U'
+							? { exists: false, content: null }
+							: await readCommitFile('HEAD', msg.oldFilePath);
+						newFile = msg.type === 'D'
+							? { exists: false, content: null }
+							: await readWorkingTreeFile(msg.newFilePath);
+					} else {
+						oldFile = msg.type === 'A'
+							? { exists: false, content: null }
+							: await readCommitFile(msg.fromHash + '^', msg.oldFilePath);
+						newFile = msg.type === 'D'
+							? { exists: false, content: null }
+							: await readCommitFile(msg.toHash, msg.newFilePath);
+					}
+				} else if (msg.toHash === UNCOMMITTED) {
+					oldFile = msg.type === 'A' || msg.type === 'U'
+						? { exists: false, content: null }
+						: await readCommitFile(msg.fromHash, msg.oldFilePath);
+					newFile = msg.type === 'D'
+						? { exists: false, content: null }
+						: await readWorkingTreeFile(msg.newFilePath);
+				} else {
+					oldFile = msg.type === 'A' || msg.type === 'U'
+						? { exists: false, content: null }
+						: await readCommitFile(msg.fromHash, msg.oldFilePath);
+					newFile = msg.type === 'D'
+						? { exists: false, content: null }
+						: await readCommitFile(msg.toHash, msg.newFilePath);
+				}
+
+				this.sendMessage({
+					command: 'getFullDiffContent',
+					diff: await this.dataSource.getFileDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath),
+					oldContent: oldFile.content,
+					newContent: newFile.content,
+					oldExists: oldFile.exists,
+					newExists: newFile.exists,
+					error: null
+				});
+				break;
+			}
 			case 'viewDiffWithWorkingFile':
 				this.sendMessage({
 					command: 'viewDiffWithWorkingFile',

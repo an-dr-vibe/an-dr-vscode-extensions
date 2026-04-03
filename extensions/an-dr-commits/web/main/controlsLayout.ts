@@ -11,6 +11,13 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 	const pullPushVisible = view.gitBranchHead !== null && view.gitBranchHead !== 'HEAD' && view.gitRemotes.length > 0;
 	return [
 		{
+			id: 'topFullDiffBtn',
+			elem: view.topFullDiffBtnElem,
+			visible: view.expandedCommit !== null && !view.expandedCommit.loading,
+			title: view.fullDiffMode ? 'Hide Full Diff Panel' : 'Show Full Diff Panel',
+			onClick: () => view.toggleFullDiffMode(!view.fullDiffMode)
+		},
+		{
 			id: 'pullBtn',
 			elem: view.pullBtnElem,
 			visible: repoInProgress || pullPushVisible,
@@ -128,7 +135,7 @@ function commitsUpdateControlsLayout(view: any) {
 			overflow = isOverflowing();
 		}
 
-		const hideOrder = ['settingsBtn', 'pullBtn', 'pushBtn'];
+		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn', 'topFullDiffBtn'];
 		for (let i = 0; i < hideOrder.length && overflow; i++) {
 			const button = buttons.find((item) => item.id === hideOrder[i]);
 			if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;

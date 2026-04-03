@@ -202,6 +202,8 @@ export interface GitRepoState {
 	cdvDivider: number;
 	cdvHeight: number;
 	cdvTopRowRatio: number;
+	fullDiffCompact: boolean;
+	fullDiffPanelHeight: number;
 	columnWidths: ColumnWidth[] | null;
 	commitOrdering: RepoCommitOrdering;
 	fileViewType: FileViewType;
@@ -313,6 +315,7 @@ export interface CommitsViewConfig {
 
 export interface CommitsViewGlobalState {
 	alwaysAcceptCheckoutCommit: boolean;
+	fullDiffViewMode: 'unified' | 'sideBySide';
 	issueLinkingConfig: IssueLinkingConfig | null;
 	pushTagSkipRemoteCheck: boolean;
 }
@@ -1435,6 +1438,7 @@ export interface RequestViewDiff extends RepoRequest {
 	readonly oldFilePath: string;
 	readonly newFilePath: string;
 	readonly type: GitFileStatus;
+	readonly viewColumn?: number;
 }
 export interface ResponseViewDiff extends ResponseWithErrorInfo {
 	readonly command: 'viewDiff';
@@ -1450,6 +1454,24 @@ export interface RequestGetFileDiff extends RepoRequest {
 export interface ResponseGetFileDiff extends BaseMessage {
 	readonly command: 'getFileDiff';
 	readonly diff: string | null;
+	readonly error: ErrorInfo;
+}
+
+export interface RequestGetFullDiffContent extends RepoRequest {
+	readonly command: 'getFullDiffContent';
+	readonly fromHash: string;
+	readonly toHash: string;
+	readonly oldFilePath: string;
+	readonly newFilePath: string;
+	readonly type: GitFileStatus;
+}
+export interface ResponseGetFullDiffContent extends BaseMessage {
+	readonly command: 'getFullDiffContent';
+	readonly diff: string | null;
+	readonly oldContent: string | null;
+	readonly newContent: string | null;
+	readonly oldExists: boolean;
+	readonly newExists: boolean;
 	readonly error: ErrorInfo;
 }
 
@@ -1547,6 +1569,7 @@ export type RequestMessage =
 	| RequestUpdateCodeReview
 	| RequestViewDiff
 	| RequestGetFileDiff
+	| RequestGetFullDiffContent
 	| RequestViewDiffWithWorkingFile
 	| RequestViewFileAtRevision
 	| RequestViewScm;
@@ -1617,6 +1640,7 @@ export type ResponseMessage =
 	| ResponseUpdateCodeReview
 	| ResponseViewDiff
 	| ResponseGetFileDiff
+	| ResponseGetFullDiffContent
 	| ResponseViewDiffWithWorkingFile
 	| ResponseViewFileAtRevision
 	| ResponseViewScm;

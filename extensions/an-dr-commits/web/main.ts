@@ -19,6 +19,13 @@ type CommitRefBadge = {
 	type: CommitRefBadgeType;
 	html: string;
 };
+type CurrentDiffRequest = {
+	fromHash: string;
+	toHash: string;
+	oldFilePath: string;
+	newFilePath: string;
+	type: GG.GitFileStatus;
+};
 
 class CommitsView {
 	private gitRepos: GG.GitRepoSet;
@@ -61,9 +68,14 @@ class CommitsView {
 
 	private moreCommitsAvailable: boolean = false;
 	private expandedCommit: ExpandedCommit | null = null;
-	private diffViewMode: 'unified' | 'sideBySide' = 'unified';
+	private quickDiffViewMode: 'unified' | 'sideBySide' = 'unified';
+	private fullDiffViewMode: 'unified' | 'sideBySide' = globalState.fullDiffViewMode;
+	private currentDiffRequest: CurrentDiffRequest | null = null;
 	private currentDiffText: string | null = null;
+	private currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null = null;
 	private diffPaneVisible: boolean = false;
+	private fullDiffMode: boolean = false;
+	private currentDiffFilePath: string | null = null;
 	private selectedCommits: Set<string> = new Set();
 	private lastSelectedIndex: number = -1;
 	private maxCommits: number;
@@ -92,6 +104,7 @@ class CommitsView {
 	private readonly footerElem: HTMLElement;
 	private readonly scrollShadowElem: HTMLElement;
 	private readonly findWidgetToggleBtnElem: HTMLElement;
+	private readonly topFullDiffBtnElem: HTMLElement;
 	private readonly settingsBtnElem: HTMLElement;
 	private readonly pullBtnElem: HTMLElement;
 	private readonly pushBtnElem: HTMLElement;
@@ -128,6 +141,7 @@ class CommitsView {
 		this.footerElem = document.getElementById('footer')!;
 		this.scrollShadowElem = <HTMLInputElement>document.getElementById('scrollShadow')!;
 		this.findWidgetToggleBtnElem = document.getElementById('findWidgetToggleBtn')!;
+		this.topFullDiffBtnElem = document.getElementById('topFullDiffBtn')!;
 		this.settingsBtnElem = document.getElementById('settingsBtn')!;
 		this.pullBtnElem = document.getElementById('pullBtn')!;
 		this.pushBtnElem = document.getElementById('pushBtn')!;
@@ -181,6 +195,7 @@ class CommitsView {
 			this.currentTags = prevState.currentTags || [];
 			this.maxCommits = prevState.maxCommits;
 			this.expandedCommit = prevState.expandedCommit;
+			this.fullDiffMode = !!prevState.fullDiffMode;
 			this.avatars = prevState.avatars;
 			this.gitConfig = prevState.gitConfig;
 			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
@@ -223,6 +238,9 @@ class CommitsView {
 		this.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
 		this.findWidgetToggleBtnElem.addEventListener('click', () => this.showFindWidgetFromToggle());
 		this.findWidgetToggleBtnElem.addEventListener('contextmenu', (event) => handledEvent(event));
+		this.topFullDiffBtnElem.innerHTML = SVG_ICONS.fullDiff;
+		this.topFullDiffBtnElem.addEventListener('click', () => this.toggleFullDiffMode(!this.fullDiffMode));
+		this.topFullDiffBtnElem.addEventListener('contextmenu', (event) => handledEvent(event));
 		this.pullBtnElem.title = 'Pull Current Branch (Right-Click for More Actions)';
 		this.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
 		this.pullBtnElem.addEventListener('click', () => this.pullCurrentBranchAction());
@@ -1236,6 +1254,7 @@ class CommitsView {
 			maxCommits: this.maxCommits,
 			onlyFollowFirstParent: this.onlyFollowFirstParent,
 			expandedCommit: expandedCommit,
+			fullDiffMode: this.fullDiffMode,
 			scrollTop: this.scrollTop,
 			branchPanel: this.branchDropdown.getState(),
 			findWidget: this.findWidget.getState(),
@@ -1674,8 +1693,16 @@ class CommitsView {
 			this.pushBtnElem.title = 'Push Current Branch (Right-Click for More Actions)';
 			this.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
 		}
+		this.renderTopFullDiffButton();
 		this.renderRepoInProgressBanner();
 		this.updateControlsLayout();
+	}
+
+	private renderTopFullDiffButton() {
+		const fullDiffAvailable = this.expandedCommit !== null && !this.expandedCommit.loading;
+		this.topFullDiffBtnElem.title = this.fullDiffMode ? 'Hide Full Diff Panel' : 'Show Full Diff Panel';
+		alterClass(this.topFullDiffBtnElem, CLASS_ACTIVE, this.fullDiffMode);
+		alterClass(this.topFullDiffBtnElem, 'overflowHidden', !fullDiffAvailable);
 	}
 
 	public renderRefreshButton() {
@@ -3746,7 +3773,9 @@ class CommitsView {
 					this.updateCompactFindWidgetState();
 					handledEvent(e);
 				} else if (this.expandedCommit !== null) {
-					if (this.diffPaneVisible) {
+					if (document.getElementById('fullDiffPanel')) {
+						this.toggleFullDiffMode(false);
+					} else if (this.diffPaneVisible) {
 						this.hideDiffPane();
 					} else {
 						this.closeCommitDetails(true);
@@ -4084,9 +4113,13 @@ class CommitsView {
 		if (elem !== null) {
 			elem.remove();
 		}
-		if (isDocked) {
-			this.viewElem.style.bottom = '0px';
+		if (this.fullDiffMode) {
+			this.destroyFullDiffPanel();
+			this.fullDiffMode = false;
+			this.currentFullDiffData = null;
+			this.currentDiffFilePath = null;
 		}
+		this.updateLayoutBottoms();
 		if (expandedCommit.commitElem !== null) {
 			expandedCommit.commitElem.classList.remove(CLASS_COMMIT_DETAILS_OPEN);
 		}
@@ -4101,6 +4134,7 @@ class CommitsView {
 				this.renderGraph();
 			}
 		}
+		this.renderTopFullDiffButton();
 	}
 
 	public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, codeReview: GG.CodeReview | null, lastViewedFile: string | null, refresh: boolean) {
@@ -4233,7 +4267,9 @@ class CommitsView {
 
 		if (!refresh) {
 			this.currentDiffText = null;
+			this.currentFullDiffData = null;
 			this.diffPaneVisible = false;
+			this.currentDiffFilePath = null;
 		}
 
 		let elem = document.getElementById('cdv'), html = '<div id="cdvContent"><div id="cdvTopRow">', isDocked = this.isCdvDocked();
@@ -4351,6 +4387,9 @@ class CommitsView {
 			this.renderCdvDiffViewBtns();
 			this.renderCdvExternalDiffBtn();
 			this.makeCdvDividerDraggable();
+			if (this.fullDiffMode) {
+				this.createFullDiffPanel();
+			}
 
 			observeElemScroll('cdvSummary', expandedCommit.scrollTop.summary, (scrollTop) => {
 				if (this.expandedCommit === null) return;
@@ -4426,6 +4465,7 @@ class CommitsView {
 				});
 			}
 		}
+		this.renderTopFullDiffButton();
 	}
 
 	private setCdvHeight(elem: HTMLElement, isDocked: boolean) {
@@ -4438,9 +4478,8 @@ class CommitsView {
 			}
 		}
 
-		let heightPx = height + 'px';
-		elem.style.height = heightPx;
-		if (isDocked) this.viewElem.style.bottom = heightPx;
+		elem.style.height = height + 'px';
+		if (isDocked) this.updateLayoutBottoms();
 		this.setCdvRowSplit();
 	}
 
@@ -4477,7 +4516,6 @@ class CommitsView {
 
 	private hideDiffPane() {
 		this.diffPaneVisible = false;
-		this.currentDiffText = null;
 		const topRowElem = document.getElementById('cdvTopRow');
 		const rowDividerElem = document.getElementById('cdvRowDivider');
 		const diffPreviewElem = document.getElementById('cdvDiffPreview');
@@ -4526,35 +4564,96 @@ class CommitsView {
 		const unifiedBtn = document.getElementById('cdvDiffViewUnified');
 		const sbsBtn = document.getElementById('cdvDiffViewSideBySide');
 		if (!unifiedBtn || !sbsBtn) return;
-		const isSbs = this.diffViewMode === 'sideBySide';
+		if (this.fullDiffMode) {
+			alterClass(unifiedBtn, CLASS_ACTIVE, false);
+			alterClass(sbsBtn, CLASS_ACTIVE, false);
+			alterClass(unifiedBtn, 'hidden', true);
+			alterClass(sbsBtn, 'hidden', true);
+			return;
+		}
+		alterClass(unifiedBtn, 'hidden', false);
+		alterClass(sbsBtn, 'hidden', false);
+		const isSbs = this.quickDiffViewMode === 'sideBySide';
 		alterClass(unifiedBtn, CLASS_ACTIVE, !isSbs);
 		alterClass(sbsBtn, CLASS_ACTIVE, isSbs);
 	}
 
 	private changeDiffViewMode(mode: 'unified' | 'sideBySide') {
-		this.diffViewMode = mode;
+		this.quickDiffViewMode = mode;
 		this.renderCdvDiffViewBtns();
 		if (this.currentDiffText !== null) {
 			this.renderDiffPreview(this.currentDiffText);
+		} else if (this.currentDiffRequest !== null) {
+			sendMessage({
+				command: 'getFileDiff',
+				repo: this.currentRepo,
+				fromHash: this.currentDiffRequest.fromHash,
+				toHash: this.currentDiffRequest.toHash,
+				oldFilePath: this.currentDiffRequest.oldFilePath,
+				newFilePath: this.currentDiffRequest.newFilePath
+			});
 		}
 	}
 
 	public renderDiffPreview(diff: string | null) {
 		this.currentDiffText = diff;
+
+		if (this.fullDiffMode) {
+			const filenameElem = document.getElementById('fullDiffFilename');
+			if (filenameElem && this.currentDiffFilePath) {
+				filenameElem.textContent = 'Contents of ' + this.currentDiffFilePath;
+			}
+			const contentElem = document.getElementById('fullDiffContent');
+			if (!contentElem) return;
+			if (diff === null) {
+				contentElem.innerHTML = '<div class="cdvDiffMessage">Unable to load diff</div>';
+			} else if (this.currentFullDiffData !== null) {
+				this.renderFullDiffContent(this.currentFullDiffData);
+				return;
+			} else if (diff === '') {
+				contentElem.innerHTML = '<div class="cdvDiffMessage">No changes</div>';
+			} else {
+				contentElem.innerHTML = '<div class="cdvDiffMessage">Select a file to view its contents</div>';
+			}
+			contentElem.scrollTop = 0;
+			this.attachFullDiffHunkNav();
+			return;
+		}
+
 		const previewElem = document.getElementById('cdvDiffPreview');
 		if (!previewElem) return;
-
 		if (diff === null) {
 			previewElem.innerHTML = '<div class="cdvDiffMessage">Unable to load diff</div>';
 		} else if (diff === '') {
 			previewElem.innerHTML = '<div class="cdvDiffMessage">No changes</div>';
-		} else if (this.diffViewMode === 'sideBySide') {
+		} else if (this.quickDiffViewMode === 'sideBySide') {
 			previewElem.innerHTML = this.buildSideBySideDiff(diff);
 		} else {
 			previewElem.innerHTML = this.buildUnifiedDiff(diff);
 		}
 		this.showDiffPane();
 		previewElem.scrollTop = 0;
+	}
+
+	public renderFullDiffContent(data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null) {
+		this.currentDiffText = data !== null ? data.diff : null;
+		this.currentFullDiffData = data;
+		const contentElem = document.getElementById('fullDiffContent');
+		if (!contentElem) return;
+		if (data === null || data.diff === null) {
+			contentElem.innerHTML = '<div class="cdvDiffMessage">Unable to load file contents</div>';
+			this.attachFullDiffHunkNav();
+			return;
+		}
+
+		const oldLines = this.getDisplayLines(data.oldExists ? data.oldContent : null);
+		const newLines = this.getDisplayLines(data.newExists ? data.newContent : null);
+		const hunks = this.parseUnifiedDiffHunks(data.diff);
+		contentElem.innerHTML = this.fullDiffViewMode === 'sideBySide'
+			? this.buildFullSideBySideFileView(oldLines, newLines, hunks)
+			: this.buildFullUnifiedFileView(oldLines, newLines, hunks);
+		contentElem.scrollTop = 0;
+		this.attachFullDiffHunkNav();
 	}
 
 	private buildUnifiedDiff(diff: string): string {
@@ -4615,6 +4714,390 @@ class CommitsView {
 		flushPair();
 
 		return html + '</tbody></table>';
+	}
+
+	private getDisplayLines(content: string | null): string[] {
+		if (content === null) return [];
+		const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+		if (normalized === '') return [];
+		const lines = normalized.split('\n');
+		if (lines[lines.length - 1] === '') lines.pop();
+		return lines;
+	}
+
+	private parseUnifiedDiffHunks(diff: string): { oldStart: number; newStart: number; lines: string[] }[] {
+		const lines = diff.split('\n');
+		const hunks: { oldStart: number; newStart: number; lines: string[] }[] = [];
+		let current: { oldStart: number; newStart: number; lines: string[] } | null = null;
+		for (const line of lines) {
+			const match = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+			if (match) {
+				current = { oldStart: parseInt(match[1]), newStart: parseInt(match[2]), lines: [] };
+				hunks.push(current);
+				continue;
+			}
+			if (current !== null && (line.startsWith(' ') || line.startsWith('+') || line.startsWith('-') || line === '\\ No newline at end of file')) {
+				current.lines.push(line);
+			}
+		}
+		return hunks;
+	}
+
+	private parseUnifiedDiffChangedLines(hunks: { oldStart: number; newStart: number; lines: string[] }[]) {
+		const oldChanged = new Set<number>();
+		const newChanged = new Set<number>();
+		for (const hunk of hunks) {
+			let oldLine = hunk.oldStart;
+			let newLine = hunk.newStart;
+			for (const line of hunk.lines) {
+				if (line === '\\ No newline at end of file') continue;
+				if (line.startsWith(' ')) {
+					oldLine++;
+					newLine++;
+				} else if (line.startsWith('-')) {
+					oldChanged.add(oldLine++);
+				} else if (line.startsWith('+')) {
+					newChanged.add(newLine++);
+				}
+			}
+		}
+		return { oldChanged, newChanged };
+	}
+
+	private buildFullFileRows(lines: string[], changedLines: Set<number>): ({ num: string; content: string; changed: boolean } | { spacer: string })[] {
+		const output: ({ num: string; content: string; changed: boolean } | { spacer: string })[] = [];
+		const lineCount = lines.length;
+		if (!this.gitRepos[this.currentRepo].fullDiffCompact || changedLines.size === 0) {
+			for (let i = 0; i < lineCount; i++) {
+				output.push({ num: String(i + 1), content: lines[i], changed: changedLines.has(i + 1) });
+			}
+			return output;
+		}
+
+		const context = 2;
+		const changed = Array.from(changedLines).sort((a, b) => a - b);
+		const ranges: { start: number; end: number }[] = [];
+		for (const line of changed) {
+			const start = Math.max(1, line - context);
+			const end = Math.min(lineCount, line + context);
+			const last = ranges[ranges.length - 1];
+			if (!last || start > last.end + 1) ranges.push({ start, end });
+			else last.end = Math.max(last.end, end);
+		}
+
+		let nextLine = 1;
+		for (const range of ranges) {
+			if (range.start > nextLine) {
+				output.push({ spacer: '… ' + (range.start - nextLine) + ' unchanged lines …' });
+			}
+			for (let line = range.start; line <= range.end; line++) {
+				output.push({ num: String(line), content: lines[line - 1], changed: changedLines.has(line) });
+			}
+			nextLine = range.end + 1;
+		}
+		if (nextLine <= lineCount) {
+			output.push({ spacer: '… ' + (lineCount - nextLine + 1) + ' unchanged lines …' });
+		}
+		return output;
+	}
+
+	private buildFullUnifiedFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string {
+		type FullUnifiedRow = { kind: 'context' | 'removed' | 'added'; oldNum: string; newNum: string; content: string; changed: boolean };
+		const rows: FullUnifiedRow[] = [];
+		let oldIndex = 1, newIndex = 1;
+		let oldPos = 0, newPos = 0;
+		const pushContextUntil = (targetOld: number, targetNew: number) => {
+			while (oldIndex < targetOld && newIndex < targetNew && oldPos < oldLines.length && newPos < newLines.length) {
+				rows.push({ kind: 'context', oldNum: String(oldIndex++), newNum: String(newIndex++), content: newLines[newPos++], changed: false });
+				oldPos++;
+			}
+		};
+
+		for (const hunk of hunks) {
+			pushContextUntil(hunk.oldStart, hunk.newStart);
+			for (const line of hunk.lines) {
+				if (line === '\\ No newline at end of file') continue;
+				if (line.startsWith(' ')) {
+					rows.push({ kind: 'context', oldNum: String(oldIndex++), newNum: String(newIndex++), content: newLines[newPos++], changed: false });
+					oldPos++;
+				} else if (line.startsWith('-')) {
+					rows.push({ kind: 'removed', oldNum: String(oldIndex++), newNum: '', content: oldLines[oldPos++] ?? line.slice(1), changed: true });
+				} else if (line.startsWith('+')) {
+					rows.push({ kind: 'added', oldNum: '', newNum: String(newIndex++), content: newLines[newPos++] ?? line.slice(1), changed: true });
+				}
+			}
+		}
+		while (oldPos < oldLines.length && newPos < newLines.length) {
+			rows.push({ kind: 'context', oldNum: String(oldIndex++), newNum: String(newIndex++), content: newLines[newPos++], changed: false });
+			oldPos++;
+		}
+		while (oldPos < oldLines.length) {
+			rows.push({ kind: 'removed', oldNum: String(oldIndex++), newNum: '', content: oldLines[oldPos++], changed: true });
+		}
+		while (newPos < newLines.length) {
+			rows.push({ kind: 'added', oldNum: '', newNum: String(newIndex++), content: newLines[newPos++], changed: true });
+		}
+
+		let html = '<div class="diffFullView">';
+		for (const row of this.compactFullDiffUnifiedRows(rows)) {
+			if ('spacer' in row) {
+				html += '<div class="diffRow diffCompactSpacer"><span class="diffLnOld"></span><span class="diffLnNew"></span><span class="diffLnSep"></span><span class="diffRowContent">' + escapeHtml(row.spacer) + '</span></div>';
+				continue;
+			}
+			const classes = row.changed ? 'diffRow fullDiffChanged fullDiffChangedNav diff' + row.kind.charAt(0).toUpperCase() + row.kind.slice(1) : 'diffRow diffContext';
+			html += '<div class="' + classes + '"><span class="diffLnOld">' + row.oldNum + '</span><span class="diffLnNew">' + row.newNum + '</span><span class="diffLnSep">│</span><span class="diffRowContent">' + escapeHtml(row.content) + '</span></div>';
+		}
+		return html + '</div>';
+	}
+
+	private compactFullDiffUnifiedRows<T extends { changed: boolean }>(rows: T[]): (T | { spacer: string })[] {
+		if (!this.gitRepos[this.currentRepo].fullDiffCompact) return rows;
+
+		const contextLines = 2;
+		const output: (T | { spacer: string })[] = [];
+		let runStart = -1;
+		const flushRun = (endExclusive: number) => {
+			if (runStart < 0) return;
+			const count = endExclusive - runStart;
+			if (count <= contextLines * 2) {
+				for (let i = runStart; i < endExclusive; i++) output.push(rows[i]);
+			} else {
+				for (let i = runStart; i < runStart + contextLines; i++) output.push(rows[i]);
+				output.push({ spacer: '… ' + (count - contextLines * 2) + ' unchanged lines …' });
+				for (let i = endExclusive - contextLines; i < endExclusive; i++) output.push(rows[i]);
+			}
+			runStart = -1;
+		};
+
+		for (let i = 0; i < rows.length; i++) {
+			if (rows[i].changed) {
+				flushRun(i);
+				output.push(rows[i]);
+			} else if (runStart < 0) {
+				runStart = i;
+			}
+		}
+		flushRun(rows.length);
+		return output;
+	}
+
+	private buildFullSideBySideFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string {
+		const changedLines = this.parseUnifiedDiffChangedLines(hunks);
+		const leftRows = this.buildFullFileRows(oldLines, changedLines.oldChanged);
+		const rightRows = this.buildFullFileRows(newLines, changedLines.newChanged);
+		const rowCount = Math.max(leftRows.length, rightRows.length);
+
+		let html = '<table class="diffSideBySide diffSideBySideFull"><tbody>';
+		for (let i = 0; i < rowCount; i++) {
+			const leftRow = i < leftRows.length ? leftRows[i] : null;
+			const rightRow = i < rightRows.length ? rightRows[i] : null;
+			const left = leftRow === null
+				? '<td class="diffSbsLeft"></td>'
+				: 'spacer' in leftRow
+					? '<td class="diffSbsLeft diffCompactSpacer">' + escapeHtml(leftRow.spacer) + '</td>'
+					: '<td class="diffSbsLeft diffContext' + (leftRow.changed ? ' diffSbsRemoved fullDiffChanged' : '') + '"><div class="diffSbsCell"><span class="diffLnOld">' + leftRow.num + '</span><span class="diffSbsContent">' + escapeHtml(leftRow.content) + '</span></div></td>';
+			const right = rightRow === null
+				? '<td class="diffSbsRight"></td>'
+				: 'spacer' in rightRow
+					? '<td class="diffSbsRight diffCompactSpacer">' + escapeHtml(rightRow.spacer) + '</td>'
+					: '<td class="diffSbsRight diffContext' + (rightRow.changed ? ' diffSbsAdded fullDiffChanged' : '') + '"><div class="diffSbsCell"><span class="diffLnNew">' + rightRow.num + '</span><span class="diffSbsContent">' + escapeHtml(rightRow.content) + '</span></div></td>';
+			html += '<tr' + ((leftRow !== null && !('spacer' in leftRow) && leftRow.changed) || (rightRow !== null && !('spacer' in rightRow) && rightRow.changed) ? ' class="fullDiffChangedNav"' : '') + '>' + left + right + '</tr>';
+		}
+		return html + '</tbody></table>';
+	}
+
+	private toggleFullDiffMode(on: boolean) {
+		this.fullDiffMode = on;
+		this.renderCdvDiffViewBtns();
+		if (on) {
+			this.createFullDiffPanel();
+			this.hideDiffPane();
+			if (this.currentFullDiffData !== null) {
+				this.renderFullDiffContent(this.currentFullDiffData);
+			} else if (this.currentDiffRequest !== null) {
+				sendMessage({
+					command: 'getFullDiffContent',
+					repo: this.currentRepo,
+					fromHash: this.currentDiffRequest.fromHash,
+					toHash: this.currentDiffRequest.toHash,
+					oldFilePath: this.currentDiffRequest.oldFilePath,
+					newFilePath: this.currentDiffRequest.newFilePath,
+					type: this.currentDiffRequest.type
+				});
+			}
+		} else {
+			this.destroyFullDiffPanel();
+			if (this.currentDiffText !== null) {
+				this.renderDiffPreview(this.currentDiffText);
+			} else if (this.currentDiffRequest !== null) {
+				sendMessage({
+					command: 'getFileDiff',
+					repo: this.currentRepo,
+					fromHash: this.currentDiffRequest.fromHash,
+					toHash: this.currentDiffRequest.toHash,
+					oldFilePath: this.currentDiffRequest.oldFilePath,
+					newFilePath: this.currentDiffRequest.newFilePath
+				});
+			}
+		}
+		this.renderTopFullDiffButton();
+		this.saveState();
+	}
+
+	private createFullDiffPanel() {
+		if (document.getElementById('fullDiffPanel')) return;
+		const height = this.gitRepos[this.currentRepo].fullDiffPanelHeight;
+		const panel = document.createElement('div');
+		panel.id = 'fullDiffPanel';
+		panel.innerHTML =
+			'<div id="fullDiffResizeHandle"></div>' +
+			'<div id="fullDiffHeader">' +
+				'<span id="fullDiffFilename">Select a file to view its contents</span>' +
+				'<div id="fullDiffHeaderRight">' +
+					'<button id="fullDiffViewUnified" title="Unified full file view">Unified</button>' +
+					'<button id="fullDiffViewSideBySide" title="Side by side full file view">Split</button>' +
+					'<button id="fullDiffCompact" title="Toggle compact mode">Compact</button>' +
+					'<button id="fullDiffPrevHunk" title="Previous change">▲</button>' +
+					'<span id="fullDiffChangeCounter">0 / 0</span>' +
+					'<button id="fullDiffNextHunk" title="Next change">▼</button>' +
+					'<button id="fullDiffClose" title="Close">&#215;</button>' +
+				'</div>' +
+			'</div>' +
+			'<div id="fullDiffContent"></div>';
+		document.body.appendChild(panel);
+		this.setFullDiffPanelHeight(height);
+		this.makeFullDiffPanelResizable();
+		this.renderFullDiffViewBtns();
+		this.renderFullDiffCompactBtn();
+		document.getElementById('fullDiffViewUnified')!.addEventListener('click', () => {
+			this.changeFullDiffViewMode('unified');
+		});
+		document.getElementById('fullDiffViewSideBySide')!.addEventListener('click', () => {
+			this.changeFullDiffViewMode('sideBySide');
+		});
+		document.getElementById('fullDiffCompact')!.addEventListener('click', () => {
+			this.gitRepos[this.currentRepo].fullDiffCompact = !this.gitRepos[this.currentRepo].fullDiffCompact;
+			this.renderFullDiffCompactBtn();
+			if (this.fullDiffMode) {
+				this.saveRepoState();
+				this.renderFullDiffContent(this.currentFullDiffData);
+			}
+		});
+		document.getElementById('fullDiffClose')!.addEventListener('click', () => {
+			this.toggleFullDiffMode(false);
+		});
+	}
+
+	private renderFullDiffCompactBtn() {
+		const btn = document.getElementById('fullDiffCompact');
+		if (!btn) return;
+		alterClass(btn, CLASS_ACTIVE, this.gitRepos[this.currentRepo].fullDiffCompact);
+	}
+
+	private renderFullDiffViewBtns() {
+		const unifiedBtn = document.getElementById('fullDiffViewUnified');
+		const sbsBtn = document.getElementById('fullDiffViewSideBySide');
+		if (!unifiedBtn || !sbsBtn) return;
+		const isSbs = this.fullDiffViewMode === 'sideBySide';
+		alterClass(unifiedBtn, CLASS_ACTIVE, !isSbs);
+		alterClass(sbsBtn, CLASS_ACTIVE, isSbs);
+	}
+
+	private changeFullDiffViewMode(mode: 'unified' | 'sideBySide') {
+		this.fullDiffViewMode = mode;
+		updateGlobalViewState('fullDiffViewMode', mode);
+		this.renderFullDiffViewBtns();
+		if (this.fullDiffMode) {
+			this.renderFullDiffContent(this.currentFullDiffData);
+		}
+	}
+
+	private destroyFullDiffPanel() {
+		const panel = document.getElementById('fullDiffPanel');
+		if (panel) panel.remove();
+		this.updateLayoutBottoms();
+	}
+
+	private setFullDiffPanelHeight(height: number) {
+		this.gitRepos[this.currentRepo].fullDiffPanelHeight = height;
+		const panel = document.getElementById('fullDiffPanel');
+		if (panel) panel.style.height = height + 'px';
+		this.updateLayoutBottoms();
+	}
+
+	private updateLayoutBottoms() {
+		const panel = document.getElementById('fullDiffPanel');
+		const cdv = document.getElementById('cdv') as HTMLElement | null;
+		const isDocked = this.isCdvDocked();
+		const panelH = panel ? this.gitRepos[this.currentRepo].fullDiffPanelHeight : 0;
+		const cdvH = (cdv && isDocked) ? this.gitRepos[this.currentRepo].cdvHeight : 0;
+		if (cdv && isDocked) cdv.style.bottom = panelH + 'px';
+		this.viewElem.style.bottom = (cdvH + panelH) + 'px';
+	}
+
+	private makeFullDiffPanelResizable() {
+		const handle = document.getElementById('fullDiffResizeHandle');
+		if (!handle) return;
+		let prevY = -1;
+
+		const onMove: EventListener = (e) => {
+			if (prevY < 0) return;
+			const delta = prevY - (<MouseEvent>e).pageY;
+			prevY = (<MouseEvent>e).pageY;
+			let h = this.gitRepos[this.currentRepo].fullDiffPanelHeight + delta;
+			h = Math.max(80, Math.min(window.innerHeight - 100, h));
+			this.setFullDiffPanelHeight(h);
+		};
+		const onUp: EventListener = (e) => {
+			if (prevY < 0) return;
+			onMove(e);
+			this.saveRepoState();
+			prevY = -1;
+			eventOverlay.remove();
+		};
+
+		handle.addEventListener('mousedown', (e) => {
+			prevY = (<MouseEvent>e).pageY;
+			eventOverlay.create('rowResize', onMove, onUp);
+		});
+	}
+
+	private attachFullDiffHunkNav() {
+		const contentElem = document.getElementById('fullDiffContent');
+		const prevBtn = document.getElementById('fullDiffPrevHunk');
+		const nextBtn = document.getElementById('fullDiffNextHunk');
+		const counterElem = document.getElementById('fullDiffChangeCounter');
+		if (!contentElem || !prevBtn || !nextBtn || !counterElem) return;
+		const hunks = Array.from(contentElem.querySelectorAll('.fullDiffChangedNav')) as HTMLElement[];
+		let idx = 0;
+		const updateCounter = () => {
+			if (hunks.length === 0) {
+				counterElem.textContent = '0 / 0';
+				return;
+			}
+			let current = 0;
+			const scrollTop = contentElem.scrollTop + 4;
+			for (let i = 0; i < hunks.length; i++) {
+				if (hunks[i].offsetTop <= scrollTop) current = i;
+				else break;
+			}
+			idx = current;
+			counterElem.textContent = (idx + 1) + ' / ' + hunks.length;
+		};
+		const scrollTo = (i: number) => {
+			idx = Math.max(0, Math.min(i, hunks.length - 1));
+			contentElem.scrollTop = hunks[idx].offsetTop - 4;
+			updateCounter();
+		};
+		const newPrev = prevBtn.cloneNode(true) as HTMLElement;
+		const newNext = nextBtn.cloneNode(true) as HTMLElement;
+		prevBtn.replaceWith(newPrev);
+		nextBtn.replaceWith(newNext);
+		contentElem.onscroll = updateCounter;
+		updateCounter();
+		if (hunks.length === 0) return;
+		newNext.addEventListener('click', () => scrollTo(idx + 1));
+		newPrev.addEventListener('click', () => scrollTo(idx - 1));
 	}
 
 	private setCdvDivider() {
@@ -4822,14 +5305,34 @@ class CommitsView {
 			}
 
 			this.cdvUpdateFileState(file, fileElem, true, true);
-			sendMessage({
-				command: 'getFileDiff',
-				repo: this.currentRepo,
+			this.currentDiffRequest = {
 				fromHash: fromHash,
 				toHash: toHash,
 				oldFilePath: file.oldFilePath,
-				newFilePath: file.newFilePath
-			});
+				newFilePath: file.newFilePath,
+				type: fileStatus
+			};
+			this.currentDiffFilePath = file.newFilePath;
+			if (this.fullDiffMode) {
+				sendMessage({
+					command: 'getFullDiffContent',
+					repo: this.currentRepo,
+					fromHash: fromHash,
+					toHash: toHash,
+					oldFilePath: file.oldFilePath,
+					newFilePath: file.newFilePath,
+					type: fileStatus
+				});
+			} else {
+				sendMessage({
+					command: 'getFileDiff',
+					repo: this.currentRepo,
+					fromHash: fromHash,
+					toHash: toHash,
+					oldFilePath: file.oldFilePath,
+					newFilePath: file.newFilePath
+				});
+			}
 		};
 
 		const triggerCopyFilePath = (file: GG.GitFileChange, absolute: boolean) => {
@@ -5354,6 +5857,15 @@ function bootstrap() {
 				break;
 			case 'getFileDiff':
 				commits.renderDiffPreview(msg.error !== null ? null : msg.diff);
+				break;
+			case 'getFullDiffContent':
+				commits.renderFullDiffContent(msg.error !== null ? null : {
+					diff: msg.diff,
+					oldContent: msg.oldContent,
+					newContent: msg.newContent,
+					oldExists: msg.oldExists,
+					newExists: msg.newExists
+				});
 				break;
 			case 'viewDiffWithWorkingFile':
 				finishOrDisplayError(msg.error, 'Unable to View Diff with Working File');

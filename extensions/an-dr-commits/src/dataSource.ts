@@ -501,6 +501,26 @@ export class DataSource extends Disposable {
 		return this.spawnGit(args, repo, (stdout) => stdout).catch(() => null);
 	}
 
+	/**
+	 * Get the contents of a working tree file.
+	 * @param repo The path of the repository.
+	 * @param filePath The path of the file relative to the repositories root.
+	 * @returns The file contents.
+	 */
+	public getWorkingTreeFile(repo: string, filePath: string) {
+		const absolutePath = path.join(repo, ...filePath.split('/'));
+		return new Promise<string>((resolve, reject) => {
+			fs.readFile(absolutePath, (err, buffer) => {
+				if (err) {
+					reject(err);
+					return;
+				}
+				const encoding = getConfig(repo).fileEncoding;
+				resolve(decode(buffer, encodingExists(encoding) ? encoding : 'utf8'));
+			});
+		});
+	}
+
 
 	/* Get Data Methods - General */
 

@@ -99,6 +99,25 @@ function commitsHandleCdvFileClick(view: any, e: Event) {
 		triggerViewFileDiff(getFileOfFileElem(expandedCommit.fileChanges, fileElem), fileElem);
 	});
 
+	addListenerToClass('fileTreeFile', 'dblclick', (e) => {
+		const expandedCommit = view.expandedCommit;
+		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
+
+		const sourceElem = <HTMLElement>(<Element>e.target).closest('.fileTreeFile'), fileElem = getFileElemOfEventTarget(e.target);
+		if (!sourceElem.classList.contains('gitDiffPossible')) return;
+		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
+		let commit = view.commits[view.commitLookup[expandedCommit.commitHash]], fromHash: string, toHash: string, fileStatus = file.type;
+		if (expandedCommit.compareWithHash !== null) {
+			const co = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
+			fromHash = co.from; toHash = co.to;
+		} else if (commit.stash !== null) {
+			if (fileStatus === GG.GitFileStatus.Untracked) {
+				fromHash = commit.stash.untrackedFilesHash!; toHash = fromHash; fileStatus = GG.GitFileStatus.Added;
+			} else { fromHash = commit.stash.baseHash; toHash = expandedCommit.commitHash; }
+		} else { fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash; }
+		sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+	});
+
 	addListenerToClass('copyGitFile', 'click', (e) => {
 		const expandedCommit = view.expandedCommit;
 		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
@@ -169,18 +188,23 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 		const codeReviewInProgressAndNotReviewed = expandedCommit.codeReview !== null && expandedCommit.codeReview.remainingFiles.includes(file.newFilePath);
 		const visibility = view.config.contextMenuActionsVisibility.commitDetailsViewFile;
 
-		const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
-			if (expandedCommit === null) return;
-			let commit = view.commits[view.commitLookup[expandedCommit.commitHash]], fromHash: string, toHash: string, fileStatus = file.type;
-			if (expandedCommit.compareWithHash !== null) {
-				const co = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
+		const getFileDiffHashes = (file: GG.GitFileChange): { fromHash: string; toHash: string; fileStatus: GG.GitFileStatus } => {
+			let commit = view.commits[view.commitLookup[expandedCommit!.commitHash]], fromHash: string, toHash: string, fileStatus = file.type;
+			if (expandedCommit!.compareWithHash !== null) {
+				const co = view.getCommitOrder(expandedCommit!.commitHash, expandedCommit!.compareWithHash);
 				fromHash = co.from; toHash = co.to;
 			} else if (commit.stash !== null) {
 				if (fileStatus === GG.GitFileStatus.Untracked) {
 					fromHash = commit.stash.untrackedFilesHash!; toHash = fromHash;
 					fileStatus = GG.GitFileStatus.Added;
-				} else { fromHash = commit.stash.baseHash; toHash = expandedCommit.commitHash; }
-			} else { fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash; }
+				} else { fromHash = commit.stash.baseHash; toHash = expandedCommit!.commitHash; }
+			} else { fromHash = expandedCommit!.commitHash; toHash = expandedCommit!.commitHash; }
+			return { fromHash, toHash, fileStatus };
+		};
+
+		const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
+			if (expandedCommit === null) return;
+			const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
 			view.cdvUpdateFileState(file, fileElem, true, true);
 			view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
 			view.currentDiffFilePath = file.newFilePath;
@@ -196,7 +220,11 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 				{
 					title: 'View Diff',
 					visible: visibility.viewDiff && diffPossible,
-					onClick: () => triggerViewFileDiff(file, fileElem)
+					onClick: () => {
+						if (expandedCommit === null) return;
+						const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
+						sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+					}
 				},
 				{
 					title: 'View File at this Revision',

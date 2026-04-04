@@ -161,7 +161,11 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				refreshOrDisplayError(msg.error, 'Unable to Pull Branch');
 				break;
 			case 'pushBranch':
-				refreshAndDisplayErrors(msg.errors, 'Unable to Push Branch', msg.willUpdateBranchConfig);
+				if (msg.errors.some((e) => e !== null && (e.includes('behind') || e.includes('Updates were rejected')))) {
+					handleResponsePushBranchBehindRemote(msg.repo, msg.branchName, msg.remotes, msg.setUpstream, msg.errors);
+				} else {
+					refreshAndDisplayErrors(msg.errors, 'Unable to Push Branch', msg.willUpdateBranchConfig);
+				}
 				break;
 			case 'pushStash':
 				refreshOrDisplayError(msg.error, 'Unable to Stash Uncommitted Changes');
@@ -312,6 +316,50 @@ function handleResponsePushTagCommitNotOnRemote(repo: string, tagName: string, r
 			skipRemoteCheck: true
 		}, 'Pushing Tag');
 	}, { type: TargetType.Repo }, 'Cancel', null, true);
+}
+
+function handleResponsePushBranchBehindRemote(repo: string, branchName: string, remotes: string[], setUpstream: boolean, errors: GG.ErrorInfo[]) {
+	const reducedErrors = reduceErrorInfos(errors);
+
+	// Check if it's a "behind" error (contains keywords from git rejection message)
+	const isBehindError = reducedErrors.error !== null &&
+		(reducedErrors.error.includes('Updates were rejected') ||
+		 reducedErrors.error.includes('failed to push') ||
+		 reducedErrors.error.includes('behind'));
+
+	if (!isBehindError || reducedErrors.partialOrCompleteSuccess) {
+		// Not a "behind" error or partial success - use normal flow
+		refreshAndDisplayErrors(errors, 'Unable to Push Branch', false);
+		return;
+	}
+
+	// Show dialog with Force Push option
+	const html = '<span class="dialogAlert">' + SVG_ICONS.alert + 'Error: Unable to Push Branch</span>' +
+		'<br><span class="messageContent errorContent">' +
+		escapeHtml(reducedErrors.error!).split('\n').join('<br>') +
+		'</span><br><br><span style="font-size: 0.9em;">You can force push to override the remote branch, but this may cause issues if others are working on this branch.</span>';
+
+	dialog.showForm(
+		html,
+		[],
+		'Force Push',
+		() => {
+			// Retry with force-with-lease mode
+			runAction({
+				command: 'pushBranch',
+				repo: repo,
+				branchName: branchName,
+				remotes: remotes,
+				setUpstream: setUpstream,
+				mode: GG.GitPushBranchMode.ForceWithLease,
+				willUpdateBranchConfig: false
+			}, 'Force Pushing Branch');
+		},
+		null,
+		'Cancel',
+		null,
+		true
+	);
 }
 
 function handleSidebarBatchRefActionResponse(msg: GG.ResponseSidebarBatchRefAction) {

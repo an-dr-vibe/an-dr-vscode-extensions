@@ -601,6 +601,10 @@ export class CommitsView extends Disposable {
 			case 'pushBranch':
 				this.sendMessage({
 					command: 'pushBranch',
+					repo: msg.repo,
+					branchName: msg.branchName,
+					remotes: msg.remotes,
+					setUpstream: msg.setUpstream,
 					willUpdateBranchConfig: msg.willUpdateBranchConfig,
 					errors: await this.dataSource.pushBranchToMultipleRemotes(msg.repo, msg.branchName, msg.remotes, msg.setUpstream, msg.mode)
 				});

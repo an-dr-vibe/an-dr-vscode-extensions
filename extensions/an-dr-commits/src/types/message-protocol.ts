@@ -531,6 +531,10 @@ export interface RequestPushBranch extends RepoRequest {
 export interface ResponsePushBranch extends ResponseWithMultiErrorInfo {
 	readonly command: 'pushBranch';
 	readonly willUpdateBranchConfig: boolean;
+	readonly repo: string;
+	readonly branchName: string;
+	readonly remotes: string[];
+	readonly setUpstream: boolean;
 }
 
 export interface RequestPushStash extends RepoRequest {

@@ -12,10 +12,21 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 	const oldLines = commitsGetDisplayLines(data.oldExists ? data.oldContent : null);
 	const newLines = commitsGetDisplayLines(data.newExists ? data.newContent : null);
 	const hunks = commitsParseUnifiedDiffHunks(data.diff);
-	contentElem.innerHTML = view.fullDiffViewMode === 'sideBySide'
+	const isSbs = view.fullDiffViewMode === 'sideBySide';
+	contentElem.innerHTML = isSbs
 		? commitsBuildFullSideBySideFileView(view, oldLines, newLines, hunks)
 		: commitsBuildFullUnifiedFileView(view, oldLines, newLines, hunks);
+	alterClass(contentElem, 'diffSbsMode', isSbs);
 	contentElem.scrollTop = 0;
+	if (isSbs) {
+		const oldPane = contentElem.querySelector('.diffSbsPaneOld') as HTMLElement | null;
+		const newPane = contentElem.querySelector('.diffSbsPaneNew') as HTMLElement | null;
+		if (oldPane && newPane) {
+			let syncing = false;
+			oldPane.addEventListener('scroll', () => { if (!syncing) { syncing = true; newPane.scrollTop = oldPane.scrollTop; syncing = false; } });
+			newPane.addEventListener('scroll', () => { if (!syncing) { syncing = true; oldPane.scrollTop = newPane.scrollTop; syncing = false; } });
+		}
+	}
 	view.attachFullDiffHunkNav();
 }
 
@@ -46,63 +57,6 @@ function commitsParseUnifiedDiffHunks(diff: string): { oldStart: number; newStar
 	return hunks;
 }
 
-function commitsParseUnifiedDiffChangedLines(hunks: { oldStart: number; newStart: number; lines: string[] }[]) {
-	const oldChanged = new Set<number>();
-	const newChanged = new Set<number>();
-	for (const hunk of hunks) {
-		let oldLine = hunk.oldStart;
-		let newLine = hunk.newStart;
-		for (const line of hunk.lines) {
-			if (line === '\\ No newline at end of file') continue;
-			if (line.startsWith(' ')) {
-				oldLine++;
-				newLine++;
-			} else if (line.startsWith('-')) {
-				oldChanged.add(oldLine++);
-			} else if (line.startsWith('+')) {
-				newChanged.add(newLine++);
-			}
-		}
-	}
-	return { oldChanged, newChanged };
-}
-
-function commitsBuildFullFileRows(view: any, lines: string[], changedLines: Set<number>): ({ num: string; content: string; changed: boolean } | { spacer: string })[] {
-	const output: ({ num: string; content: string; changed: boolean } | { spacer: string })[] = [];
-	const lineCount = lines.length;
-	if (!view.gitRepos[view.currentRepo].fullDiffCompact || changedLines.size === 0) {
-		for (let i = 0; i < lineCount; i++) {
-			output.push({ num: String(i + 1), content: lines[i], changed: changedLines.has(i + 1) });
-		}
-		return output;
-	}
-
-	const context = 2;
-	const changed = Array.from(changedLines).sort((a, b) => a - b);
-	const ranges: { start: number; end: number }[] = [];
-	for (const line of changed) {
-		const start = Math.max(1, line - context);
-		const end = Math.min(lineCount, line + context);
-		const last = ranges[ranges.length - 1];
-		if (!last || start > last.end + 1) ranges.push({ start, end });
-		else last.end = Math.max(last.end, end);
-	}
-
-	let nextLine = 1;
-	for (const range of ranges) {
-		if (range.start > nextLine) {
-			output.push({ spacer: '… ' + (range.start - nextLine) + ' unchanged lines …' });
-		}
-		for (let line = range.start; line <= range.end; line++) {
-			output.push({ num: String(line), content: lines[line - 1], changed: changedLines.has(line) });
-		}
-		nextLine = range.end + 1;
-	}
-	if (nextLine <= lineCount) {
-		output.push({ spacer: '… ' + (lineCount - nextLine + 1) + ' unchanged lines …' });
-	}
-	return output;
-}
 
 function commitsBuildFullUnifiedFileView(view: any, oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string {
 	type FullUnifiedRow = { kind: 'context' | 'removed' | 'added'; oldNum: string; newNum: string; content: string; changed: boolean };
@@ -181,24 +135,94 @@ function commitsCompactFullDiffUnifiedRows<T extends { changed: boolean }>(view:
 }
 
 function commitsBuildFullSideBySideFileView(view: any, oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string {
-	const changedLines = commitsParseUnifiedDiffChangedLines(hunks);
-	const leftRows = commitsBuildFullFileRows(view, oldLines, changedLines.oldChanged);
-	const rightRows = commitsBuildFullFileRows(view, newLines, changedLines.newChanged);
-	const rowCount = Math.max(leftRows.length, rightRows.length);
+	type SbsPairedRow = { leftNum: string; leftContent: string | null; rightNum: string; rightContent: string | null; changed: boolean };
 
-	let html = '<table class="diffSideBySide diffSideBySideFull"><tbody>';
-	for (let i = 0; i < rowCount; i++) {
-		const leftRow = i < leftRows.length ? leftRows[i] : null;
-		const rightRow = i < rightRows.length ? rightRows[i] : null;
-		const left = leftRow === null ? '<td class="diffSbsLeft"></td>' : 'spacer' in leftRow
-			? '<td class="diffSbsLeft diffCompactSpacer">' + escapeHtml(leftRow.spacer) + '</td>'
-			: '<td class="diffSbsLeft diffContext' + (leftRow.changed ? ' diffSbsRemoved fullDiffChanged' : '') + '"><div class="diffSbsCell"><span class="diffLnOld">' + leftRow.num + '</span><span class="diffSbsContent">' + escapeHtml(leftRow.content) + '</span></div></td>';
-		const right = rightRow === null ? '<td class="diffSbsRight"></td>' : 'spacer' in rightRow
-			? '<td class="diffSbsRight diffCompactSpacer">' + escapeHtml(rightRow.spacer) + '</td>'
-			: '<td class="diffSbsRight diffContext' + (rightRow.changed ? ' diffSbsAdded fullDiffChanged' : '') + '"><div class="diffSbsCell"><span class="diffLnNew">' + rightRow.num + '</span><span class="diffSbsContent">' + escapeHtml(rightRow.content) + '</span></div></td>';
-		html += '<tr' + ((leftRow !== null && !('spacer' in leftRow) && leftRow.changed) || (rightRow !== null && !('spacer' in rightRow) && rightRow.changed) ? ' class="fullDiffChangedNav"' : '') + '>' + left + right + '</tr>';
+	const rows: SbsPairedRow[] = [];
+	let oldIdx = 1;
+	let newIdx = 1;
+
+	for (const hunk of hunks) {
+		while (oldIdx < hunk.oldStart) {
+			rows.push({ leftNum: String(oldIdx), leftContent: oldLines[oldIdx - 1], rightNum: String(newIdx), rightContent: newLines[newIdx - 1], changed: false });
+			oldIdx++; newIdx++;
+		}
+		let i = 0;
+		while (i < hunk.lines.length) {
+			if (hunk.lines[i] === '\\ No newline at end of file') { i++; continue; }
+			if (hunk.lines[i].startsWith(' ')) {
+				rows.push({ leftNum: String(oldIdx), leftContent: oldLines[oldIdx - 1], rightNum: String(newIdx), rightContent: newLines[newIdx - 1], changed: false });
+				oldIdx++; newIdx++; i++;
+			} else {
+				const removed: number[] = [];
+				const added: number[] = [];
+				while (i < hunk.lines.length && (hunk.lines[i].startsWith('-') || hunk.lines[i].startsWith('+'))) {
+					if (hunk.lines[i].startsWith('-')) removed.push(oldIdx++);
+					else added.push(newIdx++);
+					i++;
+				}
+				const maxLen = Math.max(removed.length, added.length);
+				for (let j = 0; j < maxLen; j++) {
+					const o = j < removed.length ? removed[j] : null;
+					const n = j < added.length ? added[j] : null;
+					rows.push({ leftNum: o !== null ? String(o) : '', leftContent: o !== null ? (oldLines[o - 1] ?? '') : null, rightNum: n !== null ? String(n) : '', rightContent: n !== null ? (newLines[n - 1] ?? '') : null, changed: true });
+				}
+			}
+		}
 	}
-	return html + '</tbody></table>';
+	while (oldIdx <= oldLines.length && newIdx <= newLines.length) {
+		rows.push({ leftNum: String(oldIdx), leftContent: oldLines[oldIdx - 1], rightNum: String(newIdx), rightContent: newLines[newIdx - 1], changed: false });
+		oldIdx++; newIdx++;
+	}
+
+	let leftHtml = '<div class="diffSbsPane diffSbsPaneOld"><div class="diffSbsPaneInner">';
+	let rightHtml = '<div class="diffSbsPane diffSbsPaneNew"><div class="diffSbsPaneInner">';
+	for (const row of commitsCompactSbsPairedRows(view, rows)) {
+		if ('spacer' in row) {
+			leftHtml += '<div class="diffSbsFullRow diffCompactSpacer">' + escapeHtml(row.spacer) + '</div>';
+			rightHtml += '<div class="diffSbsFullRow diffCompactSpacer">' + escapeHtml(row.spacer) + '</div>';
+			continue;
+		}
+		const navClass = row.changed ? ' fullDiffChangedNav' : '';
+		if (row.leftContent === null) {
+			leftHtml += '<div class="diffSbsFullRow diffSbsPlaceholder' + navClass + '"></div>';
+		} else {
+			leftHtml += '<div class="diffSbsFullRow' + (row.changed && row.leftNum !== '' ? ' diffSbsRemoved fullDiffChanged' : ' diffContext') + navClass + '"><span class="diffLnOld">' + row.leftNum + '</span><span class="diffSbsContent">' + escapeHtml(row.leftContent) + '</span></div>';
+		}
+		if (row.rightContent === null) {
+			rightHtml += '<div class="diffSbsFullRow diffSbsPlaceholder"></div>';
+		} else {
+			rightHtml += '<div class="diffSbsFullRow' + (row.changed && row.rightNum !== '' ? ' diffSbsAdded fullDiffChanged' : ' diffContext') + '"><span class="diffLnNew">' + row.rightNum + '</span><span class="diffSbsContent">' + escapeHtml(row.rightContent) + '</span></div>';
+		}
+	}
+	leftHtml += '</div></div>';
+	rightHtml += '</div></div>';
+	return '<div class="diffSbsContainer">' + leftHtml + rightHtml + '</div>';
+}
+
+function commitsCompactSbsPairedRows<T extends { changed: boolean }>(view: any, rows: T[]): (T | { spacer: string })[] {
+	if (!view.gitRepos[view.currentRepo].fullDiffCompact) return rows;
+
+	const contextLines = 2;
+	const output: (T | { spacer: string })[] = [];
+	let runStart = -1;
+	const flushRun = (endExclusive: number) => {
+		if (runStart < 0) return;
+		const count = endExclusive - runStart;
+		if (count <= contextLines * 2) {
+			for (let i = runStart; i < endExclusive; i++) output.push(rows[i]);
+		} else {
+			for (let i = runStart; i < runStart + contextLines; i++) output.push(rows[i]);
+			output.push({ spacer: '… ' + (count - contextLines * 2) + ' unchanged lines …' });
+			for (let i = endExclusive - contextLines; i < endExclusive; i++) output.push(rows[i]);
+		}
+		runStart = -1;
+	};
+	for (let i = 0; i < rows.length; i++) {
+		if (rows[i].changed) { flushRun(i); output.push(rows[i]); }
+		else if (runStart < 0) { runStart = i; }
+	}
+	flushRun(rows.length);
+	return output;
 }
 
 function commitsToggleFullDiffMode(view: any, on: boolean) {
@@ -344,7 +368,9 @@ function commitsAttachFullDiffHunkNav(_view: any) {
 	const counterElem = document.getElementById('fullDiffChangeCounter');
 	if (!contentElem || !prevBtn || !nextBtn || !counterElem) return;
 
-	const hunks = Array.from(contentElem.querySelectorAll('.fullDiffChangedNav')) as HTMLElement[];
+	const isSbs = contentElem.classList.contains('diffSbsMode');
+	const scrollElem: HTMLElement = isSbs ? (contentElem.querySelector('.diffSbsPaneOld') as HTMLElement ?? contentElem) : contentElem;
+	const hunks = Array.from(scrollElem.querySelectorAll('.fullDiffChangedNav')) as HTMLElement[];
 	let idx = 0;
 	const updateCounter = () => {
 		if (hunks.length === 0) {
@@ -352,7 +378,7 @@ function commitsAttachFullDiffHunkNav(_view: any) {
 			return;
 		}
 		let current = 0;
-		const scrollTop = contentElem.scrollTop + 4;
+		const scrollTop = scrollElem.scrollTop + 4;
 		for (let i = 0; i < hunks.length; i++) {
 			if (hunks[i].offsetTop <= scrollTop) current = i;
 			else break;
@@ -362,7 +388,7 @@ function commitsAttachFullDiffHunkNav(_view: any) {
 	};
 	const scrollTo = (i: number) => {
 		idx = Math.max(0, Math.min(i, hunks.length - 1));
-		contentElem.scrollTop = hunks[idx].offsetTop - 4;
+		scrollElem.scrollTop = hunks[idx].offsetTop - 4;
 		updateCounter();
 	};
 
@@ -370,7 +396,7 @@ function commitsAttachFullDiffHunkNav(_view: any) {
 	const newNext = nextBtn.cloneNode(true) as HTMLElement;
 	prevBtn.replaceWith(newPrev);
 	nextBtn.replaceWith(newNext);
-	contentElem.onscroll = updateCounter;
+	scrollElem.onscroll = updateCounter;
 	updateCounter();
 	if (hunks.length === 0) return;
 	newNext.addEventListener('click', () => scrollTo(idx + 1));

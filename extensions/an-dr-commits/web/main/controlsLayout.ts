@@ -49,7 +49,10 @@ function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButto
 		if (view.gitRepoInProgressState !== null) {
 			return [{ title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort), visible: true, onClick: () => view.pushCurrentBranchAction() }];
 		} else {
-			return [{ title: 'Push Advanced...', visible: true, onClick: () => view.showPushCurrentBranchDialog() }];
+			return [
+				{ title: 'Force Push (With Lease)', visible: true, onClick: () => view.forcePushCurrentBranchAction() },
+				{ title: 'Push Advanced...', visible: true, onClick: () => view.showPushCurrentBranchDialog() }
+			];
 		}
 	} else if (button.id === 'settingsBtn') {
 		return [

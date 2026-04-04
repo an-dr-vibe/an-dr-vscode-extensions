@@ -809,6 +809,9 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	flex:1;
 	overflow-x:auto;
 	overflow-y:auto;
+}
+#fullDiffContent.diffSbsMode{
+	overflow:hidden;
 	font-family:var(--vscode-editor-font-family,monospace);
 	font-size:12px;
 	padding:4px 0;
@@ -883,6 +886,17 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	white-space:pre;
 	line-height:1.4;
 }
+.diffSbsContainer{display:flex;flex-direction:row;height:100%;}
+.diffSbsPane{flex:1;overflow-x:scroll;overflow-y:auto;min-width:0;position:relative;}
+.diffSbsPaneOld{border-right:1px solid rgba(128,128,128,0.2);}
+.diffSbsPaneInner{min-width:max-content;}
+.diffSbsFullRow{display:flex;align-items:flex-start;white-space:pre;min-width:100%;box-sizing:border-box;line-height:1.4;}
+.diffSbsFullRow .diffLnOld,.diffSbsFullRow .diffLnNew{flex:0 0 3.5em;width:3.5em;padding:0 6px 0 8px;box-sizing:border-box;line-height:1.4;color:rgba(128,128,128,0.5);text-align:right;user-select:none;-webkit-user-select:none;}
+.diffSbsFullRow .diffSbsContent{flex-shrink:0;padding-right:8px;white-space:pre;line-height:1.4;}
+.diffSbsFullRow.diffSbsRemoved{background:rgba(200,0,0,0.15);}
+.diffSbsFullRow.diffSbsAdded{background:rgba(0,160,0,0.15);}
+.diffSbsFullRow.diffCompactSpacer{color:rgba(128,128,128,0.7);font-style:italic;text-align:center;background:rgba(128,128,128,0.08);padding:4px 8px;min-width:unset;}
+.diffSbsPlaceholder{background:rgba(128,128,128,0.08);min-height:1.4em;}
 .cdvDiffViewBtn.hidden{
 	display:none !important;
 }

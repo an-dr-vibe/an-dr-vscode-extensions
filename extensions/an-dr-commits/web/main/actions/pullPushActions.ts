@@ -149,6 +149,14 @@ function commitsShowPushCurrentBranchDialog(view: any, defaultMode: GG.GitPushBr
 	}, null);
 }
 
+function commitsForcePushCurrentBranchAction(view: any) {
+	if (view.gitBranchHead === null || view.gitBranchHead === 'HEAD') return;
+	const branchName = view.gitBranchHead;
+	const remotes = view.getDefaultPushRemotes(branchName);
+	const setUpstream = view.shouldSetUpstreamForPush(branchName);
+	view.runPushCurrentBranchAction(branchName, remotes, setUpstream, GG.GitPushBranchMode.ForceWithLease);
+}
+
 function commitsShowPushButtonContextMenu(view: any, event: MouseEvent) {
 	if (view.gitRepoInProgressState !== null) {
 		contextMenu.show([[
@@ -161,6 +169,11 @@ function commitsShowPushButtonContextMenu(view: any, event: MouseEvent) {
 		return;
 	}
 	contextMenu.show([[
+		{
+			title: 'Force Push (With Lease)',
+			visible: true,
+			onClick: () => view.forcePushCurrentBranchAction()
+		},
 		{
 			title: 'Push Advanced...',
 			visible: true,

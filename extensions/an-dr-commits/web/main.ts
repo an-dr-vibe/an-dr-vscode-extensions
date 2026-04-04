@@ -433,6 +433,7 @@ class CommitsView {
 	private willPushUpdateBranchConfig(branchName: string, remotes: string[], setUpstream: boolean) { return commitsWillPushUpdateBranchConfig(this, branchName, remotes, setUpstream); }
 	private runPushCurrentBranchAction(branchName: string, remotes: string[], setUpstream: boolean, mode: GG.GitPushBranchMode) { commitsRunPushCurrentBranchAction(this, branchName, remotes, setUpstream, mode); }
 	private pushCurrentBranchAction() { commitsPushCurrentBranchAction(this); }
+	private forcePushCurrentBranchAction() { commitsForcePushCurrentBranchAction(this); }
 	private showPushCurrentBranchDialog(defaultMode: GG.GitPushBranchMode = GG.GitPushBranchMode.Normal) { commitsShowPushCurrentBranchDialog(this, defaultMode); }
 	private showPushButtonContextMenu(event: MouseEvent) { commitsShowPushButtonContextMenu(this, event); }
 	private showPullButtonContextMenu(event: MouseEvent) { commitsShowPullButtonContextMenu(this, event); }
@@ -502,8 +503,6 @@ class CommitsView {
 	public buildSideBySideDiff(diff: string): string { return commitsBuildSideBySideDiff(diff); }
 	public getDisplayLines(content: string | null): string[] { return commitsGetDisplayLines(content); }
 	public parseUnifiedDiffHunks(diff: string): { oldStart: number; newStart: number; lines: string[] }[] { return commitsParseUnifiedDiffHunks(diff); }
-	public parseUnifiedDiffChangedLines(hunks: { oldStart: number; newStart: number; lines: string[] }[]) { return commitsParseUnifiedDiffChangedLines(hunks); }
-	public buildFullFileRows(lines: string[], changedLines: Set<number>): ({ num: string; content: string; changed: boolean } | { spacer: string })[] { return commitsBuildFullFileRows(this, lines, changedLines); }
 	public buildFullUnifiedFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string { return commitsBuildFullUnifiedFileView(this, oldLines, newLines, hunks); }
 	public compactFullDiffUnifiedRows<T extends { changed: boolean }>(rows: T[]): (T | { spacer: string })[] { return commitsCompactFullDiffUnifiedRows(this, rows); }
 	public buildFullSideBySideFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string { return commitsBuildFullSideBySideFileView(this, oldLines, newLines, hunks); }

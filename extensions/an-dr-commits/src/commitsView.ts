@@ -198,6 +198,10 @@ export class CommitsView extends Disposable {
 			}
 		});
 
+		// Also hook into VS Code's built-in Git extension to catch commits made via the native SCM panel.
+		// This handles cases where the file watcher is muted or misses events from external git operations.
+		this.setupNativeScmWatcher();
+
 		// Render the content of the Webview
 		this.update();
 
@@ -1022,6 +1026,44 @@ export class CommitsView extends Disposable {
 	 */
 	private getUri(...pathComps: string[]) {
 		return vscode.Uri.file(path.join(this.extensionPath, ...pathComps));
+	}
+
+
+	/**
+	 * Subscribe to VS Code's built-in Git extension repository state changes so that commits
+	 * made via the native Source Control panel are detected and trigger a refresh.
+	 */
+	private setupNativeScmWatcher(): void {
+		const gitExt = vscode.extensions.getExtension<any>('vscode.git');
+		if (!gitExt) return;
+
+		const attach = (api: any) => {
+			if (this.isDisposed()) return;
+			let refreshTimeout: NodeJS.Timer | null = null;
+
+			const scheduleRefresh = () => {
+				if (refreshTimeout !== null) clearTimeout(refreshTimeout);
+				refreshTimeout = setTimeout(() => {
+					refreshTimeout = null;
+					if (this.panel.visible) {
+						this.sendMessage({ command: 'refresh' });
+					}
+				}, 750);
+			};
+
+			const watchRepo = (repo: any) => {
+				this.registerDisposables(repo.state.onDidChange(scheduleRefresh));
+			};
+
+			api.repositories.forEach(watchRepo);
+			this.registerDisposables(api.onDidOpenRepository(watchRepo));
+		};
+
+		if (gitExt.isActive) {
+			attach(gitExt.exports.getAPI(1));
+		} else {
+			gitExt.activate().then(() => attach(gitExt.exports.getAPI(1)));
+		}
 	}
 
 

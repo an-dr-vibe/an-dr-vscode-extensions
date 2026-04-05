@@ -99,8 +99,10 @@ function commitsPreviewCommitComparison(view: any, hash1: string, hash2: string)
 	view.previewCommitHash = null;         // cancel any pending single-commit preview
 	view.previewCompareHashes = [order.from, order.to];
 	view.filesPanelCommitHash = null;
-	view.previewFileChanges = null;
-	view.previewCompareFileChanges = null;
+	view.filesPanelFileChanges = null;
+	view.filesPanelFileTree = null;
+	view.filesPanelCompareWithHash = null;
+	view.filesPanelCodeReview = null;
 	view.resetDiffState();
 	view.filesPanel.setContentLoading();
 	view.requestCommitComparison(order.from, order.to, false);
@@ -111,7 +113,10 @@ function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, co
 	const [h1, h2] = view.previewCompareHashes;
 	if (!((commitHash === h1 && compareWithHash === h2) || (commitHash === h2 && compareWithHash === h1))) return;
 	if (view.expandedCommit !== null) return;
-	view.previewCompareFileChanges = fileChanges;
+	view.filesPanelFileChanges = fileChanges;
+	view.filesPanelFileTree = fileTree;
+	view.filesPanelCompareWithHash = compareWithHash;
+	view.filesPanelCodeReview = codeReview;
 	view.filesPanelCommitHash = commitHash;
 	const isUncommitted = compareWithHash === UNCOMMITTED || commitHash === UNCOMMITTED;
 	view.filesPanel.update(fileTree, fileChanges, codeReview !== null ? codeReview.lastViewedFile : null, -1, commitsGetFileViewType(view), isUncommitted);
@@ -131,9 +136,11 @@ function commitsUpdateSelectionPreview(view: any) {
 		view.resetDiffState();
 		view.filesPanel.clear();
 		view.filesPanelCommitHash = null;
-		view.previewFileChanges = null;
+		view.filesPanelFileChanges = null;
+		view.filesPanelFileTree = null;
+		view.filesPanelCompareWithHash = null;
+		view.filesPanelCodeReview = null;
 		view.previewCompareHashes = null;
-		view.previewCompareFileChanges = null;
 	}
 }
 

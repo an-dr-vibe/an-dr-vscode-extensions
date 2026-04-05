@@ -77,9 +77,11 @@ class CommitsView {
 	public currentDiffFilePath: string | null = null;
 	public previewCommitHash: string | null = null;
 	public filesPanelCommitHash: string | null = null;
-	public previewFileChanges: ReadonlyArray<GG.GitFileChange> | null = null;
+	public filesPanelCompareWithHash: string | null = null;
+	public filesPanelFileChanges: ReadonlyArray<GG.GitFileChange> | null = null;
+	public filesPanelFileTree: FileTreeFolder | null = null;
+	public filesPanelCodeReview: GG.CodeReview | null = null;
 	public previewCompareHashes: readonly [string, string] | null = null;
-	public previewCompareFileChanges: ReadonlyArray<GG.GitFileChange> | null = null;
 	private selectedCommits: Set<string> = new Set();
 	private lastSelectedIndex: number = -1;
 	private maxCommits: number;
@@ -477,10 +479,13 @@ class CommitsView {
 		if (this.expandedCommit !== null && this.expandedCommit.commitHash === commitHash) return;
 		this.previewCommitHash = commitHash;
 		this.filesPanelCommitHash = null;
+		this.filesPanelFileChanges = null;
+		this.filesPanelFileTree = null;
+		this.filesPanelCompareWithHash = null;
+		this.filesPanelCodeReview = null;
 		if (this.expandedCommit === null) {
 			this.resetDiffState();
 			this.previewCompareHashes = null;
-			this.previewCompareFileChanges = null;
 		}
 		this.filesPanel.setContentLoading();
 		this.requestCommitDetails(commitHash, false);
@@ -494,7 +499,10 @@ class CommitsView {
 		if (this.expandedCommit === null || this.expandedCommit.commitHash !== commitDetails.hash) {
 			this.filesPanel.update(fileTree, commitDetails.fileChanges, codeReview !== null ? codeReview.lastViewedFile : null, -1, commitsGetFileViewType(this), false);
 			this.filesPanelCommitHash = commitDetails.hash;
-			this.previewFileChanges = commitDetails.fileChanges;
+			this.filesPanelCompareWithHash = null;
+			this.filesPanelFileChanges = commitDetails.fileChanges;
+			this.filesPanelFileTree = fileTree;
+			this.filesPanelCodeReview = codeReview;
 			commitsPopulateFilesPanelHeaderForPreview(this, commitDetails);
 		}
 	}

@@ -9,31 +9,35 @@ function commitsCloseCdvContextMenuIfOpen(expandedCommit: ExpandedCommit) {
 }
 
 function commitsStartCodeReview(view: any, commitHash: string, compareWithHash: string | null, codeReview: GG.CodeReview) {
-	if (view.expandedCommit === null || view.expandedCommit.commitHash !== commitHash || view.expandedCommit.compareWithHash !== compareWithHash) return;
+	if (view.filesPanelCommitHash !== commitHash) return;
+	if (view.expandedCommit !== null && (view.expandedCommit.commitHash !== commitHash || view.expandedCommit.compareWithHash !== compareWithHash)) return;
 	view.saveAndRenderCodeReview(codeReview);
 }
 
 function commitsEndCodeReview(view: any) {
-	if (view.expandedCommit === null || view.expandedCommit.codeReview === null) return;
+	const codeReview = view.expandedCommit !== null ? view.expandedCommit.codeReview : view.filesPanelCodeReview;
+	if (codeReview === null) return;
 	view.saveAndRenderCodeReview(null);
 }
 
 function commitsSaveAndRenderCodeReview(view: any, codeReview: GG.CodeReview | null) {
-	if (view.expandedCommit === null || view.expandedCommit.fileTree === null) return;
+	const fileTree = view.expandedCommit !== null ? view.expandedCommit.fileTree : view.filesPanelFileTree;
+	if (fileTree === null) return;
 
-	view.expandedCommit.codeReview = codeReview;
-	setFileTreeReviewed(view.expandedCommit.fileTree, codeReview === null);
+	if (view.expandedCommit !== null) view.expandedCommit.codeReview = codeReview;
+	view.filesPanelCodeReview = codeReview;
+	setFileTreeReviewed(fileTree, codeReview === null);
 	view.saveState();
 	view.renderCodeReviewBtn();
-	updateFileTreeHtml(view.filesPanel.getContentElem(), view.expandedCommit.fileTree);
+	updateFileTreeHtml(view.filesPanel.getContentElem(), fileTree);
 }
 
 function commitsRenderCodeReviewBtn(view: any) {
-	if (view.expandedCommit === null) return;
 	let btnElem = document.getElementById('cdvCodeReview');
 	if (btnElem === null) return;
 
-	let active = view.expandedCommit.codeReview !== null;
+	const codeReview = view.expandedCommit !== null ? view.expandedCommit.codeReview : view.filesPanelCodeReview;
+	let active = codeReview !== null;
 	alterClass(btnElem, CLASS_ACTIVE, active);
 	btnElem.title = (active ? 'End' : 'Start') + ' Code Review';
 }

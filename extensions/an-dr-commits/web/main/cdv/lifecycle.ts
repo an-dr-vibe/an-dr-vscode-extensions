@@ -61,6 +61,10 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	if (expandedCommit === null) {
 		view.filesPanel.clear();
 		view.filesPanelCommitHash = null;
+		view.filesPanelFileChanges = null;
+		view.filesPanelFileTree = null;
+		view.filesPanelCompareWithHash = null;
+		view.filesPanelCodeReview = null;
 		return;
 	}
 
@@ -69,8 +73,7 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 		elem.remove();
 	}
 	view.resetDiffState();
-	view.filesPanel.clear();
-	view.filesPanelCommitHash = null;
+	// Files panel stays showing current commit — filesPanelCommitHash etc. are preserved
 	view.updateLayoutBottoms();
 	if (expandedCommit.commitElem !== null) {
 		expandedCommit.commitElem.classList.remove(CLASS_COMMIT_DETAILS_OPEN);
@@ -294,20 +297,27 @@ function commitsSetupCdvCodeReviewBtn(view: any, codeReviewPossible: boolean) {
 	if (!codeReviewPossible) return;
 	view.renderCodeReviewBtn();
 	document.getElementById('cdvCodeReview')!.addEventListener('click', (e: MouseEvent) => {
+		if (e.target === null) return;
 		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || e.target === null) return;
+		const commitHash = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
+		const compareWithHash = expandedCommit !== null ? expandedCommit.compareWithHash : view.filesPanelCompareWithHash;
+		const fileTree = expandedCommit !== null ? expandedCommit.fileTree : view.filesPanelFileTree;
+		const fileChanges = expandedCommit !== null ? expandedCommit.fileChanges : view.filesPanelFileChanges;
+		const codeReview = expandedCommit !== null ? expandedCommit.codeReview : view.filesPanelCodeReview;
+		const lastViewedFile = expandedCommit !== null ? expandedCommit.lastViewedFile : null;
+		if (commitHash === null || fileTree === null || fileChanges === null) return;
 		const sourceElem = <HTMLElement>(<Element>e.target).closest('#cdvCodeReview')!;
 		if (sourceElem.classList.contains(CLASS_ACTIVE)) {
-			sendMessage({ command: 'endCodeReview', repo: view.currentRepo, id: expandedCommit.codeReview!.id });
+			sendMessage({ command: 'endCodeReview', repo: view.currentRepo, id: codeReview!.id });
 			view.endCodeReview();
 		} else {
-			const order = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
-			const id = expandedCommit.compareWithHash !== null ? order.from + '-' + order.to : expandedCommit.commitHash;
+			const order = view.getCommitOrder(commitHash, compareWithHash === null ? commitHash : compareWithHash);
+			const id = compareWithHash !== null ? order.from + '-' + order.to : commitHash;
 			sendMessage({
 				command: 'startCodeReview', repo: view.currentRepo, id: id,
-				commitHash: expandedCommit.commitHash, compareWithHash: expandedCommit.compareWithHash,
-				files: getFilesInTree(expandedCommit.fileTree!, expandedCommit.fileChanges!),
-				lastViewedFile: expandedCommit.lastViewedFile
+				commitHash: commitHash, compareWithHash: compareWithHash,
+				files: getFilesInTree(fileTree, fileChanges),
+				lastViewedFile: lastViewedFile
 			});
 		}
 	});
@@ -317,8 +327,10 @@ function commitsSetupCdvExternalDiffBtn(view: any, externalDiffPossible: boolean
 	if (!externalDiffPossible) return;
 	document.getElementById('cdvExternalDiff')!.addEventListener('click', () => {
 		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || view.gitConfig === null || (view.gitConfig.diffTool === null && view.gitConfig.guiDiffTool === null)) return;
-		const order = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
+		const commitHash = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
+		const compareWithHash = expandedCommit !== null ? expandedCommit.compareWithHash : view.filesPanelCompareWithHash;
+		if (commitHash === null || view.gitConfig === null || (view.gitConfig.diffTool === null && view.gitConfig.guiDiffTool === null)) return;
+		const order = view.getCommitOrder(commitHash, compareWithHash === null ? commitHash : compareWithHash);
 		runAction({
 			command: 'openExternalDirDiff', repo: view.currentRepo,
 			fromHash: order.from, toHash: order.to, isGui: view.gitConfig.guiDiffTool !== null
@@ -365,8 +377,15 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		html += '<div id="cdvLoading">' + SVG_ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
 	} else {
 		html += '<div id="cdvSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
-		view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
+		const alreadyShowingThisCommit = view.filesPanelCommitHash === expandedCommit.commitHash && view.filesPanelCompareWithHash === expandedCommit.compareWithHash;
+		if (!alreadyShowingThisCommit || refresh) {
+			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
+		}
 		view.filesPanelCommitHash = expandedCommit.commitHash;
+		view.filesPanelCompareWithHash = expandedCommit.compareWithHash;
+		view.filesPanelFileChanges = expandedCommit.fileChanges;
+		view.filesPanelFileTree = expandedCommit.fileTree;
+		view.filesPanelCodeReview = expandedCommit.codeReview;
 	}
 	html += '</div></div><div class="cdvHeightResize"></div>';
 
@@ -426,14 +445,12 @@ function commitsSetFileViewType(view: any, type: GG.FileViewType) {
 function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null) {
-		const fileChanges = view.previewCompareHashes !== null ? view.previewCompareFileChanges : view.previewFileChanges;
-		if (fileChanges === null) return;
+		if (view.filesPanelFileChanges === null || view.filesPanelFileTree === null) return;
 		view.setFileViewType(type);
-		const fileTree = view.createFileTree(fileChanges, null);
-		const isUncommitted = view.previewCompareHashes !== null
-			? (view.previewCompareHashes[0] === UNCOMMITTED || view.previewCompareHashes[1] === UNCOMMITTED)
+		const isUncommitted = view.filesPanelCompareWithHash !== null
+			? (view.filesPanelCompareWithHash === UNCOMMITTED || view.filesPanelCommitHash === UNCOMMITTED)
 			: view.filesPanelCommitHash === UNCOMMITTED;
-		view.filesPanel.update(fileTree, fileChanges, null, -1, type, isUncommitted);
+		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, null, -1, type, isUncommitted);
 		view.renderCdvFileViewTypeBtns();
 		return;
 	}

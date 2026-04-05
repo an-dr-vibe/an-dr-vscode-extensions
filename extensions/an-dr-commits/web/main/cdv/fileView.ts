@@ -301,8 +301,7 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 
 	const fileIndex = parseInt(record.dataset.index!);
 	const expandedCommit = view.expandedCommit;
-	const isComparisonPreview = expandedCommit === null && view.previewCompareHashes !== null;
-	const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : (isComparisonPreview ? view.previewCompareFileChanges : view.previewFileChanges);
+	const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : view.filesPanelFileChanges;
 	const commitHash: string | null = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
 	if (!fileChanges || !commitHash) return null;
 
@@ -324,8 +323,9 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 		} else {
 			fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash;
 		}
-	} else if (isComparisonPreview) {
-		fromHash = view.previewCompareHashes![0]; toHash = view.previewCompareHashes![1];
+	} else if (view.filesPanelCompareWithHash !== null) {
+		const co = view.getCommitOrder(commitHash, view.filesPanelCompareWithHash);
+		fromHash = co.from; toHash = co.to;
 	} else {
 		fromHash = commitHash; toHash = commitHash;
 	}

@@ -194,7 +194,7 @@ function commitsRenderCommitDetailsViewSummary(view: any, expandedCommit: Expand
 				+ commitDetailsAvatar
 				+ '</span></span><br><br>' + textFormatter.format(commitDetails.body);
 		} else {
-			html += 'Displaying all uncommitted changes.';
+			html += 'Displaying all uncommitted changes.<br><br><span id="cdvOpenScmBtn" class="roundedBtn" title="Open Source Control panel to stage and commit changes">Commit Changes...</span>';
 		}
 	} else {
 		const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
@@ -307,6 +307,8 @@ function commitsSetupCdvInteractivity(view: any, expandedCommit: any, codeReview
 	commitsSetupCdvViewButtons(view);
 	commitsSetupCdvCodeReviewBtn(view, codeReviewPossible);
 	commitsSetupCdvExternalDiffBtn(view, externalDiffPossible);
+	const openScmBtn = document.getElementById('cdvOpenScmBtn');
+	if (openScmBtn !== null) openScmBtn.addEventListener('click', () => sendMessage({ command: 'viewScm' }));
 }
 
 function commitsRenderCommitDetailsView(view: any, refresh: boolean) {

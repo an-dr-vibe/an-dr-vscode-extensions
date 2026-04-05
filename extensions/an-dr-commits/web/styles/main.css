@@ -526,6 +526,11 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	-webkit-user-select:text;
 	user-select:text;
 }
+#cdvOpenScmBtn{
+	display:inline-block;
+	margin-top:10px;
+	padding:2px 10px;
+}
 
 .cdvSummaryTop{
 	display:inline-table;

@@ -97,10 +97,6 @@ function commitsGetCommitEditMenuGroup(view: any, hash: string, commit: GG.GitCo
 					}
 				}, target);
 			}
-		}, {
-			title: 'Copy Commit Hash',
-			visible: true,
-			onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Commit Hash', data: hash }); }
 		}
 	];
 }
@@ -139,8 +135,8 @@ function commitsGetCommitContextMenuActions(view: any, target: any): ContextMenu
 		{ title: 'Rebase current branch on this Commit' + ELLIPSIS, visible: visibility.rebase, onClick: () => view.rebaseAction(hash, abbrevCommit(hash), GG.RebaseActionOn.Commit, target) },
 		{ title: 'Reset current branch to this Commit' + ELLIPSIS, visible: visibility.reset, onClick: () => view.resetCurrentBranchToCommitAction(hash, target) }
 	], [
-		{ title: 'Copy Commit Hash to Clipboard', visible: visibility.copyHash, onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Commit Hash', data: hash }); } },
-		{ title: 'Copy Commit Subject to Clipboard', visible: visibility.copySubject, onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Commit Subject', data: commit.message }); } }
+		{ title: 'Copy Commit Hash', visible: visibility.copyHash, onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Commit Hash', data: hash }); } },
+		{ title: 'Copy Commit Subject', visible: visibility.copySubject, onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Commit Subject', data: commit.message }); } }
 	], commitsGetCommitEditMenuGroup(view, hash, commit, target)];
 }
 

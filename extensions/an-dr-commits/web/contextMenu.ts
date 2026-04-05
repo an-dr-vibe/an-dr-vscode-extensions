@@ -33,6 +33,7 @@ class ContextMenu {
 		const listener = () => this.close();
 		document.addEventListener('click', listener);
 		document.addEventListener('contextmenu', listener);
+		window.addEventListener('blur', listener);
 	}
 
 	/**

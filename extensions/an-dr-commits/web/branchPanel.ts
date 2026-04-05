@@ -67,12 +67,16 @@ class BranchPanel {
 		this.sidebar = elem.parentElement!; // #sidebar
 		this.filterHost = document.getElementById('branchPanelFilterHost');
 
-		// Fixed-position toggle button (stays visible when sidebar is hidden)
+		// Toggle button in the top controls bar
 		this.toggleBtn = document.createElement('div');
 		this.toggleBtn.id = 'sidebarToggle';
 		this.toggleBtn.title = 'Toggle Branch Panel';
-		this.toggleBtn.innerHTML = '&#9664;';
-		document.body.appendChild(this.toggleBtn);
+		this.toggleBtn.innerHTML = SVG_ICONS.sidebarPanel;
+		this.toggleBtn.classList.add('active');
+		const toggleBtnContainer = document.getElementById('sidebarToggleBtn');
+		if (toggleBtnContainer) {
+			toggleBtnContainer.appendChild(this.toggleBtn);
+		}
 		this.toggleBtn.addEventListener('click', () => this.toggleSidebar());
 
 		// Resize handle just outside the sidebar, next to the toggle button
@@ -141,7 +145,6 @@ class BranchPanel {
 	private updateWidth(width: number) {
 		this.sidebarWidth = width;
 		this.applyLayoutWidth(this.sidebarHidden ? 0 : width);
-		this.updateTogglePosition();
 		this.updateHintLayout();
 		this.scheduleScrollRestore();
 	}
@@ -152,27 +155,18 @@ class BranchPanel {
 			this.sidebar.style.overflow = 'hidden';
 			document.body.classList.add('branchPanelHidden');
 			this.applyLayoutWidth(0);
-			this.toggleBtn.innerHTML = '&#9654;';
+			this.toggleBtn.classList.remove('active');
 		} else {
 			this.sidebar.style.overflow = '';
 			document.body.classList.remove('branchPanelHidden');
 			this.applyLayoutWidth(this.sidebarWidth);
-			this.toggleBtn.innerHTML = '&#9664;';
+			this.toggleBtn.classList.add('active');
 		}
-		this.updateTogglePosition();
 		this.updateHintLayout();
 	}
 
 	private applyLayoutWidth(width: number) {
 		document.body.style.setProperty('--branch-panel-width', width + 'px');
-	}
-
-	private updateTogglePosition() {
-		this.toggleBtn.style.left = (this.sidebarHidden ? 0 : this.sidebarWidth) + 'px';
-		const resizeHandle = document.getElementById('sidebarResizeHandle');
-		if (resizeHandle !== null) {
-			resizeHandle.style.left = (this.sidebarHidden ? 0 : this.sidebarWidth - 3) + 'px';
-		}
 	}
 
 	public setTags(tags: ReadonlyArray<string>) {

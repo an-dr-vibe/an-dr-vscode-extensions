@@ -1335,6 +1335,12 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 	flex:1 1 auto;
 }
 
+#sidebarToggleBtn{
+	display:flex;
+	align-items:center;
+	flex-shrink:0;
+}
+
 #findWidgetHost{
 	display:flex;
 	align-items:center;
@@ -1421,13 +1427,13 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 #topFullDiffBtn svg, #settingsBtn svg, #pullBtn svg, #pushBtn svg{
 	position:absolute;
 	fill:var(--vscode-editor-foreground);
-	opacity:0.8;
+	opacity:0.4;
 	stroke:var(--vscode-editor-foreground);
 	stroke-opacity:0.5;
 	stroke-width:0;
 }
 #topFullDiffBtn:hover svg, #settingsBtn:hover svg, #pullBtn:hover svg, #pushBtn:hover svg{
-	opacity:1;
+	opacity:0.8;
 	stroke-width:0.5px;
 }
 #topFullDiffBtn svg, #settingsBtn svg, #pullBtn svg, #pushBtn svg{
@@ -1436,13 +1442,10 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 	width:18px !important;
 	height:18px !important;
 }
-#topFullDiffBtn.active{
-	outline:1px solid var(--vscode-inputOption-activeBorder, rgba(128,128,128,0.55));
-	outline-offset:-1px;
-	background-color:var(--vscode-inputOption-activeBackground, rgba(128,128,128,0.16));
-	border-radius:3px;
-}
 #topFullDiffBtn.active svg{
+	opacity:1;
+}
+#topFullDiffBtn.active:hover svg{
 	opacity:1;
 }
 
@@ -1473,23 +1476,24 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 	top:1px;
 	width:18px !important;
 	height:18px !important;
-	opacity:0.8;
+	opacity:0.4;
 	fill:var(--vscode-editor-foreground);
 	stroke:var(--vscode-editor-foreground);
 	stroke-opacity:0.5;
 	stroke-width:0;
 }
 #findWidgetToggleBtn:hover svg{
-	opacity:1;
+	opacity:0.8;
 	stroke-width:0.5px;
 }
 body.compactSearch #findWidgetToggleBtn{
 	display:block;
 }
-#findWidgetToggleBtn.active{
-	outline:1px solid var(--vscode-inputOption-activeBorder);
-	outline-offset:-1px;
-	background-color:var(--vscode-inputOption-activeBackground);
+#findWidgetToggleBtn.active svg{
+	opacity:1;
+}
+#findWidgetToggleBtn.active:hover svg{
+	opacity:1;
 }
 
 #controls.pullPushSupported #pullBtn,
@@ -1536,7 +1540,11 @@ body.compactSearch #findWidgetToggleBtn{
 }
 
 body.branchPanelHidden #sidebarTop{
+	width:0;
+	flex-basis:0;
+	padding:0;
 	border-right:none;
+	overflow:hidden;
 }
 
 

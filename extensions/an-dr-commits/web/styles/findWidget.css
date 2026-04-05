@@ -90,15 +90,16 @@
 	user-select:none;
 	text-align:center;
 	color:var(--vscode-input-foreground);
-	opacity:0.7;
+	opacity:0.4;
 	position:static;
 }
-.findModifier.active, #findOpenCdv.active{
-	outline:1px solid var(--vscode-inputOption-activeBorder);
-	outline-offset:-1px;
-	background-color:var(--vscode-inputOption-activeBackground);
+.findModifier.active{
+	opacity:1;
 }
-.findModifier:hover, .findModifier.active{
+.findModifier:hover, .findModifier.active:hover{
+	opacity:0.8;
+}
+.findModifier.active, .findModifier.active:hover{
 	opacity:1;
 }
 #findRegex{
@@ -134,12 +135,22 @@
 	position:absolute;
 	left:3px;
 	top:3px;
+	fill-opacity:0.4;
 }
-#findPrev:hover, #findNext:hover, #findOpenCdv:hover, #findOpenCdv.active{
+#findPrev:hover svg, #findNext:hover svg{
+	fill-opacity:0.8;
+}
+#findOpenCdv:hover svg, #findOpenCdv.active svg{
 	fill-opacity:1;
 }
+#findOpenCdv.active:hover svg{
+	fill-opacity:1;
+}
+#findPrev.disabled svg, #findNext.disabled svg{
+	fill-opacity:0.2;
+	cursor:default;
+}
 #findPrev.disabled, #findNext.disabled{
-	fill-opacity:0.3;
 	cursor:default;
 }
 

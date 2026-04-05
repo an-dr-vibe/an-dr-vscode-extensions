@@ -64,6 +64,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 					</div>
 					<div id="controls">
 						<div id="controlsLeft">
+							<div id="sidebarToggleBtn"></div>
 							<div id="findWidgetHost"></div>
 							<div id="findWidgetToggleBtn" title="Search Graph"></div>
 							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>

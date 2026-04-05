@@ -2,7 +2,15 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 	view.currentDiffText = data !== null ? data.diff : null;
 	view.currentFullDiffData = data;
 	const contentElem = document.getElementById('fullDiffContent');
+	const filenameElem = document.getElementById('fullDiffFilename');
 	if (!contentElem) return;
+
+	// Update filename display
+	if (filenameElem && view.currentDiffRequest) {
+		const filePath = view.currentDiffRequest.newFilePath || view.currentDiffRequest.oldFilePath;
+		filenameElem.textContent = filePath;
+	}
+
 	if (data === null || data.diff === null) {
 		contentElem.innerHTML = '<div class="cdvDiffMessage">Unable to load file contents</div>';
 		view.attachFullDiffHunkNav();
@@ -258,9 +266,10 @@ function commitsCreateFullDiffPanel(view: any) {
 	if (document.getElementById('fullDiffPanel')) return;
 	const panel = document.createElement('div');
 	panel.id = 'fullDiffPanel';
+	const initialFilename = (view.currentDiffRequest ? (view.currentDiffRequest.newFilePath || view.currentDiffRequest.oldFilePath) : 'Select a file to view its contents');
 	panel.innerHTML =
 		'<div id="fullDiffResizeHandle"></div>' +
-		'<div id="fullDiffHeader"><span id="fullDiffFilename">Select a file to view its contents</span>' +
+		'<div id="fullDiffHeader"><span id="fullDiffFilename">' + escapeHtml(initialFilename) + '</span>' +
 			'<div id="fullDiffHeaderRight">' +
 				'<button id="fullDiffViewUnified" title="Unified full file view">Unified</button>' +
 				'<button id="fullDiffViewSideBySide" title="Side by side full file view">Split</button>' +

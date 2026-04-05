@@ -17,7 +17,15 @@ function commitsHandleArrowKeyNav(view: any, e: KeyboardEvent, curHashIndex: num
 	if (newHashIndex > -1) {
 		handledEvent(e);
 		const elem = findCommitElemWithId(getCommitElems(), newHashIndex);
-		if (elem !== null) view.loadCommitDetails(elem);
+		if (elem !== null) {
+			const navCommit = view.getCommitOfElem(elem);
+			if (navCommit !== null && navCommit.hash === UNCOMMITTED) {
+				view.selectCommit(navCommit.hash, newHashIndex);
+				view.previewCommitFiles(navCommit.hash);
+			} else {
+				view.loadCommitDetails(elem);
+			}
+		}
 	}
 }
 
@@ -38,11 +46,7 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 		handledEvent(e);
 	} else if (view.filesPanelCommitHash !== null && view.expandedCommit === null) {
 		if (view.currentDiffRequest !== null) {
-			view.destroyFullDiffPanel();
-			view.currentDiffRequest = null;
-			view.currentFullDiffData = null;
-			view.currentDiffFilePath = null;
-			view.updateLayoutBottoms();
+			view.resetDiffState();
 		} else {
 			view.filesPanel.clear();
 			view.filesPanelCommitHash = null;
@@ -51,12 +55,7 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 		handledEvent(e);
 	} else if (view.expandedCommit !== null) {
 		if (view.currentDiffRequest !== null) {
-			view.destroyFullDiffPanel();
-			view.currentDiffRequest = null;
-			view.currentDiffText = null;
-			view.currentFullDiffData = null;
-			view.currentDiffFilePath = null;
-			view.updateLayoutBottoms();
+			view.resetDiffState();
 		} else {
 			view.closeCommitDetails(true);
 		}

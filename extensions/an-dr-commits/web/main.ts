@@ -475,6 +475,7 @@ class CommitsView {
 		if (this.expandedCommit !== null && this.expandedCommit.commitHash === commitHash) return;
 		this.previewCommitHash = commitHash;
 		this.filesPanelCommitHash = null;
+		if (this.expandedCommit === null) this.resetDiffState();
 		this.filesPanel.setContentLoading();
 		this.requestCommitDetails(commitHash, false);
 	}
@@ -521,6 +522,7 @@ class CommitsView {
 	public renderFullDiffViewBtns() { commitsRenderFullDiffViewBtns(this); }
 	public changeFullDiffViewMode(mode: 'unified' | 'sideBySide') { commitsChangeFullDiffViewMode(this, mode); }
 	private destroyFullDiffPanel() { commitsDestroyFullDiffPanel(this); }
+	public resetDiffState() { commitsResetDiffState(this); }
 	public setFullDiffPanelHeight(height: number) { commitsSetFullDiffPanelHeight(this, height); }
 	private updateLayoutBottoms() { commitsUpdateLayoutBottoms(this); }
 	public makeFullDiffPanelResizable() { commitsMakeFullDiffPanelResizable(this); }

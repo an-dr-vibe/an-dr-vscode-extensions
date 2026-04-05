@@ -309,6 +309,21 @@ function commitsDestroyFullDiffPanel(view: any) {
 	view.updateLayoutBottoms();
 }
 
+function commitsResetDiffState(view: any) {
+	view.currentDiffRequest = null;
+	view.currentDiffText = null;
+	view.currentFullDiffData = null;
+	view.currentDiffFilePath = null;
+	if (view.fullDiffMode) {
+		const filenameElem = document.getElementById('fullDiffFilename');
+		const contentElem = document.getElementById('fullDiffContent');
+		if (filenameElem) filenameElem.textContent = 'Select a file to view its contents';
+		if (contentElem) contentElem.innerHTML = '<div class="cdvDiffMessage">Select a file to view the diff</div>';
+	} else {
+		view.destroyFullDiffPanel();
+	}
+}
+
 function commitsSetFullDiffPanelHeight(view: any, height: number) {
 	view.gitRepos[view.currentRepo].fullDiffPanelHeight = height;
 	const panel = document.getElementById('fullDiffPanel');
@@ -328,6 +343,8 @@ function commitsUpdateLayoutBottoms(view: any) {
 	if (filesPanel) filesPanel.style.bottom = panelH + 'px';
 	const sidebar = document.getElementById('sidebar');
 	if (sidebar) sidebar.style.bottom = panelH + 'px';
+	const sidebarResizeHandle = document.getElementById('sidebarResizeHandle');
+	if (sidebarResizeHandle) sidebarResizeHandle.style.bottom = panelH + 'px';
 }
 
 function commitsMakeFullDiffPanelResizable(view: any) {

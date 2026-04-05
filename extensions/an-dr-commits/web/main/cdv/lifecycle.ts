@@ -3,6 +3,7 @@
 function commitsLoadCommitDetails(view: any, commitElem: HTMLElement) {
 	const commit = view.getCommitOfElem(commitElem);
 	if (commit === null) return;
+	if (commit.hash === UNCOMMITTED) return;
 	if (view.expandedCommit !== null && view.expandedCommit.commitHash === commit.hash && !view.expandedCommit.loading) return;
 
 	view.previewCommitHash = null;
@@ -67,11 +68,7 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	if (elem !== null) {
 		elem.remove();
 	}
-	view.destroyFullDiffPanel();
-	view.currentDiffRequest = null;
-	view.currentDiffText = null;
-	view.currentFullDiffData = null;
-	view.currentDiffFilePath = null;
+	view.resetDiffState();
 	view.filesPanel.clear();
 	view.filesPanelCommitHash = null;
 	view.updateLayoutBottoms();
@@ -222,7 +219,7 @@ function commitsRenderCommitDetailsViewSummary(view: any, expandedCommit: Expand
 				+ commitDetailsAvatar
 				+ '</span></span><br><br>' + textFormatter.format(commitDetails.body);
 		} else {
-			html += 'Displaying all uncommitted changes.<br><br><span id="cdvOpenScmBtn" class="roundedBtn" title="Open Source Control panel to stage and commit changes">Commit Changes...</span>';
+			html += 'Displaying all uncommitted changes.';
 		}
 	} else {
 		const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
@@ -335,8 +332,6 @@ function commitsSetupCdvInteractivity(view: any, expandedCommit: any, codeReview
 	view.renderCdvExternalDiffBtn();
 	if (view.fullDiffMode) view.createFullDiffPanel();
 	commitsSetupCdvScrollObservers(view, expandedCommit);
-	const openScmBtn = document.getElementById('cdvOpenScmBtn');
-	if (openScmBtn !== null) openScmBtn.addEventListener('click', () => sendMessage({ command: 'viewScm' }));
 }
 
 function commitsRenderCommitDetailsView(view: any, refresh: boolean) {

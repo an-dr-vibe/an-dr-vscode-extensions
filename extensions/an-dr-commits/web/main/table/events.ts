@@ -116,7 +116,13 @@ function commitsHandleTableDblClick(view: any, e: MouseEvent) {
 	} else if ((eventElem = eventTarget.closest('.commit')) !== null) {
 		e.stopPropagation();
 		closeDialogAndContextMenu();
-		if (view.expandedCommit !== null && view.expandedCommit.commitHash === view.getCommitOfElem(eventElem)?.hash) {
+		const dblCommit = view.getCommitOfElem(eventElem);
+		if (dblCommit === null) return;
+		if (dblCommit.hash === UNCOMMITTED) {
+			sendMessage({ command: 'viewScm' });
+			return;
+		}
+		if (view.expandedCommit !== null && view.expandedCommit.commitHash === dblCommit.hash) {
 			view.closeCommitDetails(true);
 		} else {
 			view.loadCommitDetails(eventElem);

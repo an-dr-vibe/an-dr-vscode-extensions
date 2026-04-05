@@ -124,6 +124,19 @@
 					"default": "File Tree",
 					"description": "Sets the default type of File View used in the Commit Details View. This can be overridden per repository using the controls on the right side of the Commit Details View."
 				},
+				"an-dr-commits.commitDetailsView.defaultDiffMode": {
+					"type": "string",
+					"enum": [
+						"Quick",
+						"Full"
+					],
+					"enumDescriptions": [
+						"Show the quick inline diff by default when a file is selected.",
+						"Show the full file diff panel by default when a file is selected."
+					],
+					"default": "Quick",
+					"description": "Specifies the default diff mode when viewing a file in the Commit Details View."
+				},
 				"an-dr-commits.commitDetailsView.location": {
 					"type": "string",
 					"enum": [

@@ -37,10 +37,14 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 		view.updateCompactFindWidgetState();
 		handledEvent(e);
 	} else if (view.expandedCommit !== null) {
-		if (document.getElementById('fullDiffPanel')) {
-			view.toggleFullDiffMode(false);
-		} else if (view.diffPaneVisible) {
+		if (view.currentDiffRequest !== null) {
+			view.destroyFullDiffPanel();
 			view.hideDiffPane();
+			view.currentDiffRequest = null;
+			view.currentDiffText = null;
+			view.currentFullDiffData = null;
+			view.currentDiffFilePath = null;
+			view.updateLayoutBottoms();
 		} else {
 			view.closeCommitDetails(true);
 		}

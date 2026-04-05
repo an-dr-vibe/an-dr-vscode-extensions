@@ -74,7 +74,7 @@ class CommitsView {
 	public currentDiffText: string | null = null;
 	public currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null = null;
 	private diffPaneVisible: boolean = false;
-	private fullDiffMode: boolean = false;
+	private fullDiffMode: boolean = initialState.config.commitDetailsView.defaultDiffMode === 'full';
 	public currentDiffFilePath: string | null = null;
 	private selectedCommits: Set<string> = new Set();
 	private lastSelectedIndex: number = -1;

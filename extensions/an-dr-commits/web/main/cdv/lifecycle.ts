@@ -40,12 +40,12 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	if (elem !== null) {
 		elem.remove();
 	}
-	if (view.fullDiffMode) {
-		view.destroyFullDiffPanel();
-		view.fullDiffMode = false;
-		view.currentFullDiffData = null;
-		view.currentDiffFilePath = null;
-	}
+	view.destroyFullDiffPanel();
+	view.hideDiffPane();
+	view.currentDiffRequest = null;
+	view.currentDiffText = null;
+	view.currentFullDiffData = null;
+	view.currentDiffFilePath = null;
 	view.updateLayoutBottoms();
 	if (expandedCommit.commitElem !== null) {
 		expandedCommit.commitElem.classList.remove(CLASS_COMMIT_DETAILS_OPEN);
@@ -302,7 +302,7 @@ function commitsSetupCdvInteractivity(view: any, expandedCommit: any, codeReview
 	view.renderCdvDiffViewBtns();
 	view.renderCdvExternalDiffBtn();
 	view.makeCdvDividerDraggable();
-	if (view.fullDiffMode) view.createFullDiffPanel();
+	if (view.fullDiffMode && view.currentDiffRequest !== null) view.createFullDiffPanel();
 	commitsSetupCdvScrollObservers(view, expandedCommit);
 	commitsSetupCdvViewButtons(view);
 	commitsSetupCdvCodeReviewBtn(view, codeReviewPossible);

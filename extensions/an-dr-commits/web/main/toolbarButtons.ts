@@ -22,10 +22,8 @@ function commitsRenderFetchButton(view: any) {
 }
 
 function commitsRenderTopFullDiffButton(view: any) {
-	const fullDiffAvailable = view.expandedCommit !== null && !view.expandedCommit.loading;
 	view.topFullDiffBtnElem.title = view.fullDiffMode ? 'Hide Full Diff Panel' : 'Show Full Diff Panel';
 	alterClass(view.topFullDiffBtnElem, CLASS_ACTIVE, view.fullDiffMode);
-	alterClass(view.topFullDiffBtnElem, 'overflowHidden', !fullDiffAvailable);
 }
 
 function commitsRenderTagDetails(view: any, tagName: string, commitHash: string, details: GG.GitTagDetails) {

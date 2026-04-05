@@ -229,26 +229,25 @@ function commitsToggleFullDiffMode(view: any, on: boolean) {
 	view.fullDiffMode = on;
 	view.renderCdvDiffViewBtns();
 	if (on) {
-		view.createFullDiffPanel();
+		view.currentDiffText = null;      // discard stale quick-diff cache
 		view.hideDiffPane();
-		if (view.currentFullDiffData !== null) {
-			view.renderFullDiffContent(view.currentFullDiffData);
-		} else if (view.currentDiffRequest !== null) {
-			sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, ...view.currentDiffRequest });
+		if (view.currentDiffRequest !== null) {
+			view.createFullDiffPanel();
+			if (view.currentFullDiffData !== null) {
+				view.renderFullDiffContent(view.currentFullDiffData);
+			} else {
+				sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, ...view.currentDiffRequest });
+			}
 		}
 	} else {
+		view.currentFullDiffData = null;  // discard stale full-diff cache
 		view.destroyFullDiffPanel();
-		if (view.currentDiffText !== null) {
-			view.renderDiffPreview(view.currentDiffText);
-		} else if (view.currentDiffRequest !== null) {
-			sendMessage({
-				command: 'getFileDiff',
-				repo: view.currentRepo,
-				fromHash: view.currentDiffRequest.fromHash,
-				toHash: view.currentDiffRequest.toHash,
-				oldFilePath: view.currentDiffRequest.oldFilePath,
-				newFilePath: view.currentDiffRequest.newFilePath
-			});
+		if (view.currentDiffRequest !== null) {
+			if (view.currentDiffText !== null) {
+				view.renderDiffPreview(view.currentDiffText);
+			} else {
+				sendMessage({ command: 'getFileDiff', repo: view.currentRepo, fromHash: view.currentDiffRequest.fromHash, toHash: view.currentDiffRequest.toHash, oldFilePath: view.currentDiffRequest.oldFilePath, newFilePath: view.currentDiffRequest.newFilePath });
+			}
 		}
 	}
 	view.renderTopFullDiffButton();

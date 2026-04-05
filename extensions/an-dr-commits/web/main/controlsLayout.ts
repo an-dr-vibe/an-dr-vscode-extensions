@@ -13,7 +13,7 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 		{
 			id: 'topFullDiffBtn',
 			elem: view.topFullDiffBtnElem,
-			visible: view.expandedCommit !== null && !view.expandedCommit.loading,
+			visible: true,
 			title: view.fullDiffMode ? 'Hide Full Diff Panel' : 'Show Full Diff Panel',
 			onClick: () => view.toggleFullDiffMode(!view.fullDiffMode)
 		},

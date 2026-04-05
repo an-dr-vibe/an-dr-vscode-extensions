@@ -39,15 +39,13 @@ function commitsHandleCdvFileClick(view: any, e: Event) {
 		}
 
 		view.cdvUpdateFileState(file, fileElem, true, true);
-		view.currentDiffRequest = {
-			fromHash: fromHash,
-			toHash: toHash,
-			oldFilePath: file.oldFilePath,
-			newFilePath: file.newFilePath,
-			type: fileStatus
-		};
+		view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
 		view.currentDiffFilePath = file.newFilePath;
+		view.currentDiffText = null;
+		view.currentFullDiffData = null;
 		if (view.fullDiffMode) {
+			view.createFullDiffPanel();
+			view.hideDiffPane();
 			sendMessage({
 				command: 'getFullDiffContent',
 				repo: view.currentRepo,
@@ -208,7 +206,11 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 			view.cdvUpdateFileState(file, fileElem, true, true);
 			view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
 			view.currentDiffFilePath = file.newFilePath;
+			view.currentDiffText = null;
+			view.currentFullDiffData = null;
 			if (view.fullDiffMode) {
+				view.createFullDiffPanel();
+				view.hideDiffPane();
 				sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
 			} else {
 				sendMessage({ command: 'getFileDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath });

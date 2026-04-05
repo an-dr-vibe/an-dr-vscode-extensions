@@ -39,7 +39,8 @@
       "Bash(grep -B 5 -A 5 \"branchData.head = ''HEAD''\\\\|branchData.branches.unshift\\\\\\(''HEAD''\\\\\\)\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-git/src/data-source/parsers.ts)",
       "Bash(grep -E \"\\\\.ts$\")",
       "Bash(ls /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/tsconfig*.json)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''scripts'''',{}\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''scripts'''',{}\\)\\)\")",
+      "Bash(head -5 grep -n \"commitsUpdateCdvFileState\\\\|currentDiffFilePath\\\\|gitDiffSelected\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/web/main/cdv/fileView.ts)"
     ]
   }
 }

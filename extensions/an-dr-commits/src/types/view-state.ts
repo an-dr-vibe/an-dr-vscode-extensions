@@ -112,6 +112,7 @@ export interface CommitDetailsViewConfig {
 	readonly fileTreeCompactFolders: boolean;
 	readonly fileViewType: FileViewType;
 	readonly location: CommitDetailsViewLocation;
+	readonly defaultDiffMode: 'quick' | 'full';
 }
 
 export interface BranchPanelConfig {

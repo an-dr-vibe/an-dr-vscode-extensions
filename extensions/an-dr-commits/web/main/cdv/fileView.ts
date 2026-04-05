@@ -15,107 +15,6 @@ function commitsHandleCdvFileClick(view: any, e: Event) {
 		}
 	};
 
-	const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
-		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null) return;
-
-		let commit = view.commits[view.commitLookup[expandedCommit.commitHash]], fromHash: string, toHash: string, fileStatus = file.type;
-		if (expandedCommit.compareWithHash !== null) {
-			const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
-			fromHash = commitOrder.from;
-			toHash = commitOrder.to;
-		} else if (commit.stash !== null) {
-			if (fileStatus === GG.GitFileStatus.Untracked) {
-				fromHash = commit.stash.untrackedFilesHash!;
-				toHash = commit.stash.untrackedFilesHash!;
-				fileStatus = GG.GitFileStatus.Added;
-			} else {
-				fromHash = commit.stash.baseHash;
-				toHash = expandedCommit.commitHash;
-			}
-		} else {
-			fromHash = expandedCommit.commitHash;
-			toHash = expandedCommit.commitHash;
-		}
-
-		view.cdvUpdateFileState(file, fileElem, true, true);
-		view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
-		view.currentDiffFilePath = file.newFilePath;
-		view.currentDiffText = null;
-		view.currentFullDiffData = null;
-		if (view.fullDiffMode) {
-			view.createFullDiffPanel();
-			view.hideDiffPane();
-			sendMessage({
-				command: 'getFullDiffContent',
-				repo: view.currentRepo,
-				fromHash: fromHash,
-				toHash: toHash,
-				oldFilePath: file.oldFilePath,
-				newFilePath: file.newFilePath,
-				type: fileStatus
-			});
-		} else {
-			sendMessage({
-				command: 'getFileDiff',
-				repo: view.currentRepo,
-				fromHash: fromHash,
-				toHash: toHash,
-				oldFilePath: file.oldFilePath,
-				newFilePath: file.newFilePath
-			});
-		}
-	};
-
-	addListenerToClass('fileTreeFolder', 'click', (e) => {
-		let expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileTree === null || e.target === null) return;
-
-		let sourceElem = <HTMLElement>(<Element>e.target).closest('.fileTreeFolder');
-		let parent = sourceElem.parentElement!;
-		parent.classList.toggle('closed');
-		let isOpen = !parent.classList.contains('closed');
-		parent.children[0].children[0].innerHTML = isOpen ? SVG_ICONS.openFolder : SVG_ICONS.closedFolder;
-		parent.children[1].classList.toggle('hidden');
-		alterFileTreeFolderOpen(expandedCommit.fileTree, decodeURIComponent(sourceElem.dataset.folderpath!), isOpen);
-		view.saveState();
-	});
-
-	addListenerToClass('fileTreeRepo', 'click', (e) => {
-		if (e.target === null) return;
-		view.loadRepos(view.gitRepos, null, {
-			repo: decodeURIComponent((<HTMLElement>(<Element>e.target).closest('.fileTreeRepo')).dataset.path!)
-		});
-	});
-
-	addListenerToClass('fileTreeFile', 'click', (e) => {
-		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
-
-		const sourceElem = <HTMLElement>(<Element>e.target).closest('.fileTreeFile'), fileElem = getFileElemOfEventTarget(e.target);
-		if (!sourceElem.classList.contains('gitDiffPossible')) return;
-		triggerViewFileDiff(getFileOfFileElem(expandedCommit.fileChanges, fileElem), fileElem);
-	});
-
-	addListenerToClass('fileTreeFile', 'dblclick', (e) => {
-		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
-
-		const sourceElem = <HTMLElement>(<Element>e.target).closest('.fileTreeFile'), fileElem = getFileElemOfEventTarget(e.target);
-		if (!sourceElem.classList.contains('gitDiffPossible')) return;
-		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
-		let commit = view.commits[view.commitLookup[expandedCommit.commitHash]], fromHash: string, toHash: string, fileStatus = file.type;
-		if (expandedCommit.compareWithHash !== null) {
-			const co = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
-			fromHash = co.from; toHash = co.to;
-		} else if (commit.stash !== null) {
-			if (fileStatus === GG.GitFileStatus.Untracked) {
-				fromHash = commit.stash.untrackedFilesHash!; toHash = fromHash; fileStatus = GG.GitFileStatus.Added;
-			} else { fromHash = commit.stash.baseHash; toHash = expandedCommit.commitHash; }
-		} else { fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash; }
-		sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
-	});
-
 	addListenerToClass('copyGitFile', 'click', (e) => {
 		const expandedCommit = view.expandedCommit;
 		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
@@ -316,8 +215,8 @@ function commitsRenderCdvExternalDiffBtn(view: any) {
 }
 
 function commitsCdvUpdateFileState(view: any, file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) {
-	const expandedCommit = view.expandedCommit, filesElem = document.getElementById('cdvFiles'), filePath = file.newFilePath;
-	if (expandedCommit === null || expandedCommit.fileTree === null || filesElem === null) return;
+	const expandedCommit = view.expandedCommit, filesElem = view.filesPanel.getContentElem(), filePath = file.newFilePath;
+	if (expandedCommit === null || expandedCommit.fileTree === null) return;
 
 	if (fileWasViewed) {
 		expandedCommit.lastViewedFile = filePath;
@@ -357,4 +256,76 @@ function commitsCdvUpdateFileState(view: any, file: GG.GitFileChange, fileElem: 
 	}
 
 	view.saveState();
+}
+
+function commitsHandleFilesPanelClick(view: any, e: MouseEvent) {
+	const target = e.target as Element;
+
+	// Folder toggle (only when CDV is open and has file tree state)
+	const folderElem = target.closest('.fileTreeFolder') as HTMLElement | null;
+	if (folderElem) {
+		const expandedCommit = view.expandedCommit;
+		if (expandedCommit === null || expandedCommit.fileTree === null) return;
+		const parent = folderElem.parentElement!;
+		parent.classList.toggle('closed');
+		const isOpen = !parent.classList.contains('closed');
+		parent.children[0].children[0].innerHTML = isOpen ? SVG_ICONS.openFolder : SVG_ICONS.closedFolder;
+		parent.children[1].classList.toggle('hidden');
+		alterFileTreeFolderOpen(expandedCommit.fileTree, decodeURIComponent(folderElem.dataset.folderpath!), isOpen);
+		view.saveState();
+		return;
+	}
+
+	// File click — show diff in full diff panel
+	const hashes = commitsGetFilesPanelDiffHashes(view, target);
+	if (!hashes) return;
+	const { file, fromHash, toHash, fileStatus } = hashes;
+	view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
+	view.currentDiffFilePath = file.newFilePath;
+	view.currentFullDiffData = null;
+	view.createFullDiffPanel();
+	sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+}
+
+function commitsHandleFilesPanelDblClick(view: any, e: MouseEvent) {
+	const hashes = commitsGetFilesPanelDiffHashes(view, e.target as Element);
+	if (!hashes) return;
+	const { file, fromHash, toHash, fileStatus } = hashes;
+	sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+}
+
+function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.GitFileChange; fromHash: string; toHash: string; fileStatus: GG.GitFileStatus } | null {
+	const fileElem = target.closest('.fileTreeFile') as HTMLElement | null;
+	if (!fileElem || !fileElem.classList.contains('gitDiffPossible')) return null;
+	const record = target.closest('.fileTreeFileRecord') as HTMLElement | null;
+	if (!record) return null;
+
+	const fileIndex = parseInt(record.dataset.index!);
+	const expandedCommit = view.expandedCommit;
+	const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : view.previewFileChanges;
+	const commitHash: string | null = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
+	if (!fileChanges || !commitHash) return null;
+
+	const file = fileChanges[fileIndex];
+	if (!file) return null;
+
+	let fromHash: string, toHash: string, fileStatus = file.type;
+	if (expandedCommit !== null) {
+		const commit = view.commits[view.commitLookup[expandedCommit.commitHash]];
+		if (expandedCommit.compareWithHash !== null) {
+			const co = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
+			fromHash = co.from; toHash = co.to;
+		} else if (commit.stash !== null) {
+			if (fileStatus === GG.GitFileStatus.Untracked) {
+				fromHash = commit.stash.untrackedFilesHash!; toHash = fromHash; fileStatus = GG.GitFileStatus.Added;
+			} else {
+				fromHash = commit.stash.baseHash; toHash = expandedCommit.commitHash;
+			}
+		} else {
+			fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash;
+		}
+	} else {
+		fromHash = commitHash; toHash = commitHash;
+	}
+	return { file, fromHash, toHash, fileStatus };
 }

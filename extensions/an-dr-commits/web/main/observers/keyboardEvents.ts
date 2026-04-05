@@ -36,10 +36,22 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 		view.compactFindWidgetPinnedOpen = false;
 		view.updateCompactFindWidgetState();
 		handledEvent(e);
+	} else if (view.filesPanelCommitHash !== null && view.expandedCommit === null) {
+		if (view.currentDiffRequest !== null) {
+			view.destroyFullDiffPanel();
+			view.currentDiffRequest = null;
+			view.currentFullDiffData = null;
+			view.currentDiffFilePath = null;
+			view.updateLayoutBottoms();
+		} else {
+			view.filesPanel.clear();
+			view.filesPanelCommitHash = null;
+			view.previewFileChanges = null;
+		}
+		handledEvent(e);
 	} else if (view.expandedCommit !== null) {
 		if (view.currentDiffRequest !== null) {
 			view.destroyFullDiffPanel();
-			view.hideDiffPane();
 			view.currentDiffRequest = null;
 			view.currentDiffText = null;
 			view.currentFullDiffData = null;

@@ -64,18 +64,20 @@ class CommitsView {
 
 	private readonly graph: Graph;
 	private readonly config: Config;
+	public filesPanel!: FilesPanel;
 	private commitDropTarget: HTMLElement | null = null;
 
 	private moreCommitsAvailable: boolean = false;
 	private expandedCommit: ExpandedCommit | null = null;
-	public quickDiffViewMode: 'unified' | 'sideBySide' = 'unified';
 	public fullDiffViewMode: 'unified' | 'sideBySide' = globalState.fullDiffViewMode;
 	public currentDiffRequest: CurrentDiffRequest | null = null;
 	public currentDiffText: string | null = null;
 	public currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null = null;
-	private diffPaneVisible: boolean = false;
 	private fullDiffMode: boolean = initialState.config.commitDetailsView.defaultDiffMode === 'full';
 	public currentDiffFilePath: string | null = null;
+	public previewCommitHash: string | null = null;
+	public filesPanelCommitHash: string | null = null;
+	public previewFileChanges: ReadonlyArray<GG.GitFileChange> | null = null;
 	private selectedCommits: Set<string> = new Set();
 	private lastSelectedIndex: number = -1;
 	private maxCommits: number;
@@ -468,6 +470,24 @@ class CommitsView {
 	/* Commit Details View */
 
 	public loadCommitDetails(commitElem: HTMLElement) { commitsLoadCommitDetails(this, commitElem); }
+	public previewCommitFiles(commitHash: string) {
+		if (this.filesPanelCommitHash === commitHash) return;
+		if (this.expandedCommit !== null && this.expandedCommit.commitHash === commitHash) return;
+		this.previewCommitHash = commitHash;
+		this.filesPanelCommitHash = null;
+		this.filesPanel.setContentLoading();
+		this.requestCommitDetails(commitHash, false);
+	}
+	public applyPreviewResponse(commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, codeReview: GG.CodeReview | null) {
+		if (this.previewCommitHash !== commitDetails.hash) return;
+		this.previewCommitHash = null;
+		if (this.expandedCommit === null || this.expandedCommit.commitHash !== commitDetails.hash) {
+			this.filesPanel.update(fileTree, commitDetails.fileChanges, codeReview !== null ? codeReview.lastViewedFile : null, -1, commitsGetFileViewType(this), false);
+			this.filesPanelCommitHash = commitDetails.hash;
+			this.previewFileChanges = commitDetails.fileChanges;
+			commitsPopulateFilesPanelHeaderForPreview(this, commitDetails);
+		}
+	}
 	public closeCommitDetails(saveAndRender: boolean) { commitsCloseCommitDetails(this, saveAndRender); }
 	public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, codeReview: GG.CodeReview | null, lastViewedFile: string | null, refresh: boolean) { commitsShowCommitDetails(this, commitDetails, fileTree, avatar, codeReview, lastViewedFile, refresh); }
 	public createFileTree(gitFiles: ReadonlyArray<GG.GitFileChange>, codeReview: GG.CodeReview | null) { return commitsCreateFileTree(this, gitFiles, codeReview); }
@@ -482,25 +502,13 @@ class CommitsView {
 	private setFileViewType(type: GG.FileViewType) { commitsSetFileViewType(this, type); }
 	private changeFileViewType(type: GG.FileViewType) { commitsChangeFileViewType(this, type); }
 
-	private setCdvRowSplit() { commitsSetCdvRowSplit(this); }
-
-	public showDiffPane() { commitsShowDiffPane(this); }
-	private hideDiffPane() { commitsHideDiffPane(this); }
-
 	/* CDV Resizable */
 
-	private makeCdvRowDividerDraggable() { commitsMakeCdvRowDividerDraggable(this); }
 	private setCdvDivider() { commitsSetCdvDivider(this); }
 	private makeCdvResizable() { commitsMakeCdvResizable(this); }
 	private makeCdvDividerDraggable() { commitsMakeCdvDividerDraggable(this); }
 
-	private renderCdvDiffViewBtns() { commitsRenderCdvDiffViewBtns(this); }
-	private changeDiffViewMode(mode: 'unified' | 'sideBySide') { commitsChangeDiffViewMode(this, mode); }
-
-	public renderDiffPreview(diff: string | null) { commitsRenderDiffPreview(this, diff); }
 	public renderFullDiffContent(data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null) { commitsRenderFullDiffContent(this, data); }
-	public buildUnifiedDiff(diff: string): string { return commitsBuildUnifiedDiff(diff); }
-	public buildSideBySideDiff(diff: string): string { return commitsBuildSideBySideDiff(diff); }
 	public getDisplayLines(content: string | null): string[] { return commitsGetDisplayLines(content); }
 	public parseUnifiedDiffHunks(diff: string): { oldStart: number; newStart: number; lines: string[] }[] { return commitsParseUnifiedDiffHunks(diff); }
 	public buildFullUnifiedFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string { return commitsBuildFullUnifiedFileView(this, oldLines, newLines, hunks); }

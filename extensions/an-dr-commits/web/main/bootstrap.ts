@@ -35,7 +35,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				break;
 			case 'commitDetails':
 				if (msg.commitDetails !== null) {
-					commits.showCommitDetails(msg.commitDetails, commits.createFileTree(msg.commitDetails.fileChanges, msg.codeReview), msg.avatar, msg.codeReview, msg.codeReview !== null ? msg.codeReview.lastViewedFile : null, msg.refresh);
+					const fileTree = commits.createFileTree(msg.commitDetails.fileChanges, msg.codeReview);
+					commits.showCommitDetails(msg.commitDetails, fileTree, msg.avatar, msg.codeReview, msg.codeReview !== null ? msg.codeReview.lastViewedFile : null, msg.refresh);
+					commits.applyPreviewResponse(msg.commitDetails, fileTree, msg.codeReview);
 				} else {
 					commits.closeCommitDetails(true);
 					dialog.showError('Unable to load Commit Details', msg.error, null, null);
@@ -258,9 +260,6 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				break;
 			case 'viewDiff':
 				finishOrDisplayError(msg.error, 'Unable to View Diff');
-				break;
-			case 'getFileDiff':
-				commits.renderDiffPreview(msg.error !== null ? null : msg.diff);
 				break;
 			case 'getFullDiffContent':
 				commits.renderFullDiffContent(msg.error !== null ? null : {

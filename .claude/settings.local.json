@@ -40,7 +40,10 @@
       "Bash(grep -E \"\\\\.ts$\")",
       "Bash(ls /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/tsconfig*.json)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''scripts'''',{}\\)\\)\")",
-      "Bash(head -5 grep -n \"commitsUpdateCdvFileState\\\\|currentDiffFilePath\\\\|gitDiffSelected\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/web/main/cdv/fileView.ts)"
+      "Bash(head -5 grep -n \"commitsUpdateCdvFileState\\\\|currentDiffFilePath\\\\|gitDiffSelected\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/web/main/cdv/fileView.ts)",
+      "Bash(ls /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/web/main/*.ts)",
+      "Bash(grep -n \"cdvExternalDiff\\\\|cdvCodeReview\\\\|cdvControls\" web/main/cdv/*.ts web/main/diffPreview.ts)",
+      "Bash(powershell -Command \":*)"
     ]
   }
 }

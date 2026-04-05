@@ -21,6 +21,8 @@ function commitsHandleCommitClick(view: any, e: MouseEvent) {
 			view.toggleCommitSelection(commit.hash, index);
 		} else {
 			view.selectCommit(commit.hash, index);
+			closeDialogAndContextMenu();
+			view.previewCommitFiles(commit.hash);
 		}
 	}
 }

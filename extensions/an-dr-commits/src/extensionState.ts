@@ -47,7 +47,9 @@ const DEFAULT_GIT_GRAPH_VIEW_GLOBAL_STATE: CommitsViewGlobalState = {
 	alwaysAcceptCheckoutCommit: false,
 	fullDiffViewMode: 'sideBySide',
 	issueLinkingConfig: null,
-	pushTagSkipRemoteCheck: false
+	pushTagSkipRemoteCheck: false,
+	filesPanelWidth: 220,
+	filesPanelHidden: false
 };
 
 const DEFAULT_GIT_GRAPH_VIEW_WORKSPACE_STATE: CommitsViewWorkspaceState = {

@@ -3,13 +3,16 @@
 function commitsLoadCommitDetails(view: any, commitElem: HTMLElement) {
 	const commit = view.getCommitOfElem(commitElem);
 	if (commit === null) return;
+	if (view.expandedCommit !== null && view.expandedCommit.commitHash === commit.hash && !view.expandedCommit.loading) return;
 
+	view.previewCommitHash = null;
 	view.closeCommitDetails(false);
 	view.saveExpandedCommitLoading(parseInt(commitElem.dataset.id!), commit.hash, commitElem, null, null);
 	commitElem.classList.add(CLASS_COMMIT_DETAILS_OPEN);
 	view.renderCommitDetailsView(false);
 	view.requestCommitDetails(commit.hash, false);
 }
+
 
 function commitsLoadCommitComparison(view: any, commitElem: HTMLElement, compareWithElem: HTMLElement) {
 	const commit = view.getCommitOfElem(commitElem);
@@ -32,20 +35,45 @@ function commitsLoadCommitComparison(view: any, commitElem: HTMLElement, compare
 	}
 }
 
+function commitsPopulateFilesPanelHeader(view: any, codeReviewPossible: boolean, externalDiffPossible: boolean) {
+	view.filesPanel.getHeaderElem().innerHTML =
+		(codeReviewPossible ? '<div id="cdvCodeReview" class="cdvControlBtn">' + SVG_ICONS.review + '</div>' : '') +
+		'<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div>' +
+		'<div id="cdvFileViewTypeList" class="cdvControlBtn cdvFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
+		(externalDiffPossible ? '<div id="cdvExternalDiff" class="cdvControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '');
+	document.getElementById('cdvFileViewTypeTree')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.Tree));
+	document.getElementById('cdvFileViewTypeList')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.List));
+	commitsSetupCdvCodeReviewBtn(view, codeReviewPossible);
+	commitsSetupCdvExternalDiffBtn(view, externalDiffPossible);
+	view.renderCdvFileViewTypeBtns();
+}
+
+function commitsPopulateFilesPanelHeaderForPreview(view: any, commitDetails: GG.GitCommitDetails) {
+	const codeReviewPossible = commitDetails.hash !== UNCOMMITTED;
+	const commit = view.commits[view.commitLookup[commitDetails.hash]];
+	const externalDiffPossible = commit !== undefined && commit.parents.length > 0;
+	commitsPopulateFilesPanelHeader(view, codeReviewPossible, externalDiffPossible);
+}
+
 function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	const expandedCommit = view.expandedCommit;
-	if (expandedCommit === null) return;
+	if (expandedCommit === null) {
+		view.filesPanel.clear();
+		view.filesPanelCommitHash = null;
+		return;
+	}
 
 	const elem = document.getElementById('cdv'), isDocked = view.isCdvDocked();
 	if (elem !== null) {
 		elem.remove();
 	}
 	view.destroyFullDiffPanel();
-	view.hideDiffPane();
 	view.currentDiffRequest = null;
 	view.currentDiffText = null;
 	view.currentFullDiffData = null;
 	view.currentDiffFilePath = null;
+	view.filesPanel.clear();
+	view.filesPanelCommitHash = null;
 	view.updateLayoutBottoms();
 	if (expandedCommit.commitElem !== null) {
 		expandedCommit.commitElem.classList.remove(CLASS_COMMIT_DETAILS_OPEN);
@@ -234,14 +262,17 @@ function commitsSetupCdvScrollObservers(view: any, expandedCommit: any) {
 		}
 	}, () => view.saveState());
 
-	observeElemScroll('cdvFiles', expandedCommit.scrollTop.fileView, (scrollTop: number) => {
+	// File scroll state is tracked by FilesPanel; sync back to expandedCommit on scroll
+	view.filesPanel.setScrollTop(expandedCommit.scrollTop.fileView);
+	view.filesPanel.setOnScrollCallback(() => {
 		if (view.expandedCommit === null) return;
-		view.expandedCommit.scrollTop.fileView = scrollTop;
+		view.expandedCommit.scrollTop.fileView = view.filesPanel.getScrollTop();
 		if (view.expandedCommit.contextMenuOpen.fileView > -1) {
 			view.expandedCommit.contextMenuOpen.fileView = -1;
 			contextMenu.close();
 		}
-	}, () => view.saveState());
+		view.saveState();
+	});
 }
 
 function commitsSetupCdvViewButtons(view: any) {
@@ -250,6 +281,9 @@ function commitsSetupCdvViewButtons(view: any) {
 	});
 	document.getElementById('cdvFileViewTypeList')!.addEventListener('click', () => {
 		view.changeFileViewType(GG.FileViewType.List);
+	});
+	document.getElementById('cdvDiffViewRaw')!.addEventListener('click', () => {
+		view.changeDiffViewMode('raw');
 	});
 	document.getElementById('cdvDiffViewUnified')!.addEventListener('click', () => {
 		view.changeDiffViewMode('unified');
@@ -298,15 +332,9 @@ function commitsSetupCdvExternalDiffBtn(view: any, externalDiffPossible: boolean
 function commitsSetupCdvInteractivity(view: any, expandedCommit: any, codeReviewPossible: boolean, externalDiffPossible: boolean) {
 	if (expandedCommit.loading) return;
 	view.makeCdvFileViewInteractive();
-	view.renderCdvFileViewTypeBtns();
-	view.renderCdvDiffViewBtns();
 	view.renderCdvExternalDiffBtn();
-	view.makeCdvDividerDraggable();
-	if (view.fullDiffMode && view.currentDiffRequest !== null) view.createFullDiffPanel();
+	if (view.fullDiffMode) view.createFullDiffPanel();
 	commitsSetupCdvScrollObservers(view, expandedCommit);
-	commitsSetupCdvViewButtons(view);
-	commitsSetupCdvCodeReviewBtn(view, codeReviewPossible);
-	commitsSetupCdvExternalDiffBtn(view, externalDiffPossible);
 	const openScmBtn = document.getElementById('cdvOpenScmBtn');
 	if (openScmBtn !== null) openScmBtn.addEventListener('click', () => sendMessage({ command: 'viewScm' }));
 }
@@ -341,27 +369,24 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 	if (expandedCommit.loading) {
 		html += '<div id="cdvLoading">' + SVG_ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
 	} else {
-		html += '<div id="cdvSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit);
-		html += '</div><div id="cdvFiles">' + generateFileViewHtml(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED) + '</div><div id="cdvDivider"></div>';
+		html += '<div id="cdvSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
+		view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
+		view.filesPanelCommitHash = expandedCommit.commitHash;
 	}
-	html += '</div><div id="cdvRowDivider"></div><div id="cdvDiffPreview"></div></div>' +
-		'<div id="cdvControls"><div id="cdvClose" class="cdvControlBtn" title="Close">' + SVG_ICONS.close + '</div>' +
-		(codeReviewPossible ? '<div id="cdvCodeReview" class="cdvControlBtn">' + SVG_ICONS.review + '</div>' : '') +
-		(!expandedCommit.loading ? '<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div><div id="cdvFileViewTypeList" class="cdvControlBtn cdvFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
-			'<div id="cdvDiffViewUnified" class="cdvControlBtn cdvDiffViewBtn" title="Unified Diff">' + SVG_ICONS.diffUnified + '</div><div id="cdvDiffViewSideBySide" class="cdvControlBtn cdvDiffViewBtn" title="Side by Side Diff">' + SVG_ICONS.diffSideBySide + '</div>' : '') +
-		(externalDiffPossible ? '<div id="cdvExternalDiff" class="cdvControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '') +
-		'</div><div class="cdvHeightResize"></div>';
+	html += '</div></div><div class="cdvHeightResize"></div>';
+
+	if (expandedCommit.loading) {
+		view.filesPanel.getHeaderElem().innerHTML = '';
+	} else {
+		commitsPopulateFilesPanelHeader(view, codeReviewPossible, externalDiffPossible);
+	}
 
 	elem.innerHTML = isDocked ? html : '<td><div class="cdvHeightResize"></div></td><td colspan="' + (view.getNumColumns() - 1) + '">' + html + '</td>';
-	if (!expandedCommit.loading) view.setCdvDivider();
-	view.setCdvRowSplit();
 	if (!isDocked) view.renderGraph();
 
 	if (!refresh) commitsScrollCdvIntoView(view, elem, isDocked, expandedCommit);
 
 	view.makeCdvResizable();
-	document.getElementById('cdvClose')!.addEventListener('click', () => view.closeCommitDetails(true));
-	view.makeCdvRowDividerDraggable();
 	commitsSetupCdvInteractivity(view, expandedCommit, codeReviewPossible, externalDiffPossible);
 	view.renderTopFullDiffButton();
 }
@@ -378,7 +403,6 @@ function commitsSetCdvHeight(view: any, elem: HTMLElement, isDocked: boolean) {
 
 	elem.style.height = height + 'px';
 	if (isDocked) view.updateLayoutBottoms();
-	view.setCdvRowSplit();
 }
 
 function commitsIsCdvOpen(view: any, commitHash: string, compareWithHash: string | null) {
@@ -405,12 +429,12 @@ function commitsSetFileViewType(view: any, type: GG.FileViewType) {
 }
 
 function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
-	const expandedCommit = view.expandedCommit, filesElem = document.getElementById('cdvFiles');
-	if (expandedCommit === null || expandedCommit.fileTree === null || expandedCommit.fileChanges === null || filesElem === null) return;
+	const expandedCommit = view.expandedCommit;
+	if (expandedCommit === null || expandedCommit.fileTree === null || expandedCommit.fileChanges === null) return;
 	CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
 	view.setFileViewType(type);
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
-	filesElem.innerHTML = generateFileViewHtml(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
+	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
 	view.makeCdvFileViewInteractive();
 	view.renderCdvFileViewTypeBtns();
 }

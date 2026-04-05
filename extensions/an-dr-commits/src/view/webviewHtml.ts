@@ -75,12 +75,14 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 							<div id="pushBtn"></div>
 							<div id="settingsBtn" title="Repository Settings"></div>
 							<div id="moreBtn" title="More Actions"></div>
+							<div id="filesPanelToggleBtn"></div>
 						</div>
 					</div>
 				</div>
 				<div id="sidebar">
 					<div id="branchPanel"></div>
 				</div>
+				<div id="filesPanel"></div>
 				<div id="content">
 					<div id="repoInProgressBanner">
 						<div id="repoInProgressBannerPrimary"></div>

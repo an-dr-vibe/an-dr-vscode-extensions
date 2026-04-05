@@ -19,14 +19,13 @@ function commitsEndCodeReview(view: any) {
 }
 
 function commitsSaveAndRenderCodeReview(view: any, codeReview: GG.CodeReview | null) {
-	let filesElem = document.getElementById('cdvFiles');
-	if (view.expandedCommit === null || view.expandedCommit.fileTree === null || filesElem === null) return;
+	if (view.expandedCommit === null || view.expandedCommit.fileTree === null) return;
 
 	view.expandedCommit.codeReview = codeReview;
 	setFileTreeReviewed(view.expandedCommit.fileTree, codeReview === null);
 	view.saveState();
 	view.renderCodeReviewBtn();
-	updateFileTreeHtml(filesElem, view.expandedCommit.fileTree);
+	updateFileTreeHtml(view.filesPanel.getContentElem(), view.expandedCommit.fileTree);
 }
 
 function commitsRenderCodeReviewBtn(view: any) {

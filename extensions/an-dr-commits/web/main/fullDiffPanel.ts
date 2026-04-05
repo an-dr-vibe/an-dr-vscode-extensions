@@ -235,28 +235,13 @@ function commitsCompactSbsPairedRows<T extends { changed: boolean }>(view: any, 
 
 function commitsToggleFullDiffMode(view: any, on: boolean) {
 	view.fullDiffMode = on;
-	view.renderCdvDiffViewBtns();
 	if (on) {
-		view.currentDiffText = null;      // discard stale quick-diff cache
-		view.hideDiffPane();
-		if (view.currentDiffRequest !== null) {
-			view.createFullDiffPanel();
-			if (view.currentFullDiffData !== null) {
-				view.renderFullDiffContent(view.currentFullDiffData);
-			} else {
-				sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, ...view.currentDiffRequest });
-			}
+		view.createFullDiffPanel();
+		if (view.currentDiffRequest !== null && view.currentFullDiffData !== null) {
+			view.renderFullDiffContent(view.currentFullDiffData);
 		}
 	} else {
-		view.currentFullDiffData = null;  // discard stale full-diff cache
 		view.destroyFullDiffPanel();
-		if (view.currentDiffRequest !== null) {
-			if (view.currentDiffText !== null) {
-				view.renderDiffPreview(view.currentDiffText);
-			} else {
-				sendMessage({ command: 'getFileDiff', repo: view.currentRepo, fromHash: view.currentDiffRequest.fromHash, toHash: view.currentDiffRequest.toHash, oldFilePath: view.currentDiffRequest.oldFilePath, newFilePath: view.currentDiffRequest.newFilePath });
-			}
-		}
 	}
 	view.renderTopFullDiffButton();
 	view.saveState();
@@ -277,9 +262,11 @@ function commitsCreateFullDiffPanel(view: any) {
 				'<button id="fullDiffPrevHunk" title="Previous change">▲</button>' +
 				'<span id="fullDiffChangeCounter">0 / 0</span>' +
 				'<button id="fullDiffNextHunk" title="Next change">▼</button>' +
-				'<button id="fullDiffClose" title="Close">&#215;</button>' +
 			'</div></div><div id="fullDiffContent"></div>';
 	document.body.appendChild(panel);
+	if (view.currentDiffRequest === null) {
+		document.getElementById('fullDiffContent')!.innerHTML = '<div class="cdvDiffMessage">Select a file to view the diff</div>';
+	}
 	view.setFullDiffPanelHeight(view.gitRepos[view.currentRepo].fullDiffPanelHeight);
 	view.makeFullDiffPanelResizable();
 	view.renderFullDiffViewBtns();
@@ -289,12 +276,9 @@ function commitsCreateFullDiffPanel(view: any) {
 	document.getElementById('fullDiffCompact')!.addEventListener('click', () => {
 		view.gitRepos[view.currentRepo].fullDiffCompact = !view.gitRepos[view.currentRepo].fullDiffCompact;
 		view.renderFullDiffCompactBtn();
-		if (view.fullDiffMode) {
-			view.saveRepoState();
-			view.renderFullDiffContent(view.currentFullDiffData);
-		}
+		view.saveRepoState();
+		view.renderFullDiffContent(view.currentFullDiffData);
 	});
-	document.getElementById('fullDiffClose')!.addEventListener('click', () => view.toggleFullDiffMode(false));
 }
 
 function commitsRenderFullDiffCompactBtn(view: any) {
@@ -316,7 +300,7 @@ function commitsChangeFullDiffViewMode(view: any, mode: 'unified' | 'sideBySide'
 	view.fullDiffViewMode = mode;
 	updateGlobalViewState('fullDiffViewMode', mode);
 	view.renderFullDiffViewBtns();
-	if (view.fullDiffMode) view.renderFullDiffContent(view.currentFullDiffData);
+	view.renderFullDiffContent(view.currentFullDiffData);
 }
 
 function commitsDestroyFullDiffPanel(view: any) {
@@ -340,6 +324,10 @@ function commitsUpdateLayoutBottoms(view: any) {
 	const cdvH = (cdv && isDocked) ? view.gitRepos[view.currentRepo].cdvHeight : 0;
 	if (cdv && isDocked) cdv.style.bottom = panelH + 'px';
 	view.viewElem.style.bottom = (cdvH + panelH) + 'px';
+	const filesPanel = document.getElementById('filesPanel');
+	if (filesPanel) filesPanel.style.bottom = panelH + 'px';
+	const sidebar = document.getElementById('sidebar');
+	if (sidebar) sidebar.style.bottom = panelH + 'px';
 }
 
 function commitsMakeFullDiffPanelResizable(view: any) {

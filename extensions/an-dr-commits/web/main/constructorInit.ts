@@ -21,6 +21,9 @@ function commitsInitDropdowns(view: any) {
 	view.repoDropdown = new Dropdown('repoDropdown', true, false, 'Repos', (values: string[]) => {
 		view.loadRepo(values[0]);
 	});
+	view.filesPanel = new FilesPanel();
+	view.filesPanel.getContentElem().addEventListener('click', (e: MouseEvent) => commitsHandleFilesPanelClick(view, e));
+	view.filesPanel.getContentElem().addEventListener('dblclick', (e: MouseEvent) => commitsHandleFilesPanelDblClick(view, e));
 	view.branchDropdown = new BranchPanel('branchPanel', (values: string[]) => {
 		view.currentBranches = values;
 		view.maxCommits = view.config.initialLoadCommits;
@@ -92,6 +95,7 @@ function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.topFullDiffBtnElem.innerHTML = SVG_ICONS.fullDiff;
 	view.topFullDiffBtnElem.addEventListener('click', () => view.toggleFullDiffMode(!view.fullDiffMode));
+	if (view.fullDiffMode && view.currentRepo && view.gitRepos[view.currentRepo]) view.createFullDiffPanel();
 	view.topFullDiffBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.pullBtnElem.title = 'Pull Current Branch (Right-Click for More Actions)';
 	view.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;

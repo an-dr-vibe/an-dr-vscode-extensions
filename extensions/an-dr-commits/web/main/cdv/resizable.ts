@@ -1,41 +1,5 @@
 /* CDV resizable helpers extracted from CommitsView */
 
-function commitsMakeCdvRowDividerDraggable(view: any) {
-	let prevY = -1;
-
-	const processResizingRowDivider: EventListener = (e) => {
-		if (prevY < 0) return;
-		const contentElem = document.getElementById('cdvContent');
-		if (!contentElem) return;
-		const delta = (<MouseEvent>e).pageY - prevY;
-		prevY = (<MouseEvent>e).pageY;
-		const totalH = contentElem.clientHeight;
-		if (totalH === 0) return;
-		let ratio = view.gitRepos[view.currentRepo].cdvTopRowRatio + delta / totalH;
-		if (ratio < 0.15) ratio = 0.15;
-		else if (ratio > 0.85) ratio = 0.85;
-		if (view.gitRepos[view.currentRepo].cdvTopRowRatio !== ratio) {
-			view.gitRepos[view.currentRepo].cdvTopRowRatio = ratio;
-			view.setCdvRowSplit();
-		}
-	};
-	const stopResizingRowDivider: EventListener = (e) => {
-		if (prevY < 0) return;
-		processResizingRowDivider(e);
-		view.saveRepoState();
-		prevY = -1;
-		eventOverlay.remove();
-	};
-
-	const rowDividerElem = document.getElementById('cdvRowDivider');
-	if (rowDividerElem !== null) {
-		rowDividerElem.addEventListener('mousedown', (e) => {
-			prevY = (<MouseEvent>e).pageY;
-			eventOverlay.create('rowResize', processResizingRowDivider, stopResizingRowDivider);
-		});
-	}
-}
-
 function commitsSetCdvDivider(view: any) {
 	let percent = (view.gitRepos[view.currentRepo].cdvDivider * 100).toFixed(2) + '%';
 	let summaryElem = document.getElementById('cdvSummary'), dividerElem = document.getElementById('cdvDivider'), filesElem = document.getElementById('cdvFiles');

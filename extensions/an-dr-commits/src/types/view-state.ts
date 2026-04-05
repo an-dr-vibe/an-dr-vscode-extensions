@@ -99,6 +99,8 @@ export interface CommitsViewGlobalState {
 	fullDiffViewMode: 'unified' | 'sideBySide';
 	issueLinkingConfig: IssueLinkingConfig | null;
 	pushTagSkipRemoteCheck: boolean;
+	filesPanelWidth: number;
+	filesPanelHidden: boolean;
 }
 
 export interface CommitsViewWorkspaceState {

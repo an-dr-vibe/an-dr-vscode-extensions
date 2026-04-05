@@ -11,6 +11,7 @@ body{
 	padding:0;
 	--top-bar-height:41px;
 	--branch-panel-width:200px;
+	--files-panel-width:220px;
 }
 body.unableToLoad{
 	margin:0 20px;
@@ -24,11 +25,14 @@ body #view{
 	position:fixed;
 	top:0;
 	left:0;
-	right:0;
+	right:var(--files-panel-width);
 	bottom:0;
 	background-color:var(--vscode-editor-background);
 	overflow-x:hidden;
 	overflow-y:auto;
+}
+body.filesPanelHidden #view{
+	right:0;
 }
 body #view:focus{
 	outline:none;
@@ -430,7 +434,7 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	display:block;
 	position:fixed;
 	left:0;
-	right:0;
+	right:var(--files-panel-width);
 	bottom:0;
 	background-color:rgba(128,128,128,0.1);
 	font-size:13px;
@@ -438,16 +442,13 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	white-space:normal;
 	cursor:default;
 }
+body.filesPanelHidden #cdv.docked{
+	right:0;
+}
 #cdvContent{
 	position:absolute;
 	left:0;
-	right:32px;
-}
-
-#cdvControls{
-	position:absolute;
 	right:0;
-	width:32px;
 }
 
 .cdvControlBtn{
@@ -469,12 +470,12 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 }
 
 #cdvFileViewTypeTree{
-	border-radius:4px 4px 0 0;
-	margin-bottom:0;
+	border-radius:4px 0 0 4px;
+	margin-right:0;
 }
 #cdvFileViewTypeList{
-	border-radius:0 0 4px 4px;
-	margin-top:0;
+	border-radius:0 4px 4px 0;
+	margin-left:0;
 }
 .cdvFileViewTypeBtn{
 	background-color:rgba(128,128,128,0.125);
@@ -496,6 +497,29 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	fill:var(--vscode-editor-foreground);
 	fill-opacity:0.6;
 }
+.cdvDiffBtnLabel{
+	position:absolute;
+	left:0;
+	right:0;
+	top:0;
+	bottom:0;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	font-size:9px;
+	font-weight:700;
+	letter-spacing:0.3px;
+	opacity:0.6;
+	color:var(--vscode-editor-foreground);
+	pointer-events:none;
+}
+.cdvControlBtn:hover .cdvDiffBtnLabel,
+.cdvControlBtn.active .cdvDiffBtnLabel{
+	opacity:0.85;
+}
+.cdvControlBtn.active:hover .cdvDiffBtnLabel{
+	opacity:1;
+}
 .cdvControlBtn:hover svg, .cdvControlBtn.active svg{
 	fill-opacity:0.75;
 }
@@ -503,7 +527,7 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	fill-opacity:0.9;
 }
 
-#cdvSummary, #cdvFiles, #cdvLoading{
+#cdvSummary, #cdvLoading{
 	position:absolute;
 	top:0;
 	bottom:0;
@@ -512,15 +536,9 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	overflow-x:hidden;
 	overflow-y:auto;
 }
-#cdvDivider{
-	position:absolute;
-	left:50%;
-	width:6px;
-	cursor:col-resize;
-}
 #cdvSummary{
 	left:0;
-	width:50%;
+	right:0;
 	padding:10px;
 	text-overflow:ellipsis;
 	-webkit-user-select:text;
@@ -590,34 +608,6 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	opacity:0.8;
 }
 
-#cdvFiles{
-	left:50%;
-	right:0;
-	padding:4px 8px 8px 0;
-	-webkit-user-select:none;
-	user-select:none;
-}
-#cdvFiles ul{
-	list-style-type:none;
-	-webkit-margin-before:0;
-	-webkit-margin-after:0;
-	-webkit-margin-start:0px;
-	-webkit-margin-end:0px;
-	-webkit-padding-start:25px;
-	margin:0;
-	padding:0 0 0 25px;
-}
-#cdvFiles > ul{
-	-webkit-padding-start:10px;
-	padding:0 0 0 10px;
-}
-#cdvFiles li{
-	margin-top:4px;
-	white-space:nowrap;
-	text-overflow:ellipsis;
-	overflow-x:hidden;
-}
-
 #cdvLoading{
 	left:0;
 	right:0;
@@ -647,28 +637,18 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	cursor:row-resize;
 }
 
-#cdv.inline #cdvContent, #cdv.inline #cdvControls{
+#cdv.inline #cdvContent{
 	top:0;
 	bottom:2px;
-}
-#cdv.inline #cdvContent{
 	border-left:1px solid rgba(128,128,128,0.2);
-}
-#cdv.inline #cdvDivider{
-	top:0;
-	bottom:6px;
 }
 #cdv.inline .cdvHeightResize{
 	bottom:0;
 	border-bottom:2px solid rgba(128,128,128,0.2);
 }
 
-#cdv.docked #cdvContent, #cdv.docked #cdvControls{
+#cdv.docked #cdvContent{
 	top:2px;
-	bottom:0;
-}
-#cdv.docked #cdvDivider{
-	top:6px;
 	bottom:0;
 }
 #cdv.docked .cdvHeightResize{
@@ -681,29 +661,8 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	left:0;
 	right:0;
 	top:0;
-	overflow:hidden;
-}
-#cdvRowDivider{
-	display:none;
-	position:absolute;
-	left:0;
-	right:0;
-	height:6px;
-	cursor:row-resize;
-	border-top:2px solid rgba(128,128,128,0.25);
-	z-index:1;
-}
-#cdvDiffPreview{
-	display:none;
-	position:absolute;
-	left:0;
-	right:0;
 	bottom:0;
-	overflow-x:auto;
-	overflow-y:auto;
-	font-family:var(--vscode-editor-font-family,monospace);
-	font-size:12px;
-	padding:4px 0;
+	overflow:hidden;
 }
 .cdvDiffMessage{
 	color:rgba(128,128,128,0.6);
@@ -712,24 +671,8 @@ body.vscode-light #commitTable tr.commit.selected.contextMenuActive td{
 	user-select:none;
 	-webkit-user-select:none;
 }
-.diffUnifiedView div{
-	white-space:pre;
-	padding:0 8px;
-	min-width:100%;
-	box-sizing:border-box;
-}
 .diffAdded{background:rgba(0,160,0,0.15);}
 .diffRemoved{background:rgba(200,0,0,0.15);}
-.diffHunk{color:rgba(100,150,255,0.9);font-style:italic;}
-.diffFileHeader{color:rgba(128,128,128,0.7);font-size:11px;}
-.diffNoNewline{color:rgba(128,128,128,0.6);font-style:italic;}
-.diffSideBySide{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--vscode-editor-font-family,monospace);}
-.diffSideBySide td{width:50%;vertical-align:top;white-space:pre;padding:0 8px;box-sizing:border-box;}
-.diffSideBySide td span{display:block;}
-.diffSbsLeft{border-right:1px solid rgba(128,128,128,0.2);}
-.diffSbsAdded{background:rgba(0,160,0,0.15);}
-.diffSbsRemoved{background:rgba(200,0,0,0.15);}
-.diffSideBySide td span.diffLnOld,.diffSideBySide td span.diffLnNew{display:inline;width:3em;text-align:right;padding-right:6px;color:rgba(128,128,128,0.5);user-select:none;-webkit-user-select:none;}
 
 
 /* Full Diff Panel */
@@ -953,11 +896,38 @@ svg.openFolderIcon, svg.closedFolderIcon, svg.fileIcon, .fileTreeFileAction svg,
 svg.openFolderIcon, svg.closedFolderIcon, svg.fileIcon{
 	width:13px;
 }
+.fileTreeFolderContents{
+	list-style:none;
+	margin:0;
+	padding:0;
+	user-select:none;
+}
+#filesPanelContent > .fileTreeFolderContents{
+	display:inline-block;
+	min-width:100%;
+}
+li > .fileTreeFolderContents{
+	padding-left:16px;
+}
 .fileTreeFolderContents.hidden{
 	display:none;
 }
 .fileTreeFolder, .fileTreeRepo{
+	display:block;
+	padding:2px 8px 2px 8px;
+	line-height:22px;
+	white-space:nowrap;
 	cursor:pointer;
+}
+.fileTreeFileRecord{
+	display:block;
+	padding:2px 8px 2px 8px;
+	line-height:22px;
+	white-space:nowrap;
+}
+.fileTreeFile{
+	display:inline;
+	white-space:nowrap;
 }
 .fileTreeFile .gitFileName{
 	color:var(--vscode-gitDecoration-modifiedResourceForeground);
@@ -1545,6 +1515,89 @@ body.branchPanelHidden #sidebarTop{
 	padding:0;
 	border-right:none;
 	overflow:hidden;
+}
+
+/* Files Panel */
+#filesPanel{
+	position:fixed;
+	top:0;
+	right:0;
+	bottom:0;
+	width:var(--files-panel-width);
+	border-left:1px solid rgba(128,128,128,0.5);
+	background-color:var(--vscode-sideBar-background, var(--vscode-editor-background));
+	z-index:10;
+	box-sizing:border-box;
+}
+body.filesPanelHidden #filesPanel{
+	display:none;
+}
+#filesPanelResizeHandle{
+	position:absolute;
+	top:0;
+	bottom:0;
+	left:-3px;
+	width:6px;
+	cursor:col-resize;
+	z-index:12;
+	background:transparent;
+}
+#filesPanelResizeHandle::before{
+	content:'';
+	position:absolute;
+	top:0;
+	bottom:0;
+	left:50%;
+	width:2px;
+	transform:translateX(-50%);
+	background-color:var(--vscode-focusBorder, rgba(0,120,215,0.6));
+	opacity:0;
+	transition:opacity 120ms ease;
+	pointer-events:none;
+}
+#filesPanelResizeHandle:hover::before{
+	opacity:0.75;
+	transition-delay:70ms;
+}
+#filesPanelResizeHandle:active::before{
+	opacity:1;
+	transition-delay:0ms;
+}
+#filesPanelHeader{
+	position:absolute;
+	top:0;
+	left:0;
+	right:0;
+	height:32px;
+	display:none;
+	align-items:center;
+	flex-direction:row;
+	padding:0 2px;
+	border-bottom:1px solid rgba(128,128,128,0.2);
+	box-sizing:border-box;
+}
+#filesPanelHeader:not(:empty){
+	display:flex;
+}
+#filesPanelContent{
+	position:absolute;
+	top:0;
+	left:0;
+	right:0;
+	bottom:0;
+	overflow-y:auto;
+	overflow-x:auto;
+	font-size:13px;
+}
+#filesPanelHeader:not(:empty) ~ #filesPanelContent{
+	top:32px;
+}
+
+.filesPanelPlaceholder{
+	padding:12px;
+	opacity:0.55;
+	font-style:italic;
+	user-select:none;
 }
 
 

@@ -191,7 +191,6 @@ function commitsMakeCdvFileViewInteractive(view: any) {
 }
 
 function commitsRenderCdvFileViewTypeBtns(view: any) {
-	if (view.expandedCommit === null) return;
 	let treeBtnElem = document.getElementById('cdvFileViewTypeTree'), listBtnElem = document.getElementById('cdvFileViewTypeList');
 	if (treeBtnElem === null || listBtnElem === null) return;
 
@@ -302,7 +301,8 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 
 	const fileIndex = parseInt(record.dataset.index!);
 	const expandedCommit = view.expandedCommit;
-	const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : view.previewFileChanges;
+	const isComparisonPreview = expandedCommit === null && view.previewCompareHashes !== null;
+	const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : (isComparisonPreview ? view.previewCompareFileChanges : view.previewFileChanges);
 	const commitHash: string | null = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
 	if (!fileChanges || !commitHash) return null;
 
@@ -324,6 +324,8 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 		} else {
 			fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash;
 		}
+	} else if (isComparisonPreview) {
+		fromHash = view.previewCompareHashes![0]; toHash = view.previewCompareHashes![1];
 	} else {
 		fromHash = commitHash; toHash = commitHash;
 	}

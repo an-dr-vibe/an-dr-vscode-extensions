@@ -425,7 +425,19 @@ function commitsSetFileViewType(view: any, type: GG.FileViewType) {
 
 function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 	const expandedCommit = view.expandedCommit;
-	if (expandedCommit === null || expandedCommit.fileTree === null || expandedCommit.fileChanges === null) return;
+	if (expandedCommit === null) {
+		const fileChanges = view.previewCompareHashes !== null ? view.previewCompareFileChanges : view.previewFileChanges;
+		if (fileChanges === null) return;
+		view.setFileViewType(type);
+		const fileTree = view.createFileTree(fileChanges, null);
+		const isUncommitted = view.previewCompareHashes !== null
+			? (view.previewCompareHashes[0] === UNCOMMITTED || view.previewCompareHashes[1] === UNCOMMITTED)
+			: view.filesPanelCommitHash === UNCOMMITTED;
+		view.filesPanel.update(fileTree, fileChanges, null, -1, type, isUncommitted);
+		view.renderCdvFileViewTypeBtns();
+		return;
+	}
+	if (expandedCommit.fileTree === null || expandedCommit.fileChanges === null) return;
 	CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
 	view.setFileViewType(type);
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);

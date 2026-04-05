@@ -45,7 +45,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				break;
 			case 'compareCommits':
 				if (msg.error === null) {
-					commits.showCommitComparison(msg.commitHash, msg.compareWithHash, msg.fileChanges, commits.createFileTree(msg.fileChanges, msg.codeReview), msg.codeReview, msg.codeReview !== null ? msg.codeReview.lastViewedFile : null, msg.refresh);
+					const compFileTree = commits.createFileTree(msg.fileChanges, msg.codeReview);
+					commits.showCommitComparison(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, msg.codeReview, msg.codeReview !== null ? msg.codeReview.lastViewedFile : null, msg.refresh);
+					commits.applyComparisonPreviewResponse(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, msg.codeReview);
 				} else {
 					commits.closeCommitComparison(true);
 					dialog.showError('Unable to load Commit Comparison', msg.error, null, null);

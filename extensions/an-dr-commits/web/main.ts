@@ -78,6 +78,8 @@ class CommitsView {
 	public previewCommitHash: string | null = null;
 	public filesPanelCommitHash: string | null = null;
 	public previewFileChanges: ReadonlyArray<GG.GitFileChange> | null = null;
+	public previewCompareHashes: readonly [string, string] | null = null;
+	public previewCompareFileChanges: ReadonlyArray<GG.GitFileChange> | null = null;
 	private selectedCommits: Set<string> = new Set();
 	private lastSelectedIndex: number = -1;
 	private maxCommits: number;
@@ -475,10 +477,17 @@ class CommitsView {
 		if (this.expandedCommit !== null && this.expandedCommit.commitHash === commitHash) return;
 		this.previewCommitHash = commitHash;
 		this.filesPanelCommitHash = null;
-		if (this.expandedCommit === null) this.resetDiffState();
+		if (this.expandedCommit === null) {
+			this.resetDiffState();
+			this.previewCompareHashes = null;
+			this.previewCompareFileChanges = null;
+		}
 		this.filesPanel.setContentLoading();
 		this.requestCommitDetails(commitHash, false);
 	}
+	public previewCommitComparison(hash1: string, hash2: string) { commitsPreviewCommitComparison(this, hash1, hash2); }
+	public applyComparisonPreviewResponse(commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, codeReview: GG.CodeReview | null) { commitsApplyComparisonPreviewResponse(this, commitHash, compareWithHash, fileChanges, fileTree, codeReview); }
+	public updateSelectionPreview() { commitsUpdateSelectionPreview(this); }
 	public applyPreviewResponse(commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, codeReview: GG.CodeReview | null) {
 		if (this.previewCommitHash !== commitDetails.hash) return;
 		this.previewCommitHash = null;

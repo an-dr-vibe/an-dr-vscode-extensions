@@ -91,6 +91,52 @@ function commitsRangeSelectCommits(view: any, toIndex: number) {
 	view.updateSelectionClasses();
 }
 
+function commitsPreviewCommitComparison(view: any, hash1: string, hash2: string) {
+	const order = view.getCommitOrder(hash1, hash2);
+	if (view.previewCompareHashes !== null &&
+		view.previewCompareHashes[0] === order.from &&
+		view.previewCompareHashes[1] === order.to) return;
+	view.previewCommitHash = null;         // cancel any pending single-commit preview
+	view.previewCompareHashes = [order.from, order.to];
+	view.filesPanelCommitHash = null;
+	view.previewFileChanges = null;
+	view.previewCompareFileChanges = null;
+	view.resetDiffState();
+	view.filesPanel.setContentLoading();
+	view.requestCommitComparison(order.from, order.to, false);
+}
+
+function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, codeReview: GG.CodeReview | null) {
+	if (view.previewCompareHashes === null) return;
+	const [h1, h2] = view.previewCompareHashes;
+	if (!((commitHash === h1 && compareWithHash === h2) || (commitHash === h2 && compareWithHash === h1))) return;
+	if (view.expandedCommit !== null) return;
+	view.previewCompareFileChanges = fileChanges;
+	view.filesPanelCommitHash = commitHash;
+	const isUncommitted = compareWithHash === UNCOMMITTED || commitHash === UNCOMMITTED;
+	view.filesPanel.update(fileTree, fileChanges, codeReview !== null ? codeReview.lastViewedFile : null, -1, commitsGetFileViewType(view), isUncommitted);
+	commitsPopulateFilesPanelHeader(view, false, false);
+}
+
+function commitsUpdateSelectionPreview(view: any) {
+	if (view.expandedCommit !== null) return;
+	const hashes: string[] = [];
+	view.selectedCommits.forEach((h: string) => hashes.push(h));
+	if (hashes.length === 2) {
+		view.previewCommitComparison(hashes[0], hashes[1]);
+	} else if (hashes.length === 1) {
+		view.previewCommitFiles(hashes[0]);
+	} else {
+		view.previewCommitHash = null;     // cancel any pending single-commit preview
+		view.resetDiffState();
+		view.filesPanel.clear();
+		view.filesPanelCommitHash = null;
+		view.previewFileChanges = null;
+		view.previewCompareHashes = null;
+		view.previewCompareFileChanges = null;
+	}
+}
+
 function commitsGetCommits(view: any): ReadonlyArray<GG.GitCommit> {
 	return view.commits;
 }

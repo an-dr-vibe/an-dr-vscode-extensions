@@ -17,8 +17,10 @@ function commitsHandleCommitClick(view: any, e: MouseEvent) {
 		const index = parseInt(eventElem.dataset.id!);
 		if ((<MouseEvent>e).shiftKey) {
 			view.rangeSelectCommits(index);
+			view.updateSelectionPreview();
 		} else if ((<MouseEvent>e).ctrlKey || (<MouseEvent>e).metaKey) {
 			view.toggleCommitSelection(commit.hash, index);
+			view.updateSelectionPreview();
 		} else {
 			view.selectCommit(commit.hash, index);
 			closeDialogAndContextMenu();

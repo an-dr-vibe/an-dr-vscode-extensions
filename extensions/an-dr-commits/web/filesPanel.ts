@@ -106,7 +106,7 @@ class FilesPanel {
 	}
 
 	private showPlaceholder() {
-		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder">Select a commit to see the changed files</div>';
+		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder">Select one or two commits to see the changed files</div>';
 	}
 
 	public update(fileTree: FileTreeFolder, fileChanges: ReadonlyArray<GG.GitFileChange>, lastViewedFile: string | null, contextMenuOpen: number, fileViewType: GG.FileViewType, isUncommitted: boolean) {

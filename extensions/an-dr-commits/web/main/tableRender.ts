@@ -183,14 +183,14 @@ function commitsRenderTableRestoreExpandedCommit(view: any) {
 
 	if (expandedCommit.compareWithHash === null) {
 		if (!expandedCommit.loading && expandedCommit.commitDetails !== null && expandedCommit.fileTree !== null) {
-			view.showCommitDetails(expandedCommit.commitDetails, expandedCommit.fileTree, expandedCommit.avatar, expandedCommit.codeReview, expandedCommit.lastViewedFile, true);
+			view.showCommitDetails(expandedCommit.commitDetails, expandedCommit.fileTree, expandedCommit.avatar, expandedCommit.lastViewedFile, true);
 			if (expandedCommit.commitHash === UNCOMMITTED) view.requestCommitDetails(expandedCommit.commitHash, true);
 		} else {
 			view.loadCommitDetails(commitElem);
 		}
 	} else {
 		if (!expandedCommit.loading && expandedCommit.fileChanges !== null && expandedCommit.fileTree !== null) {
-			view.showCommitComparison(expandedCommit.commitHash, expandedCommit.compareWithHash, expandedCommit.fileChanges, expandedCommit.fileTree, expandedCommit.codeReview, expandedCommit.lastViewedFile, true);
+			view.showCommitComparison(expandedCommit.commitHash, expandedCommit.compareWithHash, expandedCommit.fileChanges, expandedCommit.fileTree, expandedCommit.lastViewedFile, true);
 			if (expandedCommit.commitHash === UNCOMMITTED || expandedCommit.compareWithHash === UNCOMMITTED) {
 				view.requestCommitComparison(expandedCommit.commitHash, expandedCommit.compareWithHash, true);
 			}

@@ -31,7 +31,6 @@ declare global {
 		fileChanges: ReadonlyArray<GG.GitFileChange> | null;
 		fileTree: FileTreeFolder | null;
 		avatar: string | null;
-		codeReview: GG.CodeReview | null;
 		lastViewedFile: string | null;
 		loading: boolean;
 		scrollTop: {

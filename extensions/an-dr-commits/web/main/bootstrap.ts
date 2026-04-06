@@ -35,9 +35,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				break;
 			case 'commitDetails':
 				if (msg.commitDetails !== null) {
-					const fileTree = commits.createFileTree(msg.commitDetails.fileChanges, msg.codeReview);
-					commits.showCommitDetails(msg.commitDetails, fileTree, msg.avatar, msg.codeReview, msg.codeReview !== null ? msg.codeReview.lastViewedFile : null, msg.refresh);
-					commits.applyPreviewResponse(msg.commitDetails, fileTree, msg.codeReview);
+					const fileTree = commits.createFileTree(msg.commitDetails.fileChanges);
+					commits.showCommitDetails(msg.commitDetails, fileTree, msg.avatar, null, msg.refresh);
+					commits.applyPreviewResponse(msg.commitDetails, fileTree);
 				} else {
 					commits.closeCommitDetails(true);
 					dialog.showError('Unable to load Commit Details', msg.error, null, null);
@@ -45,9 +45,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				break;
 			case 'compareCommits':
 				if (msg.error === null) {
-					const compFileTree = commits.createFileTree(msg.fileChanges, msg.codeReview);
-					commits.showCommitComparison(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, msg.codeReview, msg.codeReview !== null ? msg.codeReview.lastViewedFile : null, msg.refresh);
-					commits.applyComparisonPreviewResponse(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, msg.codeReview);
+					const compFileTree = commits.createFileTree(msg.fileChanges);
+					commits.showCommitComparison(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, null, msg.refresh);
+					commits.applyComparisonPreviewResponse(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree);
 				} else {
 					commits.closeCommitComparison(true);
 					dialog.showError('Unable to load Commit Comparison', msg.error, null, null);
@@ -238,13 +238,6 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'setWorkspaceViewState':
 				finishOrDisplayError(msg.error, 'Unable to save the Workspace View State');
 				break;
-			case 'startCodeReview':
-				if (msg.error === null) {
-					commits.startCodeReview(msg.commitHash, msg.compareWithHash, msg.codeReview);
-				} else {
-					dialog.showError('Unable to Start Code Review', msg.error, null, null);
-				}
-				break;
 			case 'tagDetails':
 				if (msg.details !== null) {
 					commits.renderTagDetails(msg.tagName, msg.commitHash, msg.details);
@@ -254,11 +247,6 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 				break;
 			case 'sidebarBatchRefAction':
 				handleSidebarBatchRefActionResponse(msg);
-				break;
-			case 'updateCodeReview':
-				if (msg.error !== null) {
-					dialog.showError('Unable to update Code Review', msg.error, null, null);
-				}
 				break;
 			case 'viewDiff':
 				finishOrDisplayError(msg.error, 'Unable to View Diff');

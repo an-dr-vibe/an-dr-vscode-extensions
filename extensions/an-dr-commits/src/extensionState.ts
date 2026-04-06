@@ -2,14 +2,13 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { Avatar, AvatarCache } from './avatarManager';
 import { getConfig } from './config';
-import { BooleanOverride, CodeReview, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, RepoCommitOrdering } from './types';
+import { BooleanOverride, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, RepoCommitOrdering } from './types';
 import { GitExecutable, getPathFromStr } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
 
 const AVATAR_STORAGE_FOLDER = '/avatars';
 const AVATAR_CACHE = 'avatarCache';
-const CODE_REVIEWS = 'codeReviews';
 const GLOBAL_VIEW_STATE = 'globalViewState';
 const IGNORED_REPOS = 'ignoredRepos';
 const LAST_ACTIVE_REPO = 'lastActiveRepo';
@@ -57,13 +56,6 @@ const DEFAULT_GIT_GRAPH_VIEW_WORKSPACE_STATE: CommitsViewWorkspaceState = {
 	findIsRegex: false,
 	findOpenCommitDetailsView: false
 };
-
-export interface CodeReviewData {
-	lastActive: number;
-	lastViewedFile: string | null;
-	remainingFiles: string[];
-}
-export type CodeReviews = { [repo: string]: { [id: string]: CodeReviewData } };
 
 /**
  * Manages the Commits Extension State, which stores data in both the Visual Studio Code Global & Workspace State.
@@ -148,13 +140,6 @@ export class ExtensionState extends Disposable {
 	public transferRepo(oldRepo: string, newRepo: string) {
 		if (this.getLastActiveRepo() === oldRepo) {
 			this.setLastActiveRepo(newRepo);
-		}
-
-		let reviews = this.getCodeReviews();
-		if (typeof reviews[oldRepo] !== 'undefined') {
-			reviews[newRepo] = reviews[oldRepo];
-			delete reviews[oldRepo];
-			this.setCodeReviews(reviews);
 		}
 	}
 
@@ -338,125 +323,6 @@ export class ExtensionState extends Disposable {
 	}
 
 
-	/* Code Review */
-
-	// Note: id => the commit arguments to 'git diff' (either <commit hash> or <commit hash>-<commit hash>)
-
-	/**
-	 * Start a new Code Review.
-	 * @param repo The repository the Code Review is in.
-	 * @param id The ID of the Code Review.
-	 * @param files An array of files that must be reviewed.
-	 * @param lastViewedFile The last file the user reviewed before starting the Code Review.
-	 * @returns The Code Review that was started.
-	 */
-	public startCodeReview(repo: string, id: string, files: string[], lastViewedFile: string | null) {
-		let reviews = this.getCodeReviews();
-		if (typeof reviews[repo] === 'undefined') reviews[repo] = {};
-		reviews[repo][id] = { lastActive: (new Date()).getTime(), lastViewedFile: lastViewedFile, remainingFiles: files };
-		return this.setCodeReviews(reviews).then((err) => ({
-			codeReview: <CodeReview>Object.assign({ id: id }, reviews[repo][id]),
-			error: err
-		}));
-	}
-
-	/**
-	 * End an existing Code Review.
-	 * @param repo The repository the Code Review is in.
-	 * @param id The ID of the Code Review.
-	 */
-	public endCodeReview(repo: string, id: string) {
-		let reviews = this.getCodeReviews();
-		removeCodeReview(reviews, repo, id);
-		return this.setCodeReviews(reviews);
-	}
-
-	/**
-	 * Get an existing Code Review.
-	 * @param repo The repository the Code Review is in.
-	 * @param id The ID of the Code Review.
-	 * @returns The Code Review.
-	 */
-	public getCodeReview(repo: string, id: string) {
-		let reviews = this.getCodeReviews();
-		if (typeof reviews[repo] !== 'undefined' && typeof reviews[repo][id] !== 'undefined') {
-			reviews[repo][id].lastActive = (new Date()).getTime();
-			this.setCodeReviews(reviews);
-			return <CodeReview>Object.assign({ id: id }, reviews[repo][id]);
-		} else {
-			return null;
-		}
-	}
-
-	/**
-	 * Update information for a specific Code Review.
-	 * @param repo The repository the Code Review is in.
-	 * @param id The ID of the Code Review.
-	 * @param remainingFiles The files remaining for review.
-	 * @param lastViewedFile The last viewed file. If null, don't change the last viewed file.
-	 * @returns An error message if request can't be completed.
-	 */
-	public updateCodeReview(repo: string, id: string, remainingFiles: string[], lastViewedFile: string | null) {
-		const reviews = this.getCodeReviews();
-
-		if (typeof reviews[repo] === 'undefined' || typeof reviews[repo][id] === 'undefined') {
-			return Promise.resolve('The Code Review could not be found.');
-		}
-
-		if (remainingFiles.length > 0) {
-			reviews[repo][id].remainingFiles = remainingFiles;
-			reviews[repo][id].lastActive = (new Date()).getTime();
-			if (lastViewedFile !== null) {
-				reviews[repo][id].lastViewedFile = lastViewedFile;
-			}
-		} else {
-			removeCodeReview(reviews, repo, id);
-		}
-
-		return this.setCodeReviews(reviews);
-	}
-
-	/**
-	 * Delete any Code Reviews that haven't been active during the last 90 days.
-	 */
-	public expireOldCodeReviews() {
-		let reviews = this.getCodeReviews(), change = false, expireReviewsBefore = (new Date()).getTime() - 7776000000; // 90 days x 24 hours x 60 minutes x 60 seconds x 1000 milliseconds
-		Object.keys(reviews).forEach((repo) => {
-			Object.keys(reviews[repo]).forEach((id) => {
-				if (reviews[repo][id].lastActive < expireReviewsBefore) {
-					delete reviews[repo][id];
-					change = true;
-				}
-			});
-			removeCodeReviewRepoIfEmpty(reviews, repo);
-		});
-		if (change) this.setCodeReviews(reviews);
-	}
-
-	/**
-	 * End all Code Reviews in the current workspace.
-	 */
-	public endAllWorkspaceCodeReviews() {
-		this.setCodeReviews({});
-	}
-
-	/**
-	 * Get all Code Reviews in the current workspace.
-	 * @returns The set of Code Reviews.
-	 */
-	public getCodeReviews() {
-		return this.workspaceState.get<CodeReviews>(CODE_REVIEWS, {});
-	}
-
-	/**
-	 * Set the Code Reviews in the current workspace.
-	 * @param reviews The set of Code Reviews.
-	 */
-	private setCodeReviews(reviews: CodeReviews) {
-		return this.updateWorkspaceState(CODE_REVIEWS, reviews);
-	}
-
-
 	/* Update State Memento's */
 
 	/**
@@ -487,28 +353,3 @@ export class ExtensionState extends Disposable {
 }
 
 
-/* Helper Methods */
-
-/**
- * Remove a Code Review from a set of Code Reviews.
- * @param reviews The set of Code Reviews.
- * @param repo The repository the Code Review is in.
- * @param id The ID of the Code Review.
- */
-function removeCodeReview(reviews: CodeReviews, repo: string, id: string) {
-	if (typeof reviews[repo] !== 'undefined' && typeof reviews[repo][id] !== 'undefined') {
-		delete reviews[repo][id];
-		removeCodeReviewRepoIfEmpty(reviews, repo);
-	}
-}
-
-/**
- * Remove a repository from a set of Code Reviews if the repository doesn't contain any Code Reviews.
- * @param reviews The set of Code Reviews.
- * @param repo The repository to perform this action on.
- */
-function removeCodeReviewRepoIfEmpty(reviews: CodeReviews, repo: string) {
-	if (typeof reviews[repo] !== 'undefined' && Object.keys(reviews[repo]).length === 0) {
-		delete reviews[repo];
-	}
-}

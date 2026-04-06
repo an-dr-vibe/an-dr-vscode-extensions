@@ -159,7 +159,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		}, 150);
 	}
 
-	extensionState.expireOldCodeReviews();
 	onStartUp(context).catch(() => { });
 }
 

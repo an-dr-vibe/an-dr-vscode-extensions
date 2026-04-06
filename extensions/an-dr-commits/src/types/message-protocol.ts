@@ -1,6 +1,6 @@
 import { BaseMessage, ErrorInfo, RepoRequest, ResponseWithErrorInfo, ResponseWithMultiErrorInfo, DeepReadonly, DeepWriteable, Writeable } from './base';
 import { GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitResetMode, GitStash, GitTagDetails } from './git-domain';
-import { CodeReview, CommitsBranchPanelState, GitRepoSet, GitRepoState, PullRequestConfig } from './repo-state';
+import { CommitsBranchPanelState, GitRepoSet, GitRepoState, PullRequestConfig } from './repo-state';
 import { CommitOrdering, CommitsColumnVisibility, TagType } from './settings';
 import { CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoInProgressState, GitRepoInProgressStateType, LoadCommitsViewTo } from './view-state';
 
@@ -113,7 +113,6 @@ export interface ResponseCommitDetails extends ResponseWithErrorInfo {
 	readonly command: 'commitDetails';
 	readonly commitDetails: GitCommitDetails | null;
 	readonly avatar: string | null;
-	readonly codeReview: CodeReview | null;
 	readonly refresh: boolean;
 }
 
@@ -130,7 +129,6 @@ export interface ResponseCompareCommits extends ResponseWithErrorInfo {
 	readonly commitHash: string;
 	readonly compareWithHash: string;
 	readonly fileChanges: ReadonlyArray<GitFileChange>;
-	readonly codeReview: CodeReview | null;
 	readonly refresh: boolean;
 }
 
@@ -318,11 +316,6 @@ export interface RequestEditUserDetails extends RepoRequest {
 }
 export interface ResponseEditUserDetails extends ResponseWithMultiErrorInfo {
 	readonly command: 'editUserDetails';
-}
-
-export interface RequestEndCodeReview extends RepoRequest {
-	readonly command: 'endCodeReview';
-	readonly id: string;
 }
 
 export interface RequestExportRepoConfig extends RepoRequest {
@@ -674,21 +667,6 @@ export interface RequestShowErrorDialog extends BaseMessage {
 	readonly message: string;
 }
 
-export interface RequestStartCodeReview extends RepoRequest {
-	readonly command: 'startCodeReview';
-	readonly id: string;
-	readonly files: string[];
-	readonly lastViewedFile: string | null;
-	readonly commitHash: string;
-	readonly compareWithHash: string | null;
-}
-export interface ResponseStartCodeReview extends ResponseWithErrorInfo {
-	readonly command: 'startCodeReview';
-	readonly codeReview: CodeReview;
-	readonly commitHash: string;
-	readonly compareWithHash: string | null;
-}
-
 export interface RequestTagDetails extends RepoRequest {
 	readonly command: 'tagDetails';
 	readonly tagName: string;
@@ -755,16 +733,6 @@ export interface ResponseSidebarBatchRefAction extends BaseMessage {
 	}>;
 }
 
-export interface RequestUpdateCodeReview extends RepoRequest {
-	readonly command: 'updateCodeReview';
-	readonly id: string;
-	readonly remainingFiles: string[];
-	readonly lastViewedFile: string | null;
-}
-
-export interface ResponseUpdateCodeReview extends ResponseWithErrorInfo {
-	readonly command: 'updateCodeReview';
-}
 
 export interface RequestViewDiff extends RepoRequest {
 	readonly command: 'viewDiff';
@@ -864,7 +832,6 @@ export type RequestMessage =
 	| RequestSquashCommits
 	| RequestEditRemote
 	| RequestEditUserDetails
-	| RequestEndCodeReview
 	| RequestExportRepoConfig
 	| RequestFetch
 	| RequestFetchAvatar
@@ -898,10 +865,8 @@ export type RequestMessage =
 	| RequestSetWorkspaceViewState
 	| RequestShowErrorDialog
 	| RequestSidebarBatchRefAction
-	| RequestStartCodeReview
 	| RequestResolveSidebarTagContext
 	| RequestTagDetails
-	| RequestUpdateCodeReview
 	| RequestViewDiff
 	| RequestGetFileDiff
 	| RequestGetFullDiffContent
@@ -969,10 +934,8 @@ export type ResponseMessage =
 	| ResponseSetRemoteDefaultBranch
 	| ResponseSidebarBatchRefAction
 	| ResponseSetWorkspaceViewState
-	| ResponseStartCodeReview
 	| ResponseResolveSidebarTagContext
 	| ResponseTagDetails
-	| ResponseUpdateCodeReview
 	| ResponseViewDiff
 	| ResponseGetFileDiff
 	| ResponseGetFullDiffContent

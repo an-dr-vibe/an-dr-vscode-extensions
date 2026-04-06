@@ -82,7 +82,6 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 		const diffPossible = file.type === GG.GitFileStatus.Untracked || (file.additions !== null && file.deletions !== null);
 		const fileExistsAtThisRevision = file.type !== GG.GitFileStatus.Deleted && !isUncommitted;
 		const fileExistsAtThisRevisionAndDiffPossible = fileExistsAtThisRevision && diffPossible;
-		const codeReviewInProgressAndNotReviewed = expandedCommit.codeReview !== null && expandedCommit.codeReview.remainingFiles.includes(file.newFilePath);
 		const visibility = view.config.contextMenuActionsVisibility.commitDetailsViewFile;
 
 		const getFileDiffHashes = (file: GG.GitFileChange): { fromHash: string; toHash: string; fileStatus: GG.GitFileStatus } => {
@@ -141,18 +140,6 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 					title: 'Open File',
 					visible: visibility.openFile && file.type !== GG.GitFileStatus.Deleted,
 					onClick: () => { view.cdvUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
-				}
-			],
-			[
-				{
-					title: 'Mark as Reviewed',
-					visible: visibility.markAsReviewed && codeReviewInProgressAndNotReviewed,
-					onClick: () => view.cdvUpdateFileState(file, fileElem, true, false)
-				},
-				{
-					title: 'Mark as Not Reviewed',
-					visible: visibility.markAsNotReviewed && expandedCommit.codeReview !== null && !codeReviewInProgressAndNotReviewed,
-					onClick: () => view.cdvUpdateFileState(file, fileElem, false, false)
 				}
 			],
 			[
@@ -226,32 +213,6 @@ function commitsCdvUpdateFileState(view: any, file: GG.GitFileChange, fileElem: 
 		lastViewedElem.title = 'Last File Viewed';
 		lastViewedElem.innerHTML = SVG_ICONS.eyeOpen;
 		insertBeforeFirstChildWithClass(lastViewedElem, fileElem, 'fileTreeFileAction');
-	}
-
-	if (expandedCommit.codeReview !== null) {
-		if (isReviewed !== null) {
-			if (isReviewed) {
-				expandedCommit.codeReview.remainingFiles = expandedCommit.codeReview.remainingFiles.filter((path: string) => path !== filePath);
-			} else {
-				expandedCommit.codeReview.remainingFiles.push(filePath);
-			}
-
-			alterFileTreeFileReviewed(expandedCommit.fileTree, filePath, isReviewed);
-			updateFileTreeHtmlFileReviewed(filesElem, expandedCommit.fileTree, filePath);
-		}
-
-		sendMessage({
-			command: 'updateCodeReview',
-			repo: view.currentRepo,
-			id: expandedCommit.codeReview.id,
-			remainingFiles: expandedCommit.codeReview.remainingFiles,
-			lastViewedFile: expandedCommit.lastViewedFile
-		});
-
-		if (expandedCommit.codeReview.remainingFiles.length === 0) {
-			expandedCommit.codeReview = null;
-			view.renderCodeReviewBtn();
-		}
 	}
 
 	view.saveState();

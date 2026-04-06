@@ -297,7 +297,6 @@ export class CommitsView extends Disposable {
 					command: 'commitDetails',
 					...data[0],
 					avatar: data[1],
-					codeReview: msg.commitHash !== UNCOMMITTED ? this.extensionState.getCodeReview(msg.repo, msg.commitHash) : null,
 					refresh: msg.refresh
 				});
 				break;
@@ -307,7 +306,6 @@ export class CommitsView extends Disposable {
 					commitHash: msg.commitHash,
 					compareWithHash: msg.compareWithHash,
 					...await this.dataSource.getCommitComparison(msg.repo, msg.fromHash, msg.toHash),
-					codeReview: msg.toHash !== UNCOMMITTED ? this.extensionState.getCodeReview(msg.repo, msg.fromHash + '-' + msg.toHash) : null,
 					refresh: msg.refresh
 				});
 				break;
@@ -469,9 +467,6 @@ export class CommitsView extends Disposable {
 					command: 'editUserDetails',
 					errors: errorInfos
 				});
-				break;
-			case 'endCodeReview':
-				this.extensionState.endCodeReview(msg.repo, msg.id);
 				break;
 			case 'exportRepoConfig':
 				this.sendMessage({
@@ -713,14 +708,6 @@ export class CommitsView extends Disposable {
 			case 'showErrorMessage':
 				showErrorMessage(msg.message);
 				break;
-			case 'startCodeReview':
-				this.sendMessage({
-					command: 'startCodeReview',
-					commitHash: msg.commitHash,
-					compareWithHash: msg.compareWithHash,
-					...await this.extensionState.startCodeReview(msg.repo, msg.id, msg.files, msg.lastViewedFile)
-				});
-				break;
 			case 'tagDetails':
 				this.sendMessage({
 					command: 'tagDetails',
@@ -735,12 +722,6 @@ export class CommitsView extends Disposable {
 					requestId: msg.requestId,
 					tagName: msg.tagName,
 					...await this.dataSource.getTagContext(msg.repo, msg.tagName)
-				});
-				break;
-			case 'updateCodeReview':
-				this.sendMessage({
-					command: 'updateCodeReview',
-					error: await this.extensionState.updateCodeReview(msg.repo, msg.id, msg.remainingFiles, msg.lastViewedFile)
 				});
 				break;
 			case 'viewDiff':

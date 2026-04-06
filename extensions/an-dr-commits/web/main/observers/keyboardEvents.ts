@@ -53,7 +53,6 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 			view.filesPanelFileChanges = null;
 			view.filesPanelFileTree = null;
 			view.filesPanelCompareWithHash = null;
-			view.filesPanelCodeReview = null;
 		}
 		handledEvent(e);
 	} else if (view.expandedCommit !== null) {

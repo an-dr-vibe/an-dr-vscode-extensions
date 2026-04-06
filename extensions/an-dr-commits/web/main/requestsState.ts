@@ -102,13 +102,12 @@ function commitsPreviewCommitComparison(view: any, hash1: string, hash2: string)
 	view.filesPanelFileChanges = null;
 	view.filesPanelFileTree = null;
 	view.filesPanelCompareWithHash = null;
-	view.filesPanelCodeReview = null;
 	view.resetDiffState();
 	view.filesPanel.setContentLoading();
 	view.requestCommitComparison(order.from, order.to, false);
 }
 
-function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, codeReview: GG.CodeReview | null) {
+function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder) {
 	if (view.previewCompareHashes === null) return;
 	const [h1, h2] = view.previewCompareHashes;
 	if (!((commitHash === h1 && compareWithHash === h2) || (commitHash === h2 && compareWithHash === h1))) return;
@@ -116,11 +115,10 @@ function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, co
 	view.filesPanelFileChanges = fileChanges;
 	view.filesPanelFileTree = fileTree;
 	view.filesPanelCompareWithHash = compareWithHash;
-	view.filesPanelCodeReview = codeReview;
 	view.filesPanelCommitHash = commitHash;
 	const isUncommitted = compareWithHash === UNCOMMITTED || commitHash === UNCOMMITTED;
-	view.filesPanel.update(fileTree, fileChanges, codeReview !== null ? codeReview.lastViewedFile : null, -1, commitsGetFileViewType(view), isUncommitted);
-	commitsPopulateFilesPanelHeader(view, false, false);
+	view.filesPanel.update(fileTree, fileChanges, null, -1, commitsGetFileViewType(view), isUncommitted);
+	commitsPopulateFilesPanelHeader(view, false);
 }
 
 function commitsUpdateSelectionPreview(view: any) {
@@ -139,7 +137,6 @@ function commitsUpdateSelectionPreview(view: any) {
 		view.filesPanelFileChanges = null;
 		view.filesPanelFileTree = null;
 		view.filesPanelCompareWithHash = null;
-		view.filesPanelCodeReview = null;
 		view.previewCompareHashes = null;
 	}
 }
@@ -316,7 +313,6 @@ function commitsSaveExpandedCommitLoading(view: any, index: number, commitHash: 
 		fileChanges: null,
 		fileTree: null,
 		avatar: null,
-		codeReview: null,
 		lastViewedFile: null,
 		loading: true,
 		scrollTop: { summary: 0, fileView: 0 },

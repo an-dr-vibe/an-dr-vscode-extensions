@@ -465,10 +465,6 @@ body.filesPanelHidden #cdv.docked{
 	background-color:rgba(128,128,128,0.35);
 }
 
-#cdvCodeReview{
-	border-radius:4px;
-}
-
 #cdvFileViewTypeTree{
 	border-radius:4px 0 0 4px;
 	margin-right:0;

@@ -4,11 +4,11 @@ import { AvatarManager } from './avatarManager';
 import { getConfig } from './config';
 import { DataSource } from './dataSource';
 import { DiffDocProvider, decodeDiffDocUri } from './diffDocProvider';
-import { CodeReviewData, CodeReviews, ExtensionState } from './extensionState';
+import { ExtensionState } from './extensionState';
 import { CommitsView } from './commitsView';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
-import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, VsCodeVersionRequirement, abbrevCommit, abbrevText, copyToClipboard, doesVersionMeetRequirement, getExtensionVersion, getPathFromUri, getRelativeTimeDiff, getRepoName, getSortedRepositoryPaths, isPathInWorkspace, openFile, resolveToSymbolicPath, showErrorMessage, showInformationMessage } from './utils';
+import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, VsCodeVersionRequirement, copyToClipboard, doesVersionMeetRequirement, getExtensionVersion, getPathFromUri, getRepoName, getSortedRepositoryPaths, isPathInWorkspace, openFile, resolveToSymbolicPath, showErrorMessage, showInformationMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
 
@@ -51,9 +51,6 @@ export class CommandManager extends Disposable {
 		this.registerCommand('an-dr-commits.removeGitRepository', () => this.removeGitRepository());
 		this.registerCommand('an-dr-commits.clearAvatarCache', () => this.clearAvatarCache());
 		this.registerCommand('an-dr-commits.fetch', () => this.fetch());
-		this.registerCommand('an-dr-commits.endAllWorkspaceCodeReviews', () => this.endAllWorkspaceCodeReviews());
-		this.registerCommand('an-dr-commits.endSpecificWorkspaceCodeReview', () => this.endSpecificWorkspaceCodeReview());
-		this.registerCommand('an-dr-commits.resumeWorkspaceCodeReview', () => this.resumeWorkspaceCodeReview());
 		this.registerCommand('an-dr-commits.version', () => this.version());
 		this.registerCommand('an-dr-commits.openFile', (arg) => this.openFile(arg));
 
@@ -240,71 +237,6 @@ export class CommandManager extends Disposable {
 	}
 
 	/**
-	 * The method run when the `an-dr-commits.endAllWorkspaceCodeReviews` command is invoked.
-	 */
-	private endAllWorkspaceCodeReviews() {
-		this.extensionState.endAllWorkspaceCodeReviews();
-		showInformationMessage('Ended All Code Reviews in Workspace');
-	}
-
-	/**
-	 * The method run when the `an-dr-commits.endSpecificWorkspaceCodeReview` command is invoked.
-	 */
-	private endSpecificWorkspaceCodeReview() {
-		const codeReviews = this.extensionState.getCodeReviews();
-		if (Object.keys(codeReviews).length === 0) {
-			showErrorMessage('There are no Code Reviews in progress within the current workspace.');
-			return;
-		}
-
-		vscode.window.showQuickPick(this.getCodeReviewQuickPickItems(codeReviews), {
-			placeHolder: 'Select the Code Review you want to end:',
-			canPickMany: false
-		}).then((item) => {
-			if (item) {
-				this.extensionState.endCodeReview(item.codeReviewRepo, item.codeReviewId).then((errorInfo) => {
-					if (errorInfo === null) {
-						showInformationMessage('Successfully ended Code Review "' + item.label + '".');
-					} else {
-						showErrorMessage(errorInfo);
-					}
-				}, () => { });
-			}
-		}, () => {
-			showErrorMessage('An unexpected error occurred while running the command "End a specific Code Review in Workspace...".');
-		});
-	}
-
-	/**
-	 * The method run when the `an-dr-commits.resumeWorkspaceCodeReview` command is invoked.
-	 */
-	private resumeWorkspaceCodeReview() {
-		const codeReviews = this.extensionState.getCodeReviews();
-		if (Object.keys(codeReviews).length === 0) {
-			showErrorMessage('There are no Code Reviews in progress within the current workspace.');
-			return;
-		}
-
-		vscode.window.showQuickPick(this.getCodeReviewQuickPickItems(codeReviews), {
-			placeHolder: 'Select the Code Review you want to resume:',
-			canPickMany: false
-		}).then((item) => {
-			if (item) {
-				const commitHashes = item.codeReviewId.split('-');
-				CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
-					repo: item.codeReviewRepo,
-					commitDetails: {
-						commitHash: commitHashes[commitHashes.length > 1 ? 1 : 0],
-						compareWithHash: commitHashes.length > 1 ? commitHashes[0] : null
-					}
-				});
-			}
-		}, () => {
-			showErrorMessage('An unexpected error occurred while running the command "Resume a specific Code Review in Workspace...".');
-		});
-	}
-
-	/**
 	 * The method run when the `an-dr-commits.version` command is invoked.
 	 */
 	private async version() {
@@ -346,60 +278,4 @@ export class CommandManager extends Disposable {
 	}
 
 
-	/* Helper Methods */
-
-	/**
-	 * Transform a set of Code Reviews into a list of Quick Pick items for use with `vscode.window.showQuickPick`.
-	 * @param codeReviews A set of Code Reviews.
-	 * @returns A list of Quick Pick items.
-	 */
-	private getCodeReviewQuickPickItems(codeReviews: CodeReviews): Promise<CodeReviewQuickPickItem[]> {
-		const repos = this.repoManager.getRepos();
-		const enrichedCodeReviews: { repo: string, id: string, review: CodeReviewData, fromCommitHash: string, toCommitHash: string }[] = [];
-		const fetchCommits: { repo: string, commitHash: string }[] = [];
-
-		Object.keys(codeReviews).forEach((repo) => {
-			if (typeof repos[repo] === 'undefined') return;
-			Object.keys(codeReviews[repo]).forEach((id) => {
-				const commitHashes = id.split('-');
-				commitHashes.forEach((commitHash) => fetchCommits.push({ repo: repo, commitHash: commitHash }));
-				enrichedCodeReviews.push({
-					repo: repo, id: id, review: codeReviews[repo][id],
-					fromCommitHash: commitHashes[0], toCommitHash: commitHashes[commitHashes.length > 1 ? 1 : 0]
-				});
-			});
-		});
-
-		return Promise.all(fetchCommits.map((fetch) => this.dataSource.getCommitSubject(fetch.repo, fetch.commitHash))).then(
-			(subjects) => {
-				const commitSubjects: { [repo: string]: { [commitHash: string]: string } } = {};
-				subjects.forEach((subject, i) => {
-					if (typeof commitSubjects[fetchCommits[i].repo] === 'undefined') {
-						commitSubjects[fetchCommits[i].repo] = {};
-					}
-					commitSubjects[fetchCommits[i].repo][fetchCommits[i].commitHash] = subject !== null ? subject : '<Unknown Commit Subject>';
-				});
-
-				return enrichedCodeReviews.sort((a, b) => b.review.lastActive - a.review.lastActive).map((codeReview) => {
-					const fromSubject = commitSubjects[codeReview.repo][codeReview.fromCommitHash];
-					const toSubject = commitSubjects[codeReview.repo][codeReview.toCommitHash];
-					const isComparison = codeReview.fromCommitHash !== codeReview.toCommitHash;
-					return {
-						codeReviewRepo: codeReview.repo,
-						codeReviewId: codeReview.id,
-						label: (repos[codeReview.repo].name || getRepoName(codeReview.repo)) + ': ' + abbrevCommit(codeReview.fromCommitHash) + (isComparison ? ' ↔ ' + abbrevCommit(codeReview.toCommitHash) : ''),
-						description: getRelativeTimeDiff(Math.round(codeReview.review.lastActive / 1000)),
-						detail: isComparison
-							? abbrevText(fromSubject, 50) + ' ↔ ' + abbrevText(toSubject, 50)
-							: fromSubject
-					};
-				});
-			}
-		);
-	}
-}
-
-interface CodeReviewQuickPickItem extends vscode.QuickPickItem {
-	codeReviewRepo: string;
-	codeReviewId: string;
 }

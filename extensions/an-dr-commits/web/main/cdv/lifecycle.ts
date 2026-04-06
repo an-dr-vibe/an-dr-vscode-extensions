@@ -1,5 +1,13 @@
 /* Commit Details View lifecycle helpers extracted from CommitsView */
 
+function commitsCloseCdvContextMenuIfOpen(expandedCommit: ExpandedCommit) {
+	if (expandedCommit.contextMenuOpen.summary || expandedCommit.contextMenuOpen.fileView > -1) {
+		expandedCommit.contextMenuOpen.summary = false;
+		expandedCommit.contextMenuOpen.fileView = -1;
+		contextMenu.close();
+	}
+}
+
 function commitsLoadCommitDetails(view: any, commitElem: HTMLElement) {
 	const commit = view.getCommitOfElem(commitElem);
 	if (commit === null) return;
@@ -36,24 +44,21 @@ function commitsLoadCommitComparison(view: any, commitElem: HTMLElement, compare
 	}
 }
 
-function commitsPopulateFilesPanelHeader(view: any, codeReviewPossible: boolean, externalDiffPossible: boolean) {
+function commitsPopulateFilesPanelHeader(view: any, externalDiffPossible: boolean) {
 	view.filesPanel.getHeaderElem().innerHTML =
-		(codeReviewPossible ? '<div id="cdvCodeReview" class="cdvControlBtn">' + SVG_ICONS.review + '</div>' : '') +
 		'<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div>' +
 		'<div id="cdvFileViewTypeList" class="cdvControlBtn cdvFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
 		(externalDiffPossible ? '<div id="cdvExternalDiff" class="cdvControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '');
 	document.getElementById('cdvFileViewTypeTree')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.Tree));
 	document.getElementById('cdvFileViewTypeList')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.List));
-	commitsSetupCdvCodeReviewBtn(view, codeReviewPossible);
 	commitsSetupCdvExternalDiffBtn(view, externalDiffPossible);
 	view.renderCdvFileViewTypeBtns();
 }
 
 function commitsPopulateFilesPanelHeaderForPreview(view: any, commitDetails: GG.GitCommitDetails) {
-	const codeReviewPossible = commitDetails.hash !== UNCOMMITTED;
 	const commit = view.commits[view.commitLookup[commitDetails.hash]];
 	const externalDiffPossible = commit !== undefined && commit.parents.length > 0;
-	commitsPopulateFilesPanelHeader(view, codeReviewPossible, externalDiffPossible);
+	commitsPopulateFilesPanelHeader(view, externalDiffPossible);
 }
 
 function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
@@ -64,7 +69,6 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 		view.filesPanelFileChanges = null;
 		view.filesPanelFileTree = null;
 		view.filesPanelCompareWithHash = null;
-		view.filesPanelCodeReview = null;
 		return;
 	}
 
@@ -92,7 +96,7 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	view.renderTopFullDiffButton();
 }
 
-function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, codeReview: GG.CodeReview | null, lastViewedFile: string | null, refresh: boolean) {
+function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, lastViewedFile: string | null, refresh: boolean) {
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null || expandedCommit.commitElem === null || expandedCommit.commitHash !== commitDetails.hash || expandedCommit.compareWithHash !== null) return;
 
@@ -108,7 +112,6 @@ function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails,
 		CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
 	}
 	expandedCommit.avatar = avatar;
-	expandedCommit.codeReview = codeReview;
 	if (!refresh) {
 		expandedCommit.lastViewedFile = lastViewedFile;
 	}
@@ -119,7 +122,7 @@ function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails,
 	view.renderCommitDetailsView(refresh);
 }
 
-function commitsCreateFileTree(view: any, gitFiles: ReadonlyArray<GG.GitFileChange>, codeReview: GG.CodeReview | null) {
+function commitsCreateFileTree(view: any, gitFiles: ReadonlyArray<GG.GitFileChange>) {
 	let contents: FileTreeFolderContents = {}, i, j, path, absPath, cur: FileTreeFolder;
 	let files: FileTreeFolder = { type: 'folder', name: '', folderPath: '', contents: contents, open: true, reviewed: true };
 
@@ -141,11 +144,10 @@ function commitsCreateFileTree(view: any, gitFiles: ReadonlyArray<GG.GitFileChan
 				}
 				cur = <FileTreeFolder>cur.contents[path[j]];
 			} else if (path[j] !== '') {
-				cur.contents[path[j]] = { type: 'file', name: path[j], index: i, reviewed: codeReview === null || !codeReview.remainingFiles.includes(gitFiles[i].newFilePath) };
+				cur.contents[path[j]] = { type: 'file', name: path[j], index: i, reviewed: true };
 			}
 		}
 	}
-	if (codeReview !== null) calcFileTreeFoldersReviewed(files);
 	return files;
 }
 
@@ -168,7 +170,7 @@ function commitsCloseCommitComparison(view: any, saveAndRequestCommitDetails: bo
 	}
 }
 
-function commitsShowCommitComparison(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, codeReview: GG.CodeReview | null, lastViewedFile: string | null, refresh: boolean) {
+function commitsShowCommitComparison(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, lastViewedFile: string | null, refresh: boolean) {
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null || expandedCommit.commitElem === null || expandedCommit.compareWithElem === null || expandedCommit.commitHash !== commitHash || expandedCommit.compareWithHash !== compareWithHash) return;
 
@@ -177,7 +179,6 @@ function commitsShowCommitComparison(view: any, commitHash: string, compareWithH
 		expandedCommit.fileTree = fileTree;
 		CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
 	}
-	expandedCommit.codeReview = codeReview;
 	if (!refresh) {
 		expandedCommit.lastViewedFile = lastViewedFile;
 	}
@@ -293,36 +294,6 @@ function commitsSetupCdvViewButtons(view: any) {
 	});
 }
 
-function commitsSetupCdvCodeReviewBtn(view: any, codeReviewPossible: boolean) {
-	if (!codeReviewPossible) return;
-	view.renderCodeReviewBtn();
-	document.getElementById('cdvCodeReview')!.addEventListener('click', (e: MouseEvent) => {
-		if (e.target === null) return;
-		const expandedCommit = view.expandedCommit;
-		const commitHash = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
-		const compareWithHash = expandedCommit !== null ? expandedCommit.compareWithHash : view.filesPanelCompareWithHash;
-		const fileTree = expandedCommit !== null ? expandedCommit.fileTree : view.filesPanelFileTree;
-		const fileChanges = expandedCommit !== null ? expandedCommit.fileChanges : view.filesPanelFileChanges;
-		const codeReview = expandedCommit !== null ? expandedCommit.codeReview : view.filesPanelCodeReview;
-		const lastViewedFile = expandedCommit !== null ? expandedCommit.lastViewedFile : null;
-		if (commitHash === null || fileTree === null || fileChanges === null) return;
-		const sourceElem = <HTMLElement>(<Element>e.target).closest('#cdvCodeReview')!;
-		if (sourceElem.classList.contains(CLASS_ACTIVE)) {
-			sendMessage({ command: 'endCodeReview', repo: view.currentRepo, id: codeReview!.id });
-			view.endCodeReview();
-		} else {
-			const order = view.getCommitOrder(commitHash, compareWithHash === null ? commitHash : compareWithHash);
-			const id = compareWithHash !== null ? order.from + '-' + order.to : commitHash;
-			sendMessage({
-				command: 'startCodeReview', repo: view.currentRepo, id: id,
-				commitHash: commitHash, compareWithHash: compareWithHash,
-				files: getFilesInTree(fileTree, fileChanges),
-				lastViewedFile: lastViewedFile
-			});
-		}
-	});
-}
-
 function commitsSetupCdvExternalDiffBtn(view: any, externalDiffPossible: boolean) {
 	if (!externalDiffPossible) return;
 	document.getElementById('cdvExternalDiff')!.addEventListener('click', () => {
@@ -338,7 +309,7 @@ function commitsSetupCdvExternalDiffBtn(view: any, externalDiffPossible: boolean
 	});
 }
 
-function commitsSetupCdvInteractivity(view: any, expandedCommit: any, codeReviewPossible: boolean, externalDiffPossible: boolean) {
+function commitsSetupCdvInteractivity(view: any, expandedCommit: any, externalDiffPossible: boolean) {
 	if (expandedCommit.loading) return;
 	view.makeCdvFileViewInteractive();
 	view.renderCdvExternalDiffBtn();
@@ -359,7 +330,6 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 
 	const isDocked = view.isCdvDocked();
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
-	const codeReviewPossible = !expandedCommit.loading && commitOrder.to !== UNCOMMITTED;
 	const externalDiffPossible = !expandedCommit.loading && (expandedCommit.compareWithHash !== null || view.commits[view.commitLookup[expandedCommit.commitHash]].parents.length > 0);
 
 	let elem = document.getElementById('cdv');
@@ -385,14 +355,13 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		view.filesPanelCompareWithHash = expandedCommit.compareWithHash;
 		view.filesPanelFileChanges = expandedCommit.fileChanges;
 		view.filesPanelFileTree = expandedCommit.fileTree;
-		view.filesPanelCodeReview = expandedCommit.codeReview;
 	}
 	html += '</div></div><div class="cdvHeightResize"></div>';
 
 	if (expandedCommit.loading) {
 		view.filesPanel.getHeaderElem().innerHTML = '';
 	} else {
-		commitsPopulateFilesPanelHeader(view, codeReviewPossible, externalDiffPossible);
+		commitsPopulateFilesPanelHeader(view, externalDiffPossible);
 	}
 
 	elem.innerHTML = isDocked ? html : '<td><div class="cdvHeightResize"></div></td><td colspan="' + (view.getNumColumns() - 1) + '">' + html + '</td>';
@@ -401,7 +370,7 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 	if (!refresh) commitsScrollCdvIntoView(view, elem, isDocked, expandedCommit);
 
 	view.makeCdvResizable();
-	commitsSetupCdvInteractivity(view, expandedCommit, codeReviewPossible, externalDiffPossible);
+	commitsSetupCdvInteractivity(view, expandedCommit, externalDiffPossible);
 	view.renderTopFullDiffButton();
 }
 

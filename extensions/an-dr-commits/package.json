@@ -61,16 +61,6 @@
 			},
 			{
 				"category": "Commits",
-				"command": "an-dr-commits.endAllWorkspaceCodeReviews",
-				"title": "End All Code Reviews in Workspace"
-			},
-			{
-				"category": "Commits",
-				"command": "an-dr-commits.endSpecificWorkspaceCodeReview",
-				"title": "End a specific Code Review in Workspace..."
-			},
-			{
-				"category": "Commits",
 				"command": "an-dr-commits.fetch",
 				"title": "Fetch from Remote(s)"
 			},
@@ -78,11 +68,6 @@
 				"category": "Commits",
 				"command": "an-dr-commits.removeGitRepository",
 				"title": "Remove Git Repository..."
-			},
-			{
-				"category": "Commits",
-				"command": "an-dr-commits.resumeWorkspaceCodeReview",
-				"title": "Resume a specific Code Review in Workspace..."
 			},
 			{
 				"category": "Commits",

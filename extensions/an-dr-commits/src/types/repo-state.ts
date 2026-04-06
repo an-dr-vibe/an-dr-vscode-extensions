@@ -1,12 +1,5 @@
 import { BooleanOverride, FileViewType, RepoCommitOrdering } from './settings';
 
-export interface CodeReview {
-	id: string;
-	lastActive: number;
-	lastViewedFile: string | null;
-	remainingFiles: string[];
-}
-
 export type ColumnWidth = number;
 
 export type GitRepoSet = { [repo: string]: GitRepoState };

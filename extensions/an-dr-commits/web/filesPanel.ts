@@ -109,8 +109,8 @@ class FilesPanel {
 		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder">Select one or two commits to see the changed files</div>';
 	}
 
-	public update(fileTree: FileTreeFolder, fileChanges: ReadonlyArray<GG.GitFileChange>, lastViewedFile: string | null, contextMenuOpen: number, fileViewType: GG.FileViewType, isUncommitted: boolean) {
-		const html = generateFileViewHtml(fileTree, fileChanges, lastViewedFile, contextMenuOpen, fileViewType, isUncommitted);
+	public update(fileTree: FileTreeFolder, fileChanges: ReadonlyArray<GG.GitFileChange>, contextMenuOpen: number, fileViewType: GG.FileViewType, isUncommitted: boolean) {
+		const html = generateFileViewHtml(fileTree, fileChanges, contextMenuOpen, fileViewType, isUncommitted);
 		this.contentElem.innerHTML = html;
 		this.contentElem.scrollTop = this.scrollTop;
 	}

@@ -495,20 +495,21 @@ class CommitsView {
 		if (this.previewCommitHash !== commitDetails.hash) return;
 		this.previewCommitHash = null;
 		if (this.expandedCommit === null || this.expandedCommit.commitHash !== commitDetails.hash) {
-			this.filesPanel.update(fileTree, commitDetails.fileChanges, null, -1, commitsGetFileViewType(this), false);
+			this.filesPanel.update(fileTree, commitDetails.fileChanges, -1, commitsGetFileViewType(this), false);
 			this.filesPanelCommitHash = commitDetails.hash;
 			this.filesPanelCompareWithHash = null;
 			this.filesPanelFileChanges = commitDetails.fileChanges;
 			this.filesPanelFileTree = fileTree;
 			commitsPopulateFilesPanelHeaderForPreview(this, commitDetails);
+			this.makeCommitDetailsViewFileViewInteractive();
 		}
 	}
 	public closeCommitDetails(saveAndRender: boolean) { commitsCloseCommitDetails(this, saveAndRender); }
-	public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, lastViewedFile: string | null, refresh: boolean) { commitsShowCommitDetails(this, commitDetails, fileTree, avatar, lastViewedFile, refresh); }
+	public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, refresh: boolean) { commitsShowCommitDetails(this, commitDetails, fileTree, avatar, refresh); }
 	public createFileTree(gitFiles: ReadonlyArray<GG.GitFileChange>) { return commitsCreateFileTree(this, gitFiles); }
 	private loadCommitComparison(commitElem: HTMLElement, compareWithElem: HTMLElement) { commitsLoadCommitComparison(this, commitElem, compareWithElem); }
 	public closeCommitComparison(saveAndRequestCommitDetails: boolean) { commitsCloseCommitComparison(this, saveAndRequestCommitDetails); }
-	public showCommitComparison(commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, lastViewedFile: string | null, refresh: boolean) { commitsShowCommitComparison(this, commitHash, compareWithHash, fileChanges, fileTree, lastViewedFile, refresh); }
+	public showCommitComparison(commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, refresh: boolean) { commitsShowCommitComparison(this, commitHash, compareWithHash, fileChanges, fileTree, refresh); }
 	private renderCommitDetailsView(refresh: boolean) { commitsRenderCommitDetailsView(this, refresh); }
 	private setCommitDetailsViewHeight(elem: HTMLElement, isDocked: boolean) { commitsSetCommitDetailsViewHeight(this, elem, isDocked); }
 	public isCommitDetailsViewOpen(commitHash: string, compareWithHash: string | null) { return commitsIsCommitDetailsViewOpen(this, commitHash, compareWithHash); }
@@ -544,7 +545,7 @@ class CommitsView {
 
 	/* Commit Details View File View */
 
-	private makeCommitDetailsViewFileViewInteractive() { commitsMakeCommitDetailsViewFileViewInteractive(this); }
+	public makeCommitDetailsViewFileViewInteractive() { commitsMakeCommitDetailsViewFileViewInteractive(this); }
 	private renderCommitDetailsViewFileViewTypeBtns() { commitsRenderCommitDetailsViewFileViewTypeBtns(this); }
 	private renderCommitDetailsViewExternalDiffBtn() { commitsRenderCommitDetailsViewExternalDiffBtn(this); }
 	private commitDetailsViewUpdateFileState(file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) { commitsCommitDetailsViewUpdateFileState(this, file, fileElem, isReviewed, fileWasViewed); }

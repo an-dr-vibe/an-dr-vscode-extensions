@@ -4,43 +4,57 @@ function commitsHandleCommitDetailsViewFileClick(view: any, e: Event) {
 	const getFileElemOfEventTarget = (target: EventTarget) => <HTMLElement>(<Element>target).closest('.fileTreeFileRecord');
 	const getFileOfFileElem = (fileChanges: ReadonlyArray<GG.GitFileChange>, fileElem: HTMLElement) => fileChanges[parseInt(fileElem.dataset.index!)];
 
-	const getCommitHashForFile = (file: GG.GitFileChange, expandedCommit: ExpandedCommit) => {
-		const commit = view.commits[view.commitLookup[expandedCommit.commitHash]];
-		if (expandedCommit.compareWithHash !== null) {
-			return view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash).to;
-		} else if (commit.stash !== null && file.type === GG.GitFileStatus.Untracked) {
-			return commit.stash.untrackedFilesHash!;
-		} else {
-			return expandedCommit.commitHash;
+	const getFileChanges = () => {
+		const expandedCommit = view.expandedCommit;
+		return expandedCommit !== null ? expandedCommit.fileChanges : view.filesPanelFileChanges;
+	};
+
+	const getCommitHashForFile = (file: GG.GitFileChange) => {
+		const expandedCommit = view.expandedCommit;
+		if (expandedCommit !== null) {
+			const commit = view.commits[view.commitLookup[expandedCommit.commitHash]];
+			if (expandedCommit.compareWithHash !== null) {
+				return view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash).to;
+			} else if (commit.stash !== null && file.type === GG.GitFileStatus.Untracked) {
+				return commit.stash.untrackedFilesHash!;
+			} else {
+				return expandedCommit.commitHash;
+			}
 		}
+		const commitHash = view.filesPanelCommitHash;
+		const compareWithHash = view.filesPanelCompareWithHash;
+		if (compareWithHash !== null) {
+			return view.getCommitOrder(commitHash, compareWithHash).to;
+		}
+		return commitHash;
 	};
 
 	addListenerToClass('copyGitFile', 'click', (e) => {
-		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
+		const fileChanges = getFileChanges();
+		if (fileChanges === null || e.target === null) return;
 
 		const fileElem = getFileElemOfEventTarget(e.target);
-		sendMessage({ command: 'copyFilePath', repo: view.currentRepo, filePath: getFileOfFileElem(expandedCommit.fileChanges, fileElem).newFilePath, absolute: true });
+		sendMessage({ command: 'copyFilePath', repo: view.currentRepo, filePath: getFileOfFileElem(fileChanges, fileElem).newFilePath, absolute: true });
 	});
 
 	addListenerToClass('viewGitFileAtRevision', 'click', (e) => {
-		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
+		const fileChanges = getFileChanges();
+		if (fileChanges === null || e.target === null) return;
 
 		const fileElem = getFileElemOfEventTarget(e.target);
-		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
+		const file = getFileOfFileElem(fileChanges, fileElem);
 		view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
-		sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath });
+		sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath });
 	});
 
 	addListenerToClass('openGitFile', 'click', (e) => {
-		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
+		const fileChanges = getFileChanges();
+		if (fileChanges === null || e.target === null) return;
 
 		const fileElem = getFileElemOfEventTarget(e.target);
-		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
+		const file = getFileOfFileElem(fileChanges, fileElem);
 		view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
-		sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath });
+		sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath });
 	});
 
 	void e;
@@ -50,33 +64,28 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 	const getFileElemOfEventTarget = (target: EventTarget) => <HTMLElement>(<Element>target).closest('.fileTreeFileRecord');
 	const getFileOfFileElem = (fileChanges: ReadonlyArray<GG.GitFileChange>, fileElem: HTMLElement) => fileChanges[parseInt(fileElem.dataset.index!)];
 
-	const getCommitHashForFile = (file: GG.GitFileChange, expandedCommit: ExpandedCommit) => {
-		const commit = view.commits[view.commitLookup[expandedCommit.commitHash]];
-		if (expandedCommit.compareWithHash !== null) {
-			return view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash).to;
-		} else if (commit.stash !== null && file.type === GG.GitFileStatus.Untracked) {
-			return commit.stash.untrackedFilesHash!;
-		} else {
-			return expandedCommit.commitHash;
-		}
-	};
-
 	addListenerToClass('fileTreeFileRecord', 'contextmenu', (e: Event) => {
 		handledEvent(e);
 		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileChanges === null || e.target === null) return;
+		const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : view.filesPanelFileChanges;
+		const commitHash: string | null = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
+		const compareWithHash: string | null = expandedCommit !== null ? expandedCommit.compareWithHash : view.filesPanelCompareWithHash;
+		if (fileChanges === null || commitHash === null || e.target === null) return;
+
 		const fileElem = getFileElemOfEventTarget(e.target);
-		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
-		const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
+		const file = getFileOfFileElem(fileChanges, fileElem);
+		const commitOrder = view.getCommitOrder(commitHash, compareWithHash === null ? commitHash : compareWithHash);
 		const isUncommitted = commitOrder.to === UNCOMMITTED;
 
-		CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
-		expandedCommit.contextMenuOpen.fileView = parseInt(fileElem.dataset.index!);
+		if (expandedCommit !== null) {
+			CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
+			expandedCommit.contextMenuOpen.fileView = parseInt(fileElem.dataset.index!);
+		}
 
 		const target: ContextMenuTarget & CommitTarget = {
 			type: TargetType.CommitDetailsView,
-			hash: expandedCommit.commitHash,
-			index: view.commitLookup[expandedCommit.commitHash],
+			hash: commitHash,
+			index: view.commitLookup[commitHash],
 			elem: fileElem
 		};
 		const diffPossible = file.type === GG.GitFileStatus.Untracked || (file.additions !== null && file.deletions !== null);
@@ -84,22 +93,42 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 		const fileExistsAtThisRevisionAndDiffPossible = fileExistsAtThisRevision && diffPossible;
 		const visibility = view.config.contextMenuActionsVisibility.commitDetailsViewFile;
 
+		const getCommitHashForFile = (file: GG.GitFileChange) => {
+			if (expandedCommit !== null) {
+				const commit = view.commits[view.commitLookup[expandedCommit.commitHash]];
+				if (expandedCommit.compareWithHash !== null) {
+					return view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash).to;
+				} else if (commit.stash !== null && file.type === GG.GitFileStatus.Untracked) {
+					return commit.stash.untrackedFilesHash!;
+				} else {
+					return expandedCommit.commitHash;
+				}
+			}
+			if (compareWithHash !== null) return view.getCommitOrder(commitHash, compareWithHash).to;
+			return commitHash;
+		};
+
 		const getFileDiffHashes = (file: GG.GitFileChange): { fromHash: string; toHash: string; fileStatus: GG.GitFileStatus } => {
-			let commit = view.commits[view.commitLookup[expandedCommit!.commitHash]], fromHash: string, toHash: string, fileStatus = file.type;
-			if (expandedCommit!.compareWithHash !== null) {
-				const co = view.getCommitOrder(expandedCommit!.commitHash, expandedCommit!.compareWithHash);
+			let fromHash: string, toHash: string, fileStatus = file.type;
+			if (expandedCommit !== null) {
+				const commit = view.commits[view.commitLookup[expandedCommit.commitHash]];
+				if (expandedCommit.compareWithHash !== null) {
+					const co = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash);
+					fromHash = co.from; toHash = co.to;
+				} else if (commit.stash !== null) {
+					if (fileStatus === GG.GitFileStatus.Untracked) {
+						fromHash = commit.stash.untrackedFilesHash!; toHash = fromHash;
+						fileStatus = GG.GitFileStatus.Added;
+					} else { fromHash = commit.stash.baseHash; toHash = expandedCommit.commitHash; }
+				} else { fromHash = expandedCommit.commitHash; toHash = expandedCommit.commitHash; }
+			} else if (compareWithHash !== null) {
+				const co = view.getCommitOrder(commitHash, compareWithHash);
 				fromHash = co.from; toHash = co.to;
-			} else if (commit.stash !== null) {
-				if (fileStatus === GG.GitFileStatus.Untracked) {
-					fromHash = commit.stash.untrackedFilesHash!; toHash = fromHash;
-					fileStatus = GG.GitFileStatus.Added;
-				} else { fromHash = commit.stash.baseHash; toHash = expandedCommit!.commitHash; }
-			} else { fromHash = expandedCommit!.commitHash; toHash = expandedCommit!.commitHash; }
+			} else { fromHash = commitHash; toHash = commitHash; }
 			return { fromHash, toHash, fileStatus };
 		};
 
 		const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
-			if (expandedCommit === null) return;
 			const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
 			view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
 			view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
@@ -121,7 +150,6 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 					title: 'View Diff',
 					visible: visibility.viewDiff && diffPossible,
 					onClick: () => {
-						if (expandedCommit === null) return;
 						const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
 						sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
 					}
@@ -129,28 +157,28 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 				{
 					title: 'View File at this Revision',
 					visible: visibility.viewFileAtThisRevision && fileExistsAtThisRevisionAndDiffPossible,
-					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
+					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath }); }
 				},
 				{
 					title: 'View Diff with Working File',
 					visible: visibility.viewDiffWithWorkingFile && fileExistsAtThisRevisionAndDiffPossible,
-					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, null, true); sendMessage({ command: 'viewDiffWithWorkingFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
+					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, null, true); sendMessage({ command: 'viewDiffWithWorkingFile', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath }); }
 				},
 				{
 					title: 'Open File',
 					visible: visibility.openFile && file.type !== GG.GitFileStatus.Deleted,
-					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
+					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath }); }
 				}
 			],
 			[
 				{
 					title: 'Reset File to this Revision' + ELLIPSIS,
-					visible: visibility.resetFileToThisRevision && fileExistsAtThisRevision && expandedCommit.compareWithHash === null,
+					visible: visibility.resetFileToThisRevision && fileExistsAtThisRevision && compareWithHash === null,
 					onClick: () => {
-						const commitHash = getCommitHashForFile(file, expandedCommit);
-						dialog.showConfirmation('Are you sure you want to reset <b><i>' + escapeHtml(file.newFilePath) + '</i></b> to it\'s state at commit <b><i>' + abbrevCommit(commitHash) + '</i></b>? Any uncommitted changes made to this file will be overwritten.', 'Yes, reset file', () => {
-							runAction({ command: 'resetFileToRevision', repo: view.currentRepo, commitHash: commitHash, filePath: file.newFilePath }, 'Resetting file');
-						}, { type: TargetType.CommitDetailsView, hash: commitHash, elem: fileElem });
+						const hash = getCommitHashForFile(file);
+						dialog.showConfirmation('Are you sure you want to reset <b><i>' + escapeHtml(file.newFilePath) + '</i></b> to it\'s state at commit <b><i>' + abbrevCommit(hash) + '</i></b>? Any uncommitted changes made to this file will be overwritten.', 'Yes, reset file', () => {
+							runAction({ command: 'resetFileToRevision', repo: view.currentRepo, commitHash: hash, filePath: file.newFilePath }, 'Resetting file');
+						}, { type: TargetType.CommitDetailsView, hash: hash, elem: fileElem });
 					}
 				}
 			],
@@ -167,7 +195,7 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 				}
 			]
 		], false, target, <MouseEvent>e, view.isCommitDetailsViewDocked() ? document.body : view.viewElem, () => {
-			expandedCommit.contextMenuOpen.fileView = -1;
+			if (view.expandedCommit !== null) view.expandedCommit.contextMenuOpen.fileView = -1;
 		});
 	});
 }
@@ -187,7 +215,6 @@ function commitsRenderCommitDetailsViewFileViewTypeBtns(view: any) {
 }
 
 function commitsRenderCommitDetailsViewExternalDiffBtn(view: any) {
-	if (view.expandedCommit === null) return;
 	const externalDiffBtnElem = document.getElementById('commitDetailsViewExternalDiff');
 	if (externalDiffBtnElem === null) return;
 
@@ -201,37 +228,25 @@ function commitsRenderCommitDetailsViewExternalDiffBtn(view: any) {
 }
 
 function commitsCommitDetailsViewUpdateFileState(view: any, file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) {
-	const expandedCommit = view.expandedCommit, filesElem = view.filesPanel.getContentElem(), filePath = file.newFilePath;
-	if (expandedCommit === null || expandedCommit.fileTree === null) return;
-
-	if (fileWasViewed) {
-		expandedCommit.lastViewedFile = filePath;
-		let lastViewedElem = document.getElementById('commitDetailsViewLastFileViewed');
-		if (lastViewedElem !== null) lastViewedElem.remove();
-		lastViewedElem = document.createElement('span');
-		lastViewedElem.id = 'commitDetailsViewLastFileViewed';
-		lastViewedElem.title = 'Last File Viewed';
-		lastViewedElem.innerHTML = SVG_ICONS.eyeOpen;
-		insertBeforeFirstChildWithClass(lastViewedElem, fileElem, 'fileTreeFileAction');
-	}
-
+	void fileWasViewed;
 	view.saveState();
 }
 
 function commitsHandleFilesPanelClick(view: any, e: MouseEvent) {
 	const target = e.target as Element;
 
-	// Folder toggle (only when Commit Details View is open and has file tree state)
+	// Folder toggle
 	const folderElem = target.closest('.fileTreeFolder') as HTMLElement | null;
 	if (folderElem) {
 		const expandedCommit = view.expandedCommit;
-		if (expandedCommit === null || expandedCommit.fileTree === null) return;
+		const fileTree = expandedCommit !== null ? expandedCommit.fileTree : view.filesPanelFileTree;
+		if (fileTree === null) return;
 		const parent = folderElem.parentElement!;
 		parent.classList.toggle('closed');
 		const isOpen = !parent.classList.contains('closed');
 		parent.children[0].children[0].innerHTML = isOpen ? SVG_ICONS.openFolder : SVG_ICONS.closedFolder;
 		parent.children[1].classList.toggle('hidden');
-		alterFileTreeFolderOpen(expandedCommit.fileTree, decodeURIComponent(folderElem.dataset.folderpath!), isOpen);
+		alterFileTreeFolderOpen(fileTree, decodeURIComponent(folderElem.dataset.folderpath!), isOpen);
 		view.saveState();
 		return;
 	}

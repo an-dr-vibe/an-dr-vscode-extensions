@@ -117,8 +117,9 @@ function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, co
 	view.filesPanelCompareWithHash = compareWithHash;
 	view.filesPanelCommitHash = commitHash;
 	const isUncommitted = compareWithHash === UNCOMMITTED || commitHash === UNCOMMITTED;
-	view.filesPanel.update(fileTree, fileChanges, null, -1, commitsGetFileViewType(view), isUncommitted);
+	view.filesPanel.update(fileTree, fileChanges, -1, commitsGetFileViewType(view), isUncommitted);
 	commitsPopulateFilesPanelHeader(view, false);
+	view.makeCommitDetailsViewFileViewInteractive();
 }
 
 function commitsUpdateSelectionPreview(view: any) {
@@ -313,7 +314,6 @@ function commitsSaveExpandedCommitLoading(view: any, index: number, commitHash: 
 		fileChanges: null,
 		fileTree: null,
 		avatar: null,
-		lastViewedFile: null,
 		loading: true,
 		scrollTop: { summary: 0, fileView: 0 },
 		contextMenuOpen: { summary: false, fileView: -1 }

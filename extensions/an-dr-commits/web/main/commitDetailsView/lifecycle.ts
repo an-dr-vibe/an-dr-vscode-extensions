@@ -96,7 +96,7 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	view.renderTopFullDiffButton();
 }
 
-function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, lastViewedFile: string | null, refresh: boolean) {
+function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, refresh: boolean) {
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null || expandedCommit.commitElem === null || expandedCommit.commitHash !== commitDetails.hash || expandedCommit.compareWithHash !== null) return;
 
@@ -112,9 +112,6 @@ function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails,
 		CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	}
 	expandedCommit.avatar = avatar;
-	if (!refresh) {
-		expandedCommit.lastViewedFile = lastViewedFile;
-	}
 	expandedCommit.commitElem.classList.add(CLASS_COMMIT_DETAILS_OPEN);
 	expandedCommit.loading = false;
 	view.saveState();
@@ -170,7 +167,7 @@ function commitsCloseCommitComparison(view: any, saveAndRequestCommitDetails: bo
 	}
 }
 
-function commitsShowCommitComparison(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, lastViewedFile: string | null, refresh: boolean) {
+function commitsShowCommitComparison(view: any, commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, refresh: boolean) {
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null || expandedCommit.commitElem === null || expandedCommit.compareWithElem === null || expandedCommit.commitHash !== commitHash || expandedCommit.compareWithHash !== compareWithHash) return;
 
@@ -178,9 +175,6 @@ function commitsShowCommitComparison(view: any, commitHash: string, compareWithH
 		expandedCommit.fileChanges = fileChanges;
 		expandedCommit.fileTree = fileTree;
 		CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
-	}
-	if (!refresh) {
-		expandedCommit.lastViewedFile = lastViewedFile;
 	}
 	expandedCommit.commitElem.classList.add(CLASS_COMMIT_DETAILS_OPEN);
 	expandedCommit.compareWithElem.classList.add(CLASS_COMMIT_DETAILS_OPEN);
@@ -349,7 +343,7 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		html += '<div id="commitDetailsViewSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
 		const alreadyShowingThisCommit = view.filesPanelCommitHash === expandedCommit.commitHash && view.filesPanelCompareWithHash === expandedCommit.compareWithHash;
 		if (!alreadyShowingThisCommit || refresh) {
-			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
+			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
 		}
 		view.filesPanelCommitHash = expandedCommit.commitHash;
 		view.filesPanelCompareWithHash = expandedCommit.compareWithHash;
@@ -419,7 +413,7 @@ function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 		const isUncommitted = view.filesPanelCompareWithHash !== null
 			? (view.filesPanelCompareWithHash === UNCOMMITTED || view.filesPanelCommitHash === UNCOMMITTED)
 			: view.filesPanelCommitHash === UNCOMMITTED;
-		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, null, -1, type, isUncommitted);
+		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, -1, type, isUncommitted);
 		view.renderCommitDetailsViewFileViewTypeBtns();
 		return;
 	}
@@ -427,7 +421,7 @@ function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 	CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	view.setFileViewType(type);
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
-	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
+	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
 	view.makeCommitDetailsViewFileViewInteractive();
 	view.renderCommitDetailsViewFileViewTypeBtns();
 }

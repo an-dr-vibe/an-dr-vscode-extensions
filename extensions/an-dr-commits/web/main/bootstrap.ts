@@ -36,7 +36,7 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'commitDetails':
 				if (msg.commitDetails !== null) {
 					const fileTree = commits.createFileTree(msg.commitDetails.fileChanges);
-					commits.showCommitDetails(msg.commitDetails, fileTree, msg.avatar, null, msg.refresh);
+					commits.showCommitDetails(msg.commitDetails, fileTree, msg.avatar, msg.refresh);
 					commits.applyPreviewResponse(msg.commitDetails, fileTree);
 				} else {
 					commits.closeCommitDetails(true);
@@ -46,7 +46,7 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'compareCommits':
 				if (msg.error === null) {
 					const compFileTree = commits.createFileTree(msg.fileChanges);
-					commits.showCommitComparison(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, null, msg.refresh);
+					commits.showCommitComparison(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree, msg.refresh);
 					commits.applyComparisonPreviewResponse(msg.commitHash, msg.compareWithHash, msg.fileChanges, compFileTree);
 				} else {
 					commits.closeCommitComparison(true);

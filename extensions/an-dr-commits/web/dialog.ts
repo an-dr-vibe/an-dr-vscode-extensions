@@ -376,7 +376,7 @@ class Dialog {
 		document.body.appendChild(dialog);
 
 		let docHeight = document.body.clientHeight, dialogHeight = dialog.clientHeight + 2;
-		if (type !== DialogType.Form && dialogHeight > 0.8 * docHeight) {
+		if (dialogHeight > 0.8 * docHeight) {
 			dialogContent.style.height = Math.round(0.8 * docHeight - 22) + 'px';
 			dialogHeight = Math.round(0.8 * docHeight);
 		}

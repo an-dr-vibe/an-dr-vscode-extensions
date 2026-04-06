@@ -44,9 +44,9 @@ interface PullRequestConfigCustom extends PullRequestConfigBase {
 export type PullRequestConfig = PullRequestConfigBuiltIn | PullRequestConfigCustom;
 
 export interface GitRepoState {
-	cdvDivider: number;
-	cdvHeight: number;
-	cdvTopRowRatio: number;
+	commitDetailsViewDivider: number;
+	commitDetailsViewHeight: number;
+	commitDetailsViewTopRowRatio: number;
 	fullDiffCompact: boolean;
 	fullDiffPanelHeight: number;
 	columnWidths: ColumnWidth[] | null;

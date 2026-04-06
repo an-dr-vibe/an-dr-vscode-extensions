@@ -1,6 +1,6 @@
 /* Commit Details View lifecycle helpers extracted from CommitsView */
 
-function commitsCloseCdvContextMenuIfOpen(expandedCommit: ExpandedCommit) {
+function commitsCloseCommitDetailsViewContextMenuIfOpen(expandedCommit: ExpandedCommit) {
 	if (expandedCommit.contextMenuOpen.summary || expandedCommit.contextMenuOpen.fileView > -1) {
 		expandedCommit.contextMenuOpen.summary = false;
 		expandedCommit.contextMenuOpen.fileView = -1;
@@ -46,13 +46,13 @@ function commitsLoadCommitComparison(view: any, commitElem: HTMLElement, compare
 
 function commitsPopulateFilesPanelHeader(view: any, externalDiffPossible: boolean) {
 	view.filesPanel.getHeaderElem().innerHTML =
-		'<div id="cdvFileViewTypeTree" class="cdvControlBtn cdvFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div>' +
-		'<div id="cdvFileViewTypeList" class="cdvControlBtn cdvFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
-		(externalDiffPossible ? '<div id="cdvExternalDiff" class="cdvControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '');
-	document.getElementById('cdvFileViewTypeTree')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.Tree));
-	document.getElementById('cdvFileViewTypeList')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.List));
-	commitsSetupCdvExternalDiffBtn(view, externalDiffPossible);
-	view.renderCdvFileViewTypeBtns();
+		'<div id="commitDetailsViewFileViewTypeTree" class="commitDetailsViewControlBtn commitDetailsViewFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div>' +
+		'<div id="commitDetailsViewFileViewTypeList" class="commitDetailsViewControlBtn commitDetailsViewFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
+		(externalDiffPossible ? '<div id="commitDetailsViewExternalDiff" class="commitDetailsViewControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '');
+	document.getElementById('commitDetailsViewFileViewTypeTree')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.Tree));
+	document.getElementById('commitDetailsViewFileViewTypeList')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.List));
+	commitsSetupCommitDetailsViewExternalDiffBtn(view, externalDiffPossible);
+	view.renderCommitDetailsViewFileViewTypeBtns();
 }
 
 function commitsPopulateFilesPanelHeaderForPreview(view: any, commitDetails: GG.GitCommitDetails) {
@@ -72,7 +72,7 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 		return;
 	}
 
-	const elem = document.getElementById('cdv'), isDocked = view.isCdvDocked();
+	const elem = document.getElementById('commitDetailsView'), isDocked = view.isCommitDetailsViewDocked();
 	if (elem !== null) {
 		elem.remove();
 	}
@@ -85,7 +85,7 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	if (expandedCommit.compareWithElem !== null) {
 		expandedCommit.compareWithElem.classList.remove(CLASS_COMMIT_DETAILS_OPEN);
 	}
-	CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
+	CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	view.expandedCommit = null;
 	if (saveAndRender) {
 		view.saveState();
@@ -100,8 +100,8 @@ function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails,
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null || expandedCommit.commitElem === null || expandedCommit.commitHash !== commitDetails.hash || expandedCommit.compareWithHash !== null) return;
 
-	if (!view.isCdvDocked()) {
-		const elem = document.getElementById('cdv');
+	if (!view.isCommitDetailsViewDocked()) {
+		const elem = document.getElementById('commitDetailsView');
 		if (elem !== null) elem.remove();
 	}
 
@@ -109,7 +109,7 @@ function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails,
 	if (haveFilesChanged(expandedCommit.fileChanges, commitDetails.fileChanges)) {
 		expandedCommit.fileChanges = commitDetails.fileChanges;
 		expandedCommit.fileTree = fileTree;
-		CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
+		CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	}
 	expandedCommit.avatar = avatar;
 	if (!refresh) {
@@ -158,7 +158,7 @@ function commitsCloseCommitComparison(view: any, saveAndRequestCommitDetails: bo
 	if (expandedCommit.compareWithElem !== null) {
 		expandedCommit.compareWithElem.classList.remove(CLASS_COMMIT_DETAILS_OPEN);
 	}
-	CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
+	CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	if (saveAndRequestCommitDetails) {
 		if (expandedCommit.commitElem !== null) {
 			view.saveExpandedCommitLoading(expandedCommit.index, expandedCommit.commitHash, expandedCommit.commitElem, null, null);
@@ -177,7 +177,7 @@ function commitsShowCommitComparison(view: any, commitHash: string, compareWithH
 	if (haveFilesChanged(expandedCommit.fileChanges, fileChanges)) {
 		expandedCommit.fileChanges = fileChanges;
 		expandedCommit.fileTree = fileTree;
-		CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
+		CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	}
 	if (!refresh) {
 		expandedCommit.lastViewedFile = lastViewedFile;
@@ -212,7 +212,7 @@ function commitsRenderCommitDetailsViewSummary(view: any, expandedCommit: Expand
 						: escapedParent;
 				}).join(', ')
 				: 'None';
-			html += '<span class="cdvSummaryTop' + (commitDetailsAvatar !== '' ? ' withAvatar' : '') + '"><span class="cdvSummaryTopRow"><span class="cdvSummaryKeyValues">'
+			html += '<span class="commitDetailsViewSummaryTop' + (commitDetailsAvatar !== '' ? ' withAvatar' : '') + '"><span class="commitDetailsViewSummaryTopRow"><span class="commitDetailsViewSummaryKeyValues">'
 				+ '<b>Commit: </b>' + escapeHtml(commitDetails.hash) + '<br>'
 				+ '<b>Parents: </b>' + parents + '<br>'
 				+ '<b>Author: </b>' + escapeHtml(commitDetails.author) + (commitDetails.authorEmail !== '' ? ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(commitDetails.authorEmail) + '" tabindex="-1">' + escapeHtml(commitDetails.authorEmail) + '</a>&gt;' : '') + '<br>'
@@ -232,7 +232,7 @@ function commitsRenderCommitDetailsViewSummary(view: any, expandedCommit: Expand
 	return html;
 }
 
-function commitsScrollCdvIntoView(view: any, elem: HTMLElement, isDocked: boolean, expandedCommit: any) {
+function commitsScrollCommitDetailsViewIntoView(view: any, elem: HTMLElement, isDocked: boolean, expandedCommit: any) {
 	if (isDocked) {
 		const elemTop = view.controlsElem.clientHeight + expandedCommit.commitElem.offsetTop;
 		if (elemTop - 8 < view.viewElem.scrollTop) {
@@ -242,19 +242,19 @@ function commitsScrollCdvIntoView(view: any, elem: HTMLElement, isDocked: boolea
 		}
 	} else {
 		const elemTop = view.controlsElem.clientHeight + elem.offsetTop;
-		const cdvHeight = view.gitRepos[view.currentRepo].cdvHeight;
+		const commitDetailsViewHeight = view.gitRepos[view.currentRepo].commitDetailsViewHeight;
 		if (view.config.commitDetailsView.autoCenter) {
-			view.viewElem.scroll(0, elemTop - 12 + (cdvHeight - view.viewElem.clientHeight) / 2);
+			view.viewElem.scroll(0, elemTop - 12 + (commitDetailsViewHeight - view.viewElem.clientHeight) / 2);
 		} else if (elemTop - 32 < view.viewElem.scrollTop) {
 			view.viewElem.scroll(0, elemTop - 32);
-		} else if (elemTop + cdvHeight - view.viewElem.clientHeight + 8 > view.viewElem.scrollTop) {
-			view.viewElem.scroll(0, elemTop + cdvHeight - view.viewElem.clientHeight + 8);
+		} else if (elemTop + commitDetailsViewHeight - view.viewElem.clientHeight + 8 > view.viewElem.scrollTop) {
+			view.viewElem.scroll(0, elemTop + commitDetailsViewHeight - view.viewElem.clientHeight + 8);
 		}
 	}
 }
 
-function commitsSetupCdvScrollObservers(view: any, expandedCommit: any) {
-	observeElemScroll('cdvSummary', expandedCommit.scrollTop.summary, (scrollTop: number) => {
+function commitsSetupCommitDetailsViewScrollObservers(view: any, expandedCommit: any) {
+	observeElemScroll('commitDetailsViewSummary', expandedCommit.scrollTop.summary, (scrollTop: number) => {
 		if (view.expandedCommit === null) return;
 		view.expandedCommit.scrollTop.summary = scrollTop;
 		if (view.expandedCommit.contextMenuOpen.summary) {
@@ -276,27 +276,27 @@ function commitsSetupCdvScrollObservers(view: any, expandedCommit: any) {
 	});
 }
 
-function commitsSetupCdvViewButtons(view: any) {
-	document.getElementById('cdvFileViewTypeTree')!.addEventListener('click', () => {
+function commitsSetupCommitDetailsViewViewButtons(view: any) {
+	document.getElementById('commitDetailsViewFileViewTypeTree')!.addEventListener('click', () => {
 		view.changeFileViewType(GG.FileViewType.Tree);
 	});
-	document.getElementById('cdvFileViewTypeList')!.addEventListener('click', () => {
+	document.getElementById('commitDetailsViewFileViewTypeList')!.addEventListener('click', () => {
 		view.changeFileViewType(GG.FileViewType.List);
 	});
-	document.getElementById('cdvDiffViewRaw')!.addEventListener('click', () => {
+	document.getElementById('commitDetailsViewDiffViewRaw')!.addEventListener('click', () => {
 		view.changeDiffViewMode('raw');
 	});
-	document.getElementById('cdvDiffViewUnified')!.addEventListener('click', () => {
+	document.getElementById('commitDetailsViewDiffViewUnified')!.addEventListener('click', () => {
 		view.changeDiffViewMode('unified');
 	});
-	document.getElementById('cdvDiffViewSideBySide')!.addEventListener('click', () => {
+	document.getElementById('commitDetailsViewDiffViewSideBySide')!.addEventListener('click', () => {
 		view.changeDiffViewMode('sideBySide');
 	});
 }
 
-function commitsSetupCdvExternalDiffBtn(view: any, externalDiffPossible: boolean) {
+function commitsSetupCommitDetailsViewExternalDiffBtn(view: any, externalDiffPossible: boolean) {
 	if (!externalDiffPossible) return;
-	document.getElementById('cdvExternalDiff')!.addEventListener('click', () => {
+	document.getElementById('commitDetailsViewExternalDiff')!.addEventListener('click', () => {
 		const expandedCommit = view.expandedCommit;
 		const commitHash = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
 		const compareWithHash = expandedCommit !== null ? expandedCommit.compareWithHash : view.filesPanelCompareWithHash;
@@ -309,12 +309,12 @@ function commitsSetupCdvExternalDiffBtn(view: any, externalDiffPossible: boolean
 	});
 }
 
-function commitsSetupCdvInteractivity(view: any, expandedCommit: any, externalDiffPossible: boolean) {
+function commitsSetupCommitDetailsViewInteractivity(view: any, expandedCommit: any, externalDiffPossible: boolean) {
 	if (expandedCommit.loading) return;
-	view.makeCdvFileViewInteractive();
-	view.renderCdvExternalDiffBtn();
+	view.makeCommitDetailsViewFileViewInteractive();
+	view.renderCommitDetailsViewExternalDiffBtn();
 	if (view.fullDiffMode) view.createFullDiffPanel();
-	commitsSetupCdvScrollObservers(view, expandedCommit);
+	commitsSetupCommitDetailsViewScrollObservers(view, expandedCommit);
 }
 
 function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
@@ -328,25 +328,25 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		view.currentDiffFilePath = null;
 	}
 
-	const isDocked = view.isCdvDocked();
+	const isDocked = view.isCommitDetailsViewDocked();
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
 	const externalDiffPossible = !expandedCommit.loading && (expandedCommit.compareWithHash !== null || view.commits[view.commitLookup[expandedCommit.commitHash]].parents.length > 0);
 
-	let elem = document.getElementById('cdv');
+	let elem = document.getElementById('commitDetailsView');
 	if (elem === null) {
 		elem = document.createElement(isDocked ? 'div' : 'tr');
-		elem.id = 'cdv';
+		elem.id = 'commitDetailsView';
 		elem.className = isDocked ? 'docked' : 'inline';
-		view.setCdvHeight(elem, isDocked);
+		view.setCommitDetailsViewHeight(elem, isDocked);
 		if (isDocked) document.body.appendChild(elem);
 		else insertAfter(elem, expandedCommit.commitElem);
 	}
 
-	let html = '<div id="cdvContent"><div id="cdvTopRow">';
+	let html = '<div id="commitDetailsViewContent"><div id="commitDetailsViewTopRow">';
 	if (expandedCommit.loading) {
-		html += '<div id="cdvLoading">' + SVG_ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
+		html += '<div id="commitDetailsViewLoading">' + SVG_ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
 	} else {
-		html += '<div id="cdvSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
+		html += '<div id="commitDetailsViewSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
 		const alreadyShowingThisCommit = view.filesPanelCommitHash === expandedCommit.commitHash && view.filesPanelCompareWithHash === expandedCommit.compareWithHash;
 		if (!alreadyShowingThisCommit || refresh) {
 			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
@@ -356,7 +356,7 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		view.filesPanelFileChanges = expandedCommit.fileChanges;
 		view.filesPanelFileTree = expandedCommit.fileTree;
 	}
-	html += '</div></div><div class="cdvHeightResize"></div>';
+	html += '</div></div><div class="commitDetailsViewHeightResize"></div>';
 
 	if (expandedCommit.loading) {
 		view.filesPanel.getHeaderElem().innerHTML = '';
@@ -364,22 +364,22 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		commitsPopulateFilesPanelHeader(view, externalDiffPossible);
 	}
 
-	elem.innerHTML = isDocked ? html : '<td><div class="cdvHeightResize"></div></td><td colspan="' + (view.getNumColumns() - 1) + '">' + html + '</td>';
+	elem.innerHTML = isDocked ? html : '<td><div class="commitDetailsViewHeightResize"></div></td><td colspan="' + (view.getNumColumns() - 1) + '">' + html + '</td>';
 	if (!isDocked) view.renderGraph();
 
-	if (!refresh) commitsScrollCdvIntoView(view, elem, isDocked, expandedCommit);
+	if (!refresh) commitsScrollCommitDetailsViewIntoView(view, elem, isDocked, expandedCommit);
 
-	view.makeCdvResizable();
-	commitsSetupCdvInteractivity(view, expandedCommit, externalDiffPossible);
+	view.makeCommitDetailsViewResizable();
+	commitsSetupCommitDetailsViewInteractivity(view, expandedCommit, externalDiffPossible);
 	view.renderTopFullDiffButton();
 }
 
-function commitsSetCdvHeight(view: any, elem: HTMLElement, isDocked: boolean) {
-	let height = view.gitRepos[view.currentRepo].cdvHeight, windowHeight = window.innerHeight;
+function commitsSetCommitDetailsViewHeight(view: any, elem: HTMLElement, isDocked: boolean) {
+	let height = view.gitRepos[view.currentRepo].commitDetailsViewHeight, windowHeight = window.innerHeight;
 	if (height > windowHeight - 40) {
 		height = Math.max(windowHeight - 40, 100);
-		if (height !== view.gitRepos[view.currentRepo].cdvHeight) {
-			view.gitRepos[view.currentRepo].cdvHeight = height;
+		if (height !== view.gitRepos[view.currentRepo].commitDetailsViewHeight) {
+			view.gitRepos[view.currentRepo].commitDetailsViewHeight = height;
 			view.saveRepoState();
 		}
 	}
@@ -388,7 +388,7 @@ function commitsSetCdvHeight(view: any, elem: HTMLElement, isDocked: boolean) {
 	if (isDocked) view.updateLayoutBottoms();
 }
 
-function commitsIsCdvOpen(view: any, commitHash: string, compareWithHash: string | null) {
+function commitsIsCommitDetailsViewOpen(view: any, commitHash: string, compareWithHash: string | null) {
 	return view.expandedCommit !== null && view.expandedCommit.commitHash === commitHash && view.expandedCommit.compareWithHash === compareWithHash;
 }
 
@@ -420,14 +420,14 @@ function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 			? (view.filesPanelCompareWithHash === UNCOMMITTED || view.filesPanelCommitHash === UNCOMMITTED)
 			: view.filesPanelCommitHash === UNCOMMITTED;
 		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, null, -1, type, isUncommitted);
-		view.renderCdvFileViewTypeBtns();
+		view.renderCommitDetailsViewFileViewTypeBtns();
 		return;
 	}
 	if (expandedCommit.fileTree === null || expandedCommit.fileChanges === null) return;
-	CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
+	CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	view.setFileViewType(type);
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
 	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.lastViewedFile, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
-	view.makeCdvFileViewInteractive();
-	view.renderCdvFileViewTypeBtns();
+	view.makeCommitDetailsViewFileViewInteractive();
+	view.renderCommitDetailsViewFileViewTypeBtns();
 }

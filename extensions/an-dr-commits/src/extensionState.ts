@@ -18,9 +18,9 @@ const REOPEN_GIT_GRAPH_ON_STARTUP = 'reopenCommitsOnStartup';
 const WORKSPACE_VIEW_STATE = 'workspaceViewState';
 
 export const DEFAULT_REPO_STATE: GitRepoState = {
-	cdvDivider: 0.5,
-	cdvHeight: 250,
-	cdvTopRowRatio: 0.45,
+	commitDetailsViewDivider: 0.5,
+	commitDetailsViewHeight: 250,
+	commitDetailsViewTopRowRatio: 0.45,
 	fullDiffCompact: false,
 	fullDiffPanelHeight: 250,
 	columnWidths: null,

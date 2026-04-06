@@ -7,16 +7,16 @@ function commitsRenderGraph(view: any) {
 	if (typeof view.currentRepo === 'undefined') return;
 
 	const colHeadersElem = document.getElementById('tableColHeaders');
-	const cdvHeight = view.gitRepos[view.currentRepo].cdvHeight;
+	const commitDetailsViewHeight = view.gitRepos[view.currentRepo].commitDetailsViewHeight;
 	const headerHeight = colHeadersElem !== null ? colHeadersElem.clientHeight + 1 : 0;
-	const expandedCommit = view.isCdvDocked() ? null : view.expandedCommit;
-	const expandedCommitElem = expandedCommit !== null ? document.getElementById('cdv') : null;
+	const expandedCommit = view.isCommitDetailsViewDocked() ? null : view.expandedCommit;
+	const expandedCommitElem = expandedCommit !== null ? document.getElementById('commitDetailsView') : null;
 
 	view.config.graph.grid.expandY = expandedCommitElem !== null
 		? expandedCommitElem.getBoundingClientRect().height
-		: cdvHeight;
+		: commitDetailsViewHeight;
 	view.config.graph.grid.y = view.commits.length > 0 && view.tableElem.children.length > 0
-		? (view.tableElem.children[0].clientHeight - headerHeight - (expandedCommit !== null ? cdvHeight : 0)) / view.commits.length
+		? (view.tableElem.children[0].clientHeight - headerHeight - (expandedCommit !== null ? commitDetailsViewHeight : 0)) / view.commits.length
 		: view.config.graph.grid.y;
 	view.config.graph.grid.offsetY = headerHeight + view.config.graph.grid.y / 2;
 

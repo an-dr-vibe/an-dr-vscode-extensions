@@ -2,14 +2,14 @@
 
 function commitsResolveUrlTarget(view: any, eventTarget: Element): { target: any, isInDialog: boolean } {
 	let eventElem: HTMLElement | null;
-	if (view.expandedCommit !== null && eventTarget.closest('#cdv') !== null) {
+	if (view.expandedCommit !== null && eventTarget.closest('#commitDetailsView') !== null) {
 		const target = {
 			type: TargetType.CommitDetailsView,
 			hash: view.expandedCommit.commitHash,
 			index: view.commitLookup[view.expandedCommit.commitHash],
 			elem: <HTMLElement>eventTarget
 		};
-		CommitsView.closeCdvContextMenuIfOpen(view.expandedCommit);
+		CommitsView.closeCommitDetailsViewContextMenuIfOpen(view.expandedCommit);
 		view.expandedCommit.contextMenuOpen.summary = true;
 		return { target, isInDialog: false };
 	} else if ((eventElem = eventTarget.closest('.commit')) !== null) {

@@ -12,7 +12,7 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 	}
 
 	if (data === null || data.diff === null) {
-		contentElem.innerHTML = '<div class="cdvDiffMessage">Unable to load file contents</div>';
+		contentElem.innerHTML = '<div class="commitDetailsViewDiffMessage">Unable to load file contents</div>';
 		view.attachFullDiffHunkNav();
 		return;
 	}
@@ -265,7 +265,7 @@ function commitsCreateFullDiffPanel(view: any) {
 			'</div></div><div id="fullDiffContent"></div>';
 	document.body.appendChild(panel);
 	if (view.currentDiffRequest === null) {
-		document.getElementById('fullDiffContent')!.innerHTML = '<div class="cdvDiffMessage">Select a file to view the diff</div>';
+		document.getElementById('fullDiffContent')!.innerHTML = '<div class="commitDetailsViewDiffMessage">Select a file to view the diff</div>';
 	}
 	view.setFullDiffPanelHeight(view.gitRepos[view.currentRepo].fullDiffPanelHeight);
 	view.makeFullDiffPanelResizable();
@@ -318,7 +318,7 @@ function commitsResetDiffState(view: any) {
 		const filenameElem = document.getElementById('fullDiffFilename');
 		const contentElem = document.getElementById('fullDiffContent');
 		if (filenameElem) filenameElem.textContent = 'Select a file to view its contents';
-		if (contentElem) contentElem.innerHTML = '<div class="cdvDiffMessage">Select a file to view the diff</div>';
+		if (contentElem) contentElem.innerHTML = '<div class="commitDetailsViewDiffMessage">Select a file to view the diff</div>';
 	} else {
 		view.destroyFullDiffPanel();
 	}
@@ -333,12 +333,12 @@ function commitsSetFullDiffPanelHeight(view: any, height: number) {
 
 function commitsUpdateLayoutBottoms(view: any) {
 	const panel = document.getElementById('fullDiffPanel');
-	const cdv = document.getElementById('cdv') as HTMLElement | null;
-	const isDocked = view.isCdvDocked();
+	const commitDetailsViewElem = document.getElementById('commitDetailsView') as HTMLElement | null;
+	const isDocked = view.isCommitDetailsViewDocked();
 	const panelH = panel ? view.gitRepos[view.currentRepo].fullDiffPanelHeight : 0;
-	const cdvH = (cdv && isDocked) ? view.gitRepos[view.currentRepo].cdvHeight : 0;
-	if (cdv && isDocked) cdv.style.bottom = panelH + 'px';
-	view.viewElem.style.bottom = (cdvH + panelH) + 'px';
+	const commitDetailsViewH = (commitDetailsViewElem && isDocked) ? view.gitRepos[view.currentRepo].commitDetailsViewHeight : 0;
+	if (commitDetailsViewElem && isDocked) commitDetailsViewElem.style.bottom = panelH + 'px';
+	view.viewElem.style.bottom = (commitDetailsViewH + panelH) + 'px';
 	const filesPanel = document.getElementById('filesPanel');
 	if (filesPanel) filesPanel.style.bottom = panelH + 'px';
 	const sidebar = document.getElementById('sidebar');

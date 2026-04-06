@@ -107,7 +107,7 @@ declare global {
 
 	const enum TargetType {
 		Commit = 'commit',
-		CommitDetailsView = 'cdv',
+		CommitDetailsView = 'commitDetailsView',
 		Ref = 'ref',
 		Repo = 'repo'
 	}

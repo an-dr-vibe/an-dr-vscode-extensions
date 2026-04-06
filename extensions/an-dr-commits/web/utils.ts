@@ -33,7 +33,7 @@ const SVG_ICONS = {
 	// The SVG icons below are custom made
 	arrowDown: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M6,1L6,10.1L2.7,6.8L1.3,8.2L7,13.9L12.7,8.2L11.3,6.8L8,10.1L8,1L6,1z"/></svg>',
 	arrowUp: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M6,13L6,3.9L2.7,7.2L1.3,5.8L7,0.1L12.7,5.8L11.3,7.2L8,3.9L8,13L6,13z"/></svg>',
-	cdv: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M0,2V3.5H2V2ZM3.5,2V3.5H14V2ZM0,5v7H14V5Zm1,1.5h5.5v4H1Zm6.5,0H13v4H7.5Z"/></svg>',
+	commitDetailsView: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M0,2V3.5H2V2ZM3.5,2V3.5H14V2ZM0,5v7H14V5Zm1,1.5h5.5v4H1Zm6.5,0H13v4H7.5Z"/></svg>',
 	close: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><path fill-rule="evenodd" d="M3.8,2.4L2.4,3.8L5.7,7L2.4,10.2L3.8,11.6L7,8.3L10.2,11.6L11.6,10.2L8.3,7L11.6,3.8L10.2,2.4L7,5.7L3.8,2.4z"/></svg>',
 	diffUnified: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2,3H18V5H2ZM2,8H18V10H2ZM2,13H18V15H2Z"/></svg>',
 	diffSideBySide: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M1,3H9V5H1ZM1,8H9V10H1ZM1,13H9V15H1ZM11,3H19V5H11ZM11,8H19V10H11ZM11,13H19V15H11Z"/></svg>',

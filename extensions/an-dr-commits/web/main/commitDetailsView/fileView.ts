@@ -1,6 +1,6 @@
-/* CDV file view helpers extracted from CommitsView */
+/* Commit Details View file view helpers extracted from CommitsView */
 
-function commitsHandleCdvFileClick(view: any, e: Event) {
+function commitsHandleCommitDetailsViewFileClick(view: any, e: Event) {
 	const getFileElemOfEventTarget = (target: EventTarget) => <HTMLElement>(<Element>target).closest('.fileTreeFileRecord');
 	const getFileOfFileElem = (fileChanges: ReadonlyArray<GG.GitFileChange>, fileElem: HTMLElement) => fileChanges[parseInt(fileElem.dataset.index!)];
 
@@ -29,7 +29,7 @@ function commitsHandleCdvFileClick(view: any, e: Event) {
 
 		const fileElem = getFileElemOfEventTarget(e.target);
 		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
-		view.cdvUpdateFileState(file, fileElem, true, true);
+		view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
 		sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath });
 	});
 
@@ -39,14 +39,14 @@ function commitsHandleCdvFileClick(view: any, e: Event) {
 
 		const fileElem = getFileElemOfEventTarget(e.target);
 		const file = getFileOfFileElem(expandedCommit.fileChanges, fileElem);
-		view.cdvUpdateFileState(file, fileElem, true, true);
+		view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
 		sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath });
 	});
 
 	void e;
 }
 
-function commitsHandleCdvFileContext(view: any, e: Event) {
+function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 	const getFileElemOfEventTarget = (target: EventTarget) => <HTMLElement>(<Element>target).closest('.fileTreeFileRecord');
 	const getFileOfFileElem = (fileChanges: ReadonlyArray<GG.GitFileChange>, fileElem: HTMLElement) => fileChanges[parseInt(fileElem.dataset.index!)];
 
@@ -70,7 +70,7 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 		const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
 		const isUncommitted = commitOrder.to === UNCOMMITTED;
 
-		CommitsView.closeCdvContextMenuIfOpen(expandedCommit);
+		CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 		expandedCommit.contextMenuOpen.fileView = parseInt(fileElem.dataset.index!);
 
 		const target: ContextMenuTarget & CommitTarget = {
@@ -101,7 +101,7 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 		const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
 			if (expandedCommit === null) return;
 			const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
-			view.cdvUpdateFileState(file, fileElem, true, true);
+			view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
 			view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
 			view.currentDiffFilePath = file.newFilePath;
 			view.currentDiffText = null;
@@ -129,17 +129,17 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 				{
 					title: 'View File at this Revision',
 					visible: visibility.viewFileAtThisRevision && fileExistsAtThisRevisionAndDiffPossible,
-					onClick: () => { view.cdvUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
+					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'viewFileAtRevision', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
 				},
 				{
 					title: 'View Diff with Working File',
 					visible: visibility.viewDiffWithWorkingFile && fileExistsAtThisRevisionAndDiffPossible,
-					onClick: () => { view.cdvUpdateFileState(file, fileElem, null, true); sendMessage({ command: 'viewDiffWithWorkingFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
+					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, null, true); sendMessage({ command: 'viewDiffWithWorkingFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
 				},
 				{
 					title: 'Open File',
 					visible: visibility.openFile && file.type !== GG.GitFileStatus.Deleted,
-					onClick: () => { view.cdvUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
+					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file, expandedCommit), filePath: file.newFilePath }); }
 				}
 			],
 			[
@@ -166,19 +166,19 @@ function commitsHandleCdvFileContext(view: any, e: Event) {
 					onClick: () => sendMessage({ command: 'copyFilePath', repo: view.currentRepo, filePath: file.newFilePath, absolute: false })
 				}
 			]
-		], false, target, <MouseEvent>e, view.isCdvDocked() ? document.body : view.viewElem, () => {
+		], false, target, <MouseEvent>e, view.isCommitDetailsViewDocked() ? document.body : view.viewElem, () => {
 			expandedCommit.contextMenuOpen.fileView = -1;
 		});
 	});
 }
 
-function commitsMakeCdvFileViewInteractive(view: any) {
-	commitsHandleCdvFileClick(view, <Event><unknown>null);
-	commitsHandleCdvFileContext(view, <Event><unknown>null);
+function commitsMakeCommitDetailsViewFileViewInteractive(view: any) {
+	commitsHandleCommitDetailsViewFileClick(view, <Event><unknown>null);
+	commitsHandleCommitDetailsViewFileContext(view, <Event><unknown>null);
 }
 
-function commitsRenderCdvFileViewTypeBtns(view: any) {
-	let treeBtnElem = document.getElementById('cdvFileViewTypeTree'), listBtnElem = document.getElementById('cdvFileViewTypeList');
+function commitsRenderCommitDetailsViewFileViewTypeBtns(view: any) {
+	let treeBtnElem = document.getElementById('commitDetailsViewFileViewTypeTree'), listBtnElem = document.getElementById('commitDetailsViewFileViewTypeList');
 	if (treeBtnElem === null || listBtnElem === null) return;
 
 	let listView = view.getFileViewType() === GG.FileViewType.List;
@@ -186,9 +186,9 @@ function commitsRenderCdvFileViewTypeBtns(view: any) {
 	alterClass(listBtnElem, CLASS_ACTIVE, listView);
 }
 
-function commitsRenderCdvExternalDiffBtn(view: any) {
+function commitsRenderCommitDetailsViewExternalDiffBtn(view: any) {
 	if (view.expandedCommit === null) return;
-	const externalDiffBtnElem = document.getElementById('cdvExternalDiff');
+	const externalDiffBtnElem = document.getElementById('commitDetailsViewExternalDiff');
 	if (externalDiffBtnElem === null) return;
 
 	alterClass(externalDiffBtnElem, CLASS_ENABLED, view.gitConfig !== null && (view.gitConfig.diffTool !== null || view.gitConfig.guiDiffTool !== null));
@@ -200,16 +200,16 @@ function commitsRenderCdvExternalDiffBtn(view: any) {
 	externalDiffBtnElem.title = 'Open External Directory Diff' + (toolName !== null ? ' with "' + toolName + '"' : '');
 }
 
-function commitsCdvUpdateFileState(view: any, file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) {
+function commitsCommitDetailsViewUpdateFileState(view: any, file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) {
 	const expandedCommit = view.expandedCommit, filesElem = view.filesPanel.getContentElem(), filePath = file.newFilePath;
 	if (expandedCommit === null || expandedCommit.fileTree === null) return;
 
 	if (fileWasViewed) {
 		expandedCommit.lastViewedFile = filePath;
-		let lastViewedElem = document.getElementById('cdvLastFileViewed');
+		let lastViewedElem = document.getElementById('commitDetailsViewLastFileViewed');
 		if (lastViewedElem !== null) lastViewedElem.remove();
 		lastViewedElem = document.createElement('span');
-		lastViewedElem.id = 'cdvLastFileViewed';
+		lastViewedElem.id = 'commitDetailsViewLastFileViewed';
 		lastViewedElem.title = 'Last File Viewed';
 		lastViewedElem.innerHTML = SVG_ICONS.eyeOpen;
 		insertBeforeFirstChildWithClass(lastViewedElem, fileElem, 'fileTreeFileAction');
@@ -221,7 +221,7 @@ function commitsCdvUpdateFileState(view: any, file: GG.GitFileChange, fileElem: 
 function commitsHandleFilesPanelClick(view: any, e: MouseEvent) {
 	const target = e.target as Element;
 
-	// Folder toggle (only when CDV is open and has file tree state)
+	// Folder toggle (only when Commit Details View is open and has file tree state)
 	const folderElem = target.closest('.fileTreeFolder') as HTMLElement | null;
 	if (folderElem) {
 		const expandedCommit = view.expandedCommit;

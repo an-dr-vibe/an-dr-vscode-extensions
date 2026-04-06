@@ -57,8 +57,8 @@ describe('ExtensionState', () => {
 		it('Should return the stored repositories', () => {
 			// Setup
 			const repoState: GitRepoState = {
-				cdvDivider: 0.5,
-				cdvHeight: 250,
+				commitDetailsViewDivider: 0.5,
+				commitDetailsViewHeight: 250,
 				columnWidths: null,
 				commitOrdering: RepoCommitOrdering.AuthorDate,
 				fileViewType: FileViewType.List,
@@ -105,8 +105,8 @@ describe('ExtensionState', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				'/path/to/repo': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -143,8 +143,8 @@ describe('ExtensionState', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				'/path/to/repo': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -181,8 +181,8 @@ describe('ExtensionState', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				'/path/to/repo': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -219,8 +219,8 @@ describe('ExtensionState', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				'/path/to/repo': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -257,8 +257,8 @@ describe('ExtensionState', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				'/path/to/repo': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -298,8 +298,8 @@ describe('ExtensionState', () => {
 			// Assert
 			expect(result).toStrictEqual({
 				'/path/to/repo-1': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -319,8 +319,8 @@ describe('ExtensionState', () => {
 					workspaceFolderIndex: null
 				},
 				'/path/to/repo-2': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,

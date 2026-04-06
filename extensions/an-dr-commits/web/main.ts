@@ -172,7 +172,7 @@ class CommitsView {
 		commitsLoadRepo(this, repo);
 	}
 
-	public static closeCdvContextMenuIfOpen(expandedCommit: ExpandedCommit) { commitsCloseCdvContextMenuIfOpen(expandedCommit); }
+	public static closeCommitDetailsViewContextMenuIfOpen(expandedCommit: ExpandedCommit) { commitsCloseCommitDetailsViewContextMenuIfOpen(expandedCommit); }
 
 	private static isSameRepoInProgressState(a: GG.GitRepoInProgressState | null, b: GG.GitRepoInProgressState | null) {
 		return commitsIsSameRepoInProgressState(a, b);
@@ -510,18 +510,18 @@ class CommitsView {
 	public closeCommitComparison(saveAndRequestCommitDetails: boolean) { commitsCloseCommitComparison(this, saveAndRequestCommitDetails); }
 	public showCommitComparison(commitHash: string, compareWithHash: string, fileChanges: ReadonlyArray<GG.GitFileChange>, fileTree: FileTreeFolder, lastViewedFile: string | null, refresh: boolean) { commitsShowCommitComparison(this, commitHash, compareWithHash, fileChanges, fileTree, lastViewedFile, refresh); }
 	private renderCommitDetailsView(refresh: boolean) { commitsRenderCommitDetailsView(this, refresh); }
-	private setCdvHeight(elem: HTMLElement, isDocked: boolean) { commitsSetCdvHeight(this, elem, isDocked); }
-	public isCdvOpen(commitHash: string, compareWithHash: string | null) { return commitsIsCdvOpen(this, commitHash, compareWithHash); }
+	private setCommitDetailsViewHeight(elem: HTMLElement, isDocked: boolean) { commitsSetCommitDetailsViewHeight(this, elem, isDocked); }
+	public isCommitDetailsViewOpen(commitHash: string, compareWithHash: string | null) { return commitsIsCommitDetailsViewOpen(this, commitHash, compareWithHash); }
 	private getCommitOrder(hash1: string, hash2: string) { return commitsGetCommitOrder(this, hash1, hash2); }
 	private getFileViewType() { return commitsGetFileViewType(this); }
 	private setFileViewType(type: GG.FileViewType) { commitsSetFileViewType(this, type); }
 	private changeFileViewType(type: GG.FileViewType) { commitsChangeFileViewType(this, type); }
 
-	/* CDV Resizable */
+	/* Commit Details View Resizable */
 
-	private setCdvDivider() { commitsSetCdvDivider(this); }
-	private makeCdvResizable() { commitsMakeCdvResizable(this); }
-	private makeCdvDividerDraggable() { commitsMakeCdvDividerDraggable(this); }
+	private setCommitDetailsViewDivider() { commitsSetCommitDetailsViewDivider(this); }
+	private makeCommitDetailsViewResizable() { commitsMakeCommitDetailsViewResizable(this); }
+	private makeCommitDetailsViewDividerDraggable() { commitsMakeCommitDetailsViewDividerDraggable(this); }
 
 	public renderFullDiffContent(data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null) { commitsRenderFullDiffContent(this, data); }
 	public getDisplayLines(content: string | null): string[] { return commitsGetDisplayLines(content); }
@@ -542,14 +542,14 @@ class CommitsView {
 	public makeFullDiffPanelResizable() { commitsMakeFullDiffPanelResizable(this); }
 	public attachFullDiffHunkNav() { commitsAttachFullDiffHunkNav(this); }
 
-	/* CDV File View */
+	/* Commit Details View File View */
 
-	private makeCdvFileViewInteractive() { commitsMakeCdvFileViewInteractive(this); }
-	private renderCdvFileViewTypeBtns() { commitsRenderCdvFileViewTypeBtns(this); }
-	private renderCdvExternalDiffBtn() { commitsRenderCdvExternalDiffBtn(this); }
-	private cdvUpdateFileState(file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) { commitsCdvUpdateFileState(this, file, fileElem, isReviewed, fileWasViewed); }
+	private makeCommitDetailsViewFileViewInteractive() { commitsMakeCommitDetailsViewFileViewInteractive(this); }
+	private renderCommitDetailsViewFileViewTypeBtns() { commitsRenderCommitDetailsViewFileViewTypeBtns(this); }
+	private renderCommitDetailsViewExternalDiffBtn() { commitsRenderCommitDetailsViewExternalDiffBtn(this); }
+	private commitDetailsViewUpdateFileState(file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) { commitsCommitDetailsViewUpdateFileState(this, file, fileElem, isReviewed, fileWasViewed); }
 
-	private isCdvDocked() {
+	private isCommitDetailsViewDocked() {
 		return this.config.commitDetailsView.location === GG.CommitDetailsViewLocation.DockedToBottom;
 	}
 

@@ -302,7 +302,7 @@ function commitsProcessLoadConfig(view: any, msg: GG.ResponseLoadConfig) {
 	if (msg.config !== null && view.currentRepo === msg.repo) {
 		view.gitConfig = msg.config;
 		view.saveState();
-		view.renderCdvExternalDiffBtn();
+		view.renderCommitDetailsViewExternalDiffBtn();
 	}
 	view.settingsWidget.refresh();
 }

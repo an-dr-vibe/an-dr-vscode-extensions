@@ -24,7 +24,7 @@ class FilesPanel {
 		this.panel.appendChild(resizeHandle);
 		this.setupResize(resizeHandle);
 
-		// Header bar (populated by CDV when a commit is expanded)
+		// Header bar (populated by Commit Details View when a commit is expanded)
 		this.headerElem = document.createElement('div');
 		this.headerElem.id = 'filesPanelHeader';
 		this.panel.appendChild(this.headerElem);

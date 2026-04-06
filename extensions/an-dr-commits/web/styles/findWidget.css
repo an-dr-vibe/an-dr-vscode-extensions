@@ -106,7 +106,7 @@
 	font-size:10px;
 }
 
-#findPosition, #findPrev, #findNext, #findOpenCdv{
+#findPosition, #findPrev, #findNext, #findOpenCommitDetailsView{
 	display:inline-block;
 	-webkit-user-select:none;
 	user-select:none;
@@ -123,7 +123,7 @@
 	font-weight:400;
 	opacity:0.55;
 }
-#findPrev, #findNext, #findOpenCdv{
+#findPrev, #findNext, #findOpenCommitDetailsView{
 	position:relative;
 	width:20px;
 	height:20px;
@@ -131,7 +131,7 @@
 	cursor:pointer;
 	flex-shrink:0;
 }
-#findPrev svg, #findNext svg, #findOpenCdv svg{
+#findPrev svg, #findNext svg, #findOpenCommitDetailsView svg{
 	position:absolute;
 	left:3px;
 	top:3px;
@@ -140,10 +140,10 @@
 #findPrev:hover svg, #findNext:hover svg{
 	fill-opacity:0.8;
 }
-#findOpenCdv:hover svg, #findOpenCdv.active svg{
+#findOpenCommitDetailsView:hover svg, #findOpenCommitDetailsView.active svg{
 	fill-opacity:1;
 }
-#findOpenCdv.active:hover svg{
+#findOpenCommitDetailsView.active:hover svg{
 	fill-opacity:1;
 }
 #findPrev.disabled svg, #findNext.disabled svg{

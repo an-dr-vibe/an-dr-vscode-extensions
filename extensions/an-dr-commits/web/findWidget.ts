@@ -34,7 +34,7 @@ class FindWidget {
 		this.view = view;
 		this.widgetElem = document.createElement('div');
 		this.widgetElem.className = 'findWidget';
-		this.widgetElem.innerHTML = '<div class="findInputContainer"><input id="findInput" type="text" placeholder="Search graph..."/><span class="findInputModifiers"><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span></span></div><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCdv" title="Open the Commit Details View for the current match"></span><span id="findPosition"></span>';
+		this.widgetElem.innerHTML = '<div class="findInputContainer"><input id="findInput" type="text" placeholder="Search graph..."/><span class="findInputModifiers"><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span></span></div><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCommitDetailsView" title="Open the Commit Details View for the current match"></span><span id="findPosition"></span>';
 		(document.getElementById('findWidgetHost') ?? document.body).appendChild(this.widgetElem);
 
 		this.inputElem = <HTMLInputElement>document.getElementById('findInput')!;
@@ -98,12 +98,12 @@ class FindWidget {
 		this.nextElem.innerHTML = SVG_ICONS.arrowDown;
 		this.nextElem.addEventListener('click', () => this.next());
 
-		const openCdvElem = document.getElementById('findOpenCdv')!;
-		openCdvElem.innerHTML = SVG_ICONS.cdv;
-		alterClass(openCdvElem, CLASS_ACTIVE, workspaceState.findOpenCommitDetailsView);
-		openCdvElem.addEventListener('click', () => {
+		const openCommitDetailsViewElem = document.getElementById('findOpenCommitDetailsView')!;
+		openCommitDetailsViewElem.innerHTML = SVG_ICONS.commitDetailsView;
+		alterClass(openCommitDetailsViewElem, CLASS_ACTIVE, workspaceState.findOpenCommitDetailsView);
+		openCommitDetailsViewElem.addEventListener('click', () => {
 			updateWorkspaceViewState('findOpenCommitDetailsView', !workspaceState.findOpenCommitDetailsView);
-			alterClass(openCdvElem, CLASS_ACTIVE, workspaceState.findOpenCommitDetailsView);
+			alterClass(openCommitDetailsViewElem, CLASS_ACTIVE, workspaceState.findOpenCommitDetailsView);
 			this.openCommitDetailsViewForCurrentMatchIfEnabled();
 		});
 
@@ -411,7 +411,7 @@ class FindWidget {
 	private openCommitDetailsViewForCurrentMatchIfEnabled() {
 		if (workspaceState.findOpenCommitDetailsView) {
 			const commitHash = this.getCurrentHash();
-			if (commitHash !== null && !this.view.isCdvOpen(commitHash, null)) {
+			if (commitHash !== null && !this.view.isCommitDetailsViewOpen(commitHash, null)) {
 				const commitElem = findCommitElemWithId(getCommitElems(), this.view.getCommitId(commitHash));
 				if (commitElem !== null) {
 					this.view.loadCommitDetails(commitElem);

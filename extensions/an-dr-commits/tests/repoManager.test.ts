@@ -1223,8 +1223,8 @@ describe('RepoManager', () => {
 			);
 
 			const newRepoState = {
-				cdvDivider: 0.75,
-				cdvHeight: 300,
+				commitDetailsViewDivider: 0.75,
+				commitDetailsViewHeight: 300,
 				columnWidths: null,
 				commitOrdering: RepoCommitOrdering.Default,
 				fileViewType: FileViewType.Default,
@@ -1892,8 +1892,8 @@ describe('RepoManager', () => {
 				// Assert
 				const expected: GitRepoSet = {
 					'/path/to/workspace-folder1/repo': {
-						cdvDivider: 0.5,
-						cdvHeight: 250,
+						commitDetailsViewDivider: 0.5,
+						commitDetailsViewHeight: 250,
 						columnWidths: null,
 						commitOrdering: RepoCommitOrdering.Default,
 						fileViewType: FileViewType.Default,
@@ -2245,8 +2245,8 @@ describe('RepoManager', () => {
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Successfully exported the Commits Repository Configuration to "/path/to/workspace-folder1/repo1/.vscode/vscode-an-dr-commits.json".');
 			expect(spyOnSaveRepos).toHaveBeenCalledWith({
 				'/path/to/workspace-folder1/repo1': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -2323,8 +2323,8 @@ describe('RepoManager', () => {
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Successfully exported the Commits Repository Configuration to "/path/to/workspace-folder1/repo1/.vscode/vscode-an-dr-commits.json".');
 			expect(spyOnSaveRepos).toHaveBeenCalledWith({
 				'/path/to/workspace-folder1/repo1': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
+					commitDetailsViewDivider: 0.5,
+					commitDetailsViewHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,

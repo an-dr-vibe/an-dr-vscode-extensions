@@ -12,11 +12,11 @@ function commitsLoadAvatar(view: any, email: string, image: string) {
 		}
 	}
 
-	let cdvAvatarsElems = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName('cdvSummaryAvatar');
-	for (let i = 0; i < cdvAvatarsElems.length; i++) {
-		if (cdvAvatarsElems[i].dataset.email === escapedEmail) {
-			delete cdvAvatarsElems[i].dataset.procedural;
-			cdvAvatarsElems[i].innerHTML = '<img class="avatarImg" src="' + image + '">';
+	let commitDetailsViewAvatarsElems = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName('commitDetailsViewSummaryAvatar');
+	for (let i = 0; i < commitDetailsViewAvatarsElems.length; i++) {
+		if (commitDetailsViewAvatarsElems[i].dataset.email === escapedEmail) {
+			delete commitDetailsViewAvatarsElems[i].dataset.procedural;
+			commitDetailsViewAvatarsElems[i].innerHTML = '<img class="avatarImg" src="' + image + '">';
 		}
 	}
 
@@ -166,5 +166,5 @@ function commitsGetCommitDetailsAvatarHtml(view: any, author: string, email: str
 	let attributes = '';
 	if (visual.updateOnFetch) attributes += ' data-email="' + escapeHtml(email) + '"';
 	if (visual.procedural) attributes += ' data-procedural="true"';
-	return '<span class="cdvSummaryAvatar ' + shapeClass + '"' + attributes + '><img class="avatarImg" src="' + visual.image + '"></span>';
+	return '<span class="commitDetailsViewSummaryAvatar ' + shapeClass + '"' + attributes + '><img class="avatarImg" src="' + visual.image + '"></span>';
 }

@@ -89,6 +89,18 @@ function commitsBootstrapLoad(view: any, prevState: any, loadViewTo: GG.LoadComm
 	}
 }
 
+function addSingleDblClick(elem: HTMLElement, onSingle: () => void, onDouble: () => void) {
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	elem.addEventListener('click', () => {
+		if (timer !== null) return;
+		timer = setTimeout(() => { timer = null; onSingle(); }, 250);
+	});
+	elem.addEventListener('dblclick', () => {
+		if (timer !== null) { clearTimeout(timer); timer = null; }
+		onDouble();
+	});
+}
+
 function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
 	view.findWidgetToggleBtnElem.addEventListener('click', () => view.showFindWidgetFromToggle());
@@ -97,22 +109,32 @@ function commitsInitButtonHandlers(view: any) {
 	view.topFullDiffBtnElem.addEventListener('click', () => view.toggleFullDiffMode(!view.fullDiffMode));
 	if (view.fullDiffMode && view.currentRepo && view.gitRepos[view.currentRepo]) view.createFullDiffPanel();
 	view.topFullDiffBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
-	view.pullBtnElem.title = 'Pull Current Branch (Right-Click for More Actions)';
+	view.pullBtnElem.title = 'Fetch from Remote(s) · Double-click to Pull';
 	view.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
-	view.pullBtnElem.addEventListener('click', () => view.pullCurrentBranchAction());
+	addSingleDblClick(view.pullBtnElem,
+		() => view.gitRepoInProgressState !== null ? view.pullCurrentBranchAction() : view.fetchFromRemotesAction(),
+		() => view.pullCurrentBranchAction()
+	);
 	view.pullBtnElem.addEventListener('contextmenu', (e: MouseEvent) => {
 		handledEvent(e);
 		view.showPullButtonContextMenu(e);
 	});
-	view.pushBtnElem.title = 'Push Current Branch (Right-Click for More Actions)';
+	view.pushBtnElem.title = 'Push Current Branch · Double-click to Force Push';
 	view.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
-	view.pushBtnElem.addEventListener('click', () => view.pushCurrentBranchAction());
+	addSingleDblClick(view.pushBtnElem,
+		() => view.pushCurrentBranchAction(),
+		() => view.gitRepoInProgressState !== null ? view.pushCurrentBranchAction() : view.forcePushCurrentBranchAction()
+	);
 	view.pushBtnElem.addEventListener('contextmenu', (e: MouseEvent) => {
 		handledEvent(e);
 		view.showPushButtonContextMenu(e);
 	});
+	view.settingsBtnElem.title = 'Repository Settings · Double-click to Refresh';
 	view.settingsBtnElem.innerHTML = SVG_ICONS.gear;
-	view.settingsBtnElem.addEventListener('click', () => view.settingsWidget.show(view.currentRepo));
+	addSingleDblClick(view.settingsBtnElem,
+		() => view.settingsWidget.show(view.currentRepo),
+		() => view.refresh(true, true)
+	);
 	view.settingsBtnElem.addEventListener('contextmenu', (e: MouseEvent) => {
 		handledEvent(e);
 		view.showSettingsButtonContextMenu(e);

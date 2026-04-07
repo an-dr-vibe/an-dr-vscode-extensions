@@ -21,17 +21,17 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 			id: 'pullBtn',
 			elem: view.pullBtnElem,
 			visible: repoInProgress || pullPushVisible,
-			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue) : 'Pull Current Branch (Right-Click for More Actions)',
+			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue) : 'Fetch · Double-click to Pull (Right-Click for More Actions)',
 			onClick: () => view.pullCurrentBranchAction()
 		},
 		{
 			id: 'pushBtn',
 			elem: view.pushBtnElem,
 			visible: repoInProgress || pullPushVisible,
-			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push Current Branch (Right-Click for More Actions)',
+			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push · Double-click to Force Push (Right-Click for More Actions)',
 			onClick: () => view.pushCurrentBranchAction()
 		},
-		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => view.settingsBtnElem.click() }
+		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings · Double-click to Refresh', onClick: () => view.settingsBtnElem.click() }
 	];
 }
 

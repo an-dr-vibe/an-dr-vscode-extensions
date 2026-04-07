@@ -51,6 +51,8 @@ export class CommandManager extends Disposable {
 		this.registerCommand('an-dr-commits.removeGitRepository', () => this.removeGitRepository());
 		this.registerCommand('an-dr-commits.clearAvatarCache', () => this.clearAvatarCache());
 		this.registerCommand('an-dr-commits.fetch', () => this.fetch());
+		this.registerCommand('an-dr-commits.pull', () => this.pullFromScm());
+		this.registerCommand('an-dr-commits.push', () => this.pushFromScm());
 		this.registerCommand('an-dr-commits.version', () => this.version());
 		this.registerCommand('an-dr-commits.openFile', (arg) => this.openFile(arg));
 
@@ -230,6 +232,62 @@ export class CommandManager extends Disposable {
 			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: repoPaths[0],
 				runCommandOnLoad: 'fetch'
+			});
+		} else {
+			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);
+		}
+	}
+
+	/**
+	 * The method run when the `an-dr-commits.pull` command is invoked from the SCM panel.
+	 */
+	private pullFromScm() {
+		this.openViewWithCommand('pull', 'Pull Current Branch');
+	}
+
+	/**
+	 * The method run when the `an-dr-commits.push` command is invoked from the SCM panel.
+	 */
+	private pushFromScm() {
+		this.openViewWithCommand('push', 'Push Current Branch');
+	}
+
+	/**
+	 * Helper: opens the Commits view for a single-repo or lets the user pick, then fires a command on load.
+	 */
+	private openViewWithCommand(command: 'pull' | 'push', actionLabel: string) {
+		const repos = this.repoManager.getRepos();
+		const repoPaths = getSortedRepositoryPaths(repos, getConfig().repoDropdownOrder);
+
+		if (repoPaths.length > 1) {
+			const items: vscode.QuickPickItem[] = repoPaths.map((path) => ({
+				label: repos[path].name || getRepoName(path),
+				description: path
+			}));
+
+			const lastActiveRepo = this.extensionState.getLastActiveRepo();
+			if (lastActiveRepo !== null) {
+				const idx = items.findIndex((item) => item.description === lastActiveRepo);
+				if (idx > -1) items.unshift(items.splice(idx, 1)[0]);
+			}
+
+			vscode.window.showQuickPick(items, {
+				placeHolder: 'Select the repository to open in Commits and ' + actionLabel.toLowerCase() + ':',
+				canPickMany: false
+			}).then((item) => {
+				if (item && item.description) {
+					CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+						repo: item.description,
+						runCommandOnLoad: command
+					});
+				}
+			}, () => {
+				showErrorMessage('An unexpected error occurred while running the command "' + actionLabel + '".');
+			});
+		} else if (repoPaths.length === 1) {
+			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+				repo: repoPaths[0],
+				runCommandOnLoad: command
 			});
 		} else {
 			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);

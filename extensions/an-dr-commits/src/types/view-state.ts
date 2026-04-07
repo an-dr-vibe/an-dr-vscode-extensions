@@ -147,7 +147,7 @@ export type LoadCommitsViewTo = {
 		readonly commitHash: string,
 		readonly compareWithHash: string | null
 	},
-	readonly runCommandOnLoad?: 'fetch'
+	readonly runCommandOnLoad?: 'fetch' | 'pull' | 'push'
 } | null;
 
 export interface MuteCommitsConfig {

@@ -62,7 +62,20 @@
 			{
 				"category": "Commits",
 				"command": "an-dr-commits.fetch",
-				"title": "Fetch from Remote(s)"
+				"title": "Fetch from Remote(s)",
+				"icon": "$(sync)"
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.pull",
+				"title": "Pull Current Branch",
+				"icon": "$(arrow-down)"
+			},
+			{
+				"category": "Commits",
+				"command": "an-dr-commits.push",
+				"title": "Push Current Branch",
+				"icon": "$(arrow-up)"
 			},
 			{
 				"category": "Commits",
@@ -1217,6 +1230,21 @@
 					"default": "Inline",
 					"description": "Specifies where the \"View Commits\" action appears on the title of SCM Providers."
 				},
+				"an-dr-commits.scmButtons.fetch": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show a Fetch button in the Source Control panel title bar. Opens the Commits graph and triggers a fetch."
+				},
+				"an-dr-commits.scmButtons.pull": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show a Pull button in the Source Control panel title bar. Opens the Commits graph and triggers a pull of the current branch."
+				},
+				"an-dr-commits.scmButtons.push": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show a Push button in the Source Control panel title bar. Opens the Commits graph and triggers a push of the current branch."
+				},
 				"an-dr-commits.tabIconColourTheme": {
 					"type": "string",
 					"enum": [
@@ -1547,6 +1575,21 @@
 					"when": "scmProvider == git && config.an-dr-commits.sourceCodeProviderIntegrationLocation == 'More Actions'",
 					"command": "an-dr-commits.view",
 					"group": "inline"
+				},
+				{
+					"when": "scmProvider == git && config.an-dr-commits.scmButtons.fetch",
+					"command": "an-dr-commits.fetch",
+					"group": "navigation"
+				},
+				{
+					"when": "scmProvider == git && config.an-dr-commits.scmButtons.pull",
+					"command": "an-dr-commits.pull",
+					"group": "navigation"
+				},
+				{
+					"when": "scmProvider == git && config.an-dr-commits.scmButtons.push",
+					"command": "an-dr-commits.push",
+					"group": "navigation"
 				}
 			]
 		}

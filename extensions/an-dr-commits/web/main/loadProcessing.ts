@@ -244,6 +244,8 @@ function commitsFinaliseRepoLoad(view: any, didLoadRepoData: boolean) {
 			}
 		} else if (view.loadViewTo.runCommandOnLoad) {
 			if (view.loadViewTo.runCommandOnLoad === 'fetch') view.fetchFromRemotesAction();
+			else if (view.loadViewTo.runCommandOnLoad === 'pull') view.pullCurrentBranchAction();
+			else if (view.loadViewTo.runCommandOnLoad === 'push') view.pushCurrentBranchAction();
 		}
 		if (typeof view.loadViewTo.scrollTop === 'number') {
 			view.scrollTop = view.loadViewTo.scrollTop;

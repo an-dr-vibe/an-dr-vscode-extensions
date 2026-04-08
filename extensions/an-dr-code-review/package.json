@@ -1,15 +1,61 @@
 {
   "name": "an-dr-code-review",
   "displayName": "an-dr: Code Review",
-  "description": "Inline code review comments stored in a workspace JSON file, with Markdown export and GitHub/GitLab links.",
-  "version": "0.1.0",
+  "description": "Inline review comments plus a changed-files tree for branch, commit, tag, and GitHub pull request review. Includes functionality integrated from vscode-git-tree-compare by Maik Riechert.",
+  "version": "0.2.0",
   "publisher": "an-dr",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "keywords": ["code review", "comments", "review"],
-  "activationEvents": ["onStartupFinished"],
+  "author": {
+    "name": "an-dr"
+  },
+  "homepage": "https://github.com/an-dr/an-dr-vscode-extensions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/an-dr/an-dr-vscode-extensions.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "code review",
+    "comments",
+    "review",
+    "git",
+    "diff",
+    "tree",
+    "compare",
+    "pull request"
+  ],
+  "icon": "resources/logo.png",
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "anDrCodeReview",
+          "icon": "./resources/logo.svg",
+          "title": "Code Review"
+        }
+      ]
+    },
+    "views": {
+      "anDrCodeReview": [
+        {
+          "id": "anDrCodeReviewChanges",
+          "name": "Changes",
+          "when": "config.git.enabled && gitOpenRepositoryCount != 0",
+          "icon": "./resources/logo.svg"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "an-dr-code-review.submitComment",
@@ -42,22 +88,192 @@
       },
       {
         "command": "an-dr-code-review.exportMarkdown",
-        "title": "Code Review: Export to Markdown",
+        "title": "Export Review to Markdown",
         "category": "Code Review"
       },
       {
         "command": "an-dr-code-review.exportJira",
-        "title": "Code Review: Export to Jira",
+        "title": "Export Review to Jira",
         "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.changeRepository",
+        "title": "Change Repository...",
+        "icon": "$(repo)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.openChanges",
+        "title": "Open Changes",
+        "icon": "$(git-compare)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.openFile",
+        "title": "Open File",
+        "icon": "$(go-to-file)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.discardChanges",
+        "title": "Discard Changes",
+        "icon": "$(discard)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.discardAllChanges",
+        "title": "Discard All Changes",
+        "icon": "$(discard)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.openAllChanges",
+        "title": "Open All Changes",
+        "icon": "$(git-compare)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.openChangedFiles",
+        "title": "Open Changed Files",
+        "icon": "$(go-to-file)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.changeBase",
+        "title": "Change Base...",
+        "icon": "$(git-branch)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.refresh",
+        "title": "Refresh Changes",
+        "icon": "$(refresh)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.switchToFullDiff",
+        "title": "Switch to Full Diff",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.switchToMergeDiff",
+        "title": "Switch to Merge Diff",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.showCheckboxes",
+        "title": "Show Checkboxes",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.hideCheckboxes",
+        "title": "Hide Checkboxes",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.viewAsList",
+        "title": "View as List",
+        "icon": "$(list-flat)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.viewAsTree",
+        "title": "View as Tree",
+        "icon": "$(list-tree)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.searchChanges",
+        "title": "Search Changes",
+        "icon": "$(search)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.filterFiles",
+        "title": "Filter Files",
+        "icon": "$(filter)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.clearFilter",
+        "title": "Clear Filter",
+        "icon": "$(clear-all)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.copyPath",
+        "title": "Copy Path",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.copyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.compareGitHubPullRequest",
+        "title": "Compare GitHub Pull Request...",
+        "icon": "$(github)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.sortByName",
+        "title": "Sort by Name",
+        "category": "Code Review",
+        "enablement": "anDrCodeReview.viewAsList"
+      },
+      {
+        "command": "an-dr-code-review.sortByPath",
+        "title": "Sort by Path",
+        "category": "Code Review",
+        "enablement": "anDrCodeReview.viewAsList"
+      },
+      {
+        "command": "an-dr-code-review.sortByStatus",
+        "title": "Sort by Status",
+        "category": "Code Review",
+        "enablement": "anDrCodeReview.viewAsList"
+      },
+      {
+        "command": "an-dr-code-review.sortByRecentlyModified",
+        "title": "Sort by Recently Modified",
+        "category": "Code Review",
+        "enablement": "anDrCodeReview.viewAsList"
+      },
+      {
+        "command": "an-dr-code-review.openChangesWithDifftool",
+        "title": "Open Changes with Difftool",
+        "category": "Code Review"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "an-dr-code-review.viewAndSort",
+        "label": "View & Sort"
       }
     ],
     "menus": {
       "commandPalette": [
-        { "command": "an-dr-code-review.submitComment",   "when": "false" },
-        { "command": "an-dr-code-review.deleteComment",   "when": "false" },
-        { "command": "an-dr-code-review.resolveThread",   "when": "false" },
-        { "command": "an-dr-code-review.unresolveThread", "when": "false" },
-        { "command": "an-dr-code-review.deleteThread",    "when": "false" }
+        {
+          "command": "an-dr-code-review.submitComment",
+          "when": "false"
+        },
+        {
+          "command": "an-dr-code-review.deleteComment",
+          "when": "false"
+        },
+        {
+          "command": "an-dr-code-review.resolveThread",
+          "when": "false"
+        },
+        {
+          "command": "an-dr-code-review.unresolveThread",
+          "when": "false"
+        },
+        {
+          "command": "an-dr-code-review.deleteThread",
+          "when": "false"
+        }
       ],
       "comments/commentThread/context": [
         {
@@ -89,6 +305,261 @@
           "group": "inline",
           "when": "commentController == an-dr-code-review"
         }
+      ],
+      "an-dr-code-review.viewAndSort": [
+        {
+          "command": "an-dr-code-review.viewAsList",
+          "group": "1_view@1"
+        },
+        {
+          "command": "an-dr-code-review.viewAsTree",
+          "group": "1_view@2"
+        },
+        {
+          "command": "an-dr-code-review.sortByName",
+          "group": "2_sort@1",
+          "enablement": "anDrCodeReview.viewAsList"
+        },
+        {
+          "command": "an-dr-code-review.sortByPath",
+          "group": "2_sort@2",
+          "enablement": "anDrCodeReview.viewAsList"
+        },
+        {
+          "command": "an-dr-code-review.sortByStatus",
+          "group": "2_sort@3",
+          "enablement": "anDrCodeReview.viewAsList"
+        },
+        {
+          "command": "an-dr-code-review.sortByRecentlyModified",
+          "group": "2_sort@4",
+          "enablement": "anDrCodeReview.viewAsList"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "an-dr-code-review.changeRepository",
+          "when": "view == anDrCodeReviewChanges && gitOpenRepositoryCount != 1",
+          "group": "1_state"
+        },
+        {
+          "command": "an-dr-code-review.changeRepository",
+          "when": "view == anDrCodeReviewChanges && gitOpenRepositoryCount != 1",
+          "group": "navigation@2"
+        },
+        {
+          "command": "an-dr-code-review.changeBase",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "1_state"
+        },
+        {
+          "command": "an-dr-code-review.compareGitHubPullRequest",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "1_state"
+        },
+        {
+          "command": "an-dr-code-review.openAllChanges",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "2_files"
+        },
+        {
+          "command": "an-dr-code-review.openChangedFiles",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "2_files"
+        },
+        {
+          "command": "an-dr-code-review.discardAllChanges",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "2_files"
+        },
+        {
+          "command": "an-dr-code-review.refresh",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "1_state"
+        },
+        {
+          "command": "an-dr-code-review.refresh",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "navigation@3"
+        },
+        {
+          "command": "an-dr-code-review.switchToFullDiff",
+          "when": "view == anDrCodeReviewChanges && config.codeReview.diffMode == merge",
+          "group": "3_options"
+        },
+        {
+          "command": "an-dr-code-review.switchToMergeDiff",
+          "when": "view == anDrCodeReviewChanges && config.codeReview.diffMode == full",
+          "group": "3_options"
+        },
+        {
+          "command": "an-dr-code-review.showCheckboxes",
+          "when": "view == anDrCodeReviewChanges && !config.codeReview.showCheckboxes",
+          "group": "3_options"
+        },
+        {
+          "command": "an-dr-code-review.hideCheckboxes",
+          "when": "view == anDrCodeReviewChanges && config.codeReview.showCheckboxes",
+          "group": "3_options"
+        },
+        {
+          "command": "an-dr-code-review.viewAsList",
+          "when": "view == anDrCodeReviewChanges && !anDrCodeReview.viewAsList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "an-dr-code-review.viewAsTree",
+          "when": "view == anDrCodeReviewChanges && anDrCodeReview.viewAsList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "an-dr-code-review.searchChanges",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "2_files"
+        },
+        {
+          "command": "an-dr-code-review.filterFiles",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "navigation@4"
+        },
+        {
+          "command": "an-dr-code-review.clearFilter",
+          "when": "view == anDrCodeReviewChanges && anDrCodeReview.isFiltered",
+          "group": "navigation@5"
+        },
+        {
+          "submenu": "an-dr-code-review.viewAndSort",
+          "when": "view == anDrCodeReviewChanges",
+          "group": "0_view_and_sort"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "an-dr-code-review.openChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == file && !config.codeReview.openChanges",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.openFile",
+          "when": "view == anDrCodeReviewChanges && viewItem == file && config.codeReview.openChanges",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.discardChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == file",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.discardChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == folder",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.discardAllChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.openChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == file && !config.codeReview.openChanges",
+          "group": "1_open"
+        },
+        {
+          "command": "an-dr-code-review.openFile",
+          "when": "view == anDrCodeReviewChanges && viewItem == file && config.codeReview.openChanges",
+          "group": "1_open"
+        },
+        {
+          "command": "an-dr-code-review.discardChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == file",
+          "group": "2_discard"
+        },
+        {
+          "command": "an-dr-code-review.discardChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == folder",
+          "group": "2_discard"
+        },
+        {
+          "command": "an-dr-code-review.discardAllChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref"
+        },
+        {
+          "command": "an-dr-code-review.changeRepository",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref && gitOpenRepositoryCount != 1"
+        },
+        {
+          "command": "an-dr-code-review.changeBase",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref"
+        },
+        {
+          "command": "an-dr-code-review.changeBase",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.openAllChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref"
+        },
+        {
+          "command": "an-dr-code-review.openAllChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == folder"
+        },
+        {
+          "command": "an-dr-code-review.openChangedFiles",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref"
+        },
+        {
+          "command": "an-dr-code-review.openChangedFiles",
+          "when": "view == anDrCodeReviewChanges && viewItem == folder"
+        },
+        {
+          "command": "an-dr-code-review.openAllChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.openAllChanges",
+          "when": "view == anDrCodeReviewChanges && viewItem == folder",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.openChangedFiles",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.openChangedFiles",
+          "when": "view == anDrCodeReviewChanges && viewItem == folder",
+          "group": "inline"
+        },
+        {
+          "command": "an-dr-code-review.switchToFullDiff",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref && config.codeReview.diffMode == merge"
+        },
+        {
+          "command": "an-dr-code-review.switchToMergeDiff",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref && config.codeReview.diffMode == full"
+        },
+        {
+          "command": "an-dr-code-review.copyPath",
+          "when": "view == anDrCodeReviewChanges && viewItem == file",
+          "group": "3_copy"
+        },
+        {
+          "command": "an-dr-code-review.copyRelativePath",
+          "when": "view == anDrCodeReviewChanges && viewItem == file",
+          "group": "3_copy"
+        },
+        {
+          "submenu": "an-dr-code-review.viewAndSort",
+          "when": "view == anDrCodeReviewChanges && viewItem == ref",
+          "group": "0_view_and_sort"
+        },
+        {
+          "command": "an-dr-code-review.openChangesWithDifftool",
+          "when": "view == anDrCodeReviewChanges && viewItem == file && config.codeReview.openChangesWithDifftool",
+          "group": "1_open"
+        }
       ]
     },
     "configuration": {
@@ -107,7 +578,122 @@
         "codeReview.author": {
           "type": "string",
           "default": "",
-          "description": "Author name override (when showAuthor is enabled). Defaults to git user.name, then $USER."
+          "description": "Author name override. Defaults to git user.name, then USER."
+        },
+        "codeReview.autoChangeRepository": {
+          "type": "boolean",
+          "default": false,
+          "description": "Change the active repository when a different one is selected in Source Control."
+        },
+        "codeReview.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh the changes tree when workspace files change."
+        },
+        "codeReview.refreshIndex": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh the git index before diffing to avoid stale touched-file entries."
+        },
+        "codeReview.findRenames": {
+          "type": "boolean",
+          "default": true,
+          "description": "Detect renames in the compared changes."
+        },
+        "codeReview.renameThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 50,
+          "description": "Rename similarity threshold in percent when rename detection is enabled."
+        },
+        "codeReview.openChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open a diff when selecting a changed file instead of opening the file directly."
+        },
+        "codeReview.root": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "repository"
+          ],
+          "default": "workspace",
+          "description": "Tree root to use when the workspace folder and repository root differ."
+        },
+        "codeReview.includeFilesOutsideWorkspaceRoot": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show repository changes outside the workspace root under a special / node."
+        },
+        "codeReview.diffMode": {
+          "type": "string",
+          "enum": [
+            "merge",
+            "full"
+          ],
+          "default": "merge",
+          "description": "Use merge-base diffing or direct full diffing against the selected base."
+        },
+        "codeReview.iconsMinimal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use compact icon alignment where only files have icons."
+        },
+        "codeReview.collapsed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show folders collapsed by default. Requires restart."
+        },
+        "codeReview.compactFolders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Flatten single-child folder chains in the tree."
+        },
+        "codeReview.showCheckboxes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show review checkboxes next to files and folders."
+        },
+        "codeReview.resetCheckboxOnFileChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reset checked files automatically when they change again."
+        },
+        "codeReview.refSortOrder": {
+          "type": "string",
+          "enum": [
+            "alphabetically",
+            "committerdate"
+          ],
+          "default": "committerdate",
+          "description": "Sort order for branches and tags in the base picker."
+        },
+        "codeReview.omitUntrackedFiles": {
+          "type": "boolean",
+          "default": false,
+          "description": "Hide untracked files from the changes tree."
+        },
+        "codeReview.omitUnstagedChanges": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show only staged changes in the changes tree."
+        },
+        "codeReview.sortOrder": {
+          "type": "string",
+          "enum": [
+            "name",
+            "path",
+            "status",
+            "recentlyModified"
+          ],
+          "default": "path",
+          "description": "Sort order for files when list view is active."
+        },
+        "codeReview.openChangesWithDifftool": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a command that opens the selected change in the external git difftool."
         }
       }
     }
@@ -116,9 +702,21 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./"
   },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "@vscode/iconv-lite-umd": "0.7.0",
+    "byline": "^5.0.0",
+    "file-type": "^7.2.0",
+    "jschardet": "3.0.0",
+    "vscode-nls": "^4.0.0",
+    "which": "^1.3.0"
+  },
   "devDependencies": {
+    "@types/byline": "4.2.31",
+    "@types/file-type": "^5.2.1",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@types/which": "^1.0.28",
     "typescript": "^5.3.0"
   }
 }

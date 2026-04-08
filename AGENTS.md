@@ -34,6 +34,10 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
   `uiControl.activityBar` array in `settings.json`. New containers are appended as visible; hidden
   entries are preserved across machines via Settings Sync. Has a webview UI (drag-to-reorder,
   visibility toggles) and applies on startup (hide-only to avoid sidebar focus side-effects).
+- **an-dr-code-review** — Combines inline review comments with a review-oriented changed-files tree.
+  Comments are stored in `code-review/.code-review.json`. The tree view can compare the worktree
+  against branches, tags, commits, and GitHub pull requests. Integrated functionality from
+  `vscode-git-tree-compare` must keep visible attribution to the original author.
 
 ## Adding a new extension
 

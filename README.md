@@ -156,6 +156,41 @@ Keeps the Activity Bar layout consistent across machines. Stores visibility and 
 
 ---
 
+### an-dr: Code Review
+
+Combines inline review comments with a dedicated changed-files tree for branch and pull-request review.
+The tree supports comparing against branches, tags, commits, and GitHub pull requests, with tree/list
+view, filtering, checkboxes, base switching, and diff opening directly from the review sidebar.
+
+**Config** (`codeReview.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`dataFile`|`"code-review/.code-review.json"`|Workspace-relative storage for inline review comments.|
+|`showAuthor`|`false`|Include author names in comments and exports.|
+|`author`|`""`|Author override for comment/export metadata.|
+|`autoRefresh`|`true`|Refresh the changes tree on workspace changes.|
+|`openChanges`|`true`|Open a diff instead of the file when selecting a changed file.|
+|`diffMode`|`"merge"`|`"merge"` or `"full"` comparison mode.|
+|`showCheckboxes`|`false`|Show review checkboxes beside files and folders.|
+|`sortOrder`|`"path"`|List view sort: `name`, `path`, `status`, `recentlyModified`.|
+|`omitUntrackedFiles`|`false`|Hide untracked files from the changes tree.|
+|`omitUnstagedChanges`|`false`|Show only staged changes.|
+
+**Commands** (Ctrl+Shift+P → `Code Review`):
+
+- `Export Review to Markdown`
+- `Export Review to Jira`
+- `Change Base...`
+- `Compare GitHub Pull Request...`
+- `Refresh Changes`
+
+Integrated tree-compare functionality is based on
+[`vscode-git-tree-compare`](https://github.com/letmaik/vscode-git-tree-compare) by Maik Riechert,
+with attribution preserved in the extension sources and notice files.
+
+---
+
 ## Install
 
 ### One-liner (fresh machine or update)

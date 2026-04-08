@@ -5,7 +5,7 @@ import * as fs from 'fs'
 import { TreeDataProvider, TreeItem, TreeItemCollapsibleState,
          Uri, Disposable, EventEmitter, TextDocumentShowOptions,
          QuickPickItem, ProgressLocation, Memento, OutputChannel,
-         workspace, commands, window, env, WorkspaceFoldersChangeEvent, TreeView, ThemeIcon, TreeItemCheckboxState, TreeCheckboxChangeEvent, authentication } from 'vscode'
+         workspace, commands, window, env, WorkspaceFoldersChangeEvent, TreeView, ThemeIcon, TreeItemCheckboxState, TreeCheckboxChangeEvent, authentication, Range, Selection, TextEditorRevealType } from 'vscode'
 import { COMMAND_NAMESPACE, CONFIG_NAMESPACE, CONTEXT_NAMESPACE } from './constants'
 import { Repository, Git } from './git/git'
 import { Ref, RefType } from './git/api/git'
@@ -17,6 +17,7 @@ import { debounce, throttle } from './git/decorators'
 import { normalizePath } from './fsUtils';
 import { API as GitAPI, Repository as GitAPIRepository } from './typings/git';
 import { Octokit } from '@octokit/rest';
+import { FileCommentEntry, getCommentCountByFile, loadReviewData, onDidChangeReviewData, relativeFilePath } from '../reviewStore';
 
 
 type SortOrder = 'name' | 'path' | 'status' | 'recentlyModified';
@@ -38,6 +39,7 @@ interface CheckboxStateInfo {
 
 class FileElement implements IDiffStatus {
     modificationDate?: Date;
+    commentCount = 0;
 
     constructor(
         public srcAbsPath: string,
@@ -160,6 +162,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     private treeView: TreeView<Element>;
     private isPaused: boolean;
     private checkboxStates: Map<string, CheckboxStateInfo> = new Map<string, CheckboxStateInfo>();
+    private commentCounts: Map<string, number> = new Map<string, number>();
 
     // Other
     private readonly disposables: Disposable[] = [];
@@ -169,7 +172,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         this.readConfig();
     }
 
-    async init(treeView: TreeView<Element>) {
+    async init(treeView: TreeView<Element>, onSelectedFileChange?: (file: string | undefined) => void) {
         this.treeView = treeView
 
         // use arbitrary repository at start if there are multiple (prefer selected ones)
@@ -212,6 +215,14 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         this.disposables.push(onRelevantWorkspaceChange(this.handleWorkspaceChange, this));
 
         this.disposables.push(treeView.onDidChangeCheckboxState(this.handleChangeCheckboxState, this));
+        this.disposables.push(treeView.onDidChangeSelection((e) => {
+            const file = e.selection[0] instanceof FileElement ? this.toReviewFilePath(e.selection[0].dstAbsPath) : undefined;
+            onSelectedFileChange?.(file);
+        }));
+        this.disposables.push(onDidChangeReviewData(() => {
+            void this.refreshCommentCounts();
+        }));
+        await this.refreshCommentCounts();
     }
 
     async setRepository(repositoryRoot: string) {
@@ -436,7 +447,24 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
                 checkboxState = this.computeFolderCheckboxState(element);
             }
         }
+        if (element instanceof FileElement) {
+            element.commentCount = this.commentCounts.get(this.toReviewFilePath(element.dstAbsPath)) ?? 0;
+        }
         return toTreeItem(element, this.openChangesOnSelect, this.iconsMinimal, this.showCollapsed, this.viewAsList, checkboxState, this.asAbsolutePath);
+    }
+
+    private async refreshCommentCounts(): Promise<void> {
+        const data = await loadReviewData();
+        this.commentCounts = getCommentCountByFile(data);
+        this._onDidChangeTreeData.fire();
+    }
+
+    private toReviewFilePath(absPath: string): string {
+        const root = workspace.workspaceFolders?.[0]?.uri;
+        if (!root) {
+            return path.basename(absPath);
+        }
+        return relativeFilePath(root, Uri.file(absPath)).replace(/\\/g, '/');
     }
 
     private computeFolderCheckboxState(folder: FolderElement): TreeItemCheckboxState {
@@ -1670,6 +1698,31 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         }
     }
 
+    async openCommentLocation(entry: FileCommentEntry) {
+        const range = new Range(entry.line, 0, entry.endLine, 0);
+        const diffStatus = [...this.iterFiles()].find(file => this.toReviewFilePath(file.dstAbsPath) === entry.file);
+
+        if (diffStatus) {
+            await this.doOpenChanges(diffStatus.srcAbsPath, diffStatus.dstAbsPath, diffStatus.status, true);
+            const editor = window.activeTextEditor;
+            if (editor) {
+                editor.selection = new Selection(range.start, range.end);
+                editor.revealRange(range, TextEditorRevealType.InCenter);
+            }
+            return;
+        }
+
+        const root = workspace.workspaceFolders?.[0]?.uri;
+        if (!root) {
+            return;
+        }
+        const target = Uri.joinPath(root, entry.file);
+        const document = await workspace.openTextDocument(target);
+        const editor = await window.showTextDocument(document);
+        editor.selection = new Selection(range.start, range.end);
+        editor.revealRange(range, TextEditorRevealType.InCenter);
+    }
+
     dispose(): void {
         this.disposables.forEach(d => d.dispose());
     }
@@ -1688,10 +1741,18 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
             item.tooltip = `${element.srcAbsPath} → ${item.tooltip}`;
         }
         if (viewAsList) {
-            item.description = path.dirname(element.dstRelPath);
-            if (item.description === '.') {
-                item.description = '';
+            const pathDescription = path.dirname(element.dstRelPath);
+            const countDescription = element.commentCount > 0 ? `💬 ${element.commentCount}` : '';
+            if (pathDescription === '.') {
+                item.description = countDescription;
+            } else {
+                item.description = countDescription ? `${pathDescription} • ${countDescription}` : pathDescription;
             }
+        } else if (element.commentCount > 0) {
+            item.description = `💬 ${element.commentCount}`;
+        }
+        if (element.commentCount > 0) {
+            item.tooltip = `${item.tooltip}\nComments: ${element.commentCount}`;
         }
         item.contextValue = element.isSubmodule ? 'submodule' : 'file';
         item.id = element.dstAbsPath;

@@ -53,6 +53,10 @@
           "name": "Changes",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0",
           "icon": "./resources/logo.svg"
+        },
+        {
+          "id": "anDrCodeReviewComments",
+          "name": "Comments"
         }
       ]
     },
@@ -243,6 +247,11 @@
       {
         "command": "an-dr-code-review.openChangesWithDifftool",
         "title": "Open Changes with Difftool",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.openCommentLocation",
+        "title": "Open Comment Location",
         "category": "Code Review"
       }
     ],

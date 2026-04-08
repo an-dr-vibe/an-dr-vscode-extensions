@@ -6,7 +6,7 @@ import { createGit } from './gitHelper';
 import { toDisposable } from './git/util';
 import { GitExtension } from './typings/git';
 
-export function activate(context: ExtensionContext) {
+export function activate(context: ExtensionContext, onSelectedFileChange?: (file: string | undefined) => void) {
     const disposables: Disposable[] = [];
     context.subscriptions.push(new Disposable(() => Disposable.from(...disposables).dispose()));
 
@@ -125,6 +125,9 @@ export function activate(context: ExtensionContext) {
     commands.registerCommand(COMMAND_NAMESPACE + '.openChangesWithDifftool', node => {
         runAfterInit(() => provider!.openChangesWithDifftool(node));
     });
+    commands.registerCommand(COMMAND_NAMESPACE + '.openCommentLocation', entry => {
+        runAfterInit(() => provider!.openCommentLocation(entry));
+    });
 
     createGit(gitApi, outputChannel).then(async git => {
         const onOutput = (str: string) => outputChannel.append(str);
@@ -145,6 +148,6 @@ export function activate(context: ExtensionContext) {
             }
         );
 
-        provider.init(treeView);
+        provider.init(treeView, onSelectedFileChange);
     });
 }

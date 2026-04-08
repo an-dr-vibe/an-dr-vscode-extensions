@@ -1741,18 +1741,18 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
             item.tooltip = `${element.srcAbsPath} → ${item.tooltip}`;
         }
         if (viewAsList) {
-            const pathDescription = path.dirname(element.dstRelPath);
-            const countDescription = element.commentCount > 0 ? `💬 ${element.commentCount}` : '';
-            if (pathDescription === '.') {
-                item.description = countDescription;
-            } else {
-                item.description = countDescription ? `${pathDescription} • ${countDescription}` : pathDescription;
-            }
+            const countDescription = element.commentCount > 0
+                ? (element.commentCount >= 10 ? '+' : String(element.commentCount))
+                : '';
+            item.description = countDescription;
         } else if (element.commentCount > 0) {
-            item.description = `💬 ${element.commentCount}`;
+            item.description = element.commentCount >= 10 ? '+' : String(element.commentCount);
         }
         if (element.commentCount > 0) {
             item.tooltip = `${item.tooltip}\nComments: ${element.commentCount}`;
+        }
+        if (viewAsList && path.dirname(element.dstRelPath) !== '.') {
+            item.tooltip = `${item.tooltip}\nPath: ${path.dirname(element.dstRelPath)}`;
         }
         item.contextValue = element.isSubmodule ? 'submodule' : 'file';
         item.id = element.dstAbsPath;

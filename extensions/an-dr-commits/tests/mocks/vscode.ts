@@ -6,6 +6,7 @@ import { RequestMessage, ResponseMessage, Writeable } from '../../src/types';
 
 const mockedExtensionSettingValues: { [section: string]: any } = {};
 const mockedCommands: { [command: string]: (...args: any[]) => any } = {};
+const mockedExtensions: { [id: string]: any } = {};
 
 interface WebviewPanelMocks {
 	messages: ResponseMessage[],
@@ -169,6 +170,10 @@ export const window = {
 	showSaveDialog: jest.fn()
 };
 
+export const extensions = {
+	getExtension: jest.fn((id: string) => mockedExtensions[id])
+};
+
 export const workspace = {
 	createFileSystemWatcher: jest.fn(() => ({
 		onDidCreate: jest.fn(),
@@ -256,6 +261,10 @@ beforeEach(() => {
 	mockedWebviews = [];
 
 	version = '1.51.0';
+
+	Object.keys(mockedExtensions).forEach((id) => {
+		delete mockedExtensions[id];
+	});
 });
 
 export function mockExtensionSettingReturnValue(section: string, value: any) {
@@ -268,4 +277,8 @@ export function mockVscodeVersion(newVersion: string) {
 
 export function getMockedWebviewPanel(i: number) {
 	return mockedWebviews[i];
+}
+
+export function mockExtension(id: string, extension: any) {
+	mockedExtensions[id] = extension;
 }

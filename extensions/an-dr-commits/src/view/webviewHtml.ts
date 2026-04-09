@@ -60,14 +60,17 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 			<div id="view" tabindex="-1">
 				<div id="topBar">
 					<div id="sidebarTop">
-						<div id="branchPanelFilterHost"></div>
+						<div id="branchPanelControls">
+							<div id="branchPanelRepoHost">
+								<div id="repoDropdown" class="dropdown"></div>
+							</div>
+						</div>
 					</div>
 					<div id="controls">
 						<div id="controlsLeft">
 							<div id="sidebarToggleBtn"></div>
 							<div id="findWidgetHost"></div>
 							<div id="findWidgetToggleBtn" title="Search Graph"></div>
-							<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
 						</div>
 						<div id="controlsBtns">
 							<div id="pullBtn"></div>
@@ -80,6 +83,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 					</div>
 				</div>
 				<div id="sidebar">
+					<div id="branchPanelFilterHost"></div>
 					<div id="branchPanel"></div>
 				</div>
 				<div id="filesPanel"></div>

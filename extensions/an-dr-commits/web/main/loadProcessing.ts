@@ -13,7 +13,9 @@ function commitsLoadRepos(view: any, repos: GG.GitRepoSet, lastActiveRepo: strin
 		newRepo = view.currentRepo;
 	}
 
-	alterClass(view.controlsElem, 'singleRepo', Object.keys(repos).length === 1);
+	const isSingleRepo = Object.keys(repos).length === 1;
+	alterClass(view.controlsElem, 'singleRepo', isSingleRepo);
+	alterClass(document.body, 'singleRepo', isSingleRepo);
 	view.renderRepoDropdownOptions(newRepo);
 
 	if (loadViewTo !== null) {

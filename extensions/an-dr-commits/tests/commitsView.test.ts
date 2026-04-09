@@ -3834,6 +3834,92 @@ describe('CommitsView', () => {
 		});
 	});
 
+	describe('Native SCM Selection', () => {
+		it('Should load and refresh the selected Source Control repository when the Git API selection changes', async () => {
+			// Setup
+			const stateOnDidChange = new EventEmitter<void>();
+			const uiOnDidChange = new EventEmitter<void>();
+			const repo = {
+				rootUri: vscode.Uri.file('/path/to/repo'),
+				state: {
+					onDidChange: stateOnDidChange.subscribe
+				},
+				ui: {
+					selected: false,
+					onDidChange: uiOnDidChange.subscribe
+				}
+			};
+			vscode.mockExtension('vscode.git', {
+				isActive: true,
+				exports: {
+					getAPI: jest.fn(() => ({
+						repositories: [repo],
+						onDidOpenRepository: jest.fn(() => ({ dispose: jest.fn() }))
+					}))
+				}
+			});
+			jest.spyOn(repoManager, 'getKnownRepo').mockResolvedValue('/path/to/repo');
+
+			// Run
+			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
+			repo.ui.selected = true;
+			uiOnDidChange.emit();
+
+			// Assert
+			await waitForExpect(() => {
+				expect(mockedWebviewPanel.mocks.messages).toContainEqual({
+					command: 'loadRepos',
+					lastActiveRepo: null,
+					loadViewTo: { repo: '/path/to/repo' },
+					repos: {
+						'/path/to/repo': mockRepoState()
+					}
+				});
+				expect(mockedWebviewPanel.mocks.messages).toContainEqual({
+					command: 'refresh'
+				});
+			});
+		});
+
+		it('Should ignore selected Source Control repositories that are unknown to Commits', async () => {
+			// Setup
+			const uiOnDidChange = new EventEmitter<void>();
+			const repo = {
+				rootUri: vscode.Uri.file('/path/to/external-repo'),
+				state: {
+					onDidChange: jest.fn(() => ({ dispose: jest.fn() }))
+				},
+				ui: {
+					selected: false,
+					onDidChange: uiOnDidChange.subscribe
+				}
+			};
+			vscode.mockExtension('vscode.git', {
+				isActive: true,
+				exports: {
+					getAPI: jest.fn(() => ({
+						repositories: [repo],
+						onDidOpenRepository: jest.fn(() => ({ dispose: jest.fn() }))
+					}))
+				}
+			});
+			jest.spyOn(repoManager, 'getKnownRepo').mockResolvedValue(null);
+
+			// Run
+			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
+			mockedWebviewPanel.mocks.messages.length = 0;
+			repo.ui.selected = true;
+			uiOnDidChange.emit();
+
+			// Assert
+			await waitForExpect(() => {
+				expect(mockedWebviewPanel.mocks.messages).toStrictEqual([]);
+			});
+		});
+	});
+
 	describe('getHtmlForWebview', () => {
 		beforeEach(() => {
 			jest.spyOn(utils, 'getNonce').mockReturnValueOnce('1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d');

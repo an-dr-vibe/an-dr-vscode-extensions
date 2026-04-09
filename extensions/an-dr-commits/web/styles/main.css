@@ -1081,7 +1081,9 @@ body.vscode-high-contrast #commitTable tr.commit.findCurrentCommit{
 	overflow:hidden;
 }
 body.vscode-light .gitRef{
-	filter:saturate(1.12) contrast(1.08) brightness(0.94);
+	color:#fff;
+	background-image:linear-gradient(rgba(0,0,0,0.14), rgba(0,0,0,0.14));
+	background-blend-mode:multiply;
 }
 .gitRef[draggable="true"]{
 	cursor:grab;
@@ -1251,7 +1253,7 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 
 #sidebarTop{
 	display:flex;
-	align-items:center;
+	align-items:stretch;
 	width:var(--branch-panel-width);
 	flex:0 0 var(--branch-panel-width);
 	min-width:0;
@@ -1259,17 +1261,9 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 	border-bottom:1px solid rgba(128,128,128,0.5);
 	background-color:var(--vscode-sideBar-background, var(--vscode-editor-background));
 	box-sizing:border-box;
-	overflow:hidden;
-}
-
-#branchPanelFilterHost{
-	display:flex;
-	align-items:center;
-	justify-content:center;
-	width:100%;
-	height:100%;
-	box-sizing:border-box;
-	padding:4px 6px;
+	overflow:visible;
+	position:relative;
+	z-index:20;
 }
 
 #controls{
@@ -1353,26 +1347,61 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 	flex-shrink:0;
 }
 
-#repoControl{
-	display:inline-flex;
-	align-items:center;
-	white-space:nowrap;
-	margin:0;
-	min-width:0;
-	flex:0 0 auto;
-}
-#repoDropdown{
-	margin-left:3px;
-}
-
 .dropdownCurrentValue{
 	max-width:30vw;
 }
-#controls.singleRepo #repoControl{
-	display:none;
-}
 #controls.singleRepo .dropdownCurrentValue{
 	max-width:40vw;
+}
+
+#branchPanelControls{
+	display:flex;
+	flex-direction:column;
+	justify-content:center;
+	width:100%;
+	padding:6px;
+	box-sizing:border-box;
+}
+
+#branchPanelRepoHost,
+#branchPanelFilterHost{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	width:100%;
+	box-sizing:border-box;
+}
+
+#branchPanelFilterHost{
+	padding:6px 6px 0 6px;
+}
+
+body.singleRepo #branchPanelRepoHost{
+	display:none;
+}
+
+#branchPanelRepoHost .dropdown,
+#branchPanelRepoHost .dropdown.loaded{
+	display:block;
+	width:100%;
+	margin-top:0;
+}
+
+#branchPanelRepoHost .dropdownCurrentValue{
+	width:100% !important;
+	max-width:none;
+}
+
+#branchPanelRepoHost .dropdownMenu{
+	left:0;
+	right:0;
+}
+
+body.branchPanelHidden #sidebarTop{
+	width:0;
+	flex-basis:0;
+	border-right:none;
+	padding:0;
 }
 
 #topFullDiffBtn, #settingsBtn, #pullBtn, #pushBtn, #moreBtn{

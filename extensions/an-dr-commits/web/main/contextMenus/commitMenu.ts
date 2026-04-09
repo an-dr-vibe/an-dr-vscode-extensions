@@ -142,15 +142,54 @@ function commitsGetCommitContextMenuActions(view: any, target: any): ContextMenu
 
 function commitsGetMultiSelectContextMenuActions(view: any, _target: any): ContextMenuActions {
 	const hashes = Array.from(view.selectedCommits);
-	const sortedIndices = (hashes as string[])
-		.map((h: string) => ({ hash: h, idx: typeof view.commitLookup[h] === 'number' ? view.commitLookup[h] as number : -1 }))
-		.filter((x: any) => x.idx >= 0)
-		.sort((a: any, b: any) => a.idx - b.idx);
-	const sortedHashes = sortedIndices.map((x: any) => x.hash);
+	const selectedCommits = (hashes as string[])
+		.map((hash: string) => typeof view.commitLookup[hash] === 'number' ? view.commits[view.commitLookup[hash] as number] : null)
+		.filter((commit: GG.GitCommit | null): commit is GG.GitCommit => commit !== null);
+	const selectedCommitHashes = new Set(selectedCommits.map((commit: GG.GitCommit) => commit.hash));
+	const childByParent = new Map<string, string>();
+	const childHashes = new Set<string>();
+	let consecutive = selectedCommits.length === hashes.length && selectedCommits.length > 1;
 
-	let consecutive = sortedIndices.length === hashes.length;
-	for (let i = 1; i < sortedIndices.length && consecutive; i++) {
-		if (sortedIndices[i].idx !== sortedIndices[i - 1].idx + 1) consecutive = false;
+	for (let i = 0; i < selectedCommits.length && consecutive; i++) {
+		const commit = selectedCommits[i];
+		if (commit.parents.length !== 1) {
+			consecutive = false;
+			break;
+		}
+		const parentHash = commit.parents[0];
+		if (!selectedCommitHashes.has(parentHash)) continue;
+		if (childByParent.has(parentHash)) {
+			consecutive = false;
+			break;
+		}
+		childByParent.set(parentHash, commit.hash);
+		childHashes.add(parentHash);
+	}
+
+	let sortedHashes: string[] = [];
+	if (consecutive) {
+		const newestCandidates = selectedCommits.filter((commit: GG.GitCommit) => !childHashes.has(commit.hash));
+		const oldestCandidates = selectedCommits.filter((commit: GG.GitCommit) => !selectedCommitHashes.has(commit.parents[0]));
+		if (newestCandidates.length !== 1 || oldestCandidates.length !== 1) {
+			consecutive = false;
+		} else {
+			let currentHash: string | undefined = newestCandidates[0].hash;
+			while (typeof currentHash === 'string') {
+				sortedHashes.push(currentHash);
+				const currentCommit = selectedCommits.find((commit: GG.GitCommit) => commit.hash === currentHash)!;
+				currentHash = selectedCommitHashes.has(currentCommit.parents[0]) ? currentCommit.parents[0] : undefined;
+			}
+			if (sortedHashes.length !== hashes.length || sortedHashes[sortedHashes.length - 1] !== oldestCandidates[0].hash) {
+				consecutive = false;
+			}
+		}
+	}
+
+	if (!consecutive) {
+		sortedHashes = selectedCommits
+			.map((commit: GG.GitCommit) => ({ hash: commit.hash, idx: view.commitLookup[commit.hash] as number }))
+			.sort((a: any, b: any) => a.idx - b.idx)
+			.map((item: any) => item.hash);
 	}
 
 	return [[

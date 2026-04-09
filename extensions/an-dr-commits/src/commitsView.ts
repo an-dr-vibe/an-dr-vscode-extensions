@@ -9,7 +9,7 @@ import { Logger } from './logger';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
 import { ErrorInfo, GitConfigLocation, CommitsViewInitialState, GitPushBranchMode, GitRepoSet, LoadCommitsViewTo, RequestMessage, RequestSidebarBatchRefAction, ResponseMessage, SidebarBatchRefActionTarget, SidebarBatchRefActionType, SidebarBatchRefType, TabIconColourTheme } from './types';
-import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
+import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, isPathInWorkspace, openExtensionSettings, openExternalUrl, openFile, resolveToSymbolicPath, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
 import { renderCommitsWebviewHtml } from './view/webviewHtml';
 
@@ -35,6 +35,7 @@ export class CommitsView extends Disposable {
 	private isGraphViewLoaded: boolean = false;
 	private isPanelVisible: boolean = true;
 	private currentRepo: string | null = null;
+	private sourceControlRepos: Set<string> | null = null;
 	private loadViewTo: LoadCommitsViewTo = null; // Is used by the next call to getHtmlForWebview, and is then reset to null
 
 	private loadRepoInfoRefreshId: number = 0;
@@ -166,8 +167,10 @@ export class CommitsView extends Disposable {
 			// Subscribe to events triggered when a repository is added or deleted from Commits
 			repoManager.onDidChangeRepos((event) => {
 				if (!this.panel.visible) return;
+				const visibleRepos = this.getVisibleRepos(event.repos);
+				const numVisibleRepos = Object.keys(visibleRepos).length;
 				const loadViewTo = event.loadRepo !== null ? { repo: event.loadRepo } : null;
-				if ((event.numRepos === 0 && this.isGraphViewLoaded) || (event.numRepos > 0 && !this.isGraphViewLoaded)) {
+				if ((numVisibleRepos === 0 && this.isGraphViewLoaded) || (numVisibleRepos > 0 && !this.isGraphViewLoaded)) {
 					this.loadViewTo = loadViewTo;
 					this.update();
 				} else {
@@ -1032,12 +1035,71 @@ export class CommitsView extends Disposable {
 				}, 750);
 			};
 
+			const getSelectedApiRepository = () => {
+				if (!api || !Array.isArray(api.repositories)) return null;
+				for (const repo of api.repositories) {
+					if (repo?.ui?.selected) return repo;
+				}
+				return null;
+			};
+
+			const getKnownRepoForScmPath = async (repoPath: string) => {
+				let knownRepo = await this.repoManager.getKnownRepo(repoPath);
+				if (knownRepo === null && isPathInWorkspace(repoPath)) {
+					const registerResult = await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), false);
+					knownRepo = registerResult.root;
+				}
+				return knownRepo;
+			};
+
+			const syncVisibleRepositories = async (loadSelectedRepository: boolean) => {
+				if (this.isDisposed()) return;
+
+				const visibleRepos = new Set<string>();
+				if (api && Array.isArray(api.repositories)) {
+					for (const repo of api.repositories) {
+						const repoPath = repo?.rootUri?.fsPath;
+						if (typeof repoPath !== 'string' || repoPath.length === 0) continue;
+						const knownRepo = await getKnownRepoForScmPath(repoPath);
+						if (knownRepo !== null) visibleRepos.add(knownRepo);
+					}
+				}
+				this.sourceControlRepos = visibleRepos;
+
+				if (!this.panel.visible) return;
+				let loadViewTo: LoadCommitsViewTo = null;
+				if (loadSelectedRepository) {
+					const selectedRepoPath = getSelectedApiRepository()?.rootUri?.fsPath;
+					if (typeof selectedRepoPath === 'string' && selectedRepoPath.length > 0) {
+						const knownRepo = await getKnownRepoForScmPath(selectedRepoPath);
+						if (knownRepo !== null) loadViewTo = { repo: knownRepo };
+					}
+				}
+
+				this.respondLoadRepos(this.repoManager.getRepos(), loadViewTo);
+				if (loadSelectedRepository) scheduleRefresh();
+			};
+
 			const watchRepo = (repo: any) => {
 				this.registerDisposables(repo.state.onDidChange(scheduleRefresh));
+				if (repo?.ui && typeof repo.ui.onDidChange === 'function') {
+					this.registerDisposables(repo.ui.onDidChange(() => {
+						void syncVisibleRepositories(true);
+					}));
+				}
 			};
 
 			api.repositories.forEach(watchRepo);
-			this.registerDisposables(api.onDidOpenRepository(watchRepo));
+			this.registerDisposables(api.onDidOpenRepository((repo: any) => {
+				watchRepo(repo);
+				void syncVisibleRepositories(false);
+			}));
+			if (typeof api.onDidCloseRepository === 'function') {
+				this.registerDisposables(api.onDidCloseRepository(() => {
+					void syncVisibleRepositories(false);
+				}));
+			}
+			void syncVisibleRepositories(true);
 		};
 
 		if (gitExt.isActive) {
@@ -1056,12 +1118,22 @@ export class CommitsView extends Disposable {
 	 * @param loadViewTo What to load the view to.
 	 */
 	private respondLoadRepos(repos: GitRepoSet, loadViewTo: LoadCommitsViewTo) {
+		const visibleRepos = this.getVisibleRepos(repos);
 		this.sendMessage({
 			command: 'loadRepos',
-			repos: repos,
+			repos: visibleRepos,
 			lastActiveRepo: this.extensionState.getLastActiveRepo(),
 			loadViewTo: loadViewTo
 		});
+	}
+
+	private getVisibleRepos(repos: GitRepoSet): GitRepoSet {
+		if (this.sourceControlRepos === null) return repos;
+		const visibleRepos: GitRepoSet = {};
+		for (const repo of this.sourceControlRepos) {
+			if (typeof repos[repo] !== 'undefined') visibleRepos[repo] = repos[repo];
+		}
+		return visibleRepos;
 	}
 
 }

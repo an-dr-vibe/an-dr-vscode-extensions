@@ -153,6 +153,9 @@ Each CSS file corresponds 1:1 to its component. All get concatenated into `media
 ### Loading commits
 Webview sends `loadRepoInfo` / `loadCommits` messages → `commitsView.ts` receives → calls `dataSource.getRepoInfo()` + `dataSource.getCommits()` → sends back `loadRepoInfo` / `loadCommits` responses → webview `loadRepoInfo()` / `loadCommits()` update state → `render()`.
 
+### Following Source Control selection
+`commitsView.ts` subscribes to the built-in Git extension API on startup. When a repository's `ui.selected` state changes in VS Code Source Control, Commits resolves the selected Git API repository back to a known Commits repo via `repoManager.getKnownRepo()`, sends `loadRepos` with `loadViewTo`, then triggers a refresh so the webview reloads the newly selected repository.
+
 ### Branch filter
 `BranchPanel.changeCallback` → `main.ts` sets `this.currentBranches` → `requestLoadCommits()` → backend `dataSource.getLog(repo, branches, ...)` → passes branch names directly as `git log <branch>` args. `null` means show all (`--branches --tags --remotes`). Tag names work as valid git refs.
 

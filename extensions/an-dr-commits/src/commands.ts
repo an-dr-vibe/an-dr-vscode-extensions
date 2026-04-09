@@ -196,7 +196,16 @@ export class CommandManager extends Disposable {
 	/**
 	 * The method run when the `an-dr-commits.fetch` command is invoked.
 	 */
-	private fetch() {
+	private async fetch() {
+		const selectedRepo = await this.getSelectedSourceControlRepo();
+		if (selectedRepo !== null) {
+			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+				repo: selectedRepo,
+				runCommandOnLoad: 'fetch'
+			});
+			return;
+		}
+
 		const repos = this.repoManager.getRepos();
 		const repoPaths = getSortedRepositoryPaths(repos, getConfig().repoDropdownOrder);
 
@@ -241,21 +250,30 @@ export class CommandManager extends Disposable {
 	/**
 	 * The method run when the `an-dr-commits.pull` command is invoked from the SCM panel.
 	 */
-	private pullFromScm() {
-		this.openViewWithCommand('pull', 'Pull Current Branch');
+	private async pullFromScm() {
+		await this.openViewWithCommand('pull', 'Pull Current Branch');
 	}
 
 	/**
 	 * The method run when the `an-dr-commits.push` command is invoked from the SCM panel.
 	 */
-	private pushFromScm() {
-		this.openViewWithCommand('push', 'Push Current Branch');
+	private async pushFromScm() {
+		await this.openViewWithCommand('push', 'Push Current Branch');
 	}
 
 	/**
 	 * Helper: opens the Commits view for a single-repo or lets the user pick, then fires a command on load.
 	 */
-	private openViewWithCommand(command: 'pull' | 'push', actionLabel: string) {
+	private async openViewWithCommand(command: 'pull' | 'push', actionLabel: string) {
+		const selectedRepo = await this.getSelectedSourceControlRepo();
+		if (selectedRepo !== null) {
+			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+				repo: selectedRepo,
+				runCommandOnLoad: command
+			});
+			return;
+		}
+
 		const repos = this.repoManager.getRepos();
 		const repoPaths = getSortedRepositoryPaths(repos, getConfig().repoDropdownOrder);
 
@@ -292,6 +310,25 @@ export class CommandManager extends Disposable {
 		} else {
 			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);
 		}
+	}
+
+	private async getSelectedSourceControlRepo() {
+		const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
+		if (!gitExtension) return null;
+
+		const api = gitExtension.isActive ? gitExtension.exports.getAPI(1) : (await gitExtension.activate()).getAPI(1);
+		if (!api || !Array.isArray(api.repositories)) return null;
+
+		const selectedRepoPath = api.repositories.find((repo: any) => repo?.ui?.selected)?.rootUri?.fsPath;
+		if (typeof selectedRepoPath !== 'string' || selectedRepoPath.length === 0) return null;
+
+		let knownRepo = await this.repoManager.getKnownRepo(selectedRepoPath);
+		if (knownRepo === null && isPathInWorkspace(selectedRepoPath)) {
+			const registerResult = await this.repoManager.registerRepo(await resolveToSymbolicPath(selectedRepoPath), false);
+			knownRepo = registerResult.root;
+		}
+
+		return knownRepo;
 	}
 
 	/**

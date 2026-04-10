@@ -36,7 +36,7 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
   visibility toggles) and applies on startup (hide-only to avoid sidebar focus side-effects).
 - **an-dr-code-review** — Combines inline review comments with a review-oriented changed-files tree.
   Comments are stored in `code-review/.code-review.json`. The tree view can compare the worktree
-  against branches, tags, commits, and GitHub pull requests. Integrated functionality from
+  against branches, tags, and commits. Integrated functionality from
   `vscode-git-tree-compare` must keep visible attribution to the original author.
 
 ## Adding a new extension

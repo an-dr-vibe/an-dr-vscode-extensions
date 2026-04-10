@@ -158,8 +158,8 @@ Keeps the Activity Bar layout consistent across machines. Stores visibility and 
 
 ### an-dr: Code Review
 
-Combines inline review comments with a dedicated changed-files tree for branch and pull-request review.
-The tree supports comparing against branches, tags, commits, and GitHub pull requests, with tree/list
+Combines inline review comments with a dedicated changed-files tree for branch review.
+The tree supports comparing against branches, tags, and commits, with tree/list
 view, filtering, checkboxes, base switching, and diff opening directly from the review sidebar.
 
 **Config** (`codeReview.*`):
@@ -182,7 +182,6 @@ view, filtering, checkboxes, base switching, and diff opening directly from the 
 - `Export Review to Markdown`
 - `Export Review to Jira`
 - `Change Base...`
-- `Compare GitHub Pull Request...`
 - `Refresh Changes`
 
 Integrated tree-compare functionality is based on

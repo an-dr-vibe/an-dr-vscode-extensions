@@ -5,7 +5,7 @@ import * as fs from 'fs'
 import { TreeDataProvider, TreeItem, TreeItemCollapsibleState,
          Uri, Disposable, EventEmitter, TextDocumentShowOptions,
          QuickPickItem, ProgressLocation, Memento, OutputChannel,
-         workspace, commands, window, env, WorkspaceFoldersChangeEvent, TreeView, ThemeIcon, TreeItemCheckboxState, TreeCheckboxChangeEvent, authentication, Range, Selection, TextEditorRevealType } from 'vscode'
+         workspace, commands, window, env, WorkspaceFoldersChangeEvent, TreeView, ThemeIcon, TreeItemCheckboxState, TreeCheckboxChangeEvent, Range, Selection, TextEditorRevealType } from 'vscode'
 import { COMMAND_NAMESPACE, CONFIG_NAMESPACE, CONTEXT_NAMESPACE } from './constants'
 import { Repository, Git } from './git/git'
 import { Ref, RefType } from './git/api/git'
@@ -16,7 +16,6 @@ import { getDefaultBranch, getHeadModificationDate, getBranchCommit,
 import { debounce, throttle } from './git/decorators'
 import { normalizePath } from './fsUtils';
 import { API as GitAPI, Repository as GitAPIRepository } from './typings/git';
-import { Octokit } from '@octokit/rest';
 import { FileCommentEntry, getCommentCountByFile, loadReviewData, onDidChangeReviewData, relativeFilePath } from '../reviewStore';
 
 
@@ -1335,193 +1334,6 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             }
             this.log('Refreshing tree');
             this._onDidChangeTreeData.fire();
-        });
-    }
-
-    async compareGitHubPullRequest() {
-        if (!this.repository) {
-            window.showErrorMessage('No repository selected');
-            return;
-        }
-
-        const repository = this.repository;
-
-        // Check for uncommitted changes (ignoring untracked files)
-        try {
-            if (await hasUncommittedChanges(repository, repository.root, true)) {
-                window.showErrorMessage(
-                    'Please commit your changes or stash them before continuing.',
-                    { modal: true }
-                );
-                    return;
-            }
-        } catch (e: any) {
-            this.log('Error checking for uncommitted changes', e);
-            // Continue anyway
-        }
-
-        // Prompt for PR URL
-        const prUrl = await window.showInputBox({
-            prompt: 'Enter GitHub Pull Request URL',
-            placeHolder: 'https://github.com/owner/repo/pull/123',
-            validateInput: (value: string) => {
-                const match = value.match(/github\.com\/([^\/]+)\/([^\/]+)\/pull\/(\d+)/);
-                if (!match) {
-                    return 'Invalid GitHub PR URL. Expected format: https://github.com/owner/repo/pull/123';
-                }
-                return null;
-            }
-        });
-
-        if (!prUrl) {
-            return;
-        }
-
-        // Parse the PR URL
-        const match = prUrl.match(/github\.com\/([^\/]+)\/([^\/]+)\/pull\/(\d+)/);
-        if (!match) {
-            window.showErrorMessage('Invalid GitHub PR URL format');
-            return;
-        }
-
-        const [, owner, repo, prNumberStr] = match;
-        const prNumber = parseInt(prNumberStr, 10);
-
-        await window.withProgress({
-            location: ProgressLocation.Notification,
-            title: `Fetching PR #${prNumber} from ${owner}/${repo}`,
-            cancellable: false
-        }, async () => {
-            try {
-                // Authenticate with GitHub
-                const session = await authentication.getSession('github', ['repo'], { createIfNone: true });
-                const octokit = new Octokit({ auth: session.accessToken });
-
-                // Fetch PR details
-                this.log(`Fetching PR details for ${owner}/${repo}#${prNumber}`);
-                const { data: pr } = await octokit.pulls.get({
-                    owner,
-                    repo,
-                    pull_number: prNumber
-                });
-
-                // Extract base and head information
-                const baseRef = pr.base.ref;
-                const headRef = pr.head.ref;
-                const headSha = pr.head.sha;
-
-                this.log(`PR #${prNumber}: base=${baseRef}, head=${headRef}, sha=${headSha}`);
-
-                // Fetch the PR branch if it's from a fork
-                const headRepo = pr.head.repo;
-                if (!headRepo) {
-                    window.showErrorMessage('Cannot access PR head repository. It may have been deleted.');
-                    return;
-                }
-
-                const headRepoUrl = headRepo.clone_url;
-                const isFork = headRepo.full_name !== pr.base.repo.full_name;
-
-                // Extract head owner for branch naming
-                const headOwner = pr.head.user?.login || pr.head.repo?.owner.login;
-                if (!headOwner) {
-                    window.showErrorMessage('Could not determine PR head owner.');
-                    return;
-                }
-
-                // Create a local branch name for the PR with owner and ref name
-                const localBranchName = `pr/${prNumber}/${headOwner}/${headRef}`;
-
-                // Fetch and create/update local branch for the PR
-                try {
-                    if (isFork) {
-                        // For forks, add a remote with pr-fork- prefix
-                        const forkRemoteName = `pr-fork-${headOwner}`;
-                        
-                        this.log(`Fetching PR #${prNumber} from fork owned by ${headOwner}: ${headRepoUrl}`);
-                        
-                        // Check if remote already exists, if not add it
-                        try {
-                            const existingUrl = (await repository.exec(['remote', 'get-url', forkRemoteName])).stdout.trim();
-                            // Update URL if it's different
-                            if (existingUrl !== headRepoUrl) {
-                                await repository.exec(['remote', 'set-url', forkRemoteName, headRepoUrl]);
-                                this.log(`Updated remote ${forkRemoteName} URL to ${headRepoUrl}`);
-                            }
-                        } catch {
-                            await repository.exec(['remote', 'add', forkRemoteName, headRepoUrl]);
-                            this.log(`Added remote ${forkRemoteName}`);
-                        }
-                        
-                        // Fetch the head ref from the fork
-                        await repository.fetch({ remote: forkRemoteName, ref: headRef });
-                        
-                        // Create/update local branch pointing to the fetched commit
-                        try {
-                            // Try to create new branch
-                            await repository.exec(['branch', localBranchName, headSha]);
-                        } catch {
-                            // Branch exists, force update it
-                            await repository.exec(['branch', '-f', localBranchName, headSha]);
-                        }
-                        
-                        // Set upstream to the fork remote
-                        await repository.exec(['branch', '--set-upstream-to', `${forkRemoteName}/${headRef}`, localBranchName]);
-                        
-                        this.log(`Created local branch ${localBranchName} tracking ${forkRemoteName}/${headRef}`);
-                    } else {
-                        // For same repo, use GitHub's pull/<id>/head refspec
-                        this.log(`Fetching PR #${prNumber} from origin`);
-                        await repository.exec(['fetch', 'origin', `pull/${prNumber}/head:${localBranchName}`]);
-                        
-                        // Set upstream to origin/<headRef> if the branch exists there
-                        try {
-                            // Fetch the actual head ref to update the remote tracking branch
-                            await repository.fetch({ remote: 'origin', ref: headRef });
-                            await repository.exec(['branch', '--set-upstream-to', `origin/${headRef}`, localBranchName]);
-                            this.log(`Created local branch ${localBranchName} tracking origin/${headRef}`);
-                        } catch {
-                            this.log(`Created local branch ${localBranchName} (no upstream - origin/${headRef} not found)`);
-                        }
-                    }
-                } catch (e: any) {
-                    let msg = 'Failed to fetch and create PR branch';
-                    this.log(msg, e);
-                    window.showErrorMessage(`${msg}: ${e.message}`);
-                    return;
-                }
-
-                // Checkout the local PR branch
-                try {
-                    this.log(`Checking out branch: ${localBranchName}`);
-                    await repository.checkout(localBranchName, []);
-                } catch (e: any) {
-                    let msg = 'Failed to checkout PR branch';
-                    this.log(msg, e);
-                    window.showErrorMessage(`${msg}: ${e.message}`);
-                    return;
-                }
-
-                // Update the comparison base to the PR base branch (use origin/* to avoid stale refs)
-                try {
-                    const originBaseRef = `origin/${baseRef}`;
-                    this.log(`Updating base to: ${originBaseRef}`);
-                    await this.updateRefs(originBaseRef);
-                    await this.updateDiff(false);
-                    this.log('Refreshing tree');
-                    this._onDidChangeTreeData.fire();
-                    window.showInformationMessage(`Now comparing PR #${prNumber}: ${pr.title}`);
-                } catch (e: any) {
-                    let msg = 'Failed to update comparison base';
-                    this.log(msg, e);
-                    window.showErrorMessage(`${msg}: ${e.message}`);
-                    return;
-                }
-            } catch (e: any) {
-                let msg = 'Failed to fetch GitHub PR';
-                this.log(msg, e);
-                window.showErrorMessage(`${msg}: ${e.message || e}`);
-            }
         });
     }
 

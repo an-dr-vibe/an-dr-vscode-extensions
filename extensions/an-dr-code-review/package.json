@@ -1,7 +1,7 @@
 {
   "name": "an-dr-code-review",
   "displayName": "an-dr: Code Review",
-  "description": "Inline review comments plus a changed-files tree for branch, commit, tag, and GitHub pull request review. Includes functionality integrated from vscode-git-tree-compare by Maik Riechert.",
+  "description": "Inline review comments plus a changed-files tree for branch, commit, and tag review. Includes functionality integrated from vscode-git-tree-compare by Maik Riechert.",
   "version": "0.2.0",
   "publisher": "an-dr",
   "author": {
@@ -25,8 +25,7 @@
     "git",
     "diff",
     "tree",
-    "compare",
-    "pull request"
+    "compare"
   ],
   "icon": "resources/logo.png",
   "extensionDependencies": [
@@ -215,12 +214,6 @@
         "category": "Code Review"
       },
       {
-        "command": "an-dr-code-review.compareGitHubPullRequest",
-        "title": "Compare GitHub Pull Request...",
-        "icon": "$(github)",
-        "category": "Code Review"
-      },
-      {
         "command": "an-dr-code-review.sortByName",
         "title": "Sort by Name",
         "category": "Code Review",
@@ -358,11 +351,6 @@
         },
         {
           "command": "an-dr-code-review.changeBase",
-          "when": "view == anDrCodeReviewChanges",
-          "group": "1_state"
-        },
-        {
-          "command": "an-dr-code-review.compareGitHubPullRequest",
           "when": "view == anDrCodeReviewChanges",
           "group": "1_state"
         },
@@ -712,7 +700,6 @@
     "watch": "tsc -watch -p ./"
   },
   "dependencies": {
-    "@octokit/rest": "^22.0.1",
     "@vscode/iconv-lite-umd": "0.7.0",
     "byline": "^5.0.0",
     "file-type": "^7.2.0",

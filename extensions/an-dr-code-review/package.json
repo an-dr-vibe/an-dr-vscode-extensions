@@ -40,7 +40,7 @@
       "activitybar": [
         {
           "id": "anDrCodeReview",
-          "icon": "./resources/logo.svg",
+          "icon": "./resources/activitybar.svg",
           "title": "Code Review"
         }
       ]
@@ -51,7 +51,7 @@
           "id": "anDrCodeReviewChanges",
           "name": "Changes",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0",
-          "icon": "./resources/logo.svg"
+          "icon": "./resources/activitybar.svg"
         },
         {
           "id": "anDrCodeReviewComments",

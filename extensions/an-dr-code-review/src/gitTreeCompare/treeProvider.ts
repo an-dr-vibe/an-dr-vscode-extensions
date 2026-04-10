@@ -93,8 +93,17 @@ class ChangeBaseRemoteHeadItem extends ChangeBaseRefItem {
 }
 
 class ChangeBaseCommitItem implements QuickPickItem {
-	get label(): string { return "$(git-commit) Custom commit"; }
-	get description(): string { return ""; }
+    constructor(public readonly commit?: string) {}
+
+	get label(): string {
+        return this.commit ? `$(git-commit) Use commit ${this.commit}` : "$(git-commit) Use commit hash";
+    }
+
+	get description(): string {
+        return this.commit ? 'Compare against this commit hash' : 'Type a commit hash to use as comparison base';
+    }
+
+    alwaysShow = true;
 }
 
 class ChangeRepositoryItem implements QuickPickItem {
@@ -1273,21 +1282,76 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         }
     }
 
+    private isPotentialCommitHash(value: string): boolean {
+        return /^[0-9a-f]{4,40}$/i.test(value);
+    }
+
+    private async promptChangeBaseChoice(picks: QuickPickItem[]): Promise<QuickPickItem | undefined> {
+        const quickPick = window.createQuickPick<QuickPickItem>();
+        const defaultCommitPick = new ChangeBaseCommitItem();
+
+        quickPick.placeholder = 'Select a ref or type a commit hash to use as comparison base';
+        quickPick.matchOnDescription = true;
+        quickPick.matchOnDetail = true;
+
+        const updateItems = () => {
+            const commitInput = quickPick.value.trim();
+            const commitPicks = this.isPotentialCommitHash(commitInput) ? [new ChangeBaseCommitItem(commitInput)] : [defaultCommitPick];
+            quickPick.items = [...commitPicks, ...picks];
+        };
+
+        updateItems();
+
+        return await new Promise<QuickPickItem | undefined>(resolve => {
+            let settled = false;
+
+            const resolveOnce = (value: QuickPickItem | undefined) => {
+                if (!settled) {
+                    settled = true;
+                    resolve(value);
+                }
+            };
+
+            const valueDisposable = quickPick.onDidChangeValue(() => {
+                updateItems();
+            });
+            const acceptDisposable = quickPick.onDidAccept(() => {
+                const selectedItem = quickPick.selectedItems[0];
+                if (selectedItem) {
+                    resolveOnce(selectedItem);
+                } else {
+                    const commitInput = quickPick.value.trim();
+                    resolveOnce(this.isPotentialCommitHash(commitInput) ? new ChangeBaseCommitItem(commitInput) : undefined);
+                }
+                quickPick.hide();
+            });
+            const hideDisposable = quickPick.onDidHide(() => {
+                resolveOnce(undefined);
+            });
+
+            quickPick.show();
+
+            void valueDisposable;
+            void acceptDisposable;
+            void hideDisposable;
+        }).finally(() => {
+            quickPick.dispose();
+        });
+    }
+
     async promptChangeBase() {
         if (!this.repository) {
             window.showErrorMessage('No repository selected');
             return;
         }
-        const commit = new ChangeBaseCommitItem();
         const sortOrder = workspace.getConfiguration(CONFIG_NAMESPACE).get<'alphabetically' | 'committerdate'>('refSortOrder', 'committerdate');
         const refs = (await this.repository.getRefs({ sort: sortOrder })).filter(ref => ref.name);
         const heads = refs.filter(ref => ref.type === RefType.Head).map(ref => new ChangeBaseRefItem(ref));
         const tags = refs.filter(ref => ref.type === RefType.Tag).map(ref => new ChangeBaseTagItem(ref));
         const remoteHeads = refs.filter(ref => ref.type === RefType.RemoteHead).map(ref => new ChangeBaseRemoteHeadItem(ref));
-        const picks = [commit, ...heads, ...tags, ...remoteHeads];
+        const picks = [...heads, ...tags, ...remoteHeads];
 
-        const placeHolder = 'Select a ref to use as comparison base';
-        const choice = await window.showQuickPick<QuickPickItem>(picks, { placeHolder });
+        const choice = await this.promptChangeBaseChoice(picks);
 
         if (!choice) {
             return;
@@ -1298,14 +1362,16 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         if (choice instanceof ChangeBaseRefItem) {
             baseRef = choice.ref.name!;
         } else if (choice instanceof ChangeBaseCommitItem) {
-            const commitInput = await window.showInputBox({
-                prompt: 'Enter a commit hash to use as comparison base',
-                placeHolder: 'Commit hash'
-            })
-            if (!commitInput) {
+            if (!choice.commit) {
                 return;
             }
-            baseRef = commitInput;
+            try {
+                await this.repository.getCommit(choice.commit);
+            } catch (e: any) {
+                window.showErrorMessage(`Invalid commit hash: ${choice.commit}`);
+                return;
+            }
+            baseRef = choice.commit;
         } else {
             throw new Error("unsupported item type");
         }

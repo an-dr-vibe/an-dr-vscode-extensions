@@ -17,7 +17,7 @@ export class StatusBarItem extends Disposable {
 	private readonly logger: Logger;
 	private readonly commitsStatusBarItem: vscode.StatusBarItem;
 	private readonly blameStatusBarItem: vscode.StatusBarItem;
-	private repoCommit: { text: string, tooltip: string } | null = null;
+	private repoCommit: { repo: string, text: string, tooltip: string } | null = null;
 	private blameCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null = null;
 	private isCommitsVisible: boolean = false;
 	private isBlameVisible: boolean = false;
@@ -72,7 +72,7 @@ export class StatusBarItem extends Disposable {
 	 * Updates the current line's commit shown in the Status Bar Item.
 	 * @param activeCommit The active commit display, or NULL to show the default Commits label.
 	 */
-	public setRepoCommit(repoCommit: { text: string, tooltip: string } | null) {
+	public setRepoCommit(repoCommit: { repo: string, text: string, tooltip: string } | null) {
 		this.repoCommit = repoCommit;
 		this.refresh();
 	}
@@ -90,11 +90,17 @@ export class StatusBarItem extends Disposable {
 		if (config.statusBarShowCurrentCommit && this.repoCommit !== null) {
 			this.commitsStatusBarItem.text = StatusBarItem.COMMITS_ICON + ' ' + this.repoCommit.text;
 			this.commitsStatusBarItem.tooltip = this.repoCommit.tooltip;
+			(this.commitsStatusBarItem as vscode.StatusBarItem & { command?: any }).command = {
+				title: 'Open Commits',
+				command: 'an-dr-commits.view',
+				arguments: [{ repo: this.repoCommit.repo }]
+			};
 		} else {
 			this.commitsStatusBarItem.text = config.statusBarIconOnly
 				? StatusBarItem.COMMITS_ICON
 				: StatusBarItem.COMMITS_ICON + ' ' + StatusBarItem.COMMITS_NAME;
 			this.commitsStatusBarItem.tooltip = StatusBarItem.COMMITS_NAME;
+			(this.commitsStatusBarItem as vscode.StatusBarItem & { command?: any }).command = 'an-dr-commits.view';
 		}
 		const shouldShowCommits = config.showStatusBarItem && this.numRepos > 0;
 		if (this.isCommitsVisible !== shouldShowCommits) {

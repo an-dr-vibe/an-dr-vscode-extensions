@@ -107,7 +107,13 @@ export class CommandManager extends Disposable {
 	private async view(arg: any) {
 		let loadRepo: string | null = null;
 
-		if (typeof arg === 'object' && arg.rootUri) {
+		if (typeof arg === 'object' && typeof arg.repo === 'string') {
+			const repoPath = arg.repo;
+			loadRepo = await this.repoManager.getKnownRepo(repoPath);
+			if (loadRepo === null && isPathInWorkspace(repoPath)) {
+				loadRepo = (await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), true)).root;
+			}
+		} else if (typeof arg === 'object' && arg.rootUri) {
 			// If command is run from the Visual Studio Code Source Control View, load the specific repo
 			const repoPath = getPathFromUri(arg.rootUri);
 			loadRepo = await this.repoManager.getKnownRepo(repoPath);
@@ -117,7 +123,7 @@ export class CommandManager extends Disposable {
 			}
 		} else if (getConfig().openToTheRepoOfTheActiveTextEditorDocument && vscode.window.activeTextEditor) {
 			// If the config setting is enabled, load the repo containing the active text editor document
-			loadRepo = this.repoManager.getRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri));
+			loadRepo = await this.repoManager.resolveRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri), true);
 		}
 
 		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);

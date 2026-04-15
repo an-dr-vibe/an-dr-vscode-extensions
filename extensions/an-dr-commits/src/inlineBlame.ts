@@ -113,7 +113,7 @@ export class InlineBlameController extends Disposable {
 		}
 
 		const filePath = getPathFromUri(editor.document.uri);
-		const repo = this.repoManager.getRepoContainingFile(filePath);
+		const repo = await this.repoManager.resolveRepoContainingFile(filePath);
 		if (repo === null) {
 			this.clear(editor);
 			return;
@@ -128,7 +128,7 @@ export class InlineBlameController extends Disposable {
 				return;
 			}
 
-			this.statusBarItem.setRepoCommit(this.getRepoCommitDisplay(repoCommit));
+			this.statusBarItem.setRepoCommit(this.getRepoCommitDisplay(repo, repoCommit));
 			if (blame === null) {
 				this.statusBarItem.setBlameCommit(null);
 				editor.setDecorations(this.decorationType, []);
@@ -179,11 +179,12 @@ export class InlineBlameController extends Disposable {
 		}
 	}
 
-	private getRepoCommitDisplay(repoCommit: CommitDisplayInfo | null) {
+	private getRepoCommitDisplay(repo: string, repoCommit: CommitDisplayInfo | null) {
 		if (repoCommit === null) {
 			return null;
 		}
 		return {
+			repo: repo,
 			text: abbrevCommit(repoCommit.hash),
 			tooltip: repoCommit.summary || abbrevCommit(repoCommit.hash)
 		};

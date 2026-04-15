@@ -1118,7 +1118,7 @@ export class CommitsView extends Disposable {
 	 * @param loadViewTo What to load the view to.
 	 */
 	private respondLoadRepos(repos: GitRepoSet, loadViewTo: LoadCommitsViewTo) {
-		const visibleRepos = this.getVisibleRepos(repos);
+		const visibleRepos = this.getVisibleRepos(repos, loadViewTo?.repo ?? null);
 		this.sendMessage({
 			command: 'loadRepos',
 			repos: visibleRepos,
@@ -1127,11 +1127,14 @@ export class CommitsView extends Disposable {
 		});
 	}
 
-	private getVisibleRepos(repos: GitRepoSet): GitRepoSet {
+	private getVisibleRepos(repos: GitRepoSet, forceIncludeRepo: string | null = null): GitRepoSet {
 		if (this.sourceControlRepos === null) return repos;
 		const visibleRepos: GitRepoSet = {};
 		for (const repo of this.sourceControlRepos) {
 			if (typeof repos[repo] !== 'undefined') visibleRepos[repo] = repos[repo];
+		}
+		if (forceIncludeRepo !== null && typeof repos[forceIncludeRepo] !== 'undefined') {
+			visibleRepos[forceIncludeRepo] = repos[forceIncludeRepo];
 		}
 		return visibleRepos;
 	}

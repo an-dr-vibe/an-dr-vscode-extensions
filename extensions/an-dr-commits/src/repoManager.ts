@@ -9,7 +9,7 @@ import { Logger } from './logger';
 import { applyExternalConfigFile, generateExternalConfigFile, readExternalConfigFile, validateExternalConfigFile, writeExternalConfigFile } from './repo-manager/externalRepoConfig';
 import { doesPathExist, getWorkspaceFolderInfoForRepoInclusionMapping, isDirectory } from './repo-manager/workspaceUtils';
 import { ErrorInfo, GitRepoSet, GitRepoState } from './types';
-import { evalPromises, getPathFromStr, getPathFromUri, getRepoName, pathWithTrailingSlash, realpath, showErrorMessage, showInformationMessage } from './utils';
+import { evalPromises, getPathFromStr, getPathFromUri, getRepoName, isPathInWorkspace, pathWithTrailingSlash, realpath, showErrorMessage, showInformationMessage } from './utils';
 import { BufferedQueue } from './utils/bufferedQueue';
 import { Disposable, toDisposable } from './utils/disposable';
 import { Event, EventEmitter } from './utils/event';
@@ -259,6 +259,32 @@ export class RepoManager extends Disposable {
 	}
 
 	/**
+	 * Resolve the repository containing the specified file, registering it if needed.
+	 * This prefers the file's actual Git root over a parent repository that merely contains the path.
+	 * @param path The path of the file.
+	 * @param loadRepo If TRUE and a new repository is registered, request loading it in the Commits View.
+	 * @returns The path of the repository containing the file, or NULL if the file isn't in a workspace Git repository.
+	 */
+	public async resolveRepoContainingFile(path: string, loadRepo: boolean = false) {
+		const knownRepo = this.getRepoContainingFile(path);
+		const resolvedRoot = await this.dataSource.repoRoot(path);
+		if (resolvedRoot === null || !isPathInWorkspace(resolvedRoot)) {
+			return knownRepo;
+		}
+		if (this.isKnownRepo(resolvedRoot)) {
+			return resolvedRoot;
+		}
+		if (this.ignoredRepos.includes(resolvedRoot)) {
+			return null;
+		}
+		if (await this.addRepo(resolvedRoot)) {
+			this.sendRepos(loadRepo ? resolvedRoot : null);
+			return resolvedRoot;
+		}
+		return this.isKnownRepo(resolvedRoot) ? resolvedRoot : knownRepo;
+	}
+
+	/**
 	 * Get all known repositories that are contained in the specified folder.
 	 * @param path The path of the folder.
 	 * @returns An array of the paths of all known repositories contained in the specified folder.
@@ -490,14 +516,32 @@ export class RepoManager extends Disposable {
 	 */
 	private searchDirectoryForRepos(directory: string, maxDepth: number) {
 		return new Promise<boolean>(resolve => {
-			if (this.isDirectoryWithinRepos(directory)) {
+			if (this.isDirectoryWithinRepos(directory) && this.isKnownRepo(directory)) {
 				resolve(false);
 				return;
 			}
 
 			this.dataSource.repoRoot(directory).then(async (root) => {
 				if (root !== null) {
-					resolve(await this.addRepo(root));
+					const addedRepo = await this.addRepo(root);
+					if (maxDepth > 0) {
+						fs.readdir(directory, async (err, dirContents) => {
+							if (err) {
+								resolve(addedRepo);
+							} else {
+								let dirs = [];
+								for (let i = 0; i < dirContents.length; i++) {
+									if (dirContents[i] !== '.git' && await isDirectory(directory + '/' + dirContents[i])) {
+										dirs.push(directory + '/' + dirContents[i]);
+									}
+								}
+								const nestedRepoAdded = (await evalPromises(dirs, 2, dir => this.searchDirectoryForRepos(dir, maxDepth - 1))).indexOf(true) > -1;
+								resolve(addedRepo || nestedRepoAdded);
+							}
+						});
+					} else {
+						resolve(addedRepo);
+					}
 				} else if (maxDepth > 0) {
 					fs.readdir(directory, async (err, dirContents) => {
 						if (err) {

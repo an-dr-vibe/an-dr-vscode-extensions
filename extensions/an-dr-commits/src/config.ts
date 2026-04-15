@@ -679,6 +679,14 @@ class Config {
 		return !!this.getRenamedExtensionSetting('blame.statusBarShowCurrentCommit', 'statusBarShowCurrentCommit', false);
 	}
 
+	get blameStatusBarItemEnabled() {
+		return !!this.config.get('blame.statusBarItemEnabled', false);
+	}
+
+	get blameStatusBarIconOnly() {
+		return !!this.config.get('blame.statusBarIconOnly', true);
+	}
+
 	/**
 	 * Get the value of the `an-dr-commits.tabIconColourTheme` Extension Setting.
 	 */

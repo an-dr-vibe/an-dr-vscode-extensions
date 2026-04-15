@@ -8,7 +8,6 @@ import { RepoChangeEvent } from '../src/repoManager';
 import { StatusBarItem } from '../src/statusBarItem';
 import { EventEmitter } from '../src/utils/event';
 
-const vscodeStatusBarItem = vscode.mocks.statusBarItem;
 let onDidChangeRepos: EventEmitter<RepoChangeEvent>;
 let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 let logger: Logger;
@@ -30,19 +29,24 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
+		const blameItem = vscode.getStatusBarItem(1);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-commit)');
-		expect(vscodeStatusBarItem.tooltip).toBe('Commits');
-		expect(vscodeStatusBarItem.command).toBe('an-dr-commits.view');
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.text).toBe('$(git-commit)');
+		expect(commitsItem.tooltip).toBe('Commits');
+		expect(commitsItem.command).toBe('an-dr-commits.view');
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
+		expect(blameItem.show).toHaveBeenCalledTimes(0);
+		expect(blameItem.hide).toHaveBeenCalledTimes(0);
 
 		// Teardown
 		statusBarItem.dispose();
 
 		// Asset
-		expect(vscodeStatusBarItem.dispose).toHaveBeenCalledTimes(1);
+		expect(commitsItem.dispose).toHaveBeenCalledTimes(1);
+		expect(blameItem.dispose).toHaveBeenCalledTimes(1);
 		expect(onDidChangeRepos['listeners']).toHaveLength(0);
 		expect(onDidChangeConfiguration['listeners']).toHaveLength(0);
 	});
@@ -54,10 +58,11 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-commit) Commits');
-		expect(vscodeStatusBarItem.tooltip).toBe('Commits');
+		expect(commitsItem.text).toBe('$(git-commit) Commits');
+		expect(commitsItem.tooltip).toBe('Commits');
 
 		// Teardown
 		statusBarItem.dispose();
@@ -69,10 +74,11 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Run
 		onDidChangeRepos.emit({
@@ -82,8 +88,8 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(1);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(1);
 
 		// Teardown
 		statusBarItem.dispose();
@@ -95,10 +101,11 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(0, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(0);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.show).toHaveBeenCalledTimes(0);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Run
 		onDidChangeRepos.emit({
@@ -108,8 +115,8 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Teardown
 		statusBarItem.dispose();
@@ -121,10 +128,11 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Run
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', false);
@@ -133,8 +141,8 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(1);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(1);
 
 		// Teardown
 		statusBarItem.dispose();
@@ -146,10 +154,11 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Run
 		onDidChangeConfiguration.emit({
@@ -157,8 +166,8 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Teardown
 		statusBarItem.dispose();
@@ -170,9 +179,10 @@ describe('StatusBarItem', () => {
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-commit)');
+		expect(commitsItem.text).toBe('$(git-commit)');
 
 		// Run
 		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', false);
@@ -181,9 +191,9 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-commit) Commits');
-		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
-		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
+		expect(commitsItem.text).toBe('$(git-commit) Commits');
+		expect(commitsItem.show).toHaveBeenCalledTimes(1);
+		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
 
 		// Teardown
 		statusBarItem.dispose();
@@ -194,17 +204,64 @@ describe('StatusBarItem', () => {
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
 		vscode.mockExtensionSettingReturnValue('statusBarShowCurrentCommit', true);
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Run
 		statusBarItem.setActiveCommit({
+			repo: '/path/to/workspace-folder',
+			hash: '1a2b3c4d',
 			text: '1a2b3c4d',
 			tooltip: 'Fix current line blame'
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-commit) 1a2b3c4d');
-		expect(vscodeStatusBarItem.tooltip).toBe('Fix current line blame');
-		expect(vscodeStatusBarItem.command).toBe('an-dr-commits.view');
+		expect(commitsItem.text).toBe('$(git-commit) 1a2b3c4d');
+		expect(commitsItem.tooltip).toBe('Fix current line blame');
+		expect(commitsItem.command).toBe('an-dr-commits.view');
+
+		// Teardown
+		statusBarItem.dispose();
+	});
+
+	it('Should show an optional blame Status Bar Item that reveals the commit in Commits', () => {
+		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
+		vscode.mockExtensionSettingReturnValue('blame.statusBarItemEnabled', true);
+		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const blameItem = vscode.getStatusBarItem(1);
+
+		statusBarItem.setActiveCommit({
+			repo: '/path/to/workspace-folder',
+			hash: '1a2b3c4d',
+			text: '1a2b3c4d',
+			tooltip: 'Fix current line blame'
+		});
+
+		expect(blameItem.text).toBe('$(edit) 1a2b3c4d');
+		expect(blameItem.tooltip).toBe('Fix current line blame');
+		expect(blameItem.show).toHaveBeenCalledTimes(1);
+		expect(blameItem.command).toStrictEqual({
+			title: 'Reveal Commit in Commits',
+			command: 'an-dr-commits.revealCommitInGraph',
+			arguments: [{ repo: '/path/to/workspace-folder', commitHash: '1a2b3c4d' }]
+		});
+		statusBarItem.dispose();
+	});
+
+	it('Should show the Blame label when blame.statusBarIconOnly is disabled', () => {
+		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
+		vscode.mockExtensionSettingReturnValue('blame.statusBarItemEnabled', true);
+		vscode.mockExtensionSettingReturnValue('blame.statusBarIconOnly', false);
+		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+		const blameItem = vscode.getStatusBarItem(1);
+
+		statusBarItem.setActiveCommit({
+			repo: '/path/to/workspace-folder',
+			hash: '1a2b3c4d',
+			text: '1a2b3c4d',
+			tooltip: 'Fix current line blame'
+		});
+
+		expect(blameItem.text).toBe('$(edit) Blame 1a2b3c4d');
 
 		// Teardown
 		statusBarItem.dispose();

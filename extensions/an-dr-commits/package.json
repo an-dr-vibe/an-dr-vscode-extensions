@@ -1326,6 +1326,16 @@
 					"default": false,
 					"description": "Show the current line's blamed commit in the Commits status bar item. Clicking it still opens Commits."
 				},
+				"an-dr-commits.blame.statusBarItemEnabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show a separate Blame status bar item for the current line. Clicking it opens that commit in Commits."
+				},
+				"an-dr-commits.blame.statusBarIconOnly": {
+					"type": "boolean",
+					"default": true,
+					"description": "For the Blame status bar item, show only the icon and commit text without the \"Blame\" label."
+				},
 				"an-dr-commits.sourceCodeProviderIntegrationLocation": {
 					"type": "string",
 					"enum": [

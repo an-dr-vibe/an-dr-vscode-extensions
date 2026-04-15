@@ -9,13 +9,17 @@ import { Event } from './utils/event';
  * Manages the Commits Status Bar Item, which allows users to open the Commits View from the Visual Studio Code Status Bar.
  */
 export class StatusBarItem extends Disposable {
-	private static readonly NAME = 'Commits';
-	private static readonly ICON = '$(git-commit)';
+	private static readonly COMMITS_NAME = 'Commits';
+	private static readonly COMMITS_ICON = '$(git-commit)';
+	private static readonly BLAME_NAME = 'Blame';
+	private static readonly BLAME_ICON = '$(edit)';
 
 	private readonly logger: Logger;
-	private readonly statusBarItem: vscode.StatusBarItem;
-	private activeCommit: { text: string, tooltip: string } | null = null;
-	private isVisible: boolean = false;
+	private readonly commitsStatusBarItem: vscode.StatusBarItem;
+	private readonly blameStatusBarItem: vscode.StatusBarItem;
+	private activeCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null = null;
+	private isCommitsVisible: boolean = false;
+	private isBlameVisible: boolean = false;
 	private numRepos: number = 0;
 
 	/**
@@ -27,9 +31,9 @@ export class StatusBarItem extends Disposable {
 		super();
 		this.logger = logger;
 
-		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
-		statusBarItem.command = 'an-dr-commits.view';
-		this.statusBarItem = statusBarItem;
+		this.commitsStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
+		this.commitsStatusBarItem.command = 'an-dr-commits.view';
+		this.blameStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
 
 		this.registerDisposables(
 			onDidChangeRepos((event) => {
@@ -40,12 +44,15 @@ export class StatusBarItem extends Disposable {
 					event.affectsConfiguration('an-dr-commits.showStatusBarItem') ||
 					event.affectsConfiguration('an-dr-commits.statusBarIconOnly') ||
 					event.affectsConfiguration('an-dr-commits.statusBarShowCurrentCommit') ||
-					event.affectsConfiguration('an-dr-commits.blame.statusBarShowCurrentCommit')
+					event.affectsConfiguration('an-dr-commits.blame.statusBarShowCurrentCommit') ||
+					event.affectsConfiguration('an-dr-commits.blame.statusBarItemEnabled') ||
+					event.affectsConfiguration('an-dr-commits.blame.statusBarIconOnly')
 				) {
 					this.refresh();
 				}
 			}),
-			statusBarItem
+			this.commitsStatusBarItem,
+			this.blameStatusBarItem
 		);
 
 		this.setNumRepos(initialNumRepos);
@@ -64,7 +71,7 @@ export class StatusBarItem extends Disposable {
 	 * Updates the current line's commit shown in the Status Bar Item.
 	 * @param activeCommit The active commit display, or NULL to show the default Commits label.
 	 */
-	public setActiveCommit(activeCommit: { text: string, tooltip: string } | null) {
+	public setActiveCommit(activeCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null) {
 		this.activeCommit = activeCommit;
 		this.refresh();
 	}
@@ -75,24 +82,49 @@ export class StatusBarItem extends Disposable {
 	private refresh() {
 		const config = getConfig();
 		if (config.statusBarShowCurrentCommit && this.activeCommit !== null) {
-			this.statusBarItem.text = StatusBarItem.ICON + ' ' + this.activeCommit.text;
-			this.statusBarItem.tooltip = this.activeCommit.tooltip;
+			this.commitsStatusBarItem.text = StatusBarItem.COMMITS_ICON + ' ' + this.activeCommit.text;
+			this.commitsStatusBarItem.tooltip = this.activeCommit.tooltip;
 		} else {
-			this.statusBarItem.text = config.statusBarIconOnly
-				? StatusBarItem.ICON
-				: StatusBarItem.ICON + ' ' + StatusBarItem.NAME;
-			this.statusBarItem.tooltip = StatusBarItem.NAME;
+			this.commitsStatusBarItem.text = config.statusBarIconOnly
+				? StatusBarItem.COMMITS_ICON
+				: StatusBarItem.COMMITS_ICON + ' ' + StatusBarItem.COMMITS_NAME;
+			this.commitsStatusBarItem.tooltip = StatusBarItem.COMMITS_NAME;
 		}
-		const shouldBeVisible = config.showStatusBarItem && this.numRepos > 0;
-		if (this.isVisible !== shouldBeVisible) {
-			if (shouldBeVisible) {
-				this.statusBarItem.show();
-				this.logger.logDebug('Showing "' + StatusBarItem.NAME + '" Status Bar Item');
+		const shouldShowCommits = config.showStatusBarItem && this.numRepos > 0;
+		if (this.isCommitsVisible !== shouldShowCommits) {
+			if (shouldShowCommits) {
+				this.commitsStatusBarItem.show();
+				this.logger.logDebug('Showing "' + StatusBarItem.COMMITS_NAME + '" Status Bar Item');
 			} else {
-				this.statusBarItem.hide();
-				this.logger.logDebug('Hiding "' + StatusBarItem.NAME + '" Status Bar Item');
+				this.commitsStatusBarItem.hide();
+				this.logger.logDebug('Hiding "' + StatusBarItem.COMMITS_NAME + '" Status Bar Item');
 			}
-			this.isVisible = shouldBeVisible;
+			this.isCommitsVisible = shouldShowCommits;
+		}
+
+		if (this.activeCommit !== null) {
+			this.blameStatusBarItem.text = config.blameStatusBarIconOnly
+				? StatusBarItem.BLAME_ICON + ' ' + this.activeCommit.text
+				: StatusBarItem.BLAME_ICON + ' ' + StatusBarItem.BLAME_NAME + ' ' + this.activeCommit.text;
+			this.blameStatusBarItem.tooltip = this.activeCommit.tooltip;
+			(this.blameStatusBarItem as vscode.StatusBarItem & { command?: any }).command = this.activeCommit.hash !== null
+				? {
+					title: 'Reveal Commit in Commits',
+					command: 'an-dr-commits.revealCommitInGraph',
+					arguments: [{ repo: this.activeCommit.repo, commitHash: this.activeCommit.hash }]
+				}
+				: undefined;
+		}
+		const shouldShowBlame = config.blameStatusBarItemEnabled && this.numRepos > 0 && this.activeCommit !== null;
+		if (this.isBlameVisible !== shouldShowBlame) {
+			if (shouldShowBlame) {
+				this.blameStatusBarItem.show();
+				this.logger.logDebug('Showing "' + StatusBarItem.BLAME_NAME + '" Status Bar Item');
+			} else {
+				this.blameStatusBarItem.hide();
+				this.logger.logDebug('Hiding "' + StatusBarItem.BLAME_NAME + '" Status Bar Item');
+			}
+			this.isBlameVisible = shouldShowBlame;
 		}
 	}
 }

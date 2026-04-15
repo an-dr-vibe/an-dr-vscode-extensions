@@ -55,6 +55,7 @@ export class CommandManager extends Disposable {
 		this.registerCommand('an-dr-commits.push', () => this.pushFromScm());
 		this.registerCommand('an-dr-commits.version', () => this.version());
 		this.registerCommand('an-dr-commits.openFile', (arg) => this.openFile(arg));
+		this.registerCommand('an-dr-commits.revealCommitInGraph', (arg) => this.revealCommitInGraph(arg));
 
 		this.registerDisposable(
 			onDidChangeGitExecutable((gitExecutable) => {
@@ -120,6 +121,29 @@ export class CommandManager extends Disposable {
 		}
 
 		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);
+	}
+
+	private async revealCommitInGraph(arg: any) {
+		if (!arg || typeof arg.repo !== 'string' || typeof arg.commitHash !== 'string') {
+			return;
+		}
+
+		let loadRepo = await this.repoManager.getKnownRepo(arg.repo);
+		if (loadRepo === null) {
+			const registeredRepo = await this.repoManager.registerRepo(await resolveToSymbolicPath(arg.repo), true);
+			loadRepo = registeredRepo.root;
+		}
+		if (loadRepo === null) {
+			return;
+		}
+
+		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+			repo: loadRepo,
+			commitDetails: {
+				commitHash: arg.commitHash,
+				compareWithHash: null
+			}
+		});
 	}
 
 	/**

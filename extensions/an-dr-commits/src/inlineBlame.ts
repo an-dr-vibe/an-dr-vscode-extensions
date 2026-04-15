@@ -135,7 +135,11 @@ export class InlineBlameController extends Disposable {
 				return;
 			}
 
-			this.statusBarItem.setActiveCommit(this.getStatusBarDisplay(blame, displayAuthor));
+			const statusBarDisplay = this.getStatusBarDisplay(blame, displayAuthor);
+			this.statusBarItem.setActiveCommit({
+				...statusBarDisplay,
+				repo: repo
+			});
 			if (config.inlineBlameEnabled) {
 				const line = editor.document.lineAt(editor.selection.active.line);
 				const hoverMessage = this.shouldShowInlineHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : undefined;
@@ -182,6 +186,8 @@ export class InlineBlameController extends Disposable {
 		const config = getConfig();
 		if (!blame.committed) {
 			return {
+				repo: '',
+				hash: null,
 				text: config.blameStatusBarMessageNoCommit,
 				tooltip: this.shouldShowStatusHover(config.blameExtendedHoverInformation)
 					? 'Commits\n' + config.blameStatusBarMessageNoCommit
@@ -189,6 +195,8 @@ export class InlineBlameController extends Disposable {
 			};
 		}
 		return {
+			repo: '',
+			hash: blame.hash,
 			text: formatBlameText(config.blameStatusBarMessageFormat, blame, displayAuthor),
 			tooltip: this.shouldShowStatusHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : 'Commits'
 		};

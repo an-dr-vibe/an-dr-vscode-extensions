@@ -73,7 +73,7 @@ describe('CommandManager', () => {
 
 	it('Should construct a CommandManager, and be disposed', () => {
 		// Assert
-		expect(commandManager['disposables']).toHaveLength(11);
+		expect(commandManager['disposables']).toHaveLength(12);
 		expect(commandManager['gitExecutable']).toStrictEqual({
 			path: '/path/to/git',
 			version: '2.25.0'
@@ -233,6 +233,49 @@ describe('CommandManager', () => {
 			await waitForExpect(() => {
 				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.view');
 				expect(spyOnCommitsViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/workspace-folder' });
+			});
+		});
+	});
+
+	describe('an-dr-commits.revealCommitInGraph', () => {
+		it('Should open Commits to a specific known repository and commit', async () => {
+			spyOnGetKnownRepo.mockResolvedValueOnce('/path/to/workspace-folder/repo');
+
+			vscode.commands.executeCommand('an-dr-commits.revealCommitInGraph', {
+				repo: '/path/to/workspace-folder/repo',
+				commitHash: '1a2b3c4d'
+			});
+
+			await waitForExpect(() => {
+				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.revealCommitInGraph');
+				expect(spyOnCommitsViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, {
+					repo: '/path/to/workspace-folder/repo',
+					commitDetails: {
+						commitHash: '1a2b3c4d',
+						compareWithHash: null
+					}
+				});
+			});
+		});
+
+		it('Should register and open an unknown repository before revealing the commit', async () => {
+			spyOnGetKnownRepo.mockResolvedValueOnce(null);
+			spyOnRegisterRepo.mockResolvedValueOnce({ root: '/path/to/workspace-folder/repo', error: null });
+
+			vscode.commands.executeCommand('an-dr-commits.revealCommitInGraph', {
+				repo: '/path/to/workspace-folder/repo',
+				commitHash: '1a2b3c4d'
+			});
+
+			await waitForExpect(() => {
+				expect(spyOnRegisterRepo).toHaveBeenCalled();
+				expect(spyOnCommitsViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, {
+					repo: '/path/to/workspace-folder/repo',
+					commitDetails: {
+						commitHash: '1a2b3c4d',
+						compareWithHash: null
+					}
+				});
 			});
 		});
 	});

@@ -27,6 +27,17 @@ interface WebviewPanelMocks {
 
 let mockedWebviews: { panel: vscode.WebviewPanel, mocks: WebviewPanelMocks }[] = [];
 
+function createMockStatusBarItem() {
+	return {
+		text: '',
+		tooltip: '',
+		command: undefined as any,
+		show: jest.fn(),
+		hide: jest.fn(),
+		dispose: jest.fn()
+	};
+}
+
 export const mocks = {
 	extensionContext: {
 		asAbsolutePath: jest.fn(),
@@ -48,14 +59,8 @@ export const mocks = {
 		appendLine: jest.fn(),
 		dispose: jest.fn()
 	},
-	statusBarItem: {
-		text: '',
-		tooltip: '',
-		command: '',
-		show: jest.fn(),
-		hide: jest.fn(),
-		dispose: jest.fn()
-	},
+	statusBarItem: createMockStatusBarItem(),
+	statusBarItems: [] as ReturnType<typeof createMockStatusBarItem>[],
 	terminal: {
 		sendText: jest.fn(),
 		show: jest.fn()
@@ -181,7 +186,12 @@ export const window = {
 		dispose: jest.fn()
 	})),
 	createOutputChannel: jest.fn(() => mocks.outputChannel),
-	createStatusBarItem: jest.fn(() => mocks.statusBarItem),
+	createStatusBarItem: jest.fn(() => {
+		const item = createMockStatusBarItem();
+		mocks.statusBarItems.push(item);
+		mocks.statusBarItem = item;
+		return item;
+	}),
 	createWebviewPanel: jest.fn(createWebviewPanel),
 	createTerminal: jest.fn(() => mocks.terminal),
 	onDidChangeActiveTextEditor: jest.fn((listener: (editor: any) => void) => {
@@ -285,6 +295,8 @@ function createWebviewPanel(viewType: string, title: string, _showOptions: ViewC
 
 beforeEach(() => {
 	jest.clearAllMocks();
+	mocks.statusBarItems.splice(0, mocks.statusBarItems.length);
+	mocks.statusBarItem = createMockStatusBarItem();
 
 	window.activeTextEditor = {
 		document: {
@@ -333,6 +345,10 @@ export function mockVscodeVersion(newVersion: string) {
 
 export function getMockedWebviewPanel(i: number) {
 	return mockedWebviews[i];
+}
+
+export function getStatusBarItem(i: number) {
+	return mocks.statusBarItems[i];
 }
 
 export function mockExtension(id: string, extension: any) {

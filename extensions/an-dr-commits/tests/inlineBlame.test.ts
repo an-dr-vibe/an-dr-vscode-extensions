@@ -65,6 +65,8 @@ describe('InlineBlameController', () => {
 		expect(decoration.renderOptions.after.contentText).toContain('Jane Doe');
 		expect(decoration.renderOptions.after.contentText).toContain('Blame');
 		expect(statusBarItem.setActiveCommit).toHaveBeenCalledWith(expect.objectContaining({
+			repo: '/path/to/workspace-folder',
+			hash: '1a2b3c4d5e6f7g8h9i0j',
 			text: expect.stringContaining('1a2b3c4d')
 		}));
 
@@ -80,6 +82,8 @@ describe('InlineBlameController', () => {
 
 		expect(vscode.window.activeTextEditor.setDecorations).toHaveBeenCalledWith(expect.anything(), []);
 		expect(statusBarItem.setActiveCommit).toHaveBeenCalledWith(expect.objectContaining({
+			repo: '/path/to/workspace-folder',
+			hash: '1a2b3c4d5e6f7g8h9i0j',
 			text: expect.stringContaining('1a2b3c4d')
 		}));
 

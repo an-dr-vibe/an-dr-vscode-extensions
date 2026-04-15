@@ -95,6 +95,18 @@
 				"enablement": "isInDiffEditor && resourceScheme == an-dr-commits && an-dr-commits:codiconsSupported"
 			}
 		],
+		"colors": [
+			{
+				"id": "gitblame.inlineMessage",
+				"description": "Inline blame message. Defaults to editorCodeLens.foreground.",
+				"defaults": {
+					"dark": "editorCodeLens.foreground",
+					"light": "editorCodeLens.foreground",
+					"highContrast": "editorCodeLens.foreground",
+					"highContrastLight": "editorCodeLens.foreground"
+				}
+			}
+		],
 		"configuration": {
 			"type": "object",
 			"title": "an-dr-commits",
@@ -947,6 +959,93 @@
 					"default": false,
 					"description": "Open the Commits View to the repository containing the active Text Editor document."
 				},
+				"an-dr-commits.inlineBlame.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Deprecated compatibility alias for an-dr-commits.blame.inlineMessageEnabled."
+				},
+				"an-dr-commits.blame.inlineMessageEnabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show blame information inline next to the active line."
+				},
+				"an-dr-commits.blame.inlineMessageFormat": {
+					"type": "string",
+					"default": "Blame ${author.name} (${time.ago})",
+					"description": "Customize the inline blame message."
+				},
+				"an-dr-commits.blame.inlineMessageNoCommit": {
+					"type": "string",
+					"default": "Not Committed Yet",
+					"description": "Customize the inline blame message for uncommitted lines."
+				},
+				"an-dr-commits.blame.inlineMessageMargin": {
+					"type": "number",
+					"default": 2,
+					"description": "The amount of margin between the line and the inline blame message."
+				},
+				"an-dr-commits.blame.statusBarMessageFormat": {
+					"type": "string",
+					"default": "${commit.hash_short} ${commit.summary}",
+					"description": "Customize the current-commit text shown in the Commits status bar item."
+				},
+				"an-dr-commits.blame.statusBarMessageNoCommit": {
+					"type": "string",
+					"default": "Not Committed Yet",
+					"description": "Customize the status bar message for uncommitted lines."
+				},
+				"an-dr-commits.blame.currentUserAlias": {
+					"type": "string",
+					"default": "",
+					"description": "Alias used for blame author display."
+				},
+				"an-dr-commits.blame.ignoreWhitespace": {
+					"type": "boolean",
+					"default": false,
+					"description": "Ignore whitespace changes when blaming (-w flag)."
+				},
+				"an-dr-commits.blame.delayBlame": {
+					"type": "number",
+					"default": 0,
+					"description": "Delay in milliseconds before blame is displayed."
+				},
+				"an-dr-commits.blame.maxLineCount": {
+					"type": "number",
+					"default": 16384,
+					"description": "Skip blame for files with more lines than this value."
+				},
+				"an-dr-commits.blame.extendedHoverInformation": {
+					"type": "string",
+					"default": "off",
+					"enum": [
+						"off",
+						"inline-status",
+						"inline",
+						"status"
+					],
+					"enumDescriptions": [
+						"Do not show extended hover information.",
+						"Show extended hover information for both inline and status bar blame.",
+						"Show extended hover information only for inline blame.",
+						"Show extended hover information only for the status bar blame."
+					]
+				},
+				"an-dr-commits.blame.detectMoveOrCopyFromOtherFiles": {
+					"type": "number",
+					"default": 0,
+					"enum": [
+						0,
+						1,
+						2,
+						3
+					],
+					"enumDescriptions": [
+						"Do not look for copied or moved lines.",
+						"Look for copies from other files in the same commit (-C).",
+						"Look for copies from other files in the same commit and file creation (-C -C).",
+						"Look for copies from other files in any commit (-C -C -C)."
+					]
+				},
 				"an-dr-commits.referenceLabels.alignment": {
 					"type": "string",
 					"enum": [
@@ -1216,6 +1315,16 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Show only the icon in the status bar item. The full name is still shown in the tooltip."
+				},
+				"an-dr-commits.statusBarShowCurrentCommit": {
+					"type": "boolean",
+					"default": false,
+					"description": "Deprecated compatibility alias for an-dr-commits.blame.statusBarShowCurrentCommit."
+				},
+				"an-dr-commits.blame.statusBarShowCurrentCommit": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show the current line's blamed commit in the Commits status bar item. Clicking it still opens Commits."
 				},
 				"an-dr-commits.sourceCodeProviderIntegrationLocation": {
 					"type": "string",

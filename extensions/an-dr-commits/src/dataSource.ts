@@ -357,6 +357,29 @@ export class DataSource extends Disposable {
 		});
 	}
 
+	/**
+	 * Get blame information for a single line in a file.
+	 * @param repo The repository to run Git in.
+	 * @param filePath The normalised absolute file path.
+	 * @param lineNumber The zero-based line number.
+	 * @returns The blame information, or NULL when the line cannot be blamed.
+	 */
+	public getBlameLine(repo: string, filePath: string, lineNumber: number): Promise<BlameLineInfo | null> {
+		const relativeFilePath = filePath.startsWith(pathWithTrailingSlash(repo))
+			? filePath.substring(repo.length + 1)
+			: filePath;
+		const config = getConfig(repo);
+		const args = ['blame', '--line-porcelain'];
+		if (config.blameIgnoreWhitespace) {
+			args.push('-w');
+		}
+		for (let i = 0; i < config.blameDetectMoveOrCopyFromOtherFiles; i++) {
+			args.push('-C');
+		}
+		args.push('-L' + (lineNumber + 1) + ',' + (lineNumber + 1), '--', relativeFilePath);
+		return this.spawnGit(args, repo, (stdout) => parseBlameLineOutput(stdout));
+	}
+
 
 	/* Get Data Methods - Commit Details View */
 
@@ -2389,3 +2412,46 @@ export class DataSource extends Disposable {
 }
 
 export type { GitCommitDetailsData } from './data-source/models';
+
+export interface BlameLineInfo {
+	readonly author: string;
+	readonly authorEmail: string;
+	readonly authorTime: number;
+	readonly committed: boolean;
+	readonly hash: string;
+	readonly summary: string;
+}
+
+function parseBlameLineOutput(stdout: string): BlameLineInfo | null {
+	const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
+	if (lines.length === 0) return null;
+
+	const firstLineParts = lines[0].split(' ');
+	const hash = firstLineParts[0];
+	if (typeof hash !== 'string' || hash.length === 0) return null;
+
+	let author = '';
+	let authorEmail = '';
+	let authorTime = 0;
+	let summary = '';
+	for (let i = 1; i < lines.length; i++) {
+		if (lines[i].startsWith('author ')) {
+			author = lines[i].substring(7);
+		} else if (lines[i].startsWith('author-mail ')) {
+			authorEmail = lines[i].substring(12).replace(/^<|>$/g, '');
+		} else if (lines[i].startsWith('author-time ')) {
+			authorTime = parseInt(lines[i].substring(12), 10) || 0;
+		} else if (lines[i].startsWith('summary ')) {
+			summary = lines[i].substring(8);
+		}
+	}
+
+	return {
+		author: author,
+		authorEmail: authorEmail,
+		authorTime: authorTime,
+		committed: hash !== '0000000000000000000000000000000000000000',
+		hash: hash,
+		summary: summary
+	};
+}

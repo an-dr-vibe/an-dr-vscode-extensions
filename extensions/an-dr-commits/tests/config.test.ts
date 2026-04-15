@@ -2272,6 +2272,7 @@ describe('Config', () => {
 	});
 
 	describe('openToTheRepoOfTheActiveTextEditorDocument', testBooleanExtensionSetting('openToTheRepoOfTheActiveTextEditorDocument', 'openToTheRepoOfTheActiveTextEditorDocument', false));
+	describe('inlineBlameEnabled', testRenamedBooleanExtensionSetting('inlineBlameEnabled', 'blame.inlineMessageEnabled', 'inlineBlame.enabled', false));
 
 	describe('referenceLabels', () => {
 		describe('combineLocalAndRemoteBranchLabels', () => {
@@ -2925,6 +2926,8 @@ describe('Config', () => {
 	describe('showStatusBarItem', testBooleanExtensionSetting('showStatusBarItem', 'showStatusBarItem', true));
 
 	describe('statusBarIconOnly', testBooleanExtensionSetting('statusBarIconOnly', 'statusBarIconOnly', true));
+
+	describe('statusBarShowCurrentCommit', testRenamedBooleanExtensionSetting('statusBarShowCurrentCommit', 'blame.statusBarShowCurrentCommit', 'statusBarShowCurrentCommit', false));
 
 	describe('tabIconColourTheme', () => {
 		it('Should return TabIconColourTheme.Colour when the configuration value is "colour"', () => {

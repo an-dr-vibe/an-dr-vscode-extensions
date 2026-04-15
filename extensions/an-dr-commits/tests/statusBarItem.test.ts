@@ -188,4 +188,25 @@ describe('StatusBarItem', () => {
 		// Teardown
 		statusBarItem.dispose();
 	});
+
+	it('Should show the current commit when an-dr-commits.statusBarShowCurrentCommit is enabled', () => {
+		// Setup
+		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
+		vscode.mockExtensionSettingReturnValue('statusBarShowCurrentCommit', true);
+		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
+
+		// Run
+		statusBarItem.setActiveCommit({
+			text: '1a2b3c4d Fix current line blame',
+			tooltip: 'Fix current line blame'
+		});
+
+		// Assert
+		expect(vscodeStatusBarItem.text).toBe('$(git-branch) 1a2b3c4d Fix current line blame');
+		expect(vscodeStatusBarItem.tooltip).toBe('Fix current line blame');
+		expect(vscodeStatusBarItem.command).toBe('an-dr-commits.view');
+
+		// Teardown
+		statusBarItem.dispose();
+	});
 });

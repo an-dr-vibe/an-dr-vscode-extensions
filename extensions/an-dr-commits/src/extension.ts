@@ -8,6 +8,7 @@ import { getConfig } from './config';
 import { DataSource } from './dataSource';
 import { DiffDocProvider } from './diffDocProvider';
 import { ExtensionState } from './extensionState';
+import { InlineBlameController } from './inlineBlame';
 import { CommitsView } from './commitsView';
 import { onStartUp } from './life-cycle/startup';
 import { Logger } from './logger';
@@ -60,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const avatarManager = new AvatarManager(dataSource, extensionState, logger);
 	const repoManager = new RepoManager(dataSource, extensionState, onDidChangeConfiguration, logger);
 	const statusBarItem = new StatusBarItem(repoManager.getNumRepos(), repoManager.onDidChangeRepos, onDidChangeConfiguration, logger);
+	const inlineBlameController = new InlineBlameController(dataSource, repoManager, statusBarItem, onDidChangeConfiguration, logger);
 	const commandManager = new CommandManager(context, avatarManager, dataSource, extensionState, repoManager, gitExecutable, onDidChangeGitExecutable, logger);
 	const diffDocProvider = new DiffDocProvider(dataSource);
 
@@ -95,6 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		diffDocProvider,
 		commandManager,
 		statusBarItem,
+		inlineBlameController,
 		repoManager,
 		avatarManager,
 		dataSource,
@@ -176,6 +179,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	onStartUp(context).catch(() => { });
+	inlineBlameController.refresh();
 }
 
 /**

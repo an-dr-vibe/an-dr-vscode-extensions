@@ -71,6 +71,7 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `types.ts` | Shared TypeScript interfaces for the backend |
 | `avatarManager.ts` | Fetches and caches author avatars |
 | `statusBarItem.ts` | The status bar button that opens the graph |
+| `inlineBlame.ts` | Active editor inline blame + optional status bar current-commit display |
 | `diffDocProvider.ts` | Virtual document provider for diff views |
 | `repoFileWatcher.ts` | Watches `.git` for changes, triggers refresh |
 | `logger.ts` | Output channel logging |
@@ -181,6 +182,7 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 | Message protocol | `src/types.ts` (backend) + `web/global.d.ts` (frontend) |
 | SVG icons | `web/utils.ts` → `SVG_ICONS` constant |
 | Status bar button | `src/statusBarItem.ts` |
+| Inline blame / current line commit display | `src/inlineBlame.ts` + `src/dataSource.ts` |
 | Repo discovery | `src/repoManager.ts` |
 
 ---

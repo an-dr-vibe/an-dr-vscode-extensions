@@ -360,6 +360,58 @@ class Config {
 	}
 
 	/**
+	 * Get the value of the `an-dr-commits.blame.inlineMessageEnabled` Extension Setting.
+	 */
+	get inlineBlameEnabled() {
+		return !!this.getRenamedExtensionSetting('blame.inlineMessageEnabled', 'inlineBlame.enabled', false);
+	}
+
+	get blameInlineMessageFormat() {
+		return this.config.get('blame.inlineMessageFormat', 'Blame ${author.name} (${time.ago})');
+	}
+
+	get blameInlineMessageNoCommit() {
+		return this.config.get('blame.inlineMessageNoCommit', 'Not Committed Yet');
+	}
+
+	get blameInlineMessageMargin() {
+		return this.config.get('blame.inlineMessageMargin', 2);
+	}
+
+	get blameStatusBarMessageFormat() {
+		return this.config.get('blame.statusBarMessageFormat', '${commit.hash_short} ${commit.summary}');
+	}
+
+	get blameStatusBarMessageNoCommit() {
+		return this.config.get('blame.statusBarMessageNoCommit', 'Not Committed Yet');
+	}
+
+	get blameCurrentUserAlias() {
+		return this.config.get('blame.currentUserAlias', '');
+	}
+
+	get blameIgnoreWhitespace() {
+		return !!this.config.get('blame.ignoreWhitespace', false);
+	}
+
+	get blameDelay() {
+		return this.config.get('blame.delayBlame', 0);
+	}
+
+	get blameMaxLineCount() {
+		return this.config.get('blame.maxLineCount', 16384);
+	}
+
+	get blameExtendedHoverInformation() {
+		return this.config.get<'off' | 'inline-status' | 'inline' | 'status'>('blame.extendedHoverInformation', 'off');
+	}
+
+	get blameDetectMoveOrCopyFromOtherFiles() {
+		const value = this.config.get<number>('blame.detectMoveOrCopyFromOtherFiles', 0);
+		return value >= 0 && value <= 3 ? value : 0;
+	}
+
+	/**
 	 * Get the reference label configuration from the Extension Settings.
 	 */
 	get referenceLabels(): ReferenceLabelsConfig {
@@ -618,6 +670,13 @@ class Config {
 	 */
 	get statusBarIconOnly() {
 		return !!this.config.get('statusBarIconOnly', true);
+	}
+
+	/**
+	 * Get the value of the `an-dr-commits.blame.statusBarShowCurrentCommit` Extension Setting.
+	 */
+	get statusBarShowCurrentCommit() {
+		return !!this.getRenamedExtensionSetting('blame.statusBarShowCurrentCommit', 'statusBarShowCurrentCommit', false);
 	}
 
 	/**

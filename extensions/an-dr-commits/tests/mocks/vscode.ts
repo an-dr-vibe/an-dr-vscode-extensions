@@ -7,6 +7,11 @@ import { RequestMessage, ResponseMessage, Writeable } from '../../src/types';
 const mockedExtensionSettingValues: { [section: string]: any } = {};
 const mockedCommands: { [command: string]: (...args: any[]) => any } = {};
 const mockedExtensions: { [id: string]: any } = {};
+const activeTextEditorListeners: ((editor: any) => void)[] = [];
+const textEditorSelectionListeners: ((event: any) => void)[] = [];
+const textDocumentChangeListeners: ((event: any) => void)[] = [];
+const textDocumentSaveListeners: ((document: any) => void)[] = [];
+const textDocumentCloseListeners: ((document: any) => void)[] = [];
 
 interface WebviewPanelMocks {
 	messages: ResponseMessage[],
@@ -136,6 +141,19 @@ export class Uri implements vscode.Uri {
 	}
 }
 
+export class ThemeColor {
+	constructor(public readonly id: string) { }
+}
+
+export class Range {
+	constructor(
+		public readonly startLine: number,
+		public readonly startCharacter: number,
+		public readonly endLine: number,
+		public readonly endCharacter: number
+	) { }
+}
+
 export enum StatusBarAlignment {
 	Left = 1,
 	Right = 2
@@ -159,10 +177,21 @@ export enum ViewColumn {
 
 export const window = {
 	activeTextEditor: undefined as any,
+	createTextEditorDecorationType: jest.fn(() => ({
+		dispose: jest.fn()
+	})),
 	createOutputChannel: jest.fn(() => mocks.outputChannel),
 	createStatusBarItem: jest.fn(() => mocks.statusBarItem),
 	createWebviewPanel: jest.fn(createWebviewPanel),
 	createTerminal: jest.fn(() => mocks.terminal),
+	onDidChangeActiveTextEditor: jest.fn((listener: (editor: any) => void) => {
+		activeTextEditorListeners.push(listener);
+		return { dispose: jest.fn() };
+	}),
+	onDidChangeTextEditorSelection: jest.fn((listener: (event: any) => void) => {
+		textEditorSelectionListeners.push(listener);
+		return { dispose: jest.fn() };
+	}),
 	showErrorMessage: jest.fn(),
 	showInformationMessage: jest.fn(),
 	showOpenDialog: jest.fn(),
@@ -182,8 +211,19 @@ export const workspace = {
 		dispose: jest.fn()
 	})),
 	getConfiguration: jest.fn(() => mocks.workspaceConfiguration),
+	onDidChangeTextDocument: jest.fn((listener: (event: any) => void) => {
+		textDocumentChangeListeners.push(listener);
+		return { dispose: jest.fn() };
+	}),
 	onDidChangeWorkspaceFolders: jest.fn((_: () => Promise<void>) => ({ dispose: jest.fn() })),
-	onDidCloseTextDocument: jest.fn((_: () => void) => ({ dispose: jest.fn() })),
+	onDidCloseTextDocument: jest.fn((listener: (document: any) => void) => {
+		textDocumentCloseListeners.push(listener);
+		return { dispose: jest.fn() };
+	}),
+	onDidSaveTextDocument: jest.fn((listener: (document: any) => void) => {
+		textDocumentSaveListeners.push(listener);
+		return { dispose: jest.fn() };
+	}),
 	workspaceFolders: <{ uri: Uri, index: number }[] | undefined>undefined
 };
 
@@ -248,10 +288,26 @@ beforeEach(() => {
 
 	window.activeTextEditor = {
 		document: {
-			uri: Uri.file('/path/to/workspace-folder/active-file.txt')
+			uri: Uri.file('/path/to/workspace-folder/active-file.txt'),
+			lineAt: jest.fn((line: number) => ({
+				range: new Range(line, 0, line, 40)
+			})),
+			lineCount: 10
 		},
+		selection: {
+			active: {
+				line: 0
+			}
+		},
+		setDecorations: jest.fn(),
 		viewColumn: ViewColumn.One
 	};
+
+	activeTextEditorListeners.splice(0, activeTextEditorListeners.length);
+	textEditorSelectionListeners.splice(0, textEditorSelectionListeners.length);
+	textDocumentChangeListeners.splice(0, textDocumentChangeListeners.length);
+	textDocumentSaveListeners.splice(0, textDocumentSaveListeners.length);
+	textDocumentCloseListeners.splice(0, textDocumentCloseListeners.length);
 
 	// Clear any mocked extension setting values before each test
 	Object.keys(mockedExtensionSettingValues).forEach((section) => {
@@ -281,4 +337,25 @@ export function getMockedWebviewPanel(i: number) {
 
 export function mockExtension(id: string, extension: any) {
 	mockedExtensions[id] = extension;
+}
+
+export function emitDidChangeActiveTextEditor(editor: any) {
+	window.activeTextEditor = editor;
+	activeTextEditorListeners.forEach((listener) => listener(editor));
+}
+
+export function emitDidChangeTextEditorSelection(event: any) {
+	textEditorSelectionListeners.forEach((listener) => listener(event));
+}
+
+export function emitDidChangeTextDocument(event: any) {
+	textDocumentChangeListeners.forEach((listener) => listener(event));
+}
+
+export function emitDidSaveTextDocument(document: any) {
+	textDocumentSaveListeners.forEach((listener) => listener(document));
+}
+
+export function emitDidCloseTextDocument(document: any) {
+	textDocumentCloseListeners.forEach((listener) => listener(document));
 }

@@ -10,10 +10,11 @@ import { Event } from './utils/event';
  */
 export class StatusBarItem extends Disposable {
 	private static readonly NAME = 'Commits';
-	private static readonly ICON = '$(git-commit)';
+	private static readonly ICON = '$(git-branch)';
 
 	private readonly logger: Logger;
 	private readonly statusBarItem: vscode.StatusBarItem;
+	private activeCommit: { text: string, tooltip: string } | null = null;
 	private isVisible: boolean = false;
 	private numRepos: number = 0;
 
@@ -35,7 +36,12 @@ export class StatusBarItem extends Disposable {
 				this.setNumRepos(event.numRepos);
 			}),
 			onDidChangeConfiguration((event) => {
-				if (event.affectsConfiguration('an-dr-commits.showStatusBarItem') || event.affectsConfiguration('an-dr-commits.statusBarIconOnly')) {
+				if (
+					event.affectsConfiguration('an-dr-commits.showStatusBarItem') ||
+					event.affectsConfiguration('an-dr-commits.statusBarIconOnly') ||
+					event.affectsConfiguration('an-dr-commits.statusBarShowCurrentCommit') ||
+					event.affectsConfiguration('an-dr-commits.blame.statusBarShowCurrentCommit')
+				) {
 					this.refresh();
 				}
 			}),
@@ -55,14 +61,28 @@ export class StatusBarItem extends Disposable {
 	}
 
 	/**
+	 * Updates the current line's commit shown in the Status Bar Item.
+	 * @param activeCommit The active commit display, or NULL to show the default Commits label.
+	 */
+	public setActiveCommit(activeCommit: { text: string, tooltip: string } | null) {
+		this.activeCommit = activeCommit;
+		this.refresh();
+	}
+
+	/**
 	 * Show or hide the Status Bar Item according to the configured value of `an-dr-commits.showStatusBarItem`, and the number of repositories known to Commits.
 	 */
 	private refresh() {
 		const config = getConfig();
-		this.statusBarItem.text = config.statusBarIconOnly
-			? StatusBarItem.ICON
-			: StatusBarItem.ICON + ' ' + StatusBarItem.NAME;
-		this.statusBarItem.tooltip = StatusBarItem.NAME;
+		if (config.statusBarShowCurrentCommit && this.activeCommit !== null) {
+			this.statusBarItem.text = StatusBarItem.ICON + ' ' + this.activeCommit.text;
+			this.statusBarItem.tooltip = this.activeCommit.tooltip;
+		} else {
+			this.statusBarItem.text = config.statusBarIconOnly
+				? StatusBarItem.ICON
+				: StatusBarItem.ICON + ' ' + StatusBarItem.NAME;
+			this.statusBarItem.tooltip = StatusBarItem.NAME;
+		}
 		const shouldBeVisible = config.showStatusBarItem && this.numRepos > 0;
 		if (this.isVisible !== shouldBeVisible) {
 			if (shouldBeVisible) {

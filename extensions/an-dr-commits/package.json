@@ -986,7 +986,7 @@
 				},
 				"an-dr-commits.blame.statusBarMessageFormat": {
 					"type": "string",
-					"default": "${commit.hash_short} ${commit.summary}",
+					"default": "${commit.hash_short}",
 					"description": "Customize the current-commit text shown in the Commits status bar item."
 				},
 				"an-dr-commits.blame.statusBarMessageNoCommit": {

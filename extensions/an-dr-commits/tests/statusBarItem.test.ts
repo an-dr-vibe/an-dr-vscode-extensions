@@ -32,7 +32,7 @@ describe('StatusBarItem', () => {
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-branch)');
+		expect(vscodeStatusBarItem.text).toBe('$(git-commit)');
 		expect(vscodeStatusBarItem.tooltip).toBe('Commits');
 		expect(vscodeStatusBarItem.command).toBe('an-dr-commits.view');
 		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
@@ -56,7 +56,7 @@ describe('StatusBarItem', () => {
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-branch) Commits');
+		expect(vscodeStatusBarItem.text).toBe('$(git-commit) Commits');
 		expect(vscodeStatusBarItem.tooltip).toBe('Commits');
 
 		// Teardown
@@ -172,7 +172,7 @@ describe('StatusBarItem', () => {
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-branch)');
+		expect(vscodeStatusBarItem.text).toBe('$(git-commit)');
 
 		// Run
 		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', false);
@@ -181,7 +181,7 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-branch) Commits');
+		expect(vscodeStatusBarItem.text).toBe('$(git-commit) Commits');
 		expect(vscodeStatusBarItem.show).toHaveBeenCalledTimes(1);
 		expect(vscodeStatusBarItem.hide).toHaveBeenCalledTimes(0);
 
@@ -197,12 +197,12 @@ describe('StatusBarItem', () => {
 
 		// Run
 		statusBarItem.setActiveCommit({
-			text: '1a2b3c4d Fix current line blame',
+			text: '1a2b3c4d',
 			tooltip: 'Fix current line blame'
 		});
 
 		// Assert
-		expect(vscodeStatusBarItem.text).toBe('$(git-branch) 1a2b3c4d Fix current line blame');
+		expect(vscodeStatusBarItem.text).toBe('$(git-commit) 1a2b3c4d');
 		expect(vscodeStatusBarItem.tooltip).toBe('Fix current line blame');
 		expect(vscodeStatusBarItem.command).toBe('an-dr-commits.view');
 

@@ -379,7 +379,7 @@ class Config {
 	}
 
 	get blameStatusBarMessageFormat() {
-		return this.config.get('blame.statusBarMessageFormat', '${commit.hash_short} ${commit.summary}');
+		return this.config.get('blame.statusBarMessageFormat', '${commit.hash_short}');
 	}
 
 	get blameStatusBarMessageNoCommit() {

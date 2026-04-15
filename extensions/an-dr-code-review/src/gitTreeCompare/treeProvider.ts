@@ -16,7 +16,8 @@ import { getDefaultBranch, getHeadModificationDate, getBranchCommit,
 import { debounce, throttle } from './git/decorators'
 import { normalizePath } from './fsUtils';
 import { API as GitAPI, Repository as GitAPIRepository } from './typings/git';
-import { FileCommentEntry, getCommentCountByFile, loadReviewData, onDidChangeReviewData, relativeFilePath } from '../reviewStore';
+import { FileCommentEntry, ReviewedFileState, getCommentCountByFile, loadReviewData, loadReviewedFilesData, onDidChangeReviewData, relativeFilePath, saveReviewedFilesData } from '../reviewStore';
+import { CommentsSelection } from '../commentsView';
 
 
 type SortOrder = 'name' | 'path' | 'status' | 'recentlyModified';
@@ -39,6 +40,7 @@ interface CheckboxStateInfo {
 class FileElement implements IDiffStatus {
     modificationDate?: Date;
     commentCount = 0;
+    hasNewVersion = false;
 
     constructor(
         public srcAbsPath: string,
@@ -171,6 +173,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     private isPaused: boolean;
     private checkboxStates: Map<string, CheckboxStateInfo> = new Map<string, CheckboxStateInfo>();
     private commentCounts: Map<string, number> = new Map<string, number>();
+    private reviewedFiles = new Map<string, ReviewedFileState>();
 
     // Other
     private readonly disposables: Disposable[] = [];
@@ -180,7 +183,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         this.readConfig();
     }
 
-    async init(treeView: TreeView<Element>, onSelectedFileChange?: (file: string | undefined) => void) {
+    async init(treeView: TreeView<Element>, onSelectedSelectionChange?: (selection: CommentsSelection | undefined) => void) {
         this.treeView = treeView
 
         // use arbitrary repository at start if there are multiple (prefer selected ones)
@@ -224,12 +227,12 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
 
         this.disposables.push(treeView.onDidChangeCheckboxState(this.handleChangeCheckboxState, this));
         this.disposables.push(treeView.onDidChangeSelection((e) => {
-            const file = e.selection[0] instanceof FileElement ? this.toReviewFilePath(e.selection[0].dstAbsPath) : undefined;
-            onSelectedFileChange?.(file);
+            onSelectedSelectionChange?.(this.toCommentsSelection(e.selection[0]));
         }));
         this.disposables.push(onDidChangeReviewData(() => {
             void this.refreshCommentCounts();
         }));
+        await this.loadReviewedFiles();
         await this.refreshCommentCounts();
     }
 
@@ -364,6 +367,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     }
 
     private async handleChangeCheckboxState(e: TreeCheckboxChangeEvent<Element>) {
+        let reviewedFilesChanged = false;
         for (let [element, state] of e.items) {
             if (element instanceof FileElement || element instanceof FolderElement) {
                 this.checkboxStates.set(element.dstAbsPath, {
@@ -371,6 +375,13 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
                     timestamp: Date.now()
                 });
             }
+            if (element instanceof FileElement) {
+                reviewedFilesChanged = await this.updateReviewedFileState(element, state) || reviewedFilesChanged;
+            }
+        }
+        if (reviewedFilesChanged) {
+            await this.persistReviewedFiles();
+            this._onDidChangeTreeData.fire();
         }
     }
 
@@ -457,6 +468,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         }
         if (element instanceof FileElement) {
             element.commentCount = this.commentCounts.get(this.toReviewFilePath(element.dstAbsPath)) ?? 0;
+            element.hasNewVersion = this.reviewedFiles.get(this.toReviewFilePath(element.dstAbsPath))?.outdated ?? false;
         }
         return toTreeItem(element, this.openChangesOnSelect, this.iconsMinimal, this.showCollapsed, this.viewAsList, checkboxState, this.asAbsolutePath);
     }
@@ -467,12 +479,115 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         this._onDidChangeTreeData.fire();
     }
 
+    private async loadReviewedFiles(): Promise<void> {
+        const data = await loadReviewedFilesData();
+        this.reviewedFiles = new Map(Object.entries(data.files));
+    }
+
+    private async persistReviewedFiles(): Promise<void> {
+        const files = Object.fromEntries(
+            Array.from(this.reviewedFiles.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+        );
+        await saveReviewedFilesData({ version: 1, files });
+    }
+
     private toReviewFilePath(absPath: string): string {
         const root = workspace.workspaceFolders?.[0]?.uri;
         if (!root) {
             return path.basename(absPath);
         }
         return relativeFilePath(root, Uri.file(absPath)).replace(/\\/g, '/');
+    }
+
+    private toRepositoryRelativePath(absPath: string): string {
+        return path.relative(this.repoRoot, absPath).replace(/\\/g, '/');
+    }
+
+    private async updateReviewedFileState(file: FileElement, state: TreeItemCheckboxState): Promise<boolean> {
+        const reviewFilePath = this.toReviewFilePath(file.dstAbsPath);
+        if (state !== TreeItemCheckboxState.Checked) {
+            if (!this.reviewedFiles.has(reviewFilePath)) {
+                return false;
+            }
+            this.reviewedFiles.delete(reviewFilePath);
+            file.hasNewVersion = false;
+            return true;
+        }
+
+        const version = await this.getReviewedVersionToken(file);
+        this.reviewedFiles.set(reviewFilePath, {
+            checked: true,
+            outdated: false,
+            lastReviewedVersion: version,
+            timestamp: Date.now(),
+        });
+        file.hasNewVersion = false;
+        return true;
+    }
+
+    private async getReviewedVersionToken(file: IDiffStatus): Promise<string> {
+        const pathAtBase = (file.status === 'D' || file.status === 'R') ? file.srcAbsPath : file.dstAbsPath;
+        const repoRelativePath = this.toRepositoryRelativePath(pathAtBase);
+
+        try {
+            const details = await this.repository!.getObjectDetails(this.mergeBase, repoRelativePath);
+            return `${this.mergeBase}:${details.object}`;
+        } catch {
+            return `${this.mergeBase}:missing`;
+        }
+    }
+
+    private toCommentsSelection(element: Element | undefined): CommentsSelection | undefined {
+        if (!element) {
+            return undefined;
+        }
+
+        if (element instanceof FileElement) {
+            return {
+                label: this.toReviewFilePath(element.dstAbsPath),
+                files: [this.toReviewFilePath(element.dstAbsPath)],
+            };
+        }
+
+        if (element instanceof FolderElement) {
+            return this.createFolderSelection(element.dstAbsPath, element.useFilesOutsideTreeRoot, element.label);
+        }
+
+        if (element instanceof RepoRootElement || element instanceof RefElement) {
+            const files = Array.from(this.iterFiles()).map((file) => this.toReviewFilePath(file.dstAbsPath));
+            return {
+                label: 'the visible changes',
+                files: Array.from(new Set(files)).sort(),
+            };
+        }
+
+        return undefined;
+    }
+
+    private createFolderSelection(folderAbsPath: string, useFilesOutsideTreeRoot: boolean, label: string): CommentsSelection | undefined {
+        const filesMap = useFilesOutsideTreeRoot ? this.filesOutsideTreeRoot : this.filesInsideTreeRoot;
+        const files: string[] = [];
+
+        for (const [folderPath, folderFiles] of filesMap.entries()) {
+            if (folderPath !== folderAbsPath && !folderPath.startsWith(folderAbsPath + path.sep)) {
+                continue;
+            }
+            for (const file of folderFiles) {
+                if (!file.isSubmodule) {
+                    files.push(this.toReviewFilePath(file.dstAbsPath));
+                }
+            }
+        }
+
+        const uniqueFiles = Array.from(new Set(files)).sort();
+        if (uniqueFiles.length === 0) {
+            return undefined;
+        }
+
+        return {
+            label: this.toReviewFilePath(folderAbsPath) || label,
+            files: uniqueFiles,
+        };
     }
 
     private computeFolderCheckboxState(folder: FolderElement): TreeItemCheckboxState {
@@ -628,8 +743,11 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         this.log(`${diff.length} diff entries (${untrackedCount} untracked)`);
 
         const newFilePaths = new Set<string>();
+        const currentReviewFiles = new Set<string>();
+        let reviewedFilesChanged = false;
         // Collect files that need mtime checking for async batch processing
         const filesToCheckMtime: Array<{filePath: string, stateInfo: CheckboxStateInfo}> = [];
+        const reviewedVersionChecks: Array<Promise<{ filePath: string, reviewFilePath: string, isOutdated: boolean, shouldCheck: boolean }>> = [];
         
         for (const entry of diff) {
             const folder = path.dirname(entry.dstAbsPath);
@@ -656,6 +774,22 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
 
             // Track new file paths
             newFilePaths.add(entry.dstAbsPath);
+            const reviewFilePath = this.toReviewFilePath(entry.dstAbsPath);
+            currentReviewFiles.add(reviewFilePath);
+
+            const reviewedState = this.reviewedFiles.get(reviewFilePath);
+            if (reviewedState) {
+                reviewedVersionChecks.push((async () => {
+                    const currentVersion = await this.getReviewedVersionToken(entry);
+                    const isOutdated = reviewedState.lastReviewedVersion !== currentVersion;
+                    return {
+                        filePath: entry.dstAbsPath,
+                        reviewFilePath,
+                        isOutdated,
+                        shouldCheck: reviewedState.checked && !isOutdated,
+                    };
+                })());
+            }
             
             // Collect checked files for mtime checking to reset if modified after being checked
             if (this.resetCheckboxOnFileChange) {
@@ -687,11 +821,46 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             
             const pathsToReset = await Promise.all(statPromises);
             const actualPathsToReset = pathsToReset.filter((filePath): filePath is string => filePath !== null);
-            actualPathsToReset.forEach(filePath => this.checkboxStates.delete(filePath));
+            actualPathsToReset.forEach(filePath => {
+                this.checkboxStates.delete(filePath);
+                const reviewFilePath = this.toReviewFilePath(filePath);
+                if (this.reviewedFiles.delete(reviewFilePath)) {
+                    reviewedFilesChanged = true;
+                }
+            });
             
             // Fire tree refresh to update checkbox UI
             if (actualPathsToReset.length > 0) {
                 this._onDidChangeTreeData.fire();
+            }
+        }
+
+        if (reviewedVersionChecks.length > 0) {
+            const reviewedStatuses = await Promise.all(reviewedVersionChecks);
+            for (const status of reviewedStatuses) {
+                const reviewedState = this.reviewedFiles.get(status.reviewFilePath);
+                if (!reviewedState) {
+                    continue;
+                }
+
+                const previousOutdated = reviewedState.outdated;
+                const previousChecked = reviewedState.checked;
+                reviewedState.outdated = status.isOutdated;
+                reviewedState.checked = status.shouldCheck;
+                this.reviewedFiles.set(status.reviewFilePath, reviewedState);
+
+                if (status.shouldCheck) {
+                    this.checkboxStates.set(status.filePath, {
+                        state: TreeItemCheckboxState.Checked,
+                        timestamp: reviewedState.timestamp,
+                    });
+                } else {
+                    this.checkboxStates.delete(status.filePath);
+                }
+
+                if (previousOutdated !== reviewedState.outdated || previousChecked !== reviewedState.checked) {
+                    reviewedFilesChanged = true;
+                }
             }
         }
 
@@ -704,6 +873,13 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         }
         for (const filePath of pathsToDelete) {
             this.checkboxStates.delete(filePath);
+        }
+
+        for (const [reviewFilePath, reviewedState] of Array.from(this.reviewedFiles.entries())) {
+            if (!currentReviewFiles.has(reviewFilePath) && !reviewedState.outdated) {
+                this.reviewedFiles.delete(reviewFilePath);
+                reviewedFilesChanged = true;
+            }
         }
 
         let treeHasChanged = false;
@@ -758,6 +934,9 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         if (fireChangeEvents && (treeHasChanged || needsRefreshForSorting)) {
             this.log('Refreshing tree')
             this._onDidChangeTreeData.fire();
+        }
+        if (reviewedFilesChanged) {
+            await this.persistReviewedFiles();
         }
     }
 
@@ -1618,14 +1797,15 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
         if (element.srcAbsPath !== element.dstAbsPath) {
             item.tooltip = `${element.srcAbsPath} → ${item.tooltip}`;
         }
-        if (viewAsList) {
-            const countDescription = element.commentCount > 0
-                ? (element.commentCount >= 10 ? '+' : String(element.commentCount))
-                : '';
-            item.description = countDescription;
-        } else if (element.commentCount > 0) {
-            item.description = element.commentCount >= 10 ? '+' : String(element.commentCount);
+        const descriptionParts: string[] = [];
+        if (element.commentCount > 0) {
+            descriptionParts.push(element.commentCount >= 10 ? '+' : String(element.commentCount));
         }
+        if (element.hasNewVersion) {
+            descriptionParts.push('new ver');
+            item.tooltip = `${item.tooltip}\nCompared version changed since this file was last checked.`;
+        }
+        item.description = descriptionParts.join(' ');
         if (element.commentCount > 0) {
             item.tooltip = `${item.tooltip}\nComments: ${element.commentCount}`;
         }

@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.registerFileDecorationProvider(explorerDecorationProvider),
     );
     registerCommentsView(context, commentsProvider);
-    activateTreeCompare(context, (file) => commentsProvider.setSelectedFile(file));
+    activateTreeCompare(context, (selection) => commentsProvider.setSelection(selection));
 }
 
 export function deactivate(): void {

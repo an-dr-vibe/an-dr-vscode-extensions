@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
-import { COMMAND_NAMESPACE, COMMENTS_VIEW_ID } from './gitTreeCompare/constants';
-import { FileCommentEntry, loadReviewData, getCommentsForFile, onDidChangeReviewData } from './reviewStore';
+import { COMMAND_NAMESPACE, COMMENTS_VIEW_ID, CONTEXT_NAMESPACE } from './gitTreeCompare/constants';
+import { FileCommentEntry, FileCommentsGroup, getCommentsForFiles, loadReviewData, onDidChangeReviewData } from './reviewStore';
+
+const COMMENTS_VIEW_AS_LIST_STATE_KEY = 'commentsView.asList';
+
+export interface CommentsSelection {
+    label: string;
+    files: string[];
+}
 
 class EmptyStateItem extends vscode.TreeItem {
     constructor(label: string) {
@@ -34,11 +41,21 @@ class CommentItem extends vscode.TreeItem {
     }
 }
 
+class CommentGroupItem extends vscode.TreeItem {
+    constructor(readonly group: FileCommentsGroup) {
+        super(group.file, vscode.TreeItemCollapsibleState.Expanded);
+        this.description = group.entries.length === 1 ? '1 comment' : `${group.entries.length} comments`;
+        this.tooltip = group.file;
+        this.contextValue = 'commentGroup';
+    }
+}
+
 export class CodeReviewCommentsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<vscode.TreeItem | void>();
     readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
-    private selectedFile: string | undefined;
+    private selection: CommentsSelection | undefined;
+    private commentsViewAsList = false;
 
     constructor() {
         onDidChangeReviewData(() => {
@@ -46,11 +63,30 @@ export class CodeReviewCommentsProvider implements vscode.TreeDataProvider<vscod
         });
     }
 
-    setSelectedFile(file: string | undefined): void {
-        if (this.selectedFile === file) {
+    initialize(context: vscode.ExtensionContext): void {
+        this.commentsViewAsList = context.workspaceState.get<boolean>(COMMENTS_VIEW_AS_LIST_STATE_KEY, false);
+        void this.updateCommentsViewContext();
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand(`${COMMAND_NAMESPACE}.toggleCommentsView`, async () => {
+                await this.setCommentsViewAsList(context, !this.commentsViewAsList);
+            }),
+            vscode.commands.registerCommand(`${COMMAND_NAMESPACE}.showCommentsAsTree`, async () => {
+                await this.setCommentsViewAsList(context, false);
+            }),
+            vscode.commands.registerCommand(`${COMMAND_NAMESPACE}.showCommentsAsList`, async () => {
+                await this.setCommentsViewAsList(context, true);
+            }),
+        );
+    }
+
+    setSelection(selection: CommentsSelection | undefined): void {
+        const nextFiles = selection?.files.join('\n');
+        const currentFiles = this.selection?.files.join('\n');
+        if (this.selection?.label === selection?.label && currentFiles === nextFiles) {
             return;
         }
-        this.selectedFile = file;
+        this.selection = selection;
         this.refresh();
     }
 
@@ -59,6 +95,9 @@ export class CodeReviewCommentsProvider implements vscode.TreeDataProvider<vscod
     }
 
     async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
+        if (element instanceof CommentGroupItem) {
+            return element.group.entries.map((entry) => new CommentItem(entry));
+        }
         if (element) {
             return [];
         }
@@ -66,25 +105,45 @@ export class CodeReviewCommentsProvider implements vscode.TreeDataProvider<vscod
         if (!vscode.workspace.workspaceFolders?.[0]?.uri) {
             return [new EmptyStateItem('Open a workspace to view comments')];
         }
-        if (!this.selectedFile) {
-            return [new EmptyStateItem('Select a file to view comments')];
+        if (!this.selection || this.selection.files.length === 0) {
+            return [new EmptyStateItem('Select a file or folder to view comments')];
         }
 
         const data = await loadReviewData();
-        const entries = getCommentsForFile(data, this.selectedFile);
-        if (entries.length === 0) {
-            return [new EmptyStateItem('No comments for this file')];
+        const groups = getCommentsForFiles(data, this.selection.files);
+        if (groups.length === 0) {
+            return [new EmptyStateItem(`No comments for ${this.selection.label}`)];
         }
 
-        return entries.map((entry) => new CommentItem(entry));
+        if (this.commentsViewAsList || groups.length === 1) {
+            return groups.flatMap((group) => group.entries.map((entry) => new CommentItem(entry)));
+        }
+
+        return groups.map((group) => new CommentGroupItem(group));
     }
 
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
         return element;
     }
+
+    private async setCommentsViewAsList(context: vscode.ExtensionContext, value: boolean): Promise<void> {
+        if (this.commentsViewAsList === value) {
+            return;
+        }
+        this.commentsViewAsList = value;
+        await context.workspaceState.update(COMMENTS_VIEW_AS_LIST_STATE_KEY, value);
+        await this.updateCommentsViewContext();
+        this.refresh();
+    }
+
+    private async updateCommentsViewContext(): Promise<void> {
+        await vscode.commands.executeCommand('setContext', `${CONTEXT_NAMESPACE}.commentsViewAsList`, this.commentsViewAsList);
+    }
 }
 
 export function registerCommentsView(context: vscode.ExtensionContext, provider: CodeReviewCommentsProvider): void {
+    provider.initialize(context);
+
     const treeView = vscode.window.createTreeView(COMMENTS_VIEW_ID, {
         treeDataProvider: provider,
         canSelectMany: false,

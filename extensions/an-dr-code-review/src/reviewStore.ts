@@ -29,6 +29,23 @@ export interface FileCommentEntry {
     comment: StoredComment;
 }
 
+export interface FileCommentsGroup {
+    file: string;
+    entries: FileCommentEntry[];
+}
+
+export interface ReviewedFileState {
+    checked: boolean;
+    outdated: boolean;
+    lastReviewedVersion: string;
+    timestamp: number;
+}
+
+export interface ReviewedFilesData {
+    version: number;
+    files: Record<string, ReviewedFileState>;
+}
+
 const CODE_REVIEW_DIR = 'code-review';
 const GITIGNORE_CONTENT = '*\n';
 
@@ -54,6 +71,14 @@ function getDataFileUri(): vscode.Uri | null {
     }
     const cfg = vscode.workspace.getConfiguration('codeReview');
     return vscode.Uri.joinPath(root, cfg.get<string>('dataFile', `${CODE_REVIEW_DIR}/.code-review.json`));
+}
+
+function getReviewedFilesUri(): vscode.Uri | null {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (!root) {
+        return null;
+    }
+    return vscode.Uri.joinPath(root, CODE_REVIEW_DIR, '.checked-files.json');
 }
 
 export async function ensureCodeReviewDir(): Promise<void> {
@@ -83,6 +108,19 @@ export async function loadReviewData(): Promise<ReviewData> {
     }
 }
 
+export async function loadReviewedFilesData(): Promise<ReviewedFilesData> {
+    const uri = getReviewedFilesUri();
+    if (!uri) {
+        return { version: 1, files: {} };
+    }
+    try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        return JSON.parse(Buffer.from(bytes).toString('utf8')) as ReviewedFilesData;
+    } catch {
+        return { version: 1, files: {} };
+    }
+}
+
 export async function saveReviewData(data: ReviewData): Promise<void> {
     const uri = getDataFileUri();
     if (!uri) {
@@ -91,6 +129,15 @@ export async function saveReviewData(data: ReviewData): Promise<void> {
     await ensureCodeReviewDir();
     await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(data, null, 2), 'utf8'));
     fireReviewDataChanged();
+}
+
+export async function saveReviewedFilesData(data: ReviewedFilesData): Promise<void> {
+    const uri = getReviewedFilesUri();
+    if (!uri) {
+        return;
+    }
+    await ensureCodeReviewDir();
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(data, null, 2), 'utf8'));
 }
 
 export function relativeFilePath(rootUri: vscode.Uri, fileUri: vscode.Uri): string {
@@ -134,4 +181,39 @@ export function getCommentsForFile(data: ReviewData, file: string): FileCommentE
         return a.comment.timestamp.localeCompare(b.comment.timestamp);
     });
     return entries;
+}
+
+export function getCommentsForFiles(data: ReviewData, files: Iterable<string>): FileCommentsGroup[] {
+    const normalizedFiles = new Set(Array.from(files, (file) => file.replace(/\\/g, '/')));
+    const groups = new Map<string, FileCommentEntry[]>();
+
+    for (const thread of data.threads) {
+        if (!normalizedFiles.has(thread.file)) {
+            continue;
+        }
+
+        const entries = groups.get(thread.file) ?? [];
+        for (const comment of thread.comments) {
+            entries.push({
+                file: thread.file,
+                line: thread.line,
+                endLine: thread.endLine,
+                resolved: thread.resolved,
+                comment,
+            });
+        }
+        groups.set(thread.file, entries);
+    }
+
+    return Array.from(groups.entries())
+        .map(([file, entries]) => ({
+            file,
+            entries: entries.sort((a, b) => {
+                if (a.line !== b.line) {
+                    return a.line - b.line;
+                }
+                return a.comment.timestamp.localeCompare(b.comment.timestamp);
+            }),
+        }))
+        .sort((a, b) => a.file.localeCompare(b.file));
 }

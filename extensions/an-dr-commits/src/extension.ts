@@ -13,6 +13,7 @@ import { onStartUp } from './life-cycle/startup';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
 import { StatusBarItem } from './statusBarItem';
+import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from './tabUtils';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, findGit, getGitExecutableFromPaths, showErrorMessage, showInformationMessage } from './utils';
 import { EventEmitter } from './utils/event';
 
@@ -105,16 +106,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	const tabGroups = (vscode.window as any).tabGroups;
 	if (tabGroups && typeof tabGroups.onDidChangeTabs === 'function') {
-		const isCommitsTab = (tab: any) => {
-			const input = tab && tab.input;
-			const viewType = input && typeof input.viewType === 'string' ? input.viewType : '';
-			return commitsTabViewTypes.has(viewType) || tab.label === commitsTabLabel;
-		};
+		let duplicateCloseInFlight = false;
+		const isCommitsTab = (tab: any) => isMatchingWebviewTab(tab, commitsTabViewTypes, commitsTabLabel);
 
 		const doesCommitsTabExist = () => {
-			return tabGroups.all.some((group: any) => group.tabs.some((tab: any) => {
-				return isCommitsTab(tab);
-			}));
+			return getMatchingTabs(tabGroups, isCommitsTab).length > 0;
 		};
 
 		const cancelPendingOrphanCheck = () => {
@@ -138,7 +134,26 @@ export async function activate(context: vscode.ExtensionContext) {
 			}, 250);
 		};
 
+		const closeDuplicateCommitsTabs = async () => {
+			if (duplicateCloseInFlight || typeof tabGroups.close !== 'function') return;
+
+			const duplicateTabs = getDuplicateTabsToClose(tabGroups, isCommitsTab);
+			if (duplicateTabs.length === 0) return;
+
+			duplicateCloseInFlight = true;
+			delayOrphanChecks('closing duplicate Commits tabs', 1000);
+			try {
+				await tabGroups.close(duplicateTabs, true);
+				logger.logWarning('Closed ' + duplicateTabs.length + ' duplicate Commits tab' + (duplicateTabs.length === 1 ? '' : 's') + '.');
+			} catch (error) {
+				logger.logError('Unable to close duplicate Commits tabs: ' + String(error));
+			} finally {
+				duplicateCloseInFlight = false;
+			}
+		};
+
 		context.subscriptions.push(tabGroups.onDidChangeTabs(() => {
+			void closeDuplicateCommitsTabs();
 			try {
 				const hasCommitsTab = doesCommitsTabExist();
 				if (CommitsView.currentPanel && !hasCommitsTab) {
@@ -150,6 +165,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				logger.logError('Unable to evaluate Commits tab tracking: ' + String(error));
 			}
 		}));
+		void closeDuplicateCommitsTabs();
 	}
 	logger.log('Started Commits - Ready to use!');
 	if (extensionState.getReopenCommitsOnStartup()) {

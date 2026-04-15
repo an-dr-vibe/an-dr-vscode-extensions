@@ -5,8 +5,9 @@ import { GitTreeCompareProvider } from './treeProvider';
 import { createGit } from './gitHelper';
 import { toDisposable } from './git/util';
 import { GitExtension } from './typings/git';
+import { CommentsSelection } from '../commentsView';
 
-export function activate(context: ExtensionContext, onSelectedFileChange?: (file: string | undefined) => void) {
+export function activate(context: ExtensionContext, onSelectedSelectionChange?: (selection: CommentsSelection | undefined) => void) {
     const disposables: Disposable[] = [];
     context.subscriptions.push(new Disposable(() => Disposable.from(...disposables).dispose()));
 
@@ -143,6 +144,6 @@ export function activate(context: ExtensionContext, onSelectedFileChange?: (file
             }
         );
 
-        provider.init(treeView, onSelectedFileChange);
+        provider.init(treeView, onSelectedSelectionChange);
     });
 }

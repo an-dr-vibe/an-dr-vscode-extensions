@@ -246,6 +246,24 @@
         "command": "an-dr-code-review.openCommentLocation",
         "title": "Open Comment Location",
         "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.toggleCommentsView",
+        "title": "Toggle Comments View",
+        "icon": "$(list-tree)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.showCommentsAsTree",
+        "title": "Show Comments as Tree",
+        "icon": "$(list-tree)",
+        "category": "Code Review"
+      },
+      {
+        "command": "an-dr-code-review.showCommentsAsList",
+        "title": "Show Comments as List",
+        "icon": "$(list-flat)",
+        "category": "Code Review"
       }
     ],
     "submenus": [
@@ -428,6 +446,16 @@
           "submenu": "an-dr-code-review.viewAndSort",
           "when": "view == anDrCodeReviewChanges",
           "group": "0_view_and_sort"
+        },
+        {
+          "command": "an-dr-code-review.showCommentsAsList",
+          "when": "view == anDrCodeReviewComments && !anDrCodeReview.commentsViewAsList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "an-dr-code-review.showCommentsAsTree",
+          "when": "view == anDrCodeReviewComments && anDrCodeReview.commentsViewAsList",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [

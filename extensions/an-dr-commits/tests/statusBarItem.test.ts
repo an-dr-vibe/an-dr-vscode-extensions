@@ -207,9 +207,7 @@ describe('StatusBarItem', () => {
 		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Run
-		statusBarItem.setActiveCommit({
-			repo: '/path/to/workspace-folder',
-			hash: '1a2b3c4d',
+		statusBarItem.setRepoCommit({
 			text: '1a2b3c4d',
 			tooltip: 'Fix current line blame'
 		});
@@ -225,11 +223,10 @@ describe('StatusBarItem', () => {
 
 	it('Should show an optional blame Status Bar Item that reveals the commit in Commits', () => {
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
-		vscode.mockExtensionSettingReturnValue('blame.statusBarItemEnabled', true);
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 		const blameItem = vscode.getStatusBarItem(1);
 
-		statusBarItem.setActiveCommit({
+		statusBarItem.setBlameCommit({
 			repo: '/path/to/workspace-folder',
 			hash: '1a2b3c4d',
 			text: '1a2b3c4d',
@@ -249,12 +246,11 @@ describe('StatusBarItem', () => {
 
 	it('Should show the Blame label when blame.statusBarIconOnly is disabled', () => {
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
-		vscode.mockExtensionSettingReturnValue('blame.statusBarItemEnabled', true);
 		vscode.mockExtensionSettingReturnValue('blame.statusBarIconOnly', false);
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 		const blameItem = vscode.getStatusBarItem(1);
 
-		statusBarItem.setActiveCommit({
+		statusBarItem.setBlameCommit({
 			repo: '/path/to/workspace-folder',
 			hash: '1a2b3c4d',
 			text: '1a2b3c4d',

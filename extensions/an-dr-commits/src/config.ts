@@ -680,7 +680,7 @@ class Config {
 	}
 
 	get blameStatusBarItemEnabled() {
-		return !!this.config.get('blame.statusBarItemEnabled', false);
+		return !!this.config.get('blame.statusBarItemEnabled', true);
 	}
 
 	get blameStatusBarIconOnly() {

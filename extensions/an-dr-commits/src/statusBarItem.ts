@@ -17,7 +17,8 @@ export class StatusBarItem extends Disposable {
 	private readonly logger: Logger;
 	private readonly commitsStatusBarItem: vscode.StatusBarItem;
 	private readonly blameStatusBarItem: vscode.StatusBarItem;
-	private activeCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null = null;
+	private repoCommit: { text: string, tooltip: string } | null = null;
+	private blameCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null = null;
 	private isCommitsVisible: boolean = false;
 	private isBlameVisible: boolean = false;
 	private numRepos: number = 0;
@@ -71,8 +72,13 @@ export class StatusBarItem extends Disposable {
 	 * Updates the current line's commit shown in the Status Bar Item.
 	 * @param activeCommit The active commit display, or NULL to show the default Commits label.
 	 */
-	public setActiveCommit(activeCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null) {
-		this.activeCommit = activeCommit;
+	public setRepoCommit(repoCommit: { text: string, tooltip: string } | null) {
+		this.repoCommit = repoCommit;
+		this.refresh();
+	}
+
+	public setBlameCommit(blameCommit: { repo: string, hash: string | null, text: string, tooltip: string } | null) {
+		this.blameCommit = blameCommit;
 		this.refresh();
 	}
 
@@ -81,9 +87,9 @@ export class StatusBarItem extends Disposable {
 	 */
 	private refresh() {
 		const config = getConfig();
-		if (config.statusBarShowCurrentCommit && this.activeCommit !== null) {
-			this.commitsStatusBarItem.text = StatusBarItem.COMMITS_ICON + ' ' + this.activeCommit.text;
-			this.commitsStatusBarItem.tooltip = this.activeCommit.tooltip;
+		if (config.statusBarShowCurrentCommit && this.repoCommit !== null) {
+			this.commitsStatusBarItem.text = StatusBarItem.COMMITS_ICON + ' ' + this.repoCommit.text;
+			this.commitsStatusBarItem.tooltip = this.repoCommit.tooltip;
 		} else {
 			this.commitsStatusBarItem.text = config.statusBarIconOnly
 				? StatusBarItem.COMMITS_ICON
@@ -102,20 +108,20 @@ export class StatusBarItem extends Disposable {
 			this.isCommitsVisible = shouldShowCommits;
 		}
 
-		if (this.activeCommit !== null) {
+		if (this.blameCommit !== null) {
 			this.blameStatusBarItem.text = config.blameStatusBarIconOnly
-				? StatusBarItem.BLAME_ICON + ' ' + this.activeCommit.text
-				: StatusBarItem.BLAME_ICON + ' ' + StatusBarItem.BLAME_NAME + ' ' + this.activeCommit.text;
-			this.blameStatusBarItem.tooltip = this.activeCommit.tooltip;
-			(this.blameStatusBarItem as vscode.StatusBarItem & { command?: any }).command = this.activeCommit.hash !== null
+				? StatusBarItem.BLAME_ICON + ' ' + this.blameCommit.text
+				: StatusBarItem.BLAME_ICON + ' ' + StatusBarItem.BLAME_NAME + ' ' + this.blameCommit.text;
+			this.blameStatusBarItem.tooltip = this.blameCommit.tooltip;
+			(this.blameStatusBarItem as vscode.StatusBarItem & { command?: any }).command = this.blameCommit.hash !== null
 				? {
 					title: 'Reveal Commit in Commits',
 					command: 'an-dr-commits.revealCommitInGraph',
-					arguments: [{ repo: this.activeCommit.repo, commitHash: this.activeCommit.hash }]
+					arguments: [{ repo: this.blameCommit.repo, commitHash: this.blameCommit.hash }]
 				}
 				: undefined;
 		}
-		const shouldShowBlame = config.blameStatusBarItemEnabled && this.numRepos > 0 && this.activeCommit !== null;
+		const shouldShowBlame = config.blameStatusBarItemEnabled && this.numRepos > 0 && this.blameCommit !== null;
 		if (this.isBlameVisible !== shouldShowBlame) {
 			if (shouldShowBlame) {
 				this.blameStatusBarItem.show();

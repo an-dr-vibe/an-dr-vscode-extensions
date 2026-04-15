@@ -380,6 +380,10 @@ export class DataSource extends Disposable {
 		return this.spawnGit(args, repo, (stdout) => parseBlameLineOutput(stdout));
 	}
 
+	public getCommitDisplayInfo(repo: string, commitHash: string): Promise<CommitDisplayInfo | null> {
+		return this.spawnGit(['show', '--quiet', '--format=%H%n%s', commitHash], repo, (stdout) => parseCommitDisplayOutput(stdout));
+	}
+
 
 	/* Get Data Methods - Commit Details View */
 
@@ -2422,6 +2426,11 @@ export interface BlameLineInfo {
 	readonly summary: string;
 }
 
+export interface CommitDisplayInfo {
+	readonly hash: string;
+	readonly summary: string;
+}
+
 function parseBlameLineOutput(stdout: string): BlameLineInfo | null {
 	const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
 	if (lines.length === 0) return null;
@@ -2453,5 +2462,14 @@ function parseBlameLineOutput(stdout: string): BlameLineInfo | null {
 		committed: hash !== '0000000000000000000000000000000000000000',
 		hash: hash,
 		summary: summary
+	};
+}
+
+function parseCommitDisplayOutput(stdout: string): CommitDisplayInfo | null {
+	const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
+	if (lines.length === 0 || lines[0].length === 0) return null;
+	return {
+		hash: lines[0],
+		summary: typeof lines[1] === 'string' ? lines[1] : ''
 	};
 }

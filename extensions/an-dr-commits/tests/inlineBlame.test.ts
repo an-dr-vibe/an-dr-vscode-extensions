@@ -11,9 +11,9 @@ describe('InlineBlameController', () => {
 	let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 	let onDidChangeRepos: EventEmitter<any>;
 	let logger: Logger;
-	let dataSource: { getBlameLine: jest.Mock, getConfig: jest.Mock };
+	let dataSource: { getBlameLine: jest.Mock, getConfig: jest.Mock, getCommitDisplayInfo: jest.Mock };
 	let repoManager: { getRepoContainingFile: jest.Mock, onDidChangeRepos: any };
-	let statusBarItem: { setActiveCommit: jest.Mock };
+	let statusBarItem: { setRepoCommit: jest.Mock, setBlameCommit: jest.Mock };
 
 	beforeEach(() => {
 		jest.useFakeTimers();
@@ -28,6 +28,10 @@ describe('InlineBlameController', () => {
 				committed: true,
 				hash: '1a2b3c4d5e6f7g8h9i0j',
 				summary: 'Fix inline blame rendering'
+			}),
+			getCommitDisplayInfo: jest.fn().mockResolvedValue({
+				hash: '9f8e7d6c5b4a3210',
+				summary: 'Current repository HEAD'
 			}),
 			getConfig: jest.fn().mockResolvedValue({
 				config: {
@@ -44,7 +48,8 @@ describe('InlineBlameController', () => {
 			onDidChangeRepos: onDidChangeRepos.subscribe
 		};
 		statusBarItem = {
-			setActiveCommit: jest.fn()
+			setRepoCommit: jest.fn(),
+			setBlameCommit: jest.fn()
 		};
 		vscode.mockExtensionSettingReturnValue('inlineBlame.enabled', true);
 	});
@@ -55,16 +60,22 @@ describe('InlineBlameController', () => {
 	});
 
 	it('Should render inline blame for the active line', async () => {
+		vscode.mockExtensionSettingReturnValue('statusBarShowCurrentCommit', true);
 		const controller = new InlineBlameController(dataSource as any, repoManager as any, statusBarItem as any, onDidChangeConfiguration.subscribe, logger);
 
 		await (controller as any).update(vscode.window.activeTextEditor);
 
 		expect(dataSource.getBlameLine).toHaveBeenCalledWith('/path/to/workspace-folder', '/path/to/workspace-folder/active-file.txt', 0);
+		expect(dataSource.getCommitDisplayInfo).toHaveBeenCalledWith('/path/to/workspace-folder', 'HEAD');
 		expect(vscode.window.activeTextEditor.setDecorations).toHaveBeenCalledTimes(1);
 		const decoration = vscode.window.activeTextEditor.setDecorations.mock.calls[0][1][0];
 		expect(decoration.renderOptions.after.contentText).toContain('Jane Doe');
 		expect(decoration.renderOptions.after.contentText).toContain('Blame');
-		expect(statusBarItem.setActiveCommit).toHaveBeenCalledWith(expect.objectContaining({
+		expect(statusBarItem.setRepoCommit).toHaveBeenCalledWith({
+			text: '9f8e7d6c',
+			tooltip: 'Current repository HEAD'
+		});
+		expect(statusBarItem.setBlameCommit).toHaveBeenCalledWith(expect.objectContaining({
 			repo: '/path/to/workspace-folder',
 			hash: '1a2b3c4d5e6f7g8h9i0j',
 			text: expect.stringContaining('1a2b3c4d')
@@ -81,7 +92,11 @@ describe('InlineBlameController', () => {
 		await (controller as any).update(vscode.window.activeTextEditor);
 
 		expect(vscode.window.activeTextEditor.setDecorations).toHaveBeenCalledWith(expect.anything(), []);
-		expect(statusBarItem.setActiveCommit).toHaveBeenCalledWith(expect.objectContaining({
+		expect(statusBarItem.setRepoCommit).toHaveBeenCalledWith({
+			text: '9f8e7d6c',
+			tooltip: 'Current repository HEAD'
+		});
+		expect(statusBarItem.setBlameCommit).toHaveBeenCalledWith(expect.objectContaining({
 			repo: '/path/to/workspace-folder',
 			hash: '1a2b3c4d5e6f7g8h9i0j',
 			text: expect.stringContaining('1a2b3c4d')
@@ -98,7 +113,8 @@ describe('InlineBlameController', () => {
 
 		expect(dataSource.getBlameLine).not.toHaveBeenCalled();
 		expect(vscode.window.activeTextEditor.setDecorations).toHaveBeenCalledWith(expect.anything(), []);
-		expect(statusBarItem.setActiveCommit).toHaveBeenCalledWith(null);
+		expect(statusBarItem.setRepoCommit).toHaveBeenCalledWith(null);
+		expect(statusBarItem.setBlameCommit).toHaveBeenCalledWith(null);
 
 		controller.dispose();
 	});

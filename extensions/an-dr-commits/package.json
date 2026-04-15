@@ -1328,7 +1328,7 @@
 				},
 				"an-dr-commits.blame.statusBarItemEnabled": {
 					"type": "boolean",
-					"default": false,
+					"default": true,
 					"description": "Show a separate Blame status bar item for the current line. Clicking it opens that commit in Commits."
 				},
 				"an-dr-commits.blame.statusBarIconOnly": {

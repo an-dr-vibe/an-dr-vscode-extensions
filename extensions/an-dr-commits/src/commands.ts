@@ -47,6 +47,7 @@ export class CommandManager extends Disposable {
 
 		// Register Extension Commands
 		this.registerCommand('an-dr-commits.view', (arg) => this.view(arg));
+		this.registerCommand('an-dr-commits.viewFromStatusBar', (arg) => this.viewFromStatusBar(arg));
 		this.registerCommand('an-dr-commits.addGitRepository', () => this.addGitRepository());
 		this.registerCommand('an-dr-commits.removeGitRepository', () => this.removeGitRepository());
 		this.registerCommand('an-dr-commits.clearAvatarCache', () => this.clearAvatarCache());
@@ -121,8 +122,30 @@ export class CommandManager extends Disposable {
 				// The repo is not currently known, add it
 				loadRepo = (await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), true)).root;
 			}
-		} else if (getConfig().openToTheRepoOfTheActiveTextEditorDocument && vscode.window.activeTextEditor) {
+		} else {
+			loadRepo = await this.getSelectedSourceControlRepo();
+		}
+
+		if (loadRepo === null && getConfig().openToTheRepoOfTheActiveTextEditorDocument && vscode.window.activeTextEditor) {
 			// If the config setting is enabled, load the repo containing the active text editor document
+			loadRepo = await this.repoManager.resolveRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri), true);
+		}
+
+		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);
+	}
+
+	private async viewFromStatusBar(arg?: any) {
+		let loadRepo: string | null = null;
+		if (typeof arg === 'object' && typeof arg.repo === 'string') {
+			const repoPath = arg.repo;
+			loadRepo = await this.repoManager.getKnownRepo(repoPath);
+			if (loadRepo === null && isPathInWorkspace(repoPath)) {
+				loadRepo = (await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), true)).root;
+			}
+		} else {
+			loadRepo = await this.getSelectedSourceControlRepo();
+		}
+		if (loadRepo === null && getConfig().openToTheRepoOfTheActiveTextEditorDocument && vscode.window.activeTextEditor) {
 			loadRepo = await this.repoManager.resolveRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri), true);
 		}
 

@@ -29,6 +29,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	const commitsTabLabel = 'Commits';
 	let orphanCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 	let suppressOrphanChecksUntil = 0;
+	const hasExistingCommitsTab = () => {
+		const tabGroups = (vscode.window as any).tabGroups;
+		return !!(tabGroups && typeof tabGroups.onDidChangeTabs === 'function' && getMatchingTabs(tabGroups, (tab: any) => isMatchingWebviewTab(tab, commitsTabViewTypes, commitsTabLabel)).length > 0);
+	};
 
 	const delayOrphanChecks = (reason: string, durationMs: number) => {
 		const nextSuppressionTime = Date.now() + durationMs;
@@ -171,7 +175,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		void closeDuplicateCommitsTabs();
 	}
 	logger.log('Started Commits - Ready to use!');
-	if (extensionState.getReopenCommitsOnStartup()) {
+	if (extensionState.getReopenCommitsOnStartup() && !hasExistingCommitsTab()) {
 		logger.log('Reopening Commits because it was open before reload.');
 		setTimeout(() => {
 			void vscode.commands.executeCommand('an-dr-commits.view');

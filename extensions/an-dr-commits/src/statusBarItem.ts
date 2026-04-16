@@ -33,7 +33,7 @@ export class StatusBarItem extends Disposable {
 		this.logger = logger;
 
 		this.commitsStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
-		this.commitsStatusBarItem.command = 'an-dr-commits.view';
+		this.commitsStatusBarItem.command = 'an-dr-commits.viewFromStatusBar';
 		this.blameStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
 
 		this.registerDisposables(
@@ -92,7 +92,7 @@ export class StatusBarItem extends Disposable {
 			this.commitsStatusBarItem.tooltip = this.repoCommit.tooltip;
 			(this.commitsStatusBarItem as vscode.StatusBarItem & { command?: any }).command = {
 				title: 'Open Commits',
-				command: 'an-dr-commits.view',
+				command: 'an-dr-commits.viewFromStatusBar',
 				arguments: [{ repo: this.repoCommit.repo }]
 			};
 		} else {
@@ -100,7 +100,7 @@ export class StatusBarItem extends Disposable {
 				? StatusBarItem.COMMITS_ICON
 				: StatusBarItem.COMMITS_ICON + ' ' + StatusBarItem.COMMITS_NAME;
 			this.commitsStatusBarItem.tooltip = StatusBarItem.COMMITS_NAME;
-			(this.commitsStatusBarItem as vscode.StatusBarItem & { command?: any }).command = 'an-dr-commits.view';
+			(this.commitsStatusBarItem as vscode.StatusBarItem & { command?: any }).command = 'an-dr-commits.viewFromStatusBar';
 		}
 		const shouldShowCommits = config.showStatusBarItem && this.numRepos > 0;
 		if (this.isCommitsVisible !== shouldShowCommits) {

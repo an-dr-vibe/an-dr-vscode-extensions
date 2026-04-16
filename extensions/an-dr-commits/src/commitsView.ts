@@ -12,6 +12,7 @@ import { ErrorInfo, GitConfigLocation, CommitsViewInitialState, GitPushBranchMod
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, isPathInWorkspace, openExtensionSettings, openExternalUrl, openFile, resolveToSymbolicPath, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
 import { renderCommitsWebviewHtml } from './view/webviewHtml';
+import { getMatchingTabs, isMatchingWebviewTab } from './tabUtils';
 
 /**
  * Manages the Commits View.
@@ -51,7 +52,7 @@ export class CommitsView extends Disposable {
 	 * @param logger The Commits Logger instance.
 	 * @param loadViewTo What to load the view to.
 	 */
-	public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadCommitsViewTo) {
+	public static async createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadCommitsViewTo) {
 		const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
 
 		if (CommitsView.currentPanel) {
@@ -68,6 +69,19 @@ export class CommitsView extends Disposable {
 			CommitsView.currentPanel.panel.reveal(column);
 		} else {
 			// If Commits panel doesn't already exist
+			const tabGroups = (vscode.window as any).tabGroups;
+			if (tabGroups && typeof tabGroups.close === 'function') {
+				const commitsTabViewTypes = new Set([CommitsView.VIEW_TYPE, 'mainThreadWebview-' + CommitsView.VIEW_TYPE]);
+				const matchingTabs = getMatchingTabs(tabGroups, (tab) => isMatchingWebviewTab(tab, commitsTabViewTypes, CommitsView.NAME));
+				if (matchingTabs.length > 0) {
+					try {
+						await tabGroups.close(matchingTabs, true);
+						logger.logWarning('Closed ' + matchingTabs.length + ' existing Commits tab' + (matchingTabs.length === 1 ? '' : 's') + ' before creating a new panel.');
+					} catch (error) {
+						logger.logError('Unable to close existing Commits tabs before creating a new panel: ' + String(error));
+					}
+				}
+			}
 			CommitsView.currentPanel = new CommitsView(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, loadViewTo, column);
 		}
 	}
@@ -207,6 +221,13 @@ export class CommitsView extends Disposable {
 
 		// Render the content of the Webview
 		this.update();
+		if (loadViewTo !== null) {
+			setTimeout(() => {
+				if (this.isDisposed()) return;
+				this.logger.logDebug('Re-sending requested repo to Commits webview after initial render: ' + loadViewTo.repo);
+				this.respondLoadRepos(this.repoManager.getRepos(), loadViewTo);
+			}, 300);
+		}
 
 		this.logger.log((restoredFromSerializer ? 'Restored' : 'Created') + ' Commits View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
 	}

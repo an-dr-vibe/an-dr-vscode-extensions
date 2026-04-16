@@ -151,7 +151,7 @@ class CommitsView {
 		this.observeUrls();
 		this.observeTableEvents();
 
-		const canRestoreFromPrevState = !!prevState && !prevState.currentRepoLoading &&
+		const canRestoreFromPrevState = initialState.loadViewTo === null && !!prevState && !prevState.currentRepoLoading &&
 			typeof this.gitRepos[prevState.currentRepo] !== 'undefined' && prevState.commits.length > 0;
 		if (canRestoreFromPrevState && prevState) commitsRestoreFromPrevState(this, prevState);
 

@@ -74,13 +74,13 @@ function commitsResolveLoadViewTo(view: any, prevState: any, canRestoreFromPrevS
 
 function commitsBootstrapLoad(view: any, prevState: any, loadViewTo: GG.LoadCommitsViewTo) {
 	if (!view.loadRepos(view.gitRepos, initialState.lastActiveRepo, loadViewTo)) {
-		if (prevState) {
+		if (prevState && loadViewTo === null) {
 			view.scrollTop = prevState.scrollTop;
 			view.viewElem.scroll(0, view.scrollTop);
 		}
 		view.requestLoadRepoInfoAndCommits(false, false);
 	}
-	if (prevState !== null) {
+	if (prevState !== null && loadViewTo === null) {
 		// After VS Code restores a webview, the first load sequence can occasionally stall.
 		// Re-request repos shortly after startup to guarantee the view fully bootstraps.
 		setTimeout(() => {

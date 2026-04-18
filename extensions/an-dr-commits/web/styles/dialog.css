@@ -217,6 +217,35 @@ body.vscode-high-contrast .dialog{
 	z-index:43;
 }
 
+.dialog .dialogStashFileList{
+	max-height:180px;
+	overflow-y:auto;
+	text-align:left;
+	margin-top:8px;
+	border:1px solid rgba(128,128,128,0.3);
+	border-radius:4px;
+	padding:4px 8px;
+}
+.dialog .dialogStashFileList ul{
+	margin:0;
+	padding-left:16px;
+}
+.dialog .dialogStashFileList li{
+	font-family:var(--vscode-editor-font-family,monospace);
+	font-size:12px;
+	line-height:18px;
+	word-break:break-all;
+}
+
+.dialog #dialogAction2{
+	background-color:rgba(128,128,128,0.15);
+	border-color:rgba(128,128,128,0.8);
+	box-shadow:0 0 1px 1px rgba(128,128,128,0.2);
+}
+.dialog #dialogAction2:hover{
+	background-color:rgba(128,128,128,0.25);
+}
+
 
 /* Custom Select Input */
 

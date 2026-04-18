@@ -615,10 +615,28 @@ export class CommitsView extends Disposable {
 					error: await this.dataSource.setRemoteDefaultBranch(msg.repo, msg.remote, msg.branch)
 				});
 				break;
-			case 'pullBranch':
+			case 'pullBranch': {
+				const pullError = await this.dataSource.pullBranch(msg.repo, msg.branchName, msg.remote, msg.createNewCommit, msg.squash);
+				if (pullError !== null && (pullError.includes('cannot pull with rebase') || pullError.includes('You have unstaged changes'))) {
+					const files = await this.dataSource.getUnstagedFiles(msg.repo);
+					this.sendMessage({
+						command: 'pullBranchUnstagedChanges',
+						repo: msg.repo,
+						branchName: msg.branchName,
+						remote: msg.remote,
+						createNewCommit: msg.createNewCommit,
+						squash: msg.squash,
+						files: files
+					});
+				} else {
+					this.sendMessage({ command: 'pullBranch', error: pullError });
+				}
+				break;
+			}
+			case 'pullBranchWithStash':
 				this.sendMessage({
 					command: 'pullBranch',
-					error: await this.dataSource.pullBranch(msg.repo, msg.branchName, msg.remote, msg.createNewCommit, msg.squash)
+					error: await this.dataSource.pullBranchWithStash(msg.repo, msg.branchName, msg.remote, msg.createNewCommit, msg.squash, msg.reapply)
 				});
 				break;
 			case 'pushBranch':

@@ -1,5 +1,22 @@
 /* Pull/push action helpers extracted from CommitsView */
 
+function handlePullBranchUnstagedChanges(msg: GG.ResponsePullBranchUnstagedChanges) {
+	const sendStashPull = (reapply: boolean) => runAction({
+		command: 'pullBranchWithStash',
+		repo: msg.repo,
+		branchName: msg.branchName,
+		remote: msg.remote,
+		createNewCommit: msg.createNewCommit,
+		squash: msg.squash,
+		reapply: reapply
+	}, reapply ? 'Stashing & Pulling Branch' : 'Stashing & Pulling Branch');
+	dialog.showPullUnstagedChanges(
+		msg.files,
+		() => sendStashPull(true),
+		() => sendStashPull(false)
+	);
+}
+
 function commitsGetCurrentPullRemote(view: any) {
 	if (view.gitBranchHead === null || view.gitBranchHead === 'HEAD' || view.gitConfig === null) return null;
 	const branchConfig = view.gitConfig.branches[view.gitBranchHead];

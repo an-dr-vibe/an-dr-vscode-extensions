@@ -513,6 +513,24 @@ export interface ResponsePullBranch extends ResponseWithErrorInfo {
 	readonly command: 'pullBranch';
 }
 
+export interface RequestPullBranchWithStash extends RepoRequest {
+	readonly command: 'pullBranchWithStash';
+	readonly branchName: string;
+	readonly remote: string;
+	readonly createNewCommit: boolean;
+	readonly squash: boolean;
+	readonly reapply: boolean;
+}
+export interface ResponsePullBranchUnstagedChanges {
+	readonly command: 'pullBranchUnstagedChanges';
+	readonly repo: string;
+	readonly branchName: string;
+	readonly remote: string;
+	readonly createNewCommit: boolean;
+	readonly squash: boolean;
+	readonly files: string[];
+}
+
 export interface RequestPushBranch extends RepoRequest {
 	readonly command: 'pushBranch';
 	readonly branchName: string;
@@ -848,6 +866,7 @@ export type RequestMessage =
 	| RequestPopStash
 	| RequestPruneRemote
 	| RequestPullBranch
+	| RequestPullBranchWithStash
 	| RequestPushBranch
 	| RequestPushStash
 	| RequestPushTag
@@ -919,6 +938,7 @@ export type ResponseMessage =
 	| ResponsePopStash
 	| ResponsePruneRemote
 	| ResponsePullBranch
+	| ResponsePullBranchUnstagedChanges
 	| ResponsePushBranch
 	| ResponsePushStash
 	| ResponsePushTag

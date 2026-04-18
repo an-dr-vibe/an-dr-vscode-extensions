@@ -343,6 +343,50 @@ class Dialog {
 	}
 
 	/**
+	 * Show a dialog when pull fails due to unstaged changes, offering stash options.
+	 * @param files The list of files with unstaged changes.
+	 * @param onStashAndReapply Callback when the user chooses to stash and re-apply after pull.
+	 * @param onStashOnly Callback when the user chooses to stash only (no re-apply).
+	 */
+	public showPullUnstagedChanges(files: string[], onStashAndReapply: () => void, onStashOnly: () => void) {
+		closeDialogAndContextMenu();
+		this.type = DialogType.Message;
+		this.target = null;
+		eventOverlay.create('dialogBacking', null, null);
+
+		const fileListHtml = '<div class="dialogStashFileList"><ul>' +
+			files.map((f) => '<li>' + escapeHtml(f) + '</li>').join('') +
+			'</ul></div>';
+		const html = '<b>How to Proceed?</b><br><span class="messageContent">The following files have unstaged changes:</span>' +
+			fileListHtml +
+			'<br>' +
+			'<div id="dialogAction" class="roundedBtn">Stash &amp; Re-apply</div>' +
+			'<div id="dialogAction2" class="roundedBtn">Stash Only</div>' +
+			'<div id="dialogSecondaryAction" class="roundedBtn">Cancel</div>';
+
+		const dialog = document.createElement('div'), dialogContent = document.createElement('div');
+		dialog.className = 'dialog';
+		dialogContent.className = 'dialogContent';
+		dialogContent.innerHTML = html;
+		dialog.appendChild(dialogContent);
+		this.elem = dialog;
+		document.body.appendChild(dialog);
+
+		let docHeight = document.body.clientHeight, dialogHeight = dialog.clientHeight + 2;
+		if (dialogHeight > 0.8 * docHeight) {
+			dialogContent.style.height = Math.round(0.8 * docHeight - 22) + 'px';
+			dialogHeight = Math.round(0.8 * docHeight);
+		}
+		dialog.style.top = Math.max(Math.round((docHeight - dialogHeight) / 2), 10) + 'px';
+
+		const self = this;
+		document.getElementById('dialogAction')!.addEventListener('click', () => { self.close(); onStashAndReapply(); });
+		document.getElementById('dialogAction2')!.addEventListener('click', () => { self.close(); onStashOnly(); });
+		document.getElementById('dialogSecondaryAction')!.addEventListener('click', () => self.close());
+		this.actioned = () => { self.close(); onStashAndReapply(); };
+	}
+
+	/**
 	 * Show a dialog to indicate that an action is currently running.
 	 * @param action A short name that identifies the action that is running.
 	 */

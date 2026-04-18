@@ -1093,6 +1093,36 @@ export class DataSource extends Disposable {
 	}
 
 	/**
+	 * Returns the list of files with unstaged changes (modified tracked + untracked).
+	 * @param repo The path of the repository.
+	 */
+	public async getUnstagedFiles(repo: string): Promise<string[]> {
+		const result = await this.spawnGit(['status', '--short', '--porcelain'], repo, (stdout) => stdout).catch(() => '');
+		return result.split('\n')
+			.filter((line) => line.length > 0)
+			.map((line) => line.substring(3));
+	}
+
+	/**
+	 * Stash uncommitted changes, pull, then optionally re-apply the stash.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the remote branch.
+	 * @param remote The name of the remote.
+	 * @param createNewCommit Is `--no-ff` enabled if a merge is required.
+	 * @param squash Is `--squash` enabled if a merge is required.
+	 * @param reapply Whether to pop the stash after a successful pull.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async pullBranchWithStash(repo: string, branchName: string, remote: string, createNewCommit: boolean, squash: boolean, reapply: boolean): Promise<ErrorInfo> {
+		const stashError = await this.pushStash(repo, 'an-dr-commits: auto-stash before pull', false);
+		if (stashError !== null) return stashError;
+		const pullError = await this.pullBranch(repo, branchName, remote, createNewCommit, squash);
+		if (pullError !== null) return pullError;
+		if (reapply) return this.popStash(repo, 'stash@{0}', false);
+		return null;
+	}
+
+	/**
 	 * Pull a remote branch into the current branch.
 	 * @param repo The path of the repository.
 	 * @param branchName The name of the remote branch.

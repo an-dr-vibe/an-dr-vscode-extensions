@@ -164,6 +164,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'pullBranch':
 				refreshOrDisplayError(msg.error, 'Unable to Pull Branch');
 				break;
+			case 'pullBranchUnstagedChanges':
+				handlePullBranchUnstagedChanges(msg);
+				break;
 			case 'pushBranch':
 				if (msg.errors.some((e) => e !== null && (e.includes('behind') || e.includes('Updates were rejected')))) {
 					handleResponsePushBranchBehindRemote(msg.repo, msg.branchName, msg.remotes, msg.setUpstream, msg.errors);

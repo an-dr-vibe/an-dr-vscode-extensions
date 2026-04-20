@@ -111,16 +111,7 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 		view.currentBranches = view.currentBranches.filter((branch: string) => view.gitBranches.includes(branch) || globPatterns.includes(branch));
 	}
 	if (view.currentBranches === null || view.currentBranches.length === 0) {
-		const onRepoLoadShowCheckedOutBranch = getOnRepoLoadShowCheckedOutBranch(view.gitRepos[view.currentRepo].onRepoLoadShowCheckedOutBranch);
-		const onRepoLoadShowSpecificBranches = getOnRepoLoadShowSpecificBranches(view.gitRepos[view.currentRepo].onRepoLoadShowSpecificBranches);
-		view.currentBranches = [];
-		if (onRepoLoadShowSpecificBranches.length > 0) {
-			const globPatterns = view.config.customBranchGlobPatterns.map((pattern: GG.CustomBranchGlobPattern) => pattern.glob);
-			view.currentBranches.push(...onRepoLoadShowSpecificBranches.filter((branch: string) => view.gitBranches.includes(branch) || globPatterns.includes(branch)));
-		}
-		if (onRepoLoadShowCheckedOutBranch && view.gitBranchHead !== null && !view.currentBranches.includes(view.gitBranchHead)) {
-			view.currentBranches.push(view.gitBranchHead);
-		}
+		view.currentBranches = getInitialBranchesOnRepoLoad(view);
 		if (view.currentBranches.length === 0) view.currentBranches.push(SHOW_ALL_BRANCHES);
 	}
 
@@ -132,6 +123,54 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 	const hideRemotes = hiddenRemotes.filter((hiddenRemote: string) => remotes.includes(hiddenRemote));
 	if (hiddenRemotes.length !== hideRemotes.length) view.saveRepoStateValue(view.currentRepo, 'hideRemotes', hideRemotes);
 	view.finaliseLoadRepoInfo(true, isRepo);
+}
+
+function getInitialBranchesOnRepoLoad(view: any): string[] {
+	const mode = view.config.onRepoLoad.mode;
+	if (mode === 'showAll') {
+		return [];
+	}
+	if (mode === 'currentBranch') {
+		return view.gitBranchHead !== null ? [view.gitBranchHead] : [];
+	}
+	if (mode === 'currentBranchAndMainMaster') {
+		const branches: string[] = [];
+		if (view.gitBranchHead !== null) {
+			branches.push(view.gitBranchHead);
+		}
+		const mainlineBranch = findMainlineBranch(view);
+		if (mainlineBranch !== null && !branches.includes(mainlineBranch)) {
+			branches.push(mainlineBranch);
+		}
+		return branches;
+	}
+
+	const onRepoLoadShowCheckedOutBranch = getOnRepoLoadShowCheckedOutBranch(view.gitRepos[view.currentRepo].onRepoLoadShowCheckedOutBranch);
+	const onRepoLoadShowSpecificBranches = getOnRepoLoadShowSpecificBranches(view.gitRepos[view.currentRepo].onRepoLoadShowSpecificBranches);
+	const branches: string[] = [];
+	if (onRepoLoadShowSpecificBranches.length > 0) {
+		const globPatterns = view.config.customBranchGlobPatterns.map((pattern: GG.CustomBranchGlobPattern) => pattern.glob);
+		branches.push(...onRepoLoadShowSpecificBranches.filter((branch: string) => view.gitBranches.includes(branch) || globPatterns.includes(branch)));
+	}
+	if (onRepoLoadShowCheckedOutBranch && view.gitBranchHead !== null && !branches.includes(view.gitBranchHead)) {
+		branches.push(view.gitBranchHead);
+	}
+	return branches;
+}
+
+function findMainlineBranch(view: any): string | null {
+	const preferredBranches = ['main', 'master'];
+	for (const branch of preferredBranches) {
+		if (view.gitBranches.includes(branch)) {
+			return branch;
+		}
+	}
+	for (const branch of view.gitBranches) {
+		if (branch.startsWith('remotes/') && (branch.endsWith('/main') || branch.endsWith('/master'))) {
+			return branch;
+		}
+	}
+	return null;
 }
 
 function commitsFinaliseLoadRepoInfo(view: any, repoInfoChanges: boolean, isRepo: boolean) {

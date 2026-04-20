@@ -553,12 +553,17 @@ class Config {
 	 */
 	get onRepoLoad(): OnRepoLoadConfig {
 		const branches = this.config.get('repository.onLoad.showSpecificBranches', []);
+		const mode = this.config.get<string>('repository.onLoad.mode', 'showAll');
 		return {
+			mode: mode === 'currentBranch' || mode === 'currentBranchAndMainMaster' || mode === 'configuredBranches'
+				? mode
+				: 'showAll',
 			scrollToHead: !!this.getRenamedExtensionSetting('repository.onLoad.scrollToHead', 'openRepoToHead', false),
 			showCheckedOutBranch: !!this.getRenamedExtensionSetting('repository.onLoad.showCheckedOutBranch', 'showCurrentBranchByDefault', false),
 			showSpecificBranches: Array.isArray(branches)
 				? branches.filter((branch) => typeof branch === 'string')
-				: []
+				: [],
+			showRemoteBranchesForSelectedLocalBranches: !!this.config.get('repository.onLoad.showRemoteBranchesForSelectedLocalBranches', true)
 		};
 	}
 

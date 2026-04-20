@@ -1202,6 +1202,17 @@
 					"default": false,
 					"description": "Automatically scroll the Commits View to be centered on the commit referenced by HEAD. This will only occur if the commit referenced by HEAD is within the loaded commits on the Commits View."
 				},
+				"an-dr-commits.repository.onLoad.mode": {
+					"type": "string",
+					"enum": [
+						"showAll",
+						"currentBranch",
+						"currentBranchAndMainMaster",
+						"configuredBranches"
+					],
+					"default": "showAll",
+					"markdownDescription": "Choose which branches are initially shown when a repository is loaded in the Commits View. `currentBranchAndMainMaster` shows the checked out branch plus a detected `main` or `master` branch. `configuredBranches` uses the existing `Repository > On Load: Show Checked Out Branch` and `Repository > On Load: Show Specific Branches` settings."
+				},
 				"an-dr-commits.repository.onLoad.showCheckedOutBranch": {
 					"type": "boolean",
 					"default": false,
@@ -1230,6 +1241,11 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Show Remote Branches in Commits by default. This can be overridden per repository from the Commits View's Control Bar."
+				},
+				"an-dr-commits.repository.onLoad.showRemoteBranchesForSelectedLocalBranches": {
+					"type": "boolean",
+					"default": true,
+					"description": "When specific local branches are selected, also include their tracked remote branches if available."
 				},
 				"an-dr-commits.repository.showRemoteHeads": {
 					"type": "boolean",

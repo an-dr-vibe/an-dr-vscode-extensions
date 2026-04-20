@@ -189,11 +189,14 @@ function commitsRequestLoadRepoInfo(view: any) {
 
 function commitsRequestLoadCommits(view: any) {
 	const repoState = view.gitRepos[view.currentRepo];
+	const selectedBranches = view.currentBranches === null || (view.currentBranches.length === 1 && view.currentBranches[0] === SHOW_ALL_BRANCHES)
+		? null
+		: getBranchesToLoad(view, view.currentBranches);
 	sendMessage({
 		command: 'loadCommits',
 		repo: view.currentRepo,
 		refreshId: ++view.currentRepoRefreshState.loadCommitsRefreshId,
-		branches: view.currentBranches === null || (view.currentBranches.length === 1 && view.currentBranches[0] === SHOW_ALL_BRANCHES) ? null : view.currentBranches,
+		branches: selectedBranches,
 		maxCommits: view.maxCommits,
 		showTags: true,
 		showRemoteBranches: true,
@@ -204,6 +207,33 @@ function commitsRequestLoadCommits(view: any) {
 		hideRemotes: repoState.hideRemotes,
 		stashes: view.gitStashes
 	});
+}
+
+function getBranchesToLoad(view: any, selectedBranches: ReadonlyArray<string>): string[] {
+	const branches = [...selectedBranches];
+	if (!view.config.onRepoLoad.showRemoteBranchesForSelectedLocalBranches) {
+		return branches;
+	}
+
+	for (const branch of selectedBranches) {
+		if (branch === 'HEAD' || branch === SHOW_ALL_BRANCHES || branch.startsWith('remotes/') || branch.startsWith('--glob=')) {
+			continue;
+		}
+
+		const upstream = view.gitBranchUpstreams[branch];
+		if (typeof upstream !== 'string' || upstream === '') {
+			continue;
+		}
+
+		const remoteBranch = view.gitBranches.includes('remotes/' + upstream)
+			? 'remotes/' + upstream
+			: upstream;
+		if (!branches.includes(remoteBranch)) {
+			branches.push(remoteBranch);
+		}
+	}
+
+	return branches;
 }
 
 function commitsRequestLoadRepoInfoAndCommits(view: any, hard: boolean, skipRepoInfo: boolean, configChanges: boolean = false) {

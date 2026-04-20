@@ -156,9 +156,11 @@ export interface MuteCommitsConfig {
 }
 
 export interface OnRepoLoadConfig {
+	readonly mode: 'showAll' | 'currentBranch' | 'currentBranchAndMainMaster' | 'configuredBranches';
 	readonly scrollToHead: boolean;
 	readonly showCheckedOutBranch: boolean;
 	readonly showSpecificBranches: ReadonlyArray<string>;
+	readonly showRemoteBranchesForSelectedLocalBranches: boolean;
 }
 
 export interface ReferenceLabelsConfig {

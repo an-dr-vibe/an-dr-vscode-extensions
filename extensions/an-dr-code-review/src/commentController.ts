@@ -31,6 +31,16 @@ class ReviewComment implements vscode.Comment {
 
 const CODE_REVIEW_DIR = 'code-review';
 
+type ExportBehavior = {
+    showDocument: boolean;
+    showNotification: boolean;
+    allowEmpty: boolean;
+};
+
+function shouldIncludeExportTimestamp(): boolean {
+    return vscode.workspace.getConfiguration('codeReview').get<boolean>('exportCommentTimestamp', true);
+}
+
 function getGitCwd(): string | null {
     const local = process.env.LOCAL_WORKSPACE_FOLDER;
     if (local) {
@@ -112,12 +122,11 @@ function buildFileUrl(file: string, startLine: number, endLine: number): string 
     return `${base}/blob/${branch}/${resolveSymlink(file)}${anchor}`;
 }
 
-async function exportMarkdown(data: ReviewData): Promise<void> {
-    if (data.threads.length === 0) {
+async function writeMarkdownExport(data: ReviewData, behavior: ExportBehavior): Promise<void> {
+    if (data.threads.length === 0 && !behavior.allowEmpty) {
         vscode.window.showInformationMessage('Code Review: no comments to export.');
         return;
     }
-
     const byFile = new Map<string, StoredThread[]>();
     for (const thread of data.threads) {
         if (!byFile.has(thread.file)) {
@@ -144,9 +153,17 @@ async function exportMarkdown(data: ReviewData): Promise<void> {
             const resolvedPart = thread.resolved ? ' ✅' : '';
             lines.push(`### ${lineLabel}${resolvedPart}${linkPart}`, '');
             for (const comment of thread.comments) {
-                const date = new Date(comment.timestamp).toLocaleString();
-                const meta = comment.author ? `**${comment.author}** · *${date}*` : `*${date}*`;
-                lines.push(meta, '', comment.body, '');
+                const metaParts: string[] = [];
+                if (comment.author) {
+                    metaParts.push(`**${comment.author}**`);
+                }
+                if (shouldIncludeExportTimestamp()) {
+                    metaParts.push(`*${new Date(comment.timestamp).toLocaleString()}*`);
+                }
+                if (metaParts.length > 0) {
+                    lines.push(metaParts.join(' · '), '');
+                }
+                lines.push(comment.body, '');
             }
             lines.push('---', '');
         }
@@ -156,17 +173,20 @@ async function exportMarkdown(data: ReviewData): Promise<void> {
     const rootUri = vscode.workspace.workspaceFolders![0].uri;
     const outUri = vscode.Uri.joinPath(rootUri, CODE_REVIEW_DIR, 'code-review.md');
     await vscode.workspace.fs.writeFile(outUri, Buffer.from(lines.join('\n'), 'utf8'));
-    const doc = await vscode.workspace.openTextDocument(outUri);
-    await vscode.window.showTextDocument(doc);
-    vscode.window.showInformationMessage(`Code review exported to ${CODE_REVIEW_DIR}/code-review.md`);
+    if (behavior.showDocument) {
+        const doc = await vscode.workspace.openTextDocument(outUri);
+        await vscode.window.showTextDocument(doc);
+    }
+    if (behavior.showNotification) {
+        vscode.window.showInformationMessage(`Code review exported to ${CODE_REVIEW_DIR}/code-review.md`);
+    }
 }
 
-async function exportJira(data: ReviewData): Promise<void> {
-    if (data.threads.length === 0) {
+async function writeJiraExport(data: ReviewData, behavior: ExportBehavior): Promise<void> {
+    if (data.threads.length === 0 && !behavior.allowEmpty) {
         vscode.window.showInformationMessage('Code Review: no comments to export.');
         return;
     }
-
     const byFile = new Map<string, StoredThread[]>();
     for (const thread of data.threads) {
         if (!byFile.has(thread.file)) {
@@ -192,9 +212,17 @@ async function exportJira(data: ReviewData): Promise<void> {
             const resolvedPart = thread.resolved ? ' (resolved)' : '';
             lines.push(`h3. ${lineLabel}${resolvedPart}${linkPart}`, '');
             for (const comment of thread.comments) {
-                const date = new Date(comment.timestamp).toLocaleString();
-                const meta = comment.author ? `*${comment.author}* | _${date}_` : `_${date}_`;
-                lines.push(meta, '', comment.body, '');
+                const metaParts: string[] = [];
+                if (comment.author) {
+                    metaParts.push(`*${comment.author}*`);
+                }
+                if (shouldIncludeExportTimestamp()) {
+                    metaParts.push(`_${new Date(comment.timestamp).toLocaleString()}_`);
+                }
+                if (metaParts.length > 0) {
+                    lines.push(metaParts.join(' | '), '');
+                }
+                lines.push(comment.body, '');
             }
             lines.push('----', '');
         }
@@ -204,9 +232,35 @@ async function exportJira(data: ReviewData): Promise<void> {
     const rootUri = vscode.workspace.workspaceFolders![0].uri;
     const outUri = vscode.Uri.joinPath(rootUri, CODE_REVIEW_DIR, 'code-review.jira');
     await vscode.workspace.fs.writeFile(outUri, Buffer.from(lines.join('\n'), 'utf8'));
-    const doc = await vscode.workspace.openTextDocument(outUri);
-    await vscode.window.showTextDocument(doc);
-    vscode.window.showInformationMessage(`Code review exported to ${CODE_REVIEW_DIR}/code-review.jira`);
+    if (behavior.showDocument) {
+        const doc = await vscode.workspace.openTextDocument(outUri);
+        await vscode.window.showTextDocument(doc);
+    }
+    if (behavior.showNotification) {
+        vscode.window.showInformationMessage(`Code review exported to ${CODE_REVIEW_DIR}/code-review.jira`);
+    }
+}
+
+async function syncAutoExports(): Promise<void> {
+    if (!vscode.workspace.workspaceFolders?.[0]?.uri) {
+        return;
+    }
+
+    const cfg = vscode.workspace.getConfiguration('codeReview');
+    const data = await loadReviewData();
+    const behavior: ExportBehavior = {
+        showDocument: false,
+        showNotification: false,
+        allowEmpty: true,
+    };
+
+    const autoExport = cfg.get<string>('autoExport', 'none');
+    if (autoExport === 'markdown' || autoExport === 'both') {
+        await writeMarkdownExport(data, behavior);
+    }
+    if (autoExport === 'jira' || autoExport === 'both') {
+        await writeJiraExport(data, behavior);
+    }
 }
 
 export function activateCommentController(context: vscode.ExtensionContext): void {
@@ -252,6 +306,19 @@ export function activateCommentController(context: vscode.ExtensionContext): voi
     }
 
     void restoreThreads();
+    void syncAutoExports();
+
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (
+                event.affectsConfiguration('codeReview.autoExport') ||
+                event.affectsConfiguration('codeReview.exportCommentTimestamp') ||
+                event.affectsConfiguration('codeReview.dataFile')
+            ) {
+                void syncAutoExports();
+            }
+        })
+    );
 
     async function handleSubmit(reply: vscode.CommentReply): Promise<void> {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -366,7 +433,15 @@ export function activateCommentController(context: vscode.ExtensionContext): voi
         vscode.commands.registerCommand('an-dr-code-review.resolveThread', (thread: vscode.CommentThread) => setResolved(thread, true)),
         vscode.commands.registerCommand('an-dr-code-review.unresolveThread', (thread: vscode.CommentThread) => setResolved(thread, false)),
         vscode.commands.registerCommand('an-dr-code-review.deleteThread', (thread: vscode.CommentThread) => handleDeleteThread(thread)),
-        vscode.commands.registerCommand('an-dr-code-review.exportMarkdown', async () => exportMarkdown(await loadReviewData())),
-        vscode.commands.registerCommand('an-dr-code-review.exportJira', async () => exportJira(await loadReviewData())),
+        vscode.commands.registerCommand('an-dr-code-review.exportMarkdown', async () => writeMarkdownExport(await loadReviewData(), {
+            showDocument: true,
+            showNotification: true,
+            allowEmpty: false,
+        })),
+        vscode.commands.registerCommand('an-dr-code-review.exportJira', async () => writeJiraExport(await loadReviewData(), {
+            showDocument: true,
+            showNotification: true,
+            allowEmpty: false,
+        })),
     );
 }

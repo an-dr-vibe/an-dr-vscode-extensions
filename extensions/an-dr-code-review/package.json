@@ -266,6 +266,18 @@
         "category": "Code Review"
       }
     ],
+    "keybindings": [
+      {
+        "command": "an-dr-code-review.submitComment",
+        "key": "alt+enter",
+        "when": "commentController == an-dr-code-review && anDrCodeReview.submitKey == altEnter"
+      },
+      {
+        "command": "an-dr-code-review.submitComment",
+        "key": "ctrl+enter",
+        "when": "commentController == an-dr-code-review && anDrCodeReview.submitKey == ctrlEnter"
+      }
+    ],
     "submenus": [
       {
         "id": "an-dr-code-review.viewAndSort",
@@ -604,6 +616,31 @@
           "type": "string",
           "default": "",
           "description": "Author name override. Defaults to git user.name, then USER."
+        },
+        "codeReview.autoExport": {
+          "type": "string",
+          "enum": [
+            "none",
+            "markdown",
+            "jira",
+            "both"
+          ],
+          "default": "none",
+          "description": "Automatically keep exported review files updated when review comments change."
+        },
+        "codeReview.submitKey": {
+          "type": "string",
+          "enum": [
+            "ctrl+enter",
+            "alt+enter"
+          ],
+          "default": "ctrl+enter",
+          "description": "Keyboard shortcut used to submit a review comment."
+        },
+        "codeReview.exportCommentTimestamp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include comment timestamps in Markdown and Jira exports."
         },
         "codeReview.autoChangeRepository": {
           "type": "boolean",

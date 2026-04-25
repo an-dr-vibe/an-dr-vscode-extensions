@@ -129,11 +129,13 @@ function branchPanelRenderBranchTreeHtml(view: any, nodes: BranchTreeNode[], ind
 			const collapsed = view.folderCollapsed[node.path] ?? false;
 			const icon = collapsed ? BRANCH_PANEL_CLOSED_FOLDER_ICON : BRANCH_PANEL_OPEN_FOLDER_ICON;
 			const isRemoteRoot = treeType === 'remote' && indent === 1;
+			const remoteUrl = isRemoteRoot && typeof view.remoteUrls === 'object' ? (view.remoteUrls[node.name] ?? null) : null;
 			html += '<div class="branchPanelFolder" data-folder="' + escapeHtml(node.path) + '"' +
 				(isRemoteRoot ? ' data-entry-type="remote" data-entry-name="' + escapeHtml(node.name) + '"' : '') +
 				' style="padding-left:' + (4 + indent * 14) + 'px">' +
 				'<span class="branchPanelFolderIcon">' + icon + '</span>' +
 				'<span class="branchPanelFolderName">' + escapeHtml(node.name + '/') + '</span>' +
+				(remoteUrl !== null ? '<span class="branchPanelFolderUrl" title="' + escapeHtml(remoteUrl) + '">' + escapeHtml(remoteUrl) + '</span>' : '') +
 				'</div>';
 			if (!collapsed) {
 				html += branchPanelRenderBranchTreeHtml(view, node.children, indent + 1, filter, treeType);

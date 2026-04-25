@@ -175,6 +175,28 @@ function commitsDeleteRemoteAction(view: any, name: string) {
 	}, { type: TargetType.Repo });
 }
 
+function commitsEditRemoteAction(view: any, name: string) {
+	if (view.currentRepo === null) return;
+	const currentUrl: string | null = view.gitRemoteUrls[name] ?? null;
+	const pushUrlPlaceholder = 'Leave blank to use the Fetch URL';
+	dialog.showForm('Edit the remote <b><i>' + escapeHtml(name) + '</i></b>:', [
+		{ type: DialogInputType.Text, name: 'Name', default: name, placeholder: null },
+		{ type: DialogInputType.Text, name: 'Fetch URL', default: currentUrl !== null ? currentUrl : '', placeholder: null },
+		{ type: DialogInputType.Text, name: 'Push URL', default: '', placeholder: pushUrlPlaceholder }
+	], 'Save Changes', (values: any[]) => {
+		runAction({
+			command: 'editRemote',
+			repo: view.currentRepo,
+			nameOld: name,
+			nameNew: <string>values[0],
+			urlOld: currentUrl,
+			urlNew: <string>values[1] !== '' ? <string>values[1] : null,
+			pushUrlOld: null,
+			pushUrlNew: <string>values[2] !== '' ? <string>values[2] : null
+		}, 'Saving Changes to Remote');
+	}, { type: TargetType.Repo });
+}
+
 function commitsFetchFromRemotesAction(view: any) {
 	runAction({ command: 'fetch', repo: view.currentRepo, name: null, prune: view.config.fetchAndPrune, pruneTags: view.config.fetchAndPruneTags }, 'Fetching from Remote(s)');
 }

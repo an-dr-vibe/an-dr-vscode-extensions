@@ -174,6 +174,7 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 | Full diff bottom panel rendering | `web/main/fullDiffPanel.ts` + `web/styles/main.css` |
 | Git command execution | `src/dataSource.ts` |
 | Branch/tag sidebar UI | `web/branchPanel.ts` + `web/styles/branchPanel.css` |
+| Remote URL display / edit in sidebar | `web/branchPanelRender.ts` + `web/main/contextMenus/sidebar.ts` + `web/main/actions/gitActions.ts` |
 | Commit table rendering | `web/main.ts` → `renderTable()` (~line 812) |
 | Commit graph (SVG) | `web/graph.ts` |
 | Context menu actions | `web/main.ts` (handlers) + `src/commands.ts` (execution) |

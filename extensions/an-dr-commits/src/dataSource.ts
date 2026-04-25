@@ -152,20 +152,40 @@ export class DataSource extends Disposable {
 			this.getRemotes(repo),
 			showStashes ? this.getStashes(repo) : Promise.resolve([]),
 			this.getRepoInProgressState(repo)
-		]).then((results) => {
+		]).then(async (results) => {
+			const remotes: string[] = results[1];
+			const remoteUrls = await this.getRemoteUrls(repo, remotes).catch(() => ({}));
 			return {
 				branches: results[0].branches,
 				branchUpstreams: results[0].branchUpstreams,
 				goneUpstreamBranches: results[0].goneUpstreamBranches,
 				remoteHeadTargets: results[0].remoteHeadTargets,
 				head: results[0].head,
-				remotes: results[1],
+				remotes: remotes,
+				remoteUrls: remoteUrls,
 				stashes: results[2],
 				repoInProgressState: results[3],
 				error: null
 			};
 		}).catch((errorMessage) => {
-			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], stashes: [], repoInProgressState: null, error: errorMessage };
+			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], remoteUrls: {}, stashes: [], repoInProgressState: null, error: errorMessage };
+		});
+	}
+
+	private getRemoteUrls(repo: string, remotes: string[]): Promise<{ [remoteName: string]: string | null }> {
+		if (remotes.length === 0) return Promise.resolve({});
+		return this.spawnGit(['remote', '-v'], repo, (stdout) => {
+			const result: { [remoteName: string]: string | null } = {};
+			for (const remote of remotes) result[remote] = null;
+			for (const line of stdout.split(EOL_REGEX)) {
+				if (!line.includes('(fetch)')) continue;
+				const tab = line.indexOf('\t');
+				if (tab === -1) continue;
+				const name = line.substring(0, tab);
+				const url = line.substring(tab + 1).replace(' (fetch)', '').trim();
+				if (typeof result[name] !== 'undefined') result[name] = url;
+			}
+			return result;
 		});
 	}
 

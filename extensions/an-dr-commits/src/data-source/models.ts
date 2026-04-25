@@ -55,6 +55,7 @@ export interface GitRefData {
 
 export interface GitRepoInfo extends GitBranchData {
 	remotes: string[];
+	remoteUrls: { [remoteName: string]: string | null };
 	stashes: GitStash[];
 }
 

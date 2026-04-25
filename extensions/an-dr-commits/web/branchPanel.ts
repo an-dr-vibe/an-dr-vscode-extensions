@@ -45,6 +45,7 @@ class BranchPanel {
 	private listScrollTop: number = 0;
 	private sidebarWidth: number = 200;
 	private sidebarHidden: boolean = false;
+	private remoteUrls: { [remoteName: string]: string | null } = {};
 	private actionSelection: Set<string> = new Set();
 	private actionSelectionAnchor: string | null = null;
 	private actionSelectionActive: string | null = null;
@@ -167,6 +168,11 @@ class BranchPanel {
 
 	private applyLayoutWidth(width: number) {
 		document.body.style.setProperty('--branch-panel-width', width + 'px');
+	}
+
+	public setRemoteUrls(urls: { [remoteName: string]: string | null }) {
+		this.remoteUrls = urls;
+		this.render();
 	}
 
 	public setTags(tags: ReadonlyArray<string>) {

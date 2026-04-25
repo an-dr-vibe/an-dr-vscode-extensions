@@ -37,6 +37,7 @@ class CommitsView {
 	private gitBranchHead: string | null = null;
 	private gitConfig: GG.GitRepoConfig | null = null;
 	private gitRemotes: ReadonlyArray<string> = [];
+	private gitRemoteUrls: { [remoteName: string]: string | null } = {};
 	private gitStashes: ReadonlyArray<GG.GitStash> = [];
 	private gitTags: ReadonlyArray<string> = [];
 	private commits: GG.GitCommit[] = [];
@@ -182,8 +183,8 @@ class CommitsView {
 		return commitsGetRebaseSequenceBadgeHtml(this, commitHash);
 	}
 
-	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
-		commitsLoadRepoInfo(this, branchOptions, branchUpstreams, goneUpstreamBranches, remoteHeadTargets, repoInProgressState, branchHead, remotes, stashes, isRepo);
+	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, remoteUrls: { readonly [remoteName: string]: string | null }, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
+		commitsLoadRepoInfo(this, branchOptions, branchUpstreams, goneUpstreamBranches, remoteHeadTargets, repoInProgressState, branchHead, remotes, remoteUrls, stashes, isRepo);
 	}
 
 	private finaliseLoadRepoInfo(repoInfoChanges: boolean, isRepo: boolean) {
@@ -388,6 +389,7 @@ class CommitsView {
 	private deleteTagAction(refName: string, deleteOnRemote: string | null) { commitsDeleteTagAction(this, refName, deleteOnRemote); }
 	private cleanupLocalBranchesAction() { commitsCleanupLocalBranchesAction(this); }
 	private deleteRemoteAction(name: string) { commitsDeleteRemoteAction(this, name); }
+	private editRemoteAction(name: string) { commitsEditRemoteAction(this, name); }
 	private fetchFromRemotesAction() { commitsFetchFromRemotesAction(this); }
 	private mergeAction(obj: string, name: string, actionOn: GG.MergeActionOn, target: DialogTarget & (CommitTarget | RefTarget)) { commitsMergeAction(this, obj, name, actionOn, target); }
 	private rebaseAction(obj: string, name: string, actionOn: GG.RebaseActionOn, target: DialogTarget & (CommitTarget | RefTarget)) { commitsRebaseAction(this, obj, name, actionOn, target); }

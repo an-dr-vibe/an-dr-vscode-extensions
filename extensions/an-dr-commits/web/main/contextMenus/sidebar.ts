@@ -38,18 +38,28 @@ function commitsSidebarSectionActions(view: any, type: string, name: string): Co
 	}
 
 	if (type === 'remote') {
+		const remoteUrl: string | null = view.gitRemoteUrls[name] ?? null;
 		return [[
+			{
+				title: 'Edit Remote' + ELLIPSIS,
+				visible: true,
+				onClick: () => view.editRemoteAction(name)
+			},
 			{
 				title: 'Delete Remote' + ELLIPSIS,
 				visible: true,
 				onClick: () => view.deleteRemoteAction(name)
-			},
+			}
+		], [
 			{
 				title: 'Copy Name',
 				visible: true,
-				onClick: () => {
-					sendMessage({ command: 'copyToClipboard', type: 'Remote Name', data: name });
-				}
+				onClick: () => sendMessage({ command: 'copyToClipboard', type: 'Remote Name', data: name })
+			},
+			{
+				title: 'Copy URL',
+				visible: remoteUrl !== null,
+				onClick: () => sendMessage({ command: 'copyToClipboard', type: 'Remote URL', data: remoteUrl! })
 			}
 		]];
 	}

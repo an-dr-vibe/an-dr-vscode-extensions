@@ -43,6 +43,8 @@ function commitsLoadRepo(view: any, repo: string) {
 	view.maxCommits = view.config.initialLoadCommits;
 	view.gitConfig = null;
 	view.gitRemotes = [];
+	view.gitRemoteUrls = {};
+	if (view.branchDropdown) view.branchDropdown.setRemoteUrls({});
 	view.gitStashes = [];
 	view.gitTags = [];
 	view.gitBranchUpstreams = {};
@@ -84,7 +86,7 @@ function commitsGetRebaseSequenceBadgeHtml(view: any, commitHash: string) {
 	return '<span class="rebaseSeqBadge ' + match.kind + '">' + escapeHtml(label) + '</span>';
 }
 
-function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
+function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, remoteUrls: { readonly [remoteName: string]: string | null }, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
 	view.gitStashes = stashes;
 	if (!isRepo || (!view.currentRepoRefreshState.hard && arraysStrictlyEqual(view.gitBranches, branchOptions) && shallowStringMapEqual(view.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(view.gitGoneUpstreamBranches, goneUpstreamBranches) && shallowStringMapEqual(view.gitRemoteHeadTargets, remoteHeadTargets) && commitsIsSameRepoInProgressState(view.gitRepoInProgressState, repoInProgressState) && view.gitBranchHead === branchHead && arraysStrictlyEqual(view.gitRemotes, remotes))) {
 		view.saveState();
@@ -99,6 +101,7 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 	view.gitRepoInProgressState = repoInProgressState;
 	view.gitBranchHead = branchHead;
 	view.gitRemotes = remotes;
+	view.gitRemoteUrls = remoteUrls;
 	view.renderFetchButton();
 
 	if (view.loadViewTo !== null && view.loadViewTo.repo === view.currentRepo) {
@@ -117,6 +120,7 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 
 	view.saveState();
 	view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
+	view.branchDropdown.setRemoteUrls(view.gitRemoteUrls);
 	if (view.pendingBranchPanelState !== null) view.branchDropdown.restoreState(view.pendingBranchPanelState);
 
 	const hiddenRemotes = view.gitRepos[view.currentRepo].hideRemotes;
@@ -321,7 +325,7 @@ function commitsProcessLoadRepoInfoResponse(view: any, msg: GG.ResponseLoadRepoI
 	if (msg.error === null) {
 		const refreshState = view.currentRepoRefreshState;
 		if (refreshState.inProgress && refreshState.loadRepoInfoRefreshId === msg.refreshId) {
-			view.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.remoteHeadTargets, msg.repoInProgressState, msg.head, msg.remotes, msg.stashes, msg.isRepo);
+			view.loadRepoInfo(msg.branches, msg.branchUpstreams, msg.goneUpstreamBranches, msg.remoteHeadTargets, msg.repoInProgressState, msg.head, msg.remotes, msg.remoteUrls ?? {}, msg.stashes, msg.isRepo);
 		}
 	} else {
 		view.displayLoadDataError('Unable to load Repository Info', msg.error);

@@ -408,6 +408,7 @@ export interface ResponseLoadRepoInfo extends ResponseWithErrorInfo {
 	readonly remoteHeadTargets: { readonly [remoteName: string]: string };
 	readonly head: string | null;
 	readonly remotes: ReadonlyArray<string>;
+	readonly remoteUrls: { readonly [remoteName: string]: string | null };
 	readonly stashes: ReadonlyArray<GitStash>;
 	readonly repoInProgressState: GitRepoInProgressState | null;
 	readonly isRepo: boolean;

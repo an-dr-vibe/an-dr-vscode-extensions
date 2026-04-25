@@ -47,6 +47,8 @@ export interface ContextMenuActionsVisibility {
 		readonly createArchive: boolean;
 		readonly selectInBranchesDropdown: boolean;
 		readonly unselectInBranchesDropdown: boolean;
+		readonly setUpstream: boolean;
+		readonly unsetUpstream: boolean;
 		readonly copyName: boolean;
 	};
 	readonly commit: {

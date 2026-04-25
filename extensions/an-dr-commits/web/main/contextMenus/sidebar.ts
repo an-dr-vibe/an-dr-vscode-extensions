@@ -86,8 +86,8 @@ async function commitsSidebarBranchActions(view: any, name: string): Promise<Con
 
 	const target = view.createSidebarRefTarget(resolvedBranch.name);
 	const actions = resolvedBranch.kind === 'remoteBranch'
-		? view.getRemoteBranchContextMenuActions(resolvedBranch.remote, target)
-		: view.getBranchContextMenuActions(target);
+		? view.getRemoteBranchContextMenuActionsForSidebar(resolvedBranch.remote, target)
+		: view.getBranchContextMenuActionsForSidebar(target);
 	const actionsWithSelect = [
 		...actions,
 		[{ title: 'Select Only This', visible: true, onClick: () => view.branchDropdown.selectOnlyOption(name) }]

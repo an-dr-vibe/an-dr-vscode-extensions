@@ -621,6 +621,23 @@ export interface ResponseRenameBranch extends ResponseWithErrorInfo {
 	readonly command: 'renameBranch';
 }
 
+export interface RequestSetBranchUpstream extends RepoRequest {
+	readonly command: 'setBranchUpstream';
+	readonly branchName: string;
+	readonly upstream: string;
+}
+export interface ResponseSetBranchUpstream extends ResponseWithErrorInfo {
+	readonly command: 'setBranchUpstream';
+}
+
+export interface RequestUnsetBranchUpstream extends RepoRequest {
+	readonly command: 'unsetBranchUpstream';
+	readonly branchName: string;
+}
+export interface ResponseUnsetBranchUpstream extends ResponseWithErrorInfo {
+	readonly command: 'unsetBranchUpstream';
+}
+
 export interface RequestRescanForRepos extends BaseMessage {
 	readonly command: 'rescanForRepos';
 }
@@ -874,6 +891,8 @@ export type RequestMessage =
 	| RequestRebase
 	| RequestRepoInProgressAction
 	| RequestRenameBranch
+	| RequestSetBranchUpstream
+	| RequestUnsetBranchUpstream
 	| RequestRescanForRepos
 	| RequestResetFileToRevision
 	| RequestResetToCommit
@@ -947,6 +966,8 @@ export type ResponseMessage =
 	| ResponseRepoInProgressAction
 	| ResponseRefresh
 	| ResponseRenameBranch
+	| ResponseSetBranchUpstream
+	| ResponseUnsetBranchUpstream
 	| ResponseResetFileToRevision
 	| ResponseResetToCommit
 	| ResponseRevertCommit

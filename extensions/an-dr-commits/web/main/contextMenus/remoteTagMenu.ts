@@ -1,6 +1,6 @@
 /* Remote branch, stash, tag, and issue context menu helpers extracted from CommitsView */
 
-function commitsGetRemoteBranchContextMenuActions(view: any, remote: string, target: any): ContextMenuActions {
+function commitsGetRemoteBranchContextMenuActions(view: any, remote: string, target: any, inSidebar: boolean = false): ContextMenuActions {
 	const refName = target.ref, visibility = view.config.contextMenuActionsVisibility.remoteBranch;
 	const branchName = remote !== '' ? refName.substring(remote.length + 1) : '';
 	const prefixedRefName = 'remotes/' + refName;
@@ -36,8 +36,8 @@ function commitsGetRemoteBranchContextMenuActions(view: any, remote: string, tar
 		}}
 	], [
 		{ title: 'Create Archive', visible: visibility.createArchive, onClick: () => { runAction({ command: 'createArchive', repo: view.currentRepo, ref: refName }, 'Creating Archive'); } },
-		{ title: 'Select in Branches Dropdown', visible: visibility.selectInBranchesDropdown && !isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.selectOption(prefixedRefName) },
-		{ title: 'Unselect in Branches Dropdown', visible: visibility.unselectInBranchesDropdown && isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.unselectOption(prefixedRefName) }
+		{ title: 'Select in Sidebar', visible: !inSidebar && visibility.selectInBranchesDropdown && !isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.selectOption(prefixedRefName) },
+		{ title: 'Unselect in Sidebar', visible: !inSidebar && visibility.unselectInBranchesDropdown && isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.unselectOption(prefixedRefName) }
 	], [
 		{ title: 'Copy Branch Name to Clipboard', visible: visibility.copyName, onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Branch Name', data: refName }); } }
 	]];

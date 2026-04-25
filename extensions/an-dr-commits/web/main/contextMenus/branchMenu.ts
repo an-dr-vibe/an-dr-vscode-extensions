@@ -83,11 +83,36 @@ function commitsBranchCoreMenuGroup(view: any, refName: string, visibility: any,
 			visible: visibility.rebase && view.gitBranchHead !== refName,
 			onClick: () => view.rebaseAction(refName, refName, GG.RebaseActionOn.Branch, target)
 		},
-		commitsBranchPushAction(view, refName, target)
+		commitsBranchPushAction(view, refName, target),
+		{
+			title: 'Track Remote Branch' + ELLIPSIS,
+			visible: visibility.setUpstream && view.gitRemotes.length > 0,
+			onClick: () => {
+				const remoteBranches = view.gitBranches
+					.filter((b: string) => b.startsWith('remotes/'))
+					.map((b: string) => ({ name: b.substring(8), value: b.substring(8) }));
+				const currentUpstream = view.gitBranchUpstreams[refName] || '';
+				const defaultVal = remoteBranches.some((o: any) => o.value === currentUpstream)
+					? currentUpstream
+					: (remoteBranches[0] ? remoteBranches[0].value : '');
+				dialog.showSelect(
+					'Select the remote branch to track for <b><i>' + escapeHtml(refName) + '</i></b>:',
+					defaultVal,
+					remoteBranches,
+					'Set Upstream',
+					(upstream: string) => runAction({ command: 'setBranchUpstream', repo: view.currentRepo, branchName: refName, upstream: upstream }, 'Setting Branch Upstream'),
+					target
+				);
+			}
+		}, {
+			title: 'Remove Upstream',
+			visible: visibility.unsetUpstream && typeof view.gitBranchUpstreams[refName] === 'string',
+			onClick: () => runAction({ command: 'unsetBranchUpstream', repo: view.currentRepo, branchName: refName }, 'Removing Branch Upstream')
+		}
 	];
 }
 
-function commitsBranchExtraMenuGroups(view: any, refName: string, visibility: any, isSelectedInBranchesDropdown: boolean, target: any): ContextMenuAction[][] {
+function commitsBranchExtraMenuGroups(view: any, refName: string, visibility: any, isSelectedInBranchesDropdown: boolean, target: any, inSidebar: boolean = false): ContextMenuAction[][] {
 	return [
 		[
 			view.getViewIssueAction(refName, visibility.viewIssue, target),
@@ -104,16 +129,16 @@ function commitsBranchExtraMenuGroups(view: any, refName: string, visibility: an
 			}
 		], [
 			{ title: 'Create Archive', visible: visibility.createArchive, onClick: () => { runAction({ command: 'createArchive', repo: view.currentRepo, ref: refName }, 'Creating Archive'); } },
-			{ title: 'Select in Branches Dropdown', visible: visibility.selectInBranchesDropdown && !isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.selectOption(refName) },
-			{ title: 'Unselect in Branches Dropdown', visible: visibility.unselectInBranchesDropdown && isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.unselectOption(refName) }
+			{ title: 'Select in Sidebar', visible: !inSidebar && visibility.selectInBranchesDropdown && !isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.selectOption(refName) },
+			{ title: 'Unselect in Sidebar', visible: !inSidebar && visibility.unselectInBranchesDropdown && isSelectedInBranchesDropdown, onClick: () => view.branchDropdown.unselectOption(refName) }
 		], [
 			{ title: 'Copy Branch Name to Clipboard', visible: visibility.copyName, onClick: () => { sendMessage({ command: 'copyToClipboard', type: 'Branch Name', data: refName }); } }
 		]
 	];
 }
 
-function commitsGetBranchContextMenuActions(view: any, target: any): ContextMenuActions {
+function commitsGetBranchContextMenuActions(view: any, target: any, inSidebar: boolean = false): ContextMenuActions {
 	const refName = target.ref, visibility = view.config.contextMenuActionsVisibility.branch;
 	const isSelectedInBranchesDropdown = view.branchDropdown.isSelected(refName);
-	return [commitsBranchCoreMenuGroup(view, refName, visibility, target), ...commitsBranchExtraMenuGroups(view, refName, visibility, isSelectedInBranchesDropdown, target)];
+	return [commitsBranchCoreMenuGroup(view, refName, visibility, target), ...commitsBranchExtraMenuGroups(view, refName, visibility, isSelectedInBranchesDropdown, target, inSidebar)];
 }

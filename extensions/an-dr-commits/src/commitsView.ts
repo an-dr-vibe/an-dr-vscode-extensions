@@ -687,6 +687,18 @@ export class CommitsView extends Disposable {
 					error: await this.dataSource.renameBranch(msg.repo, msg.oldName, msg.newName)
 				});
 				break;
+			case 'setBranchUpstream':
+				this.sendMessage({
+					command: 'setBranchUpstream',
+					error: await this.dataSource.setBranchUpstream(msg.repo, msg.branchName, msg.upstream)
+				});
+				break;
+			case 'unsetBranchUpstream':
+				this.sendMessage({
+					command: 'unsetBranchUpstream',
+					error: await this.dataSource.unsetBranchUpstream(msg.repo, msg.branchName)
+				});
+				break;
 			case 'rescanForRepos':
 				if (!(await this.repoManager.searchWorkspaceForRepos())) {
 					showErrorMessage('No Git repositories were found in the current workspace.');

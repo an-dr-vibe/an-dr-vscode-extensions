@@ -370,9 +370,11 @@ class CommitsView {
 	/* Context Menu Generation */
 
 	private getBranchContextMenuActions(target: DialogTarget & RefTarget): ContextMenuActions { return commitsGetBranchContextMenuActions(this, target); }
+	private getBranchContextMenuActionsForSidebar(target: DialogTarget & RefTarget): ContextMenuActions { return commitsGetBranchContextMenuActions(this, target, true); }
 	private getCommitContextMenuActions(target: DialogTarget & CommitTarget): ContextMenuActions { return commitsGetCommitContextMenuActions(this, target); }
 	private getMultiSelectContextMenuActions(target: DialogTarget & CommitTarget): ContextMenuActions { return commitsGetMultiSelectContextMenuActions(this, target); }
 	private getRemoteBranchContextMenuActions(remote: string, target: DialogTarget & RefTarget): ContextMenuActions { return commitsGetRemoteBranchContextMenuActions(this, remote, target); }
+	private getRemoteBranchContextMenuActionsForSidebar(remote: string, target: DialogTarget & RefTarget): ContextMenuActions { return commitsGetRemoteBranchContextMenuActions(this, remote, target, true); }
 	private getStashContextMenuActions(target: DialogTarget & RefTarget): ContextMenuActions { return commitsGetStashContextMenuActions(this, target); }
 	private getTagContextMenuActions(isAnnotated: boolean, target: DialogTarget & RefTarget): ContextMenuActions { return commitsGetTagContextMenuActions(this, isAnnotated, target); }
 	private getUncommittedChangesContextMenuActions(target: DialogTarget & CommitTarget): ContextMenuActions { return commitsGetUncommittedChangesContextMenuActions(this, target); }

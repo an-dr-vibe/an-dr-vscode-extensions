@@ -1179,6 +1179,14 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['branch', '-m', oldName, newName], repo);
 	}
 
+	public setBranchUpstream(repo: string, branchName: string, upstream: string) {
+		return this.runGitCommand(['branch', '--set-upstream-to=' + upstream, branchName], repo);
+	}
+
+	public unsetBranchUpstream(repo: string, branchName: string) {
+		return this.runGitCommand(['branch', '--unset-upstream', branchName], repo);
+	}
+
 
 	/* Git Action Methods - Branches & Commits */
 

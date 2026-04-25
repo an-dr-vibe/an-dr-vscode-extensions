@@ -30,6 +30,7 @@ class BranchPanel {
 	private readonly branchChangeCallback: (values: string[]) => void;
 	private readonly tagChangeCallback: (values: string[]) => void;
 	private readonly contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void;
+	private readonly doubleClickCallback: (type: 'branch' | 'tag', name: string) => void;
 	private options: ReadonlyArray<DropdownOption> = [];
 	private optionsSelected: boolean[] = [];
 	private tagNames: ReadonlyArray<string> = [];
@@ -58,10 +59,11 @@ class BranchPanel {
 	private readonly filterHost: HTMLElement | null;
 	private pendingScrollRestoreHandle: number | null = null;
 
-	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean) {
+	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean) {
 		this.branchChangeCallback = branchChangeCallback;
 		this.tagChangeCallback = tagChangeCallback;
 		this.contextMenuCallback = contextMenuCallback;
+		this.doubleClickCallback = doubleClickCallback;
 		this.flattenSingleChildGroups = flattenSingleChildGroups;
 		this.groupsFirst = groupsFirst;
 		const elem = document.getElementById(id)!;
@@ -100,6 +102,7 @@ class BranchPanel {
 		this.listElem = elem.appendChild(document.createElement('div'));
 		this.listElem.className = 'branchPanelList';
 		this.listElem.addEventListener('click', (e) => this.handleClick(e));
+		this.listElem.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
 		this.listElem.addEventListener('contextmenu', (e) => this.handleContextMenu(e));
 		this.listElem.addEventListener('mousedown', () => this.setActionSelectionVisible(true));
 		this.filterInput.addEventListener('focus', () => this.setActionSelectionVisible(false));
@@ -399,6 +402,21 @@ class BranchPanel {
 			e.preventDefault();
 			e.stopPropagation();
 			this.contextMenuCallback('branch', option.value, e);
+		}
+	}
+
+	private handleDoubleClick(e: MouseEvent) {
+		const target = <HTMLElement>e.target;
+		const tagItem = target.closest('.branchPanelTagItem') as HTMLElement | null;
+		const item = target.closest('.branchPanelItem') as HTMLElement | null;
+		if (tagItem !== null && typeof tagItem.dataset.tagid !== 'undefined') {
+			const tagName = this.tagNames[parseInt(tagItem.dataset.tagid)];
+			if (typeof tagName !== 'undefined') this.doubleClickCallback('tag', tagName);
+		} else if (item !== null && typeof item.dataset.id !== 'undefined') {
+			const idx = parseInt(item.dataset.id);
+			if (idx === 0) return;
+			const option = this.options[idx];
+			if (typeof option !== 'undefined') this.doubleClickCallback('branch', option.value);
 		}
 	}
 

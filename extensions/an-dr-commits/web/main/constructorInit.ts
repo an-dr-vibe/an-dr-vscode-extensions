@@ -36,6 +36,18 @@ function commitsInitDropdowns(view: any) {
 		view.renderTable();
 	}, (type: any, name: string, event: MouseEvent) => {
 		void view.openSidebarContextMenu(type, name, event);
+	}, (type: 'branch' | 'tag', name: string) => {
+		if (type !== 'branch') return;
+		const target = { type: TargetType.Repo };
+		if (name.startsWith('remotes/')) {
+			const refName = name.substring(8);
+			const slash = refName.indexOf('/');
+			if (slash === -1) return;
+			view.checkoutBranchAction(refName, refName.substring(0, slash), null, target);
+		} else {
+			if (view.gitBranchHead === name) return;
+			view.checkoutBranchAction(name, null, null, target);
+		}
 	}, view.config.branchPanel.flattenSingleChildGroups, view.config.branchPanel.groupsFirst);
 }
 
@@ -48,7 +60,7 @@ function commitsRestoreFromPrevState(view: any, prevState: any) {
 	view.fullDiffMode = !!prevState.fullDiffMode;
 	view.avatars = prevState.avatars;
 	view.gitConfig = prevState.gitConfig;
-	view.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
+	view.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitRemoteUrls || {}, prevState.gitStashes, true);
 	view.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
 	view.branchDropdown.restoreState(prevState.branchPanel);
 	view.findWidget.restoreState(prevState.findWidget);

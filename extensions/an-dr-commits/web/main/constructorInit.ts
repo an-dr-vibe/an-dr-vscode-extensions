@@ -37,8 +37,13 @@ function commitsInitDropdowns(view: any) {
 	}, (type: any, name: string, event: MouseEvent) => {
 		void view.openSidebarContextMenu(type, name, event);
 	}, (type: 'branch' | 'tag', name: string) => {
-		if (type !== 'branch') return;
-		const target = { type: TargetType.Repo };
+		const target: RepoTarget = { type: TargetType.Repo };
+		if (type === 'tag') {
+			dialog.showConfirmation('Checking out tag <b><i>' + escapeHtml(name) + '</i></b> will result in a \'detached HEAD\' state — you won\'t be on any branch.', 'Yes, checkout', () => {
+				runAction({ command: 'checkoutBranch', repo: view.currentRepo, branchName: name, remoteBranch: null, pullAfterwards: null }, 'Checking out Tag');
+			}, target);
+			return;
+		}
 		if (name.startsWith('remotes/')) {
 			const refName = name.substring(8);
 			const slash = refName.indexOf('/');

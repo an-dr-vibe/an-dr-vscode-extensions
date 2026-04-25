@@ -85,7 +85,6 @@
 	width:18px;
 	line-height:16px;
 	font-size:11px;
-	cursor:pointer;
 	-webkit-user-select:none;
 	user-select:none;
 	text-align:center;
@@ -128,7 +127,6 @@
 	width:20px;
 	height:20px;
 	vertical-align:top;
-	cursor:pointer;
 	flex-shrink:0;
 }
 #findPrev svg, #findNext svg, #findOpenCommitDetailsView svg{

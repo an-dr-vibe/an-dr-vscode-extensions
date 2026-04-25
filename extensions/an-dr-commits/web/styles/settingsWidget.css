@@ -124,7 +124,6 @@
 	height:13px;
 	margin-right:5px;
 	vertical-align:middle;
-	cursor:pointer;
 }
 .settingsSection .hideRemoteBtn svg{
 	position:absolute;
@@ -138,7 +137,6 @@
 	width:17px;
 	height:17px;
 	vertical-align:top;
-	cursor:pointer;
 }
 .settingsSection > table td.btns.remoteBtns div{
 	vertical-align:middle;
@@ -168,14 +166,12 @@
 .settingsSectionButtons > div{
 	display:inline-block;
 	line-height:24px;
-	cursor:pointer;
 	padding-right:6px;
 }
 
 .settingsSection label{
 	display:inline-block;
 	margin:4px 0;
-	cursor:pointer;
 }
 
 .settingsSection .customCheckbox{
@@ -232,7 +228,6 @@
 	height:24px;
 	top:8px;
 	right:10px;
-	cursor:pointer;
 	z-index:33;
 }
 #settingsClose svg{
@@ -254,7 +249,6 @@
 }
 
 #settingsWidget .settingsWidgetInfo{
-	cursor:help;
 }
 #settingsWidget .settingsWidgetInfo > svg{
 	width:15px !important;

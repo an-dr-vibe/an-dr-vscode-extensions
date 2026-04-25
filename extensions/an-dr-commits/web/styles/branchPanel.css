@@ -60,7 +60,6 @@ body.branchPanelHidden #sidebarResizeHandle{
 	width:26px;
 	height:26px;
 	min-width:26px;
-	cursor:pointer;
 	border-radius:4px;
 	-webkit-user-select:none;
 	user-select:none;
@@ -108,7 +107,6 @@ body.branchPanelHidden #sidebarResizeHandle{
 	font-size:11px;
 	text-transform:uppercase;
 	opacity:0.7;
-	cursor:pointer;
 	-webkit-user-select:none;
 	user-select:none;
 	letter-spacing:0.5px;
@@ -136,7 +134,6 @@ body.branchPanelHidden #sidebarResizeHandle{
 /* Folder row */
 .branchPanelFolder{
 	padding:3px 6px 3px 4px;
-	cursor:pointer;
 	-webkit-user-select:none;
 	user-select:none;
 	display:flex;
@@ -205,7 +202,6 @@ body.branchPanelHidden #sidebarResizeHandle{
 /* Branch/tag item row */
 .branchPanelItem{
 	padding:3px 6px 3px 4px;
-	cursor:pointer;
 	-webkit-user-select:none;
 	user-select:none;
 	display:flex;
@@ -214,7 +210,6 @@ body.branchPanelHidden #sidebarResizeHandle{
 	overflow:hidden;
 }
 .branchPanelItem[draggable="true"]{
-	cursor:grab;
 }
 .branchPanelItem:hover{
 	background-color:var(--vscode-list-hoverBackground, rgba(128,128,128,0.1));
@@ -365,7 +360,6 @@ body.branchPanelHidden #sidebar{
 	width:26px;
 	height:26px;
 	min-width:26px;
-	cursor:pointer;
 	border-radius:4px;
 	-webkit-user-select:none;
 	user-select:none;

@@ -19,7 +19,6 @@
 	line-height:24px;
 	padding-left:10px;
 	padding-right:20px;
-	cursor:pointer;
 	-webkit-user-select:none;
 	user-select:none;
 	white-space:nowrap;
@@ -62,7 +61,6 @@
 
 .dropdownOption{
 	position:relative;
-	cursor:pointer;
 	padding:4px 10px;
 	-webkit-user-select:none;
 	user-select:none;

@@ -94,6 +94,7 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 		return;
 	}
 
+	const prevBranchHead = view.gitBranchHead;
 	view.gitBranches = branchOptions;
 	view.gitBranchUpstreams = branchUpstreams;
 	view.gitGoneUpstreamBranches = goneUpstreamBranches;
@@ -116,6 +117,13 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 	if (view.currentBranches === null || view.currentBranches.length === 0) {
 		view.currentBranches = getInitialBranchesOnRepoLoad(view);
 		if (view.currentBranches.length === 0) view.currentBranches.push(SHOW_ALL_BRANCHES);
+	}
+
+	// When transitioning into detached HEAD, ensure HEAD is visible in the graph
+	if (branchHead === 'HEAD' && prevBranchHead !== 'HEAD' &&
+		Array.isArray(view.currentBranches) && !view.currentBranches.includes('HEAD') &&
+		!(view.currentBranches.length === 1 && view.currentBranches[0] === SHOW_ALL_BRANCHES)) {
+		view.currentBranches = [...view.currentBranches, 'HEAD'];
 	}
 
 	view.saveState();

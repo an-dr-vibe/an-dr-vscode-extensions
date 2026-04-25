@@ -6,7 +6,7 @@ function commitsGetBranchOptions(view: any, includeShowAll?: boolean): ReadonlyA
 	const options: DialogSelectInputOption[] = [];
 	if (includeShowAll) {
 		options.push({ name: 'Show All', value: SHOW_ALL_BRANCHES });
-		options.push({ name: 'HEAD', value: 'HEAD', isCurrent: view.gitBranchHead === 'HEAD' });
+		options.push({ name: 'HEAD', value: 'HEAD' });
 	}
 	for (let i = 0; i < view.config.customBranchGlobPatterns.length; i++) {
 		options.push({ name: 'Glob: ' + view.config.customBranchGlobPatterns[i].name, value: view.config.customBranchGlobPatterns[i].glob });

@@ -127,6 +127,11 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 		refName = escapeHtml(commit.stash.selector);
 		branchBadges.unshift({ type: 'stash', html: '<span class="gitRef stash" data-name="' + refName + '" title="Stash: ' + escapeHtml(commit.stash.selector.substring(5)) + '">' + SVG_ICONS.stash + '<span class="gitRefName" data-fullref="' + refName + '">' + escapeHtml(commit.stash.selector.substring(5)) + '</span></span>' });
 	}
+	const showHeadBadge = view.gitBranchHead === 'HEAD' ||
+		(Array.isArray(view.currentBranches) && view.currentBranches.includes('HEAD'));
+	if (showHeadBadge && commit.hash === view.commitHead) {
+		branchBadges.unshift({ type: 'head', html: '<span class="gitRef head active" data-name="HEAD" title="Detached HEAD">' + SVG_ICONS.target + '<span class="gitRefName" data-fullref="HEAD">HEAD</span></span>' });
+	}
 	const refBranches = view.renderRefBadgeGroup(branchBadges);
 	const refTags = view.renderRefBadgeGroup(tagBadges);
 	return '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +

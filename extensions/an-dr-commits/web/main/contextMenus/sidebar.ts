@@ -166,6 +166,7 @@ function commitsCreateSidebarRefTarget(view: any, refName: string, hash: string 
 }
 
 function commitsResolveSidebarBranch(view: any, value: string): SidebarResolvedRef | null {
+	if (value === 'HEAD') return null;
 	if (value.startsWith('remotes/')) {
 		const refName = value.substring(8);
 		const slash = refName.indexOf('/');

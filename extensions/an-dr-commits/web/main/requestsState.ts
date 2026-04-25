@@ -209,31 +209,8 @@ function commitsRequestLoadCommits(view: any) {
 	});
 }
 
-function getBranchesToLoad(view: any, selectedBranches: ReadonlyArray<string>): string[] {
-	const branches = [...selectedBranches];
-	if (!view.config.onRepoLoad.showRemoteBranchesForSelectedLocalBranches) {
-		return branches;
-	}
-
-	for (const branch of selectedBranches) {
-		if (branch === 'HEAD' || branch === SHOW_ALL_BRANCHES || branch.startsWith('remotes/') || branch.startsWith('--glob=')) {
-			continue;
-		}
-
-		const upstream = view.gitBranchUpstreams[branch];
-		if (typeof upstream !== 'string' || upstream === '') {
-			continue;
-		}
-
-		const remoteBranch = view.gitBranches.includes('remotes/' + upstream)
-			? 'remotes/' + upstream
-			: upstream;
-		if (!branches.includes(remoteBranch)) {
-			branches.push(remoteBranch);
-		}
-	}
-
-	return branches;
+function getBranchesToLoad(_view: any, selectedBranches: ReadonlyArray<string>): string[] {
+	return [...selectedBranches];
 }
 
 function commitsRequestLoadRepoInfoAndCommits(view: any, hard: boolean, skipRepoInfo: boolean, configChanges: boolean = false) {

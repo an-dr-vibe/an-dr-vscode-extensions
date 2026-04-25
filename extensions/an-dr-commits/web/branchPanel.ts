@@ -225,6 +225,44 @@ class BranchPanel {
 		return false;
 	}
 
+	public addToSelection(values: ReadonlyArray<string>) {
+		if (this.optionsSelected[0]) return;
+		let changed = false;
+		for (let i = 1; i < this.options.length; i++) {
+			if (!this.optionsSelected[i] && values.includes(this.options[i].value)) {
+				this.optionsSelected[i] = true;
+				changed = true;
+			}
+		}
+		if (changed) this.render();
+	}
+
+	public selectOnlyOption(value: string) {
+		const idx = this.options.findIndex((o) => o.value === value);
+		if (idx === -1) return;
+		this.optionsSelected = this.options.map((_, i) => i === idx);
+		this.render();
+		this.branchChangeCallback(this.getSelectedBranchValues());
+	}
+
+	public selectOnlyTag(tagName: string) {
+		const idx = this.tagNames.indexOf(tagName);
+		this.tagSelected = idx > -1 ? new Set([idx]) : new Set();
+		this.pendingTagSelectionNames.clear();
+		this.render();
+		this.tagChangeCallback(this.getSelectedTagValues());
+	}
+
+	public selectTag(tagName: string) {
+		const idx = this.tagNames.indexOf(tagName);
+		if (idx > -1 && !this.tagSelected.has(idx)) {
+			this.tagSelected.add(idx);
+			this.pendingTagSelectionNames.clear();
+			this.render();
+			this.tagChangeCallback(this.getSelectedTagValues());
+		}
+	}
+
 	public selectOption(value: string) {
 		const idx = this.options.findIndex((o) => o.value === value);
 		if (idx > -1 && !this.optionsSelected[0] && !this.optionsSelected[idx]) {

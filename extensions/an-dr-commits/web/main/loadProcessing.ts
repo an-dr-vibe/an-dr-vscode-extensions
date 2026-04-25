@@ -258,6 +258,11 @@ function commitsLoadCommits(view: any, commits: GG.GitCommit[], commitHead: stri
 	view.saveState();
 	view.graph.loadCommits(view.commits, view.commitHead, view.commitLookup, view.onlyFollowFirstParent);
 	view.render();
+	if (view.pendingRevealRef !== null) {
+		const ref = view.pendingRevealRef;
+		view.pendingRevealRef = null;
+		view.revealReference(ref);
+	}
 	if (currentRepoLoading && view.config.onRepoLoad.scrollToHead && view.commitHead !== null) view.scrollToCommit(view.commitHead, true);
 	view.finaliseLoadCommits();
 	view.requestAvatars(avatarsNeeded);

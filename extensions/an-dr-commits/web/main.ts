@@ -357,7 +357,7 @@ class CommitsView {
 
 	private async openSidebarContextMenu(type: 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection', name: string, event: MouseEvent) { return commitsOpenSidebarContextMenu(this, type, name, event); }
 	private async getSidebarContextMenuActions(type: 'branch' | 'tag' | 'remote' | 'remoteSection' | 'localSection', name: string): Promise<ContextMenuActions> { return commitsGetSidebarContextMenuActions(this, type, name); }
-	private appendSidebarRevealAction(actions: ContextMenuActions, refName: string): ContextMenuActions { return commitsAppendSidebarRevealAction(this, actions, refName); }
+	private appendSidebarRevealAction(actions: ContextMenuActions, refName: string, branchOptionValue?: string): ContextMenuActions { return commitsAppendSidebarRevealAction(this, actions, refName, branchOptionValue); }
 	private createSidebarRefTarget(refName: string, hash: string = ''): DialogTarget & RefTarget { return commitsCreateSidebarRefTarget(this, refName, hash); }
 	private resolveSidebarBranch(value: string): SidebarResolvedRef | null { return commitsResolveSidebarBranch(this, value); }
 	private async resolveSidebarSelection(selection: ReadonlyArray<BranchPanelActionSelectionItem>): Promise<ReadonlyArray<SidebarResolvedRef>> { return commitsResolveSidebarSelection(this, selection); }

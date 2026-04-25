@@ -88,7 +88,11 @@ async function commitsSidebarBranchActions(view: any, name: string): Promise<Con
 	const actions = resolvedBranch.kind === 'remoteBranch'
 		? view.getRemoteBranchContextMenuActions(resolvedBranch.remote, target)
 		: view.getBranchContextMenuActions(target);
-	return view.appendSidebarRevealAction(actions, resolvedBranch.name);
+	const actionsWithSelect = [
+		...actions,
+		[{ title: 'Select Only This', visible: true, onClick: () => view.branchDropdown.selectOnlyOption(name) }]
+	];
+	return view.appendSidebarRevealAction(actionsWithSelect, resolvedBranch.name, name);
 }
 
 async function commitsSidebarTagActions(view: any, name: string): Promise<ContextMenuActions> {
@@ -109,7 +113,18 @@ async function commitsSidebarTagActions(view: any, name: string): Promise<Contex
 	}
 	const target = view.createSidebarRefTarget(name, tagContext.hash);
 	const actions = view.getTagContextMenuActions(tagContext.annotated, target);
-	return view.appendSidebarRevealAction(actions, name);
+	return [
+		...actions,
+		[{ title: 'Select Only This', visible: true, onClick: () => view.branchDropdown.selectOnlyTag(name) }],
+		[{
+			title: 'Reveal',
+			visible: true,
+			onClick: () => {
+				view.branchDropdown.selectTag(name);
+				view.revealReference(name);
+			}
+		}]
+	];
 }
 
 async function commitsGetSidebarContextMenuActions(view: any, type: string, name: string): Promise<ContextMenuActions> {
@@ -144,13 +159,20 @@ async function commitsGetSidebarContextMenuActions(view: any, type: string, name
 	]];
 }
 
-function commitsAppendSidebarRevealAction(view: any, actions: ContextMenuActions, refName: string): ContextMenuActions {
+function commitsAppendSidebarRevealAction(view: any, actions: ContextMenuActions, refName: string, branchOptionValue?: string): ContextMenuActions {
 	return [
 		...actions,
 		[{
 			title: 'Reveal',
-			visible: view.findRenderedRefElem(refName) !== null,
-			onClick: () => view.revealReference(refName)
+			visible: true,
+			onClick: () => {
+				if (view.findRenderedRefElem(refName) !== null) {
+					view.revealReference(refName);
+				} else if (branchOptionValue !== undefined) {
+					view.pendingRevealRef = refName;
+					view.branchDropdown.selectOption(branchOptionValue);
+				}
+			}
 		}]
 	];
 }

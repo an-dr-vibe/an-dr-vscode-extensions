@@ -25,7 +25,20 @@ function commitsInitDropdowns(view: any) {
 	view.filesPanel.getContentElem().addEventListener('click', (e: MouseEvent) => commitsHandleFilesPanelClick(view, e));
 	view.filesPanel.getContentElem().addEventListener('dblclick', (e: MouseEvent) => commitsHandleFilesPanelDblClick(view, e));
 	view.branchDropdown = new BranchPanel('branchPanel', (values: string[]) => {
-		view.currentBranches = values;
+		const prev: string[] = Array.isArray(view.currentBranches) ? view.currentBranches : [];
+		const expanded = [...values];
+		if (view.config.onRepoLoad.showRemoteBranchesForSelectedLocalBranches) {
+			for (const branch of values) {
+				if (branch === SHOW_ALL_BRANCHES || branch === 'HEAD' || branch.startsWith('remotes/') || branch.startsWith('--glob=')) continue;
+				if (prev.includes(branch)) continue;
+				const upstream = view.gitBranchUpstreams[branch];
+				if (typeof upstream !== 'string' || upstream === '') continue;
+				const remoteBranch = view.gitBranches.includes('remotes/' + upstream) ? 'remotes/' + upstream : upstream;
+				if (!expanded.includes(remoteBranch)) expanded.push(remoteBranch);
+			}
+		}
+		view.currentBranches = expanded;
+		if (expanded.length > values.length) view.branchDropdown.addToSelection(expanded);
 		view.maxCommits = view.config.initialLoadCommits;
 		view.saveState();
 		view.clearCommits();

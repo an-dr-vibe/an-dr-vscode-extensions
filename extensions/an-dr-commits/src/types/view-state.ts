@@ -96,7 +96,7 @@ export interface CommitsViewConfig {
 
 export interface CommitsViewGlobalState {
 	alwaysAcceptCheckoutCommit: boolean;
-	fullDiffViewMode: 'unified' | 'sideBySide';
+	fullDiffViewMode: 'unified' | 'sideBySide' | 'raw';
 	issueLinkingConfig: IssueLinkingConfig | null;
 	pushTagSkipRemoteCheck: boolean;
 	filesPanelWidth: number;

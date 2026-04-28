@@ -752,6 +752,12 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 	padding:4px 0;
 	background-color:var(--vscode-editor-background);
 }
+#fullDiffContent.diffRawMode{
+	font-family:var(--vscode-editor-font-family,monospace);
+	font-size:12px;
+	padding:4px 0;
+	background-color:var(--vscode-editor-background);
+}
 .diffFullView{width:100%;}
 .diffRow{
 	display:flex;
@@ -785,6 +791,19 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 .diffRow.diffHunk{color:rgba(100,150,255,0.9);font-style:italic;}
 .diffRow.diffFileHeader{color:rgba(128,128,128,0.7);}
 .diffRow.diffNoNewline{color:rgba(128,128,128,0.6);font-style:italic;}
+.diffRawView{width:max-content;min-width:100%;}
+.diffRawLine{
+	white-space:pre;
+	min-width:100%;
+	box-sizing:border-box;
+	line-height:1.4;
+}
+.diffRawContent{display:inline-block;padding:0 8px;}
+.diffRawLine.diffAdded{background:rgba(0,160,0,0.15);}
+.diffRawLine.diffRemoved{background:rgba(200,0,0,0.15);}
+.diffRawLine.diffHunk{color:rgba(100,150,255,0.9);}
+.diffRawLine.diffFileHeader{color:rgba(128,128,128,0.7);}
+.diffRawLine.diffNoNewline{color:rgba(128,128,128,0.6);font-style:italic;}
 .diffCompactSpacer{
 	color:rgba(128,128,128,0.7);
 	font-style:italic;

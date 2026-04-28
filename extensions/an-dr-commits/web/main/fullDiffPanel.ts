@@ -21,10 +21,14 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 	const newLines = commitsGetDisplayLines(data.newExists ? data.newContent : null);
 	const hunks = commitsParseUnifiedDiffHunks(data.diff);
 	const isSbs = view.fullDiffViewMode === 'sideBySide';
-	contentElem.innerHTML = isSbs
+	const isRaw = view.fullDiffViewMode === 'raw';
+	contentElem.innerHTML = isRaw
+		? commitsBuildRawDiffView(data.diff)
+		: isSbs
 		? commitsBuildFullSideBySideFileView(view, oldLines, newLines, hunks)
 		: commitsBuildFullUnifiedFileView(view, oldLines, newLines, hunks);
 	alterClass(contentElem, 'diffSbsMode', isSbs);
+	alterClass(contentElem, 'diffRawMode', isRaw);
 	contentElem.scrollTop = 0;
 	if (isSbs) {
 		const oldPane = contentElem.querySelector('.diffSbsPaneOld') as HTMLElement | null;
@@ -45,6 +49,28 @@ function commitsGetDisplayLines(content: string | null): string[] {
 	const lines = normalized.split('\n');
 	if (lines[lines.length - 1] === '') lines.pop();
 	return lines;
+}
+
+function commitsBuildRawDiffView(diff: string): string {
+	const lines = diff.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+	if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+	let html = '<div class="diffRawView">';
+	for (const line of lines) {
+		const classes = ['diffRawLine'];
+		if (line.startsWith('@@')) {
+			classes.push('diffHunk', 'fullDiffChangedNav');
+		} else if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('new file mode ') || line.startsWith('deleted file mode ') || line.startsWith('similarity index ') || line.startsWith('rename from ') || line.startsWith('rename to ')) {
+			classes.push('diffFileHeader');
+		} else if (line.startsWith('+')) {
+			classes.push('diffAdded');
+		} else if (line.startsWith('-')) {
+			classes.push('diffRemoved');
+		} else if (line === '\\ No newline at end of file') {
+			classes.push('diffNoNewline');
+		}
+		html += '<div class="' + classes.join(' ') + '"><span class="diffRawContent">' + escapeHtml(line) + '</span></div>';
+	}
+	return html + '</div>';
 }
 
 function commitsParseUnifiedDiffHunks(diff: string): { oldStart: number; newStart: number; lines: string[] }[] {
@@ -245,6 +271,7 @@ function commitsCreateFullDiffPanel(view: any) {
 			'<div id="fullDiffHeaderRight">' +
 				'<button id="fullDiffViewUnified" title="Unified full file view">Unified</button>' +
 				'<button id="fullDiffViewSideBySide" title="Side by side full file view">Split</button>' +
+				'<button id="fullDiffViewRaw" title="Raw git diff output">Raw</button>' +
 				'<button id="fullDiffCompact" title="Toggle compact mode">Compact</button>' +
 				'<button id="fullDiffPrevHunk" title="Previous change">▲</button>' +
 				'<span id="fullDiffChangeCounter">0 / 0</span>' +
@@ -260,6 +287,7 @@ function commitsCreateFullDiffPanel(view: any) {
 	view.renderFullDiffCompactBtn();
 	document.getElementById('fullDiffViewUnified')!.addEventListener('click', () => view.changeFullDiffViewMode('unified'));
 	document.getElementById('fullDiffViewSideBySide')!.addEventListener('click', () => view.changeFullDiffViewMode('sideBySide'));
+	document.getElementById('fullDiffViewRaw')!.addEventListener('click', () => view.changeFullDiffViewMode('raw'));
 	document.getElementById('fullDiffCompact')!.addEventListener('click', () => {
 		view.gitRepos[view.currentRepo].fullDiffCompact = !view.gitRepos[view.currentRepo].fullDiffCompact;
 		view.renderFullDiffCompactBtn();
@@ -277,13 +305,16 @@ function commitsRenderFullDiffCompactBtn(view: any) {
 function commitsRenderFullDiffViewBtns(view: any) {
 	const unifiedBtn = document.getElementById('fullDiffViewUnified');
 	const sbsBtn = document.getElementById('fullDiffViewSideBySide');
-	if (!unifiedBtn || !sbsBtn) return;
+	const rawBtn = document.getElementById('fullDiffViewRaw');
+	if (!unifiedBtn || !sbsBtn || !rawBtn) return;
 	const isSbs = view.fullDiffViewMode === 'sideBySide';
-	alterClass(unifiedBtn, CLASS_ACTIVE, !isSbs);
+	const isRaw = view.fullDiffViewMode === 'raw';
+	alterClass(unifiedBtn, CLASS_ACTIVE, !isSbs && !isRaw);
 	alterClass(sbsBtn, CLASS_ACTIVE, isSbs);
+	alterClass(rawBtn, CLASS_ACTIVE, isRaw);
 }
 
-function commitsChangeFullDiffViewMode(view: any, mode: 'unified' | 'sideBySide') {
+function commitsChangeFullDiffViewMode(view: any, mode: 'unified' | 'sideBySide' | 'raw') {
 	view.fullDiffViewMode = mode;
 	updateGlobalViewState('fullDiffViewMode', mode);
 	view.renderFullDiffViewBtns();

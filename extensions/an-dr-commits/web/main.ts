@@ -70,7 +70,7 @@ class CommitsView {
 
 	private moreCommitsAvailable: boolean = false;
 	private expandedCommit: ExpandedCommit | null = null;
-	public fullDiffViewMode: 'unified' | 'sideBySide' = globalState.fullDiffViewMode;
+	public fullDiffViewMode: 'unified' | 'sideBySide' | 'raw' = globalState.fullDiffViewMode;
 	public currentDiffRequest: CurrentDiffRequest | null = null;
 	public currentDiffText: string | null = null;
 	public currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null = null;
@@ -535,7 +535,7 @@ class CommitsView {
 	public createFullDiffPanel() { commitsCreateFullDiffPanel(this); }
 	public renderFullDiffCompactBtn() { commitsRenderFullDiffCompactBtn(this); }
 	public renderFullDiffViewBtns() { commitsRenderFullDiffViewBtns(this); }
-	public changeFullDiffViewMode(mode: 'unified' | 'sideBySide') { commitsChangeFullDiffViewMode(this, mode); }
+	public changeFullDiffViewMode(mode: 'unified' | 'sideBySide' | 'raw') { commitsChangeFullDiffViewMode(this, mode); }
 	private destroyFullDiffPanel() { commitsDestroyFullDiffPanel(this); }
 	public resetDiffState() { commitsResetDiffState(this); }
 	public setFullDiffPanelHeight(height: number) { commitsSetFullDiffPanelHeight(this, height); }

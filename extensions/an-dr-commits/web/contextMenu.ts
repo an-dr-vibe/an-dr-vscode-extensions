@@ -70,21 +70,19 @@ class ContextMenu {
 		const menu = document.createElement('ul');
 		menu.className = 'contextMenu' + (checked ? ' checked' : '') + (className !== null ? ' ' + className : '');
 		menu.style.opacity = '0';
+		menu.style.position = 'fixed';
 		menu.innerHTML = html;
-		frameElem.appendChild(menu);
-		const menuBounds = menu.getBoundingClientRect(), frameBounds = frameElem.getBoundingClientRect();
-		const relativeX = event.pageX + menuBounds.width < frameBounds.right
-			? -2 // context menu fits to the right
-			: event.pageX - menuBounds.width > frameBounds.left
-				? 2 - menuBounds.width // context menu fits to the left
-				: -2 - (menuBounds.width - (frameBounds.width - (event.pageX - frameBounds.left))); // Overlap the context menu horizontally with the cursor
-		const relativeY = event.pageY + menuBounds.height < frameBounds.bottom
-			? -2 // context menu fits below
-			: event.pageY - menuBounds.height > frameBounds.top
-				? 2 - menuBounds.height // context menu fits above
-				: -2 - (menuBounds.height - (frameBounds.height - (event.pageY - frameBounds.top))); // Overlap the context menu vertically with the cursor
-		menu.style.left = (frameElem.scrollLeft + Math.max(event.pageX - frameBounds.left + relativeX, 2)) + 'px';
-		menu.style.top = (frameElem.scrollTop + Math.max(event.pageY - frameBounds.top + relativeY, 2)) + 'px';
+		document.body.appendChild(menu);
+		const menuBounds = menu.getBoundingClientRect();
+		const vw = window.innerWidth, vh = window.innerHeight;
+		const x = event.clientX + menuBounds.width < vw
+			? event.clientX - 2
+			: Math.max(event.clientX - menuBounds.width + 2, 2);
+		const y = event.clientY + menuBounds.height < vh
+			? event.clientY - 2
+			: Math.max(event.clientY - menuBounds.height + 2, 2);
+		menu.style.left = x + 'px';
+		menu.style.top = y + 'px';
 		menu.style.opacity = '1';
 		this.elem = menu;
 		this.onClose = onClose;

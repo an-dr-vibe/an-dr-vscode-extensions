@@ -302,8 +302,10 @@ class Dialog {
 		}
 
 		if (inputs.length > 0 && (inputs[0].type === DialogInputType.Text || inputs[0].type === DialogInputType.TextRef)) {
-			// If the first input is a text field, set focus to it.
-			(<HTMLInputElement>document.getElementById('dialogInput0')).focus();
+			// If the first input is a text field, set focus to it and select any pre-filled value.
+			const firstInput = <HTMLInputElement>document.getElementById('dialogInput0');
+			firstInput.focus();
+			firstInput.select();
 		}
 	}
 

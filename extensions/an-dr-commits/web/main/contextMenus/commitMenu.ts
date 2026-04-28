@@ -106,7 +106,7 @@ function commitsGetCommitContextMenuActions(view: any, target: any): ContextMenu
 	const commit = view.commits[view.commitLookup[hash]];
 	return [[
 		{ title: 'Add Tag' + ELLIPSIS, visible: visibility.addTag, onClick: () => view.addTagAction(hash, '', view.config.dialogDefaults.addTag.type, '', null, target) },
-		{ title: 'Create Branch' + ELLIPSIS, visible: visibility.createBranch, onClick: () => view.createBranchAction(hash, '', view.config.dialogDefaults.createBranch.checkout, target) }
+		{ title: 'Create Branch' + ELLIPSIS, visible: visibility.createBranch, onClick: () => view.createBranchAction(hash, view.gitBranchHead ?? '', view.config.dialogDefaults.createBranch.checkout, target) }
 	], [
 		{
 			title: 'Checkout' + (globalState.alwaysAcceptCheckoutCommit ? '' : ELLIPSIS),

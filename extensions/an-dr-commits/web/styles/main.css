@@ -12,6 +12,7 @@ body{
 	--top-bar-height:41px;
 	--branch-panel-width:200px;
 	--files-panel-width:220px;
+	--files-panel-inline-width:220px;
 }
 body.unableToLoad{
 	margin:0 20px;
@@ -463,18 +464,6 @@ body.filesPanelHidden #commitDetailsView.docked{
 	background-color:rgba(128,128,128,0.35);
 }
 
-#commitDetailsViewFileViewTypeTree{
-	border-radius:4px 0 0 4px;
-	margin-right:0;
-}
-#commitDetailsViewFileViewTypeList{
-	border-radius:0 4px 4px 0;
-	margin-left:0;
-}
-.commitDetailsViewFileViewTypeBtn{
-	background-color:rgba(128,128,128,0.125);
-}
-
 #commitDetailsViewExternalDiff{
 	display:none;
 }
@@ -526,7 +515,6 @@ body.filesPanelHidden #commitDetailsView.docked{
 	top:0;
 	bottom:0;
 	box-sizing:border-box;
-	border-right:1px solid rgba(128,128,128,0.2);
 	overflow-x:hidden;
 	overflow-y:auto;
 }
@@ -538,47 +526,47 @@ body.filesPanelHidden #commitDetailsView.docked{
 	-webkit-user-select:text;
 	user-select:text;
 }
+#commitDetailsViewInlineFiles{
+	position:absolute;
+	top:0;
+	right:0;
+	bottom:0;
+	width:var(--files-panel-inline-width, 220px);
+	border-left:1px solid rgba(128,128,128,0.5);
+	background-color:var(--vscode-sideBar-background, var(--vscode-editor-background));
+	box-sizing:border-box;
+	display:none;
+	flex-direction:column;
+}
+body.filesPanelHidden #commitDetailsViewSummary{
+	right:var(--files-panel-inline-width, 220px);
+	border-right:1px solid rgba(128,128,128,0.2);
+}
+body.filesPanelHidden #commitDetailsViewInlineFiles{
+	display:flex;
+}
+#commitDetailsViewInlineFilesHeader{
+	flex-shrink:0;
+	height:32px;
+	display:none;
+	align-items:center;
+	border-bottom:1px solid rgba(128,128,128,0.2);
+	box-sizing:border-box;
+}
+#commitDetailsViewInlineFilesHeader:not(:empty){
+	display:flex;
+}
+#commitDetailsViewInlineFilesContent{
+	flex:1 1 0;
+	overflow-y:auto;
+	overflow-x:hidden;
+}
 #commitDetailsViewOpenScmBtn{
 	display:inline-block;
 	margin-top:10px;
 	padding:2px 10px;
 }
 
-.commitDetailsViewSummaryTop{
-	display:inline-table;
-	width:100%;
-}
-.commitDetailsViewSummaryTopRow{
-	display:table-row;
-}
-.commitDetailsViewSummaryKeyValues, .commitDetailsViewSummaryAvatar{
-	display:table-cell;
-	vertical-align:top;
-}
-.commitDetailsViewSummaryKeyValues{
-	max-width:0px;
-	overflow-x:hidden;
-	text-overflow:ellipsis;
-}
-.commitDetailsViewSummaryTop.withAvatar .commitDetailsViewSummaryKeyValues{
-	padding-right:10px;
-}
-.commitDetailsViewSummaryAvatar{
-	width:54px;
-	height:54px;
-	overflow:hidden;
-}
-.commitDetailsViewSummaryAvatar > img{
-	display:block;
-	width:54px;
-	height:54px;
-}
-.commitDetailsViewSummaryAvatar.circle{
-	border-radius:27px;
-}
-.commitDetailsViewSummaryAvatar.square{
-	border-radius:4px;
-}
 
 .signatureInfo{
 	margin-left:4px;

@@ -2,6 +2,7 @@
 
 > **Maintenance rule**: Update this file whenever you add, remove, or significantly change a file, feature, or data flow. Keep it accurate so future agents can skip exploratory reads.
 > **Commit rule**: Never create a git commit or push unless the user explicitly requests it ("commit", "push", "commit and push", etc.). Completing a coding task does NOT imply permission to commit.
+> **DRY rule**: Never duplicate logic or markup. If two places need the same output, extract a shared function or reuse existing methods. Prefer passing rendered HTML/data from one owner rather than re-rendering independently.
 
 ---
 

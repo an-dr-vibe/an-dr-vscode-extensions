@@ -44,15 +44,34 @@ function commitsLoadCommitComparison(view: any, commitElem: HTMLElement, compare
 	}
 }
 
+function commitsCanShowExternalDiffButton(view: any, externalDiffPossible: boolean) {
+	return externalDiffPossible && view.gitConfig !== null && (view.gitConfig.diffTool !== null || view.gitConfig.guiDiffTool !== null);
+}
+
+function commitsGetFilesPanelHeaderHtml(view: any, externalDiffPossible: boolean) {
+	return commitsCanShowExternalDiffButton(view, externalDiffPossible) ? '<div id="commitDetailsViewExternalDiff" class="commitDetailsViewControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '';
+}
+
+function commitsAttachHeaderListeners(container: HTMLElement | null, view: any, externalDiffPossible: boolean) {
+	if (container === null) return;
+	if (commitsCanShowExternalDiffButton(view, externalDiffPossible)) {
+		const extDiff = container.querySelector('[id="commitDetailsViewExternalDiff"]');
+		if (extDiff) extDiff.addEventListener('click', () => {
+			const expandedCommit = view.expandedCommit;
+			const commitHash = expandedCommit !== null ? expandedCommit.commitHash : view.filesPanelCommitHash;
+			const compareWithHash = expandedCommit !== null ? expandedCommit.compareWithHash : view.filesPanelCompareWithHash;
+			if (commitHash === null || view.gitConfig === null || (view.gitConfig.diffTool === null && view.gitConfig.guiDiffTool === null)) return;
+			const order = view.getCommitOrder(commitHash, compareWithHash === null ? commitHash : compareWithHash);
+			runAction({ command: 'openExternalDirDiff', repo: view.currentRepo, fromHash: order.from, toHash: order.to, isGui: view.gitConfig.guiDiffTool !== null }, 'Opening External Directory Diff');
+		});
+	}
+}
+
 function commitsPopulateFilesPanelHeader(view: any, externalDiffPossible: boolean) {
-	view.filesPanel.getHeaderElem().innerHTML =
-		'<div id="commitDetailsViewFileViewTypeTree" class="commitDetailsViewControlBtn commitDetailsViewFileViewTypeBtn" title="File Tree View">' + SVG_ICONS.fileTree + '</div>' +
-		'<div id="commitDetailsViewFileViewTypeList" class="commitDetailsViewControlBtn commitDetailsViewFileViewTypeBtn" title="File List View">' + SVG_ICONS.fileList + '</div>' +
-		(externalDiffPossible ? '<div id="commitDetailsViewExternalDiff" class="commitDetailsViewControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '');
-	document.getElementById('commitDetailsViewFileViewTypeTree')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.Tree));
-	document.getElementById('commitDetailsViewFileViewTypeList')!.addEventListener('click', () => view.changeFileViewType(GG.FileViewType.List));
-	commitsSetupCommitDetailsViewExternalDiffBtn(view, externalDiffPossible);
-	view.renderCommitDetailsViewFileViewTypeBtns();
+	const headerHtml = commitsGetFilesPanelHeaderHtml(view, externalDiffPossible);
+	const headerElem = view.filesPanel.getHeaderElem();
+	headerElem.innerHTML = headerHtml;
+	commitsAttachHeaderListeners(headerElem, view, externalDiffPossible);
 }
 
 function commitsPopulateFilesPanelHeaderForPreview(view: any, commitDetails: GG.GitCommitDetails) {
@@ -196,7 +215,6 @@ function commitsRenderCommitDetailsViewSummary(view: any, expandedCommit: Expand
 				urls: true
 			});
 			const commitDetails = expandedCommit.commitDetails!;
-			const commitDetailsAvatar = view.getCommitDetailsAvatarHtml(commitDetails.author, commitDetails.authorEmail, expandedCommit.avatar);
 			const parents = commitDetails.parents.length > 0
 				? commitDetails.parents.map((parent: string) => {
 					const escapedParent = escapeHtml(parent);
@@ -205,16 +223,13 @@ function commitsRenderCommitDetailsViewSummary(view: any, expandedCommit: Expand
 						: escapedParent;
 				}).join(', ')
 				: 'None';
-			html += '<span class="commitDetailsViewSummaryTop' + (commitDetailsAvatar !== '' ? ' withAvatar' : '') + '"><span class="commitDetailsViewSummaryTopRow"><span class="commitDetailsViewSummaryKeyValues">'
-				+ '<b>Commit: </b>' + escapeHtml(commitDetails.hash) + '<br>'
+			html += '<b>Commit: </b>' + escapeHtml(commitDetails.hash) + '<br>'
 				+ '<b>Parents: </b>' + parents + '<br>'
 				+ '<b>Author: </b>' + escapeHtml(commitDetails.author) + (commitDetails.authorEmail !== '' ? ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(commitDetails.authorEmail) + '" tabindex="-1">' + escapeHtml(commitDetails.authorEmail) + '</a>&gt;' : '') + '<br>'
 				+ (commitDetails.authorDate !== commitDetails.committerDate ? '<b>Author Date: </b>' + formatLongDate(commitDetails.authorDate) + '<br>' : '')
 				+ '<b>Committer: </b>' + escapeHtml(commitDetails.committer) + (commitDetails.committerEmail !== '' ? ' &lt;<a class="' + CLASS_EXTERNAL_URL + '" href="mailto:' + escapeHtml(commitDetails.committerEmail) + '" tabindex="-1">' + escapeHtml(commitDetails.committerEmail) + '</a>&gt;' : '') + (commitDetails.signature !== null ? generateSignatureHtml(commitDetails.signature) : '') + '<br>'
 				+ '<b>' + (commitDetails.authorDate !== commitDetails.committerDate ? 'Committer ' : '') + 'Date: </b>' + formatLongDate(commitDetails.committerDate)
-				+ '</span>'
-				+ commitDetailsAvatar
-				+ '</span></span><br><br>' + textFormatter.format(commitDetails.body);
+				+ '<br><br>' + textFormatter.format(commitDetails.body);
 		} else {
 			html += 'Displaying all uncommitted changes.';
 		}
@@ -270,12 +285,6 @@ function commitsSetupCommitDetailsViewScrollObservers(view: any, expandedCommit:
 }
 
 function commitsSetupCommitDetailsViewViewButtons(view: any) {
-	document.getElementById('commitDetailsViewFileViewTypeTree')!.addEventListener('click', () => {
-		view.changeFileViewType(GG.FileViewType.Tree);
-	});
-	document.getElementById('commitDetailsViewFileViewTypeList')!.addEventListener('click', () => {
-		view.changeFileViewType(GG.FileViewType.List);
-	});
 	document.getElementById('commitDetailsViewDiffViewRaw')!.addEventListener('click', () => {
 		view.changeDiffViewMode('raw');
 	});
@@ -339,11 +348,13 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		html += '<div id="commitDetailsViewLoading">' + SVG_ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
 	} else {
 		html += '<div id="commitDetailsViewSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
+		html += '<div id="commitDetailsViewInlineFiles"><div id="commitDetailsViewInlineFilesHeader"></div><div id="commitDetailsViewInlineFilesContent"></div></div>';
 		const alreadyShowingThisCommit = view.filesPanelCommitHash === expandedCommit.commitHash && view.filesPanelCompareWithHash === expandedCommit.compareWithHash;
 		if (!alreadyShowingThisCommit || refresh) {
 			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
 		}
 		view.filesPanelCommitHash = expandedCommit.commitHash;
+		// Inline content is populated after elem.innerHTML is set (see below)
 		view.filesPanelCompareWithHash = expandedCommit.compareWithHash;
 		view.filesPanelFileChanges = expandedCommit.fileChanges;
 		view.filesPanelFileTree = expandedCommit.fileTree;
@@ -357,6 +368,20 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 	}
 
 	elem.innerHTML = isDocked ? html : '<td><div class="commitDetailsViewHeightResize"></div></td><td colspan="' + (view.getNumColumns() - 1) + '">' + html + '</td>';
+
+	// Populate inline files pane (reuses FilesPanel's rendered content — no duplication)
+	if (!expandedCommit.loading) {
+		const inlineHeader = document.getElementById('commitDetailsViewInlineFilesHeader');
+		if (inlineHeader !== null) {
+			inlineHeader.innerHTML = commitsGetFilesPanelHeaderHtml(view, externalDiffPossible);
+			commitsAttachHeaderListeners(inlineHeader, view, externalDiffPossible);
+		}
+		const inlineContent = document.getElementById('commitDetailsViewInlineFilesContent');
+		if (inlineContent !== null) {
+			inlineContent.innerHTML = view.filesPanel.getContentHtml();
+		}
+	}
+
 	if (!isDocked) view.renderGraph();
 
 	if (!refresh) commitsScrollCommitDetailsViewIntoView(view, elem, isDocked, expandedCommit);
@@ -392,9 +417,7 @@ function commitsGetCommitOrder(view: any, hash1: string, hash2: string) {
 }
 
 function commitsGetFileViewType(view: any) {
-	return view.gitRepos[view.currentRepo].fileViewType === GG.FileViewType.Default
-		? view.config.commitDetailsView.fileViewType
-		: view.gitRepos[view.currentRepo].fileViewType;
+	return GG.FileViewType.Tree;
 }
 
 function commitsSetFileViewType(view: any, type: GG.FileViewType) {
@@ -403,6 +426,7 @@ function commitsSetFileViewType(view: any, type: GG.FileViewType) {
 }
 
 function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
+	type = GG.FileViewType.Tree;
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null) {
 		if (view.filesPanelFileChanges === null || view.filesPanelFileTree === null) return;
@@ -411,7 +435,6 @@ function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 			? (view.filesPanelCompareWithHash === UNCOMMITTED || view.filesPanelCommitHash === UNCOMMITTED)
 			: view.filesPanelCommitHash === UNCOMMITTED;
 		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, -1, type, isUncommitted);
-		view.renderCommitDetailsViewFileViewTypeBtns();
 		return;
 	}
 	if (expandedCommit.fileTree === null || expandedCommit.fileChanges === null) return;
@@ -419,6 +442,9 @@ function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 	view.setFileViewType(type);
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
 	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
+	const inlineContent = document.getElementById('commitDetailsViewInlineFilesContent');
+	if (inlineContent !== null) {
+		inlineContent.innerHTML = view.filesPanel.getContentHtml();
+	}
 	view.makeCommitDetailsViewFileViewInteractive();
-	view.renderCommitDetailsViewFileViewTypeBtns();
 }

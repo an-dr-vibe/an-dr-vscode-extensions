@@ -546,7 +546,6 @@ class CommitsView {
 	/* Commit Details View File View */
 
 	public makeCommitDetailsViewFileViewInteractive() { commitsMakeCommitDetailsViewFileViewInteractive(this); }
-	private renderCommitDetailsViewFileViewTypeBtns() { commitsRenderCommitDetailsViewFileViewTypeBtns(this); }
 	private renderCommitDetailsViewExternalDiffBtn() { commitsRenderCommitDetailsViewExternalDiffBtn(this); }
 	private commitDetailsViewUpdateFileState(file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) { commitsCommitDetailsViewUpdateFileState(this, file, fileElem, isReviewed, fileWasViewed); }
 

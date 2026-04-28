@@ -124,15 +124,13 @@
 				"an-dr-commits.commitDetailsView.fileView.type": {
 					"type": "string",
 					"enum": [
-						"File Tree",
-						"File List"
+						"File Tree"
 					],
 					"enumDescriptions": [
-						"Display files in a tree structure.",
-						"Display files in a list (useful for repositories with deep folder structures)."
+						"Display files in a tree structure."
 					],
 					"default": "File Tree",
-					"description": "Sets the default type of File View used in the Commit Details View. This can be overridden per repository using the controls on the right side of the Commit Details View."
+					"description": "Sets the default type of File View used in the Commit Details View."
 				},
 				"an-dr-commits.commitDetailsView.defaultDiffMode": {
 					"type": "string",
@@ -1470,15 +1468,13 @@
 				"an-dr-commits.defaultFileViewType": {
 					"type": "string",
 					"enum": [
-						"File Tree",
-						"File List"
+						"File Tree"
 					],
 					"enumDescriptions": [
-						"Display files in a tree structure",
-						"Display files in a list (useful for repositories with deep folder structures)"
+						"Display files in a tree structure"
 					],
 					"default": "File Tree",
-					"description": "Sets the default type of File View used in the Commit Details / Comparison Views. This can be overridden per repository using the controls on the right side of the Commit Details / Comparison Views.",
+					"description": "Sets the default type of File View used in the Commit Details / Comparison Views.",
 					"deprecationMessage": "Depreciated: This setting has been renamed to an-dr-commits.commitDetailsView.fileView.type",
 					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.commitDetailsView.fileView.type#`"
 				},

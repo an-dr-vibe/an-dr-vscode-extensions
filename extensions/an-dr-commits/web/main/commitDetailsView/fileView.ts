@@ -201,26 +201,16 @@ function commitsMakeCommitDetailsViewFileViewInteractive(view: any) {
 	commitsHandleCommitDetailsViewFileContext(view, <Event><unknown>null);
 }
 
-function commitsRenderCommitDetailsViewFileViewTypeBtns(view: any) {
-	let treeBtnElem = document.getElementById('commitDetailsViewFileViewTypeTree'), listBtnElem = document.getElementById('commitDetailsViewFileViewTypeList');
-	if (treeBtnElem === null || listBtnElem === null) return;
-
-	let listView = view.getFileViewType() === GG.FileViewType.List;
-	alterClass(treeBtnElem, CLASS_ACTIVE, !listView);
-	alterClass(listBtnElem, CLASS_ACTIVE, listView);
-}
-
 function commitsRenderCommitDetailsViewExternalDiffBtn(view: any) {
-	const externalDiffBtnElem = document.getElementById('commitDetailsViewExternalDiff');
-	if (externalDiffBtnElem === null) return;
-
-	alterClass(externalDiffBtnElem, CLASS_ENABLED, view.gitConfig !== null && (view.gitConfig.diffTool !== null || view.gitConfig.guiDiffTool !== null));
 	const toolName = view.gitConfig !== null
 		? view.gitConfig.guiDiffTool !== null
 			? view.gitConfig.guiDiffTool
 			: view.gitConfig.diffTool
 		: null;
-	externalDiffBtnElem.title = 'Open External Directory Diff' + (toolName !== null ? ' with "' + toolName + '"' : '');
+	document.querySelectorAll('[id="commitDetailsViewExternalDiff"]').forEach((externalDiffBtnElem) => {
+		alterClass(<HTMLElement>externalDiffBtnElem, CLASS_ENABLED, toolName !== null);
+		(<HTMLElement>externalDiffBtnElem).title = 'Open External Directory Diff' + (toolName !== null ? ' with "' + toolName + '"' : '');
+	});
 }
 
 function commitsCommitDetailsViewUpdateFileState(view: any, file: GG.GitFileChange, fileElem: HTMLElement, isReviewed: boolean | null, fileWasViewed: boolean) {

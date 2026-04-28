@@ -51,6 +51,7 @@ class FilesPanel {
 		this.toggleBtn.addEventListener('click', () => this.toggle());
 
 		// Apply initial state
+		this.applyInlineWidth(this.panelWidth);
 		this.applyWidth(this.panelHidden ? 0 : this.panelWidth);
 		if (this.panelHidden) {
 			document.body.classList.add('filesPanelHidden');
@@ -68,6 +69,7 @@ class FilesPanel {
 			const w = Math.max(140, Math.min(600, startWidth - (e.clientX - startX)));
 			this.panelWidth = w;
 			this.applyWidth(w);
+			this.applyInlineWidth(w);
 		};
 		const onUp = () => {
 			document.removeEventListener('mousemove', onMove);
@@ -87,6 +89,10 @@ class FilesPanel {
 		document.body.style.setProperty('--files-panel-width', width + 'px');
 	}
 
+	private applyInlineWidth(width: number) {
+		document.body.style.setProperty('--files-panel-inline-width', width + 'px');
+	}
+
 	private toggle() {
 		this.panelHidden = !this.panelHidden;
 		if (this.panelHidden) {
@@ -97,6 +103,10 @@ class FilesPanel {
 			document.body.classList.remove('filesPanelHidden');
 			this.applyWidth(this.panelWidth);
 			this.toggleBtn.classList.add('active');
+		}
+		const inlineContent = document.getElementById('commitDetailsViewInlineFilesContent');
+		if (inlineContent !== null) {
+			inlineContent.innerHTML = this.contentElem.innerHTML;
 		}
 		updateGlobalViewState('filesPanelHidden', this.panelHidden);
 	}
@@ -144,5 +154,13 @@ class FilesPanel {
 
 	public getContentElem(): HTMLElement {
 		return this.contentElem;
+	}
+
+	public getContentHtml(): string {
+		return this.contentElem.innerHTML;
+	}
+
+	public isHidden(): boolean {
+		return this.panelHidden;
 	}
 }

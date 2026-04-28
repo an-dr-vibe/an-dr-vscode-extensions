@@ -169,6 +169,4 @@ This extension is available on the [Visual Studio Marketplace](https://marketpla
 
 Thank you to all of the contributors that help with the development of Commits!
 
-Some of the icons used in Commits are from the following sources, please support them for their excellent work!
-- [GitHub Octicons](https://octicons.github.com/) ([License](https://github.com/primer/octicons/blob/master/LICENSE))
-- [Icons8](https://icons8.com/icon/pack/free-icons/ios11) ([License](https://icons8.com/license))
+The icons used in Commits are from [VS Code Codicons](https://github.com/microsoft/vscode-codicons).

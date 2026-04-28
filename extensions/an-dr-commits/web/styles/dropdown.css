@@ -96,8 +96,8 @@ body.vscode-high-contrast .dropdownOption:hover{
 	top:6px;
 	right:10px;
 }
-.dropdownOptionInfo svg{
-	fill:var(--vscode-menu-foreground);
+.dropdownOptionInfo .codicon{
+	color:var(--vscode-menu-foreground);
 	opacity:0.35;
 }
 
@@ -108,13 +108,13 @@ body.vscode-high-contrast .dropdownOption:hover{
 	top:7px;
 	left:10px;
 }
-.dropdownOptionMultiSelected svg{
-	fill:var(--vscode-menu-foreground);
+.dropdownOptionMultiSelected .codicon{
+	color:var(--vscode-menu-foreground);
 	opacity:0.7;
 }
 
-.dropdownOption:hover svg{
-	fill:var(--vscode-menu-selectionForeground, var(--vscode-menu-foreground));
+.dropdownOption:hover .codicon{
+	color:var(--vscode-menu-selectionForeground, var(--vscode-menu-foreground));
 	opacity:0.85;
 }
 

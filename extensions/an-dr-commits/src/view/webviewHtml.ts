@@ -33,7 +33,7 @@ export function renderCommitsWebviewHtml(options: CommitsWebviewHtmlRenderOption
 		<html lang="en">
 			<head>
 				<meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${standardiseCspSource(options.panel.webview.cspSource)} 'unsafe-inline'; script-src 'nonce-${options.nonce}'; img-src data:;">
+				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${standardiseCspSource(options.panel.webview.cspSource)} 'unsafe-inline'; font-src ${standardiseCspSource(options.panel.webview.cspSource)}; script-src 'nonce-${options.nonce}'; img-src data:;">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<link rel="stylesheet" type="text/css" href="${options.mediaCssUri}">
 				<title>${options.viewName}</title>

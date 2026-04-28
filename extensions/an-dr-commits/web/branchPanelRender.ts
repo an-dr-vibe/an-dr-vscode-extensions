@@ -10,7 +10,7 @@ function branchPanelIsAutoTagSelected(view: any) {
 
 function branchPanelBuildAutoTagItemHtml(view: any, indent: number) {
 	return '<div class="branchPanelItem branchPanelAutoTagItem' + (branchPanelIsAutoTagSelected(view) ? ' selected' : '') + '" title="Automatically show tags on the visible graph" style="padding-left:' + (4 + indent * 14) + 'px">' +
-		'<span class="branchPanelCheck">' + (branchPanelIsAutoTagSelected(view) ? SVG_ICONS.check : '') + '</span>' +
+		'<span class="branchPanelCheck">' + (branchPanelIsAutoTagSelected(view) ? ICONS.check : '') + '</span>' +
 		'<span class="branchPanelItemName">Auto</span>' +
 		'</div>';
 }
@@ -33,7 +33,7 @@ function branchPanelBuildItemHtml(view: any, idx: number, name: string, selected
 		(actionKey !== null ? ' data-action-key="' + escapeHtml(actionKey) + '"' : '') +
 		(isDraggableBranch ? ' data-drag-ref-type="branch" data-drag-ref-name="' + escapeHtml(view.options[idx].value) + '" draggable="true"' : '') +
 		' title="' + escapeHtml(title + (hint !== null ? ' ' + hint : '') + (remoteDefaultHint !== null ? ' (' + remoteDefaultHint + ')' : '')) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
-		'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
+		'<span class="branchPanelCheck">' + (selected ? ICONS.check : '') + '</span>' +
 		'<span class="branchPanelItemContent">' +
 		'<span class="branchPanelItemName">' + escapeHtml(name) + '</span>' +
 		(isCurrent ? '<span class="branchPanelCurrentBadge">HEAD</span>' : '') +
@@ -169,7 +169,7 @@ function branchPanelRenderTagTreeHtml(view: any, nodes: BranchTreeNode[], indent
 		const selected = view.tagSelected.has(node.idx);
 		const actionKey = view.getActionSelectionKey('tag', node.fullName);
 		html += '<div class="branchPanelItem branchPanelTagItem' + (selected ? ' selected' : '') + '" data-tagid="' + node.idx + '" data-action-key="' + escapeHtml(actionKey) + '" data-drag-ref-type="tag" data-drag-ref-name="' + escapeHtml(node.fullName) + '" draggable="true" title="' + escapeHtml(node.fullName) + '" style="padding-left:' + (4 + indent * 14) + 'px">' +
-			'<span class="branchPanelCheck">' + (selected ? SVG_ICONS.check : '') + '</span>' +
+			'<span class="branchPanelCheck">' + (selected ? ICONS.check : '') + '</span>' +
 			'<span class="branchPanelItemName">' + escapeHtml(node.displayName) + '</span>' +
 			'</div>';
 	}

@@ -90,16 +90,16 @@ class FindWidget {
 
 		this.prevElem = document.getElementById('findPrev')!;
 		this.prevElem.classList.add(CLASS_DISABLED);
-		this.prevElem.innerHTML = SVG_ICONS.arrowUp;
+		this.prevElem.innerHTML = ICONS.arrowUp;
 		this.prevElem.addEventListener('click', () => this.prev());
 
 		this.nextElem = document.getElementById('findNext')!;
 		this.nextElem.classList.add(CLASS_DISABLED);
-		this.nextElem.innerHTML = SVG_ICONS.arrowDown;
+		this.nextElem.innerHTML = ICONS.arrowDown;
 		this.nextElem.addEventListener('click', () => this.next());
 
 		const openCommitDetailsViewElem = document.getElementById('findOpenCommitDetailsView')!;
-		openCommitDetailsViewElem.innerHTML = SVG_ICONS.commitDetailsView;
+		openCommitDetailsViewElem.innerHTML = ICONS.commitDetailsView;
 		alterClass(openCommitDetailsViewElem, CLASS_ACTIVE, workspaceState.findOpenCommitDetailsView);
 		openCommitDetailsViewElem.addEventListener('click', () => {
 			updateWorkspaceViewState('findOpenCommitDetailsView', !workspaceState.findOpenCommitDetailsView);

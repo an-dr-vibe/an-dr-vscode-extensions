@@ -228,7 +228,7 @@ function commitsRequestLoadRepoInfoAndCommits(view: any, hard: boolean, skipRepo
 	}
 
 	view.renderRefreshButton();
-	if (view.commits.length === 0) view.tableElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + 'Loading ...</h2>';
+	if (view.commits.length === 0) view.tableElem.innerHTML = '<h2 id="loadingHeader">' + ICONS.loading + 'Loading ...</h2>';
 	if (skipRepoInfo) {
 		if (!refreshState.requestingRepoInfo) view.requestLoadCommits();
 	} else {

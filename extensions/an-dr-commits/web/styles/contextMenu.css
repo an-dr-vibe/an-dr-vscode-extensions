@@ -57,12 +57,12 @@ body.vscode-high-contrast .contextMenu li.contextMenuItem:hover{
 	user-select:none;
 }
 
-.contextMenu.checked li.contextMenuItem .contextMenuItemCheck svg{
-	fill:var(--vscode-menu-foreground);
+.contextMenu.checked li.contextMenuItem .contextMenuItemCheck .codicon{
+	color:var(--vscode-menu-foreground);
 	opacity:0.6;
 }
 
-.contextMenu.checked li.contextMenuItem:hover .contextMenuItemCheck svg{
-	fill:var(--vscode-menu-selectionForeground);
+.contextMenu.checked li.contextMenuItem:hover .contextMenuItemCheck .codicon{
+	color:var(--vscode-menu-selectionForeground);
 	opacity:0.8;
 }

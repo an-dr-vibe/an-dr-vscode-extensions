@@ -4,10 +4,13 @@ const path = require('path');
 
 const MEDIA_DIRECTORY = './media';
 const STYLES_DIRECTORY = './web/styles';
+const CODICONS_CSS_FILE = './node_modules/@vscode/codicons/dist/codicon.css';
+const CODICONS_FONT_FILE = './node_modules/@vscode/codicons/dist/codicon.ttf';
 
 const MAIN_CSS_FILE = 'main.css';
 const MAIN_JS_FILE = 'main.js';
 const UTILS_JS_FILE = 'utils.js';
+const CODICONS_FONT_OUTPUT_FILE = 'codicon.ttf';
 
 const OUTPUT_MIN_CSS_FILE = 'out.min.css';
 const OUTPUT_MIN_JS_FILE = 'out.min.js';
@@ -84,7 +87,7 @@ cp.exec('uglifyjs ' + path.join(MEDIA_DIRECTORY, OUTPUT_TMP_JS_FILE) + ' ' + (DE
 });
 
 // Combine the CSS files
-let cssFileContents = '';
+let cssFileContents = fs.readFileSync(CODICONS_CSS_FILE).toString().replace(/url\("\.\/codicon\.ttf[^"]*"\)/g, 'url("codicon.ttf")') + '\r\n';
 packageCssFiles.forEach((fileName) => {
 	let contents = fs.readFileSync(fileName).toString();
 	if (DEBUG) {
@@ -106,3 +109,4 @@ packageCssFiles.forEach((fileName) => {
 	}
 });
 fs.writeFileSync(path.join(MEDIA_DIRECTORY, OUTPUT_MIN_CSS_FILE), cssFileContents);
+fs.copyFileSync(CODICONS_FONT_FILE, path.join(MEDIA_DIRECTORY, CODICONS_FONT_OUTPUT_FILE));

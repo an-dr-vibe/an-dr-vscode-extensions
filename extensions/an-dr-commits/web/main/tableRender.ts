@@ -26,7 +26,7 @@ function commitsRenderGraph(view: any) {
 }
 
 function commitsGetRemoteDefaultCloudHtml(_view: any, title: string) {
-	return '<span class="gitRefCloud" title="' + escapeHtml(title) + '">' + SVG_ICONS.target + '</span>';
+	return '<span class="gitRefCloud" title="' + escapeHtml(title) + '">' + ICONS.target + '</span>';
 }
 
 function commitsGetHeadRemoteSuffixHtml(view: any, remoteName: string, remoteRefName: string, isRemoteDefault: boolean, isGoneUpstream: boolean) {
@@ -100,7 +100,7 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 		const headName = branchLabels.heads[j].name;
 		refName = escapeHtml(headName);
 		refActive = headName === view.gitBranchHead;
-		const headIcon = refActive ? SVG_ICONS.target : SVG_ICONS.branch;
+		const headIcon = refActive ? ICONS.target : ICONS.branch;
 		refHtml = '<span class="gitRef head' + (refActive ? ' active' : '') + '" data-name="' + refName + '" data-drag-ref-type="branch" data-drag-ref-name="' + refName + '" draggable="true" title="Branch: ' + refName + '">' + headIcon + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span>';
 		for (k = 0; k < branchLabels.heads[j].remotes.length; k++) {
 			const remoteName = branchLabels.heads[j].remotes[k];
@@ -116,21 +116,21 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 		refName = escapeHtml(remoteName);
 		const remoteRoot = branchLabels.remotes[j].remote;
 		const isRemoteDefault = remoteRoot !== null && view.gitRemoteHeadTargets[remoteRoot] === remoteName;
-		branchBadges.push({ type: 'remote', html: '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (remoteRoot !== null ? escapeHtml(remoteRoot) : '') + '" title="Remote Branch: ' + refName + '">' + SVG_ICONS.cloud + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>' });
+		branchBadges.push({ type: 'remote', html: '<span class="gitRef remote' + (isRemoteDefault ? ' default' : '') + '" data-name="' + refName + '" data-remote="' + (remoteRoot !== null ? escapeHtml(remoteRoot) : '') + '" title="Remote Branch: ' + refName + '">' + ICONS.cloud + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>' });
 	}
 	for (j = 0; j < commit.tags.length; j++) {
 		if (selectedTags.size > 0 && !selectedTags.has(commit.tags[j].name)) continue;
 		refName = escapeHtml(commit.tags[j].name);
-		tagBadges.push({ type: 'tag', html: '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '" data-drag-ref-type="tag" data-drag-ref-name="' + refName + '" draggable="true" title="Tag: ' + refName + '">' + SVG_ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>' });
+		tagBadges.push({ type: 'tag', html: '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '" data-drag-ref-type="tag" data-drag-ref-name="' + refName + '" draggable="true" title="Tag: ' + refName + '">' + ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>' });
 	}
 	if (commit.stash !== null) {
 		refName = escapeHtml(commit.stash.selector);
-		branchBadges.unshift({ type: 'stash', html: '<span class="gitRef stash" data-name="' + refName + '" title="Stash: ' + escapeHtml(commit.stash.selector.substring(5)) + '">' + SVG_ICONS.stash + '<span class="gitRefName" data-fullref="' + refName + '">' + escapeHtml(commit.stash.selector.substring(5)) + '</span></span>' });
+		branchBadges.unshift({ type: 'stash', html: '<span class="gitRef stash" data-name="' + refName + '" title="Stash: ' + escapeHtml(commit.stash.selector.substring(5)) + '">' + ICONS.stash + '<span class="gitRefName" data-fullref="' + refName + '">' + escapeHtml(commit.stash.selector.substring(5)) + '</span></span>' });
 	}
 	const showHeadBadge = view.gitBranchHead === 'HEAD' ||
 		(Array.isArray(view.currentBranches) && view.currentBranches.includes('HEAD'));
 	if (showHeadBadge && commit.hash === view.commitHead) {
-		branchBadges.unshift({ type: 'head', html: '<span class="gitRef head active" data-name="HEAD" title="Detached HEAD">' + SVG_ICONS.target + '<span class="gitRefName" data-fullref="HEAD">HEAD</span></span>' });
+		branchBadges.unshift({ type: 'head', html: '<span class="gitRef head active" data-name="HEAD" title="Detached HEAD">' + ICONS.target + '<span class="gitRefName" data-fullref="HEAD">HEAD</span></span>' });
 	}
 	const refBranches = view.renderRefBadgeGroup(branchBadges);
 	const refTags = view.renderRefBadgeGroup(tagBadges);

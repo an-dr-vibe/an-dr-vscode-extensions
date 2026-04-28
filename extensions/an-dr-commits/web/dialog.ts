@@ -221,7 +221,7 @@ class Dialog {
 					input.options.map((option, optionId) => '<label><input type="radio" name="dialogInput' + id + '" value="' + optionId + '"' + (option.value === input.default ? ' checked' : '') + ' tabindex="' + (id + 1) + '"/><span class="customRadio"></span>' + escapeHtml(option.name) + '</label>').join('<br>') +
 					'</span></td>';
 			} else {
-				const infoHtml = input.info ? '<span class="dialogInfo" title="' + escapeHtml(input.info) + '">' + SVG_ICONS.info + '</span>' : '';
+				const infoHtml = input.info ? '<span class="dialogInfo" title="' + escapeHtml(input.info) + '">' + ICONS.info + '</span>' : '';
 				if (input.type === DialogInputType.Select) {
 					inputHtml = '<td class="inputCol"><div id="dialogFormSelect' + id + '"></div></td>' + (infoColRequired ? '<td>' + infoHtml + '</td>' : '');
 				} else if (input.type === DialogInputType.Checkbox) {
@@ -335,7 +335,7 @@ class Dialog {
 		};
 		this.show(
 			DialogType.Message,
-			'<span class="dialogAlert">' + SVG_ICONS.alert + 'Error: ' + message + '</span>' + (reason !== null ? '<br><span class="messageContent errorContent">' + escapeHtml(reason).split('\n').join('<br>') + '</span>' : ''),
+			'<span class="dialogAlert">' + ICONS.alert + 'Error: ' + message + '</span>' + (reason !== null ? '<br><span class="messageContent errorContent">' + escapeHtml(reason).split('\n').join('<br>') + '</span>' : ''),
 			actionName,
 			'Dismiss',
 			onPrimaryAction,
@@ -393,7 +393,7 @@ class Dialog {
 	 * @param action A short name that identifies the action that is running.
 	 */
 	public showActionRunning(action: string) {
-		this.show(DialogType.ActionRunning, '<span class="actionRunning">' + SVG_ICONS.loading + action + ' ...</span>', null, 'Dismiss', null, null, null);
+		this.show(DialogType.ActionRunning, '<span class="actionRunning">' + ICONS.loading + action + ' ...</span>', null, 'Dismiss', null, null, null);
 	}
 
 	/**

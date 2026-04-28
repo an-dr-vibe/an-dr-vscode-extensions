@@ -125,7 +125,7 @@
 	margin-right:5px;
 	vertical-align:middle;
 }
-.settingsSection .hideRemoteBtn svg{
+.settingsSection .hideRemoteBtn .codicon{
 	position:absolute;
 	top:0;
 	left:0;
@@ -141,19 +141,23 @@
 .settingsSection > table td.btns.remoteBtns div{
 	vertical-align:middle;
 }
-.settingsSection > table #editRepoName svg, .settingsSection > table #editInitialBranches svg, .settingsSection > table .editRemote svg{
+.settingsSection > table #editRepoName .codicon, .settingsSection > table #editInitialBranches .codicon, .settingsSection > table .editRemote .codicon{
 	position:absolute;
 	left:1.5px;
 	top:1.5px;
 	width:14px !important;
 	height:14px !important;
+	font-size:14px;
+	line-height:14px;
 }
-.settingsSection > table #deleteRepoName svg, .settingsSection > table #clearInitialBranches svg, .settingsSection > table .deleteRemote svg, .settingsSection > table .fetchRemote svg, .settingsSection > table .pruneRemote svg, .settingsSection > table .setDefaultRemoteBranch svg{
+.settingsSection > table #deleteRepoName .codicon, .settingsSection > table #clearInitialBranches .codicon, .settingsSection > table .deleteRemote .codicon, .settingsSection > table .fetchRemote .codicon, .settingsSection > table .pruneRemote .codicon, .settingsSection > table .setDefaultRemoteBranch .codicon{
 	position:absolute;
 	left:0.5px;
 	top:0.5px;
 	width:16px !important;
 	height:16px !important;
+	font-size:16px;
+	line-height:16px;
 }
 
 .settingsSectionButtons{
@@ -182,22 +186,26 @@
 	border-color:var(--vscode-editorSuggestWidget-foreground);
 }
 
-.settingsSectionButtons > div.editBtn svg{
+.settingsSectionButtons > div.editBtn .codicon{
 	vertical-align:top;
 	margin:6px;
 	width:12px !important;
 	height:12px !important;
+	font-size:12px;
+	line-height:12px;
 }
-.settingsSectionButtons > div.addBtn svg, .settingsSectionButtons > div.removeBtn svg, #openExtensionSettings svg, #exportRepositoryConfig svg{
+.settingsSectionButtons > div.addBtn .codicon, .settingsSectionButtons > div.removeBtn .codicon, #openExtensionSettings .codicon, #exportRepositoryConfig .codicon{
 	vertical-align:top;
 	width:14px !important;
 	height:14px !important;
+	font-size:14px;
+	line-height:14px;
 	margin:5px;
 }
-#openExtensionSettings svg, #exportRepositoryConfig svg{
+#openExtensionSettings .codicon, #exportRepositoryConfig .codicon{
 	margin-top:6px;
 }
-#exportRepositoryConfig svg{
+#exportRepositoryConfig .codicon{
 	margin-right:7px;
 }
 
@@ -212,14 +220,15 @@
 	line-height:24px;
 	text-align:center;
 }
-#settingsLoading svg{
+#settingsLoading .codicon{
 	display:inline-block;
 	width:15px !important;
 	height:20px !important;
+	font-size:15px;
+	line-height:20px;
 	margin-top:2px;
 	margin-right:8px;
 	vertical-align:top;
-	animation:loadingIconAnimation 2s linear infinite;
 }
 
 #settingsClose{
@@ -230,16 +239,18 @@
 	right:10px;
 	z-index:33;
 }
-#settingsClose svg{
+#settingsClose .codicon{
 	position:absolute;
 	left:4px;
 	top:4px;
 	width:16px !important;
 	height:16px !important;
+	font-size:16px;
+	line-height:16px;
 }
 
-.settingsSectionButtons > div:hover svg, .settingsSection .hideRemoteBtn:hover svg, .settingsSection > table td.btns div:hover svg, #settingsClose:hover{
-	fill-opacity:1;
+.settingsSectionButtons > div:hover .codicon, .settingsSection .hideRemoteBtn:hover .codicon, .settingsSection > table td.btns div:hover .codicon, #settingsClose:hover .codicon{
+	opacity:1;
 }
 #settingsWidget.loading #settingsContent{
 	opacity:0.1;
@@ -250,9 +261,11 @@
 
 #settingsWidget .settingsWidgetInfo{
 }
-#settingsWidget .settingsWidgetInfo > svg{
+#settingsWidget .settingsWidgetInfo > .codicon{
 	width:15px !important;
 	height:15px !important;
+	font-size:15px;
+	line-height:15px;
 	margin-top:-2px;
 	margin-left:5px;
 	vertical-align:middle;

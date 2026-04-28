@@ -154,7 +154,7 @@ class CustomSelect {
 				this.optionsElem.style.width = currentElemRect.width + 'px';
 				this.optionsElem.style.maxHeight = Math.max(document.body.clientHeight - currentElemRect.top - currentElemRect.height - 2, 50) + 'px';
 				this.optionsElem.className = 'customSelectOptions' + (this.data.multiple ? ' multiple' : '');
-				const icon = this.data.multiple ? '<div class="selectedIcon">' + SVG_ICONS.check + '</div>' : '';
+				const icon = this.data.multiple ? '<div class="selectedIcon">' + ICONS.check + '</div>' : '';
 				this.optionsElem.innerHTML = this.data.options.map((option, index) =>
 					'<div class="customSelectOption" data-index="' + index + '">' + icon + escapeHtml(option.name) + '</div>'
 				).join('');

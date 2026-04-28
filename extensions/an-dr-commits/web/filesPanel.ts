@@ -43,7 +43,7 @@ class FilesPanel {
 		this.toggleBtn = document.createElement('div');
 		this.toggleBtn.id = 'filesPanelToggle';
 		this.toggleBtn.title = 'Toggle Files Panel';
-		this.toggleBtn.innerHTML = SVG_ICONS.filesPanel;
+		this.toggleBtn.innerHTML = ICONS.filesPanel;
 		const toggleBtnContainer = document.getElementById('filesPanelToggleBtn');
 		if (toggleBtnContainer) {
 			toggleBtnContainer.appendChild(this.toggleBtn);

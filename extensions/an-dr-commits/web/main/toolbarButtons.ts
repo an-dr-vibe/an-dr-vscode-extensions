@@ -12,9 +12,9 @@ function commitsRenderFetchButton(view: any) {
 		view.pushBtnElem.title = view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort);
 	} else {
 		view.pullBtnElem.title = 'Pull Current Branch (Right-Click for More Actions)';
-		view.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
+		view.pullBtnElem.innerHTML = ICONS.arrowDown;
 		view.pushBtnElem.title = 'Push Current Branch (Right-Click for More Actions)';
-		view.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
+		view.pushBtnElem.innerHTML = ICONS.arrowUp;
 	}
 	view.renderRepoInProgressBanner();
 	view.updateControlsLayout();

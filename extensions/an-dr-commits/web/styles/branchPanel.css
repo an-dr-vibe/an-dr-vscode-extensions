@@ -64,19 +64,21 @@ body.branchPanelHidden #sidebarResizeHandle{
 	-webkit-user-select:none;
 	user-select:none;
 }
-#sidebarToggle svg{
+#sidebarToggle .codicon{
 	width:20px;
 	height:20px;
-	fill:var(--vscode-editor-foreground);
+	font-size:20px;
+	line-height:20px;
+	color:var(--vscode-editor-foreground);
 	opacity:0.4;
 }
-#sidebarToggle:hover svg{
+#sidebarToggle:hover .codicon{
 	opacity:0.8;
 }
-#sidebarToggle.active svg{
+#sidebarToggle.active .codicon{
 	opacity:1;
 }
-#sidebarToggle.active:hover svg{
+#sidebarToggle.active:hover .codicon{
 	opacity:1;
 }
 
@@ -177,20 +179,12 @@ body.branchPanelHidden #sidebarResizeHandle{
 	margin-right:6px;
 	color:var(--vscode-editor-foreground);
 }
-.branchPanelFolderIcon svg{
-	fill:currentColor;
-	width:16px;
-	height:16px;
-	display:block;
-	opacity:1;
-}
-.branchPanelFolderIcon svg path{
-	fill:currentColor;
-}
 .branchPanelFolderIcon .openFolderIcon,
 .branchPanelFolderIcon .closedFolderIcon{
 	width:16px;
 	height:16px;
+	font-size:16px;
+	line-height:16px;
 }
 
 .branchPanelFolderName{
@@ -279,8 +273,10 @@ body.branchPanelHidden #sidebarResizeHandle{
 .branchPanelItem.actionSelected .branchPanelCheck:empty{
 	opacity:1;
 }
-.branchPanelCheck svg{
-	fill:var(--vscode-checkbox-foreground, var(--vscode-editor-foreground));
+.branchPanelCheck .codicon{
+	color:var(--vscode-checkbox-foreground, var(--vscode-editor-foreground));
+	font-size:10px;
+	line-height:10px;
 	width:10px;
 	height:10px;
 }
@@ -383,18 +379,20 @@ body.branchPanelHidden #sidebar{
 	-webkit-user-select:none;
 	user-select:none;
 }
-#filesPanelToggle svg{
+#filesPanelToggle .codicon{
 	width:20px;
 	height:20px;
-	fill:var(--vscode-editor-foreground);
+	font-size:20px;
+	line-height:20px;
+	color:var(--vscode-editor-foreground);
 	opacity:0.4;
 }
-#filesPanelToggle:hover svg{
+#filesPanelToggle:hover .codicon{
 	opacity:0.8;
 }
-#filesPanelToggle.active svg{
+#filesPanelToggle.active .codicon{
 	opacity:1;
 }
-#filesPanelToggle.active:hover svg{
+#filesPanelToggle.active:hover .codicon{
 	opacity:1;
 }

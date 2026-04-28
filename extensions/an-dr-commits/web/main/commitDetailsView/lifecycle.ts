@@ -49,7 +49,7 @@ function commitsCanShowExternalDiffButton(view: any, externalDiffPossible: boole
 }
 
 function commitsGetFilesPanelHeaderHtml(view: any, externalDiffPossible: boolean) {
-	return commitsCanShowExternalDiffButton(view, externalDiffPossible) ? '<div id="commitDetailsViewExternalDiff" class="commitDetailsViewControlBtn">' + SVG_ICONS.linkExternal + '</div>' : '';
+	return commitsCanShowExternalDiffButton(view, externalDiffPossible) ? '<div id="commitDetailsViewExternalDiff" class="commitDetailsViewControlBtn">' + ICONS.linkExternal + '</div>' : '';
 }
 
 function commitsAttachHeaderListeners(container: HTMLElement | null, view: any, externalDiffPossible: boolean) {
@@ -345,7 +345,7 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 
 	let html = '<div id="commitDetailsViewContent"><div id="commitDetailsViewTopRow">';
 	if (expandedCommit.loading) {
-		html += '<div id="commitDetailsViewLoading">' + SVG_ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
+		html += '<div id="commitDetailsViewLoading">' + ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
 	} else {
 		html += '<div id="commitDetailsViewSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
 		html += '<div id="commitDetailsViewInlineFiles"><div id="commitDetailsViewInlineFilesHeader"></div><div id="commitDetailsViewInlineFilesContent"></div></div>';

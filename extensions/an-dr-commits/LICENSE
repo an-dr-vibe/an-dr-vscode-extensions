@@ -23,4 +23,5 @@ Licenses for software that are referenced, used and/or modified in the Commits
 extension are provided in the ./licenses directory, in accordance with their 
 respective licenses. This includes:
 - LICENSE_MICROSOFT - Copyright (c) 2015 - present Microsoft Corporation
-- LICENSE_OCTICONS - Copyright (c) 2019 GitHub Inc.
+- LICENSE_CODICONS - VS Code Codicons icon font license
+- LICENSE_CODICONS_CODE - VS Code Codicons package code license, Copyright (c) Microsoft Corporation

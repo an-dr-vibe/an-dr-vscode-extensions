@@ -129,23 +129,28 @@
 	vertical-align:top;
 	flex-shrink:0;
 }
-#findPrev svg, #findNext svg, #findOpenCommitDetailsView svg{
+#findPrev .codicon, #findNext .codicon, #findOpenCommitDetailsView .codicon{
 	position:absolute;
 	left:3px;
 	top:3px;
-	fill-opacity:0.4;
+	width:14px;
+	height:14px;
+	font-size:14px;
+	line-height:14px;
+	color:var(--vscode-editor-foreground);
+	opacity:0.4;
 }
-#findPrev:hover svg, #findNext:hover svg{
-	fill-opacity:0.8;
+#findPrev:hover .codicon, #findNext:hover .codicon{
+	opacity:0.8;
 }
-#findOpenCommitDetailsView:hover svg, #findOpenCommitDetailsView.active svg{
-	fill-opacity:1;
+#findOpenCommitDetailsView:hover .codicon, #findOpenCommitDetailsView.active .codicon{
+	opacity:1;
 }
-#findOpenCommitDetailsView.active:hover svg{
-	fill-opacity:1;
+#findOpenCommitDetailsView.active:hover .codicon{
+	opacity:1;
 }
-#findPrev.disabled svg, #findNext.disabled svg{
-	fill-opacity:0.2;
+#findPrev.disabled .codicon, #findNext.disabled .codicon{
+	opacity:0.2;
 	cursor:default;
 }
 #findPrev.disabled, #findNext.disabled{

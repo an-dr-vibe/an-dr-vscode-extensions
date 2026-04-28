@@ -39,6 +39,10 @@ body #view:focus{
 	outline:none;
 }
 
+.codicon{
+	color:currentColor;
+}
+
 body.selection-background-color-exists ::-moz-selection{
 	background-color: var(--vscode-selection-background);
 }
@@ -471,14 +475,16 @@ body.filesPanelHidden #commitDetailsView.docked{
 	display:block;
 }
 
-.commitDetailsViewControlBtn svg{
+.commitDetailsViewControlBtn .codicon{
 	position:absolute;
 	width:20px;
 	height:20px;
 	left:2px;
 	top:2px;
-	fill:var(--vscode-editor-foreground);
-	fill-opacity:0.6;
+	font-size:20px;
+	line-height:20px;
+	color:var(--vscode-editor-foreground);
+	opacity:0.6;
 }
 .commitDetailsViewDiffBtnLabel{
 	position:absolute;
@@ -503,11 +509,11 @@ body.filesPanelHidden #commitDetailsView.docked{
 .commitDetailsViewControlBtn.active:hover .commitDetailsViewDiffBtnLabel{
 	opacity:1;
 }
-.commitDetailsViewControlBtn:hover svg, .commitDetailsViewControlBtn.active svg{
-	fill-opacity:0.75;
+.commitDetailsViewControlBtn:hover .codicon, .commitDetailsViewControlBtn.active .codicon{
+	opacity:0.75;
 }
-.commitDetailsViewControlBtn.active:hover svg{
-	fill-opacity:0.9;
+.commitDetailsViewControlBtn.active:hover .codicon{
+	opacity:0.9;
 }
 
 #commitDetailsViewSummary, #commitDetailsViewLoading{
@@ -573,19 +579,19 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 	vertical-align:middle;
 	line-height:13px;
 }
-.signatureInfo svg{
+.signatureInfo .codicon{
 	vertical-align:0 !important;
 }
-.signatureInfo.G svg, .signatureInfo.X svg{
-	fill:#009028;
+.signatureInfo.G .codicon, .signatureInfo.X .codicon{
+	color:#009028;
 	opacity:0.9;
 }
-.signatureInfo.U svg, .signatureInfo.Y svg, .signatureInfo.R svg, .signatureInfo.E svg{
-	fill:#f09000;
+.signatureInfo.U .codicon, .signatureInfo.Y .codicon, .signatureInfo.R .codicon, .signatureInfo.E .codicon{
+	color:#f09000;
 	opacity:1;
 }
-.signatureInfo.B svg{
-	fill:#e00000;
+.signatureInfo.B .codicon{
+	color:#e00000;
 	opacity:0.8;
 }
 
@@ -599,15 +605,16 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 	line-height:24px;
 	text-overflow:ellipsis;
 }
-#commitDetailsViewLoading svg{
+#commitDetailsViewLoading .codicon{
 	display:inline-block;
 	width:15px !important;
 	height:20px !important;
+	font-size:15px;
+	line-height:20px;
 	margin-top:2px;
 	margin-right:8px;
 	vertical-align:top;
-	fill:var(--vscode-editor-foreground);
-	animation:loadingIconAnimation 2s linear infinite;
+	color:var(--vscode-editor-foreground);
 }
 
 .commitDetailsViewHeightResize{
@@ -834,13 +841,17 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 
 .fileTreeFileIcon, .fileTreeFolderIcon, .fileTreeRepoIcon, .fileTreeFileAction{
 	position:relative;
-	display:inline-block;
-	width:13px;
-	height:18px;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	width:16px;
+	height:22px;
 	vertical-align:top;
 }
 .fileTreeFileIcon, .fileTreeFolderIcon, .fileTreeRepoIcon{
-	margin-right:8px;
+	margin-right:6px;
+	color:var(--vscode-icon-foreground, var(--vscode-editor-foreground));
+	opacity:0.75;
 }
 .fileTreeFileAction{
 	margin-left:8px;
@@ -852,24 +863,14 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 .fileTreeFileRecord:hover .fileTreeFileAction, .fileTreeFileRecord.contextMenuActive .fileTreeFileAction, .fileTreeFileRecord.dialogActive .fileTreeFileAction{
 	opacity:1;
 }
-svg.openFolderIcon, svg.closedFolderIcon, svg.fileIcon, .fileTreeFileAction svg{
-	position:absolute;
-	top:2.5px;
-	height:13px !important;
-	fill:var(--vscode-editor-foreground);
-	fill-opacity:0.6;
+.fileTreeCodicon, .fileTreeFileAction .codicon{
+	width:16px;
+	height:16px;
+	font-size:16px;
+	line-height:16px;
 }
-.fileTreeFileAction.copyGitFile svg{
-	top:3px;
-}
-.fileTreeFileAction.viewGitFileAtRevision svg, .fileTreeFileAction.openGitFile svg{
-	top:4px;
-}
-.fileTreeFolder:hover svg.openFolderIcon, .fileTreeFolder:hover svg.closedFolderIcon, .fileTreeFileRecord:hover svg.fileIcon, .fileTreeFileRecord.contextMenuActive svg.fileIcon, .fileTreeFileRecord.dialogActive svg.fileIcon, .fileTreeRepo:hover svg, .fileTreeFileAction:hover svg{
-	fill-opacity:0.8;
-}
-svg.openFolderIcon, svg.closedFolderIcon, svg.fileIcon{
-	width:13px;
+.fileTreeFolder:hover .fileTreeFolderIcon, .fileTreeFileRecord:hover .fileTreeFileIcon, .fileTreeFileRecord.contextMenuActive .fileTreeFileIcon, .fileTreeFileRecord.dialogActive .fileTreeFileIcon, .fileTreeRepo:hover .fileTreeRepoIcon, .fileTreeFileAction:hover .codicon{
+	opacity:1;
 }
 .fileTreeFolderContents{
 	list-style:none;
@@ -1075,10 +1076,11 @@ body.vscode-light .gitRef{
 .gitRef.active .gitRefHeadRemoteName{
 	font-weight:bold;
 }
-.gitRef > svg{
-	fill:currentColor;
+.gitRef > .codicon{
 	width:14px;
 	height:14px;
+	font-size:14px;
+	line-height:14px;
 	flex:0 0 14px;
 	margin:0 2px 0 4px;
 	display:block;
@@ -1123,10 +1125,11 @@ body.vscode-light .gitRef{
 	flex:0 0 11px;
 	opacity:0.95;
 }
-.gitRefCloud svg{
+.gitRefCloud .codicon{
 	width:11px;
 	height:11px;
-	fill:currentColor;
+	font-size:11px;
+	line-height:11px;
 }
 
 .gitRef.compact{
@@ -1144,22 +1147,28 @@ body.vscode-light .gitRef{
 .gitRef.compact .gitRefHeadRemote{
 	display:none;
 }
-.gitRef.compact > svg{
+.gitRef.compact > .codicon{
 	padding:0;
 	width:14px;
 	height:14px;
+	font-size:14px;
+	line-height:14px;
 	margin:0;
 	display:block;
 	vertical-align:middle;
 }
-.gitRef.tag > svg{
+.gitRef.tag > .codicon{
 	width:16px;
 	height:16px;
+	font-size:16px;
+	line-height:16px;
 	flex:0 0 16px;
 }
-.gitRef.compact.tag > svg{
+.gitRef.compact.tag > .codicon{
 	width:16px;
 	height:16px;
+	font-size:16px;
+	line-height:16px;
 	flex:0 0 16px;
 }
 
@@ -1203,12 +1212,11 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 	text-align:center;
 	line-height:32px;
 }
-#loadingHeader svg{
-	display:inline;
-	fill:var(--vscode-editor-foreground);
+#loadingHeader .codicon{
+	display:inline-block;
+	color:var(--vscode-editor-foreground);
 	margin-right:10px;
 	vertical-align:top;
-	animation:loadingIconAnimation 2s linear infinite;
 }
 @keyframes loadingIconAnimation{
 	0%{ transform:rotate(0deg); opacity:0.7; }
@@ -1392,28 +1400,24 @@ body.branchPanelHidden #sidebarTop{
 #topFullDiffBtn, #pullBtn, #pushBtn, #moreBtn{
 	display:none;
 }
-#topFullDiffBtn svg, #settingsBtn svg, #pullBtn svg, #pushBtn svg{
+#topFullDiffBtn .codicon, #settingsBtn .codicon, #pullBtn .codicon, #pushBtn .codicon{
 	position:absolute;
-	fill:var(--vscode-editor-foreground);
-	opacity:0.4;
-	stroke:var(--vscode-editor-foreground);
-	stroke-opacity:0.5;
-	stroke-width:0;
-}
-#topFullDiffBtn:hover svg, #settingsBtn:hover svg, #pullBtn:hover svg, #pushBtn:hover svg{
-	opacity:0.8;
-	stroke-width:0.5px;
-}
-#topFullDiffBtn svg, #settingsBtn svg, #pullBtn svg, #pushBtn svg{
 	left:1px;
 	top:2px;
-	width:18px !important;
-	height:18px !important;
+	width:18px;
+	height:18px;
+	font-size:18px;
+	line-height:18px;
+	color:var(--vscode-editor-foreground);
+	opacity:0.4;
 }
-#topFullDiffBtn.active svg{
+#topFullDiffBtn:hover .codicon, #settingsBtn:hover .codicon, #pullBtn:hover .codicon, #pushBtn:hover .codicon{
+	opacity:0.8;
+}
+#topFullDiffBtn.active .codicon{
 	opacity:1;
 }
-#topFullDiffBtn.active:hover svg{
+#topFullDiffBtn.active:hover .codicon{
 	opacity:1;
 }
 
@@ -1437,29 +1441,27 @@ body.branchPanelHidden #sidebarTop{
 	user-select:none;
 	display:none;
 }
-#findWidgetToggleBtn svg{
+#findWidgetToggleBtn .codicon{
 	position:absolute;
 	left:1px;
 	top:1px;
-	width:18px !important;
-	height:18px !important;
+	width:18px;
+	height:18px;
+	font-size:18px;
+	line-height:18px;
+	color:var(--vscode-editor-foreground);
 	opacity:0.4;
-	fill:var(--vscode-editor-foreground);
-	stroke:var(--vscode-editor-foreground);
-	stroke-opacity:0.5;
-	stroke-width:0;
 }
-#findWidgetToggleBtn:hover svg{
+#findWidgetToggleBtn:hover .codicon{
 	opacity:0.8;
-	stroke-width:0.5px;
 }
 body.compactSearch #findWidgetToggleBtn{
 	display:block;
 }
-#findWidgetToggleBtn.active svg{
+#findWidgetToggleBtn.active .codicon{
 	opacity:1;
 }
-#findWidgetToggleBtn.active:hover svg{
+#findWidgetToggleBtn.active:hover .codicon{
 	opacity:1;
 }
 

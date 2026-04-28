@@ -105,7 +105,7 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `settingsWidget.ts` | Repository settings panel |
 | `settingsWidgetDialogs.ts` | Settings widget issue-linking and pull-request dialog flows |
 | `textFormatter.ts` | Commit message formatting (issue links, etc.) |
-| `utils.ts` | Frontend globals: `SVG_ICONS` object, `escapeHtml`, `VSCODE_API`, helpers |
+| `utils.ts` | Frontend globals: `ICONS` object, `escapeHtml`, `VSCODE_API`, helpers |
 | `branchPanelRender.ts` | Branch panel tree building and HTML rendering helpers |
 | `main/*` | Extracted `main.ts` helper modules (committed column, controls layout, quick diff rendering, file tree rendering, full diff panel rendering, repo-state helpers, misc helpers) |
 | `global.d.ts` | Type declarations for globals shared across web files |
@@ -183,7 +183,7 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 | Webview HTML structure | `src/commitsView.ts` → `getHtmlForWebview()` |
 | Extension settings | `src/config.ts` + `package.json` `contributes.configuration` |
 | Message protocol | `src/types.ts` (backend) + `web/global.d.ts` (frontend) |
-| SVG icons | `web/utils.ts` → `SVG_ICONS` constant |
+| Webview icons | `web/utils.ts` → `ICONS` constant |
 | Status bar button | `src/statusBarItem.ts` |
 | Inline blame / current line commit display | `src/inlineBlame.ts` + `src/dataSource.ts` |
 | Repo discovery | `src/repoManager.ts` |
@@ -193,7 +193,7 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 ## Important conventions
 
 - **No shared code** between `src/` and `web/` — they are compiled independently.
-- Frontend globals (`SVG_ICONS`, `escapeHtml`, `VSCODE_API`, etc.) are defined in `web/utils.ts` and available to all other web files (concatenated, not module imports).
+- Frontend globals (`ICONS`, `escapeHtml`, `VSCODE_API`, etc.) are defined in `web/utils.ts` and available to all other web files (concatenated, not module imports).
 - `BranchPanel` (`web/branchPanel.ts`) implements the same public interface as `Dropdown` — `setOptions`, `isSelected`, `selectOption`, `unselectOption`, `refresh`, `isOpen`, `close` — plus `setTags(tags)`. It is stored in `main.ts` as `this.branchDropdown: BranchPanel`.
 - Sidebar width is set dynamically via JS (`sidebar.style.width`, `content.style.marginLeft`). The CSS default `margin-left:200px` on `#content` is just a fallback.
 - `currentBranches` is persisted in extension state. `[SHOW_ALL_BRANCHES]` means no filter (git log sees `null`).

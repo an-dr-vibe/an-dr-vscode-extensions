@@ -230,7 +230,7 @@ function commitsHandleFilesPanelClick(view: any, e: MouseEvent) {
 		const parent = folderElem.parentElement!;
 		parent.classList.toggle('closed');
 		const isOpen = !parent.classList.contains('closed');
-		parent.children[0].children[0].innerHTML = isOpen ? SVG_ICONS.openFolder : SVG_ICONS.closedFolder;
+		parent.children[0].children[0].innerHTML = isOpen ? ICONS.openFolder : ICONS.closedFolder;
 		parent.children[1].classList.toggle('hidden');
 		alterFileTreeFolderOpen(fileTree, decodeURIComponent(folderElem.dataset.folderpath!), isOpen);
 		view.saveState();

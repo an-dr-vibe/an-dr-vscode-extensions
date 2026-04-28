@@ -23,8 +23,8 @@ interface BranchPanelActionSelectionItem {
 	type: 'branch' | 'tag';
 	name: string;
 }
-const BRANCH_PANEL_OPEN_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v1.08H1.75V3Zm12.43 3.75H1.8l1.14 5.04c.09.4.44.68.85.68h8.42c.39 0 .73-.26.84-.64l1.13-5.08Z"/></svg>';
-const BRANCH_PANEL_CLOSED_FOLDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.75 3A1.75 1.75 0 0 1 3.5 1.25h2.08c.46 0 .9.18 1.23.51l.66.66c.1.1.24.16.38.16h4.65c.97 0 1.75.78 1.75 1.75v7.17c0 .97-.78 1.75-1.75 1.75h-9A1.75 1.75 0 0 1 1.75 12.5V3Z"/></svg>';
+const BRANCH_PANEL_OPEN_FOLDER_ICON = ICONS.openFolder;
+const BRANCH_PANEL_CLOSED_FOLDER_ICON = ICONS.closedFolder;
 
 class BranchPanel {
 	private readonly branchChangeCallback: (values: string[]) => void;
@@ -78,7 +78,7 @@ class BranchPanel {
 		this.toggleBtn = document.createElement('div');
 		this.toggleBtn.id = 'sidebarToggle';
 		this.toggleBtn.title = 'Toggle Branch Panel';
-		this.toggleBtn.innerHTML = SVG_ICONS.sidebarPanel;
+		this.toggleBtn.innerHTML = ICONS.sidebarPanel;
 		this.toggleBtn.classList.add('active');
 		const toggleBtnContainer = document.getElementById('sidebarToggleBtn');
 		if (toggleBtnContainer) {

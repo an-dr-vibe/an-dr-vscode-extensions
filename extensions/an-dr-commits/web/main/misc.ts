@@ -139,10 +139,10 @@ function generateSignatureHtml(signature: GG.GitSignature) {
 		+ ' Signed by ' + escapeHtml(signature.signer !== '' ? signature.signer : '<Unknown>')
 		+ ' (GPG Key Id: ' + escapeHtml(signature.key !== '' ? signature.key : '<Unknown>') + ')">'
 		+ (signature.status === GG.GitSignatureStatus.GoodAndValid
-			? SVG_ICONS.passed
+			? ICONS.passed
 			: signature.status === GG.GitSignatureStatus.Bad
-				? SVG_ICONS.failed
-				: SVG_ICONS.inconclusive)
+				? ICONS.failed
+				: ICONS.inconclusive)
 		+ '</span>';
 }
 

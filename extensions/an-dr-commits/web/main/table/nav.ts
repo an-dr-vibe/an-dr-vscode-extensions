@@ -64,7 +64,7 @@ function commitsRevealReference(view: any, refName: string) {
 }
 
 function commitsLoadMoreCommits(view: any) {
-	view.footerElem.innerHTML = '<h2 id="loadingHeader">' + SVG_ICONS.loading + 'Loading ...</h2>';
+	view.footerElem.innerHTML = '<h2 id="loadingHeader">' + ICONS.loading + 'Loading ...</h2>';
 	view.maxCommits += view.config.loadMoreCommits;
 	view.saveState();
 	view.requestLoadRepoInfoAndCommits(false, true);

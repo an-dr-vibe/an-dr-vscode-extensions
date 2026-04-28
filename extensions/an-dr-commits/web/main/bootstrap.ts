@@ -289,7 +289,7 @@ function handleResponseDeleteBranch(msg: GG.ResponseDeleteBranch) {
 function handleResponsePushTagCommitNotOnRemote(repo: string, tagName: string, remotes: string[], commitHash: string, error: string) {
 	const remotesNotContainingCommit: string[] = parseExtensionErrorInfo(error, GG.ErrorInfoExtensionPrefix.PushTagCommitNotOnRemote);
 
-	const html = '<span class="dialogAlert">' + SVG_ICONS.alert + 'Warning: Commit is not on Remote' + (remotesNotContainingCommit.length > 1 ? 's ' : ' ') + '</span><br>' +
+	const html = '<span class="dialogAlert">' + ICONS.alert + 'Warning: Commit is not on Remote' + (remotesNotContainingCommit.length > 1 ? 's ' : ' ') + '</span><br>' +
 		'<span class="messageContent">' +
 		'<p style="margin:0 0 6px 0;">The tag <b><i>' + escapeHtml(tagName) + '</i></b> is on a commit that isn\'t on any known branch on the remote' + (remotesNotContainingCommit.length > 1 ? 's' : '') + ' ' + formatCommaSeparatedList(remotesNotContainingCommit.map((remote) => '<b><i>' + escapeHtml(remote) + '</i></b>')) + '.</p>' +
 		'<p style="margin:0;">Would you like to proceed to push the tag to the remote' + (remotes.length > 1 ? 's' : '') + ' ' + formatCommaSeparatedList(remotes.map((remote) => '<b><i>' + escapeHtml(remote) + '</i></b>')) + ' anyway?</p>' +
@@ -326,7 +326,7 @@ function handleResponsePushBranchBehindRemote(repo: string, branchName: string, 
 	}
 
 	// Show dialog with Force Push option
-	const html = '<span class="dialogAlert">' + SVG_ICONS.alert + 'Error: Unable to Push Branch</span>' +
+	const html = '<span class="dialogAlert">' + ICONS.alert + 'Error: Unable to Push Branch</span>' +
 		'<br><span class="messageContent errorContent">' +
 		escapeHtml(reducedErrors.error!).split('\n').join('<br>') +
 		'</span><br><br><span style="font-size: 0.9em;">You can force push to override the remote branch, but this may cause issues if others are working on this branch.</span>';

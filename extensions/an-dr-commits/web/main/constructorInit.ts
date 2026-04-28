@@ -130,11 +130,11 @@ function addSingleDblClick(elem: HTMLElement, onSingle: () => void, onDouble: ()
 }
 
 function commitsInitButtonHandlers(view: any) {
-	view.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
+	view.findWidgetToggleBtnElem.innerHTML = ICONS.search;
 	view.findWidgetToggleBtnElem.addEventListener('click', () => view.showFindWidgetFromToggle());
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.pullBtnElem.title = 'Fetch from Remote(s) · Double-click to Pull';
-	view.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
+	view.pullBtnElem.innerHTML = ICONS.arrowDown;
 	addSingleDblClick(view.pullBtnElem,
 		() => view.gitRepoInProgressState !== null ? view.pullCurrentBranchAction() : view.fetchFromRemotesAction(),
 		() => view.pullCurrentBranchAction()
@@ -144,7 +144,7 @@ function commitsInitButtonHandlers(view: any) {
 		view.showPullButtonContextMenu(e);
 	});
 	view.pushBtnElem.title = 'Push Current Branch · Double-click to Force Push';
-	view.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
+	view.pushBtnElem.innerHTML = ICONS.arrowUp;
 	addSingleDblClick(view.pushBtnElem,
 		() => view.pushCurrentBranchAction(),
 		() => view.gitRepoInProgressState !== null ? view.pushCurrentBranchAction() : view.forcePushCurrentBranchAction()
@@ -154,7 +154,7 @@ function commitsInitButtonHandlers(view: any) {
 		view.showPushButtonContextMenu(e);
 	});
 	view.settingsBtnElem.title = 'Repository Settings · Double-click to Refresh';
-	view.settingsBtnElem.innerHTML = SVG_ICONS.gear;
+	view.settingsBtnElem.innerHTML = ICONS.gear;
 	addSingleDblClick(view.settingsBtnElem,
 		() => view.settingsWidget.show(view.currentRepo),
 		() => view.refresh(true, true)

@@ -290,7 +290,7 @@
 								},
 								"resetFileToThisRevision": {
 									"type": "boolean",
-									"title": "Reset File to this Revision..."
+									"title": "Restore File Before/After Change..."
 								},
 								"copyAbsoluteFilePath": {
 									"type": "boolean",

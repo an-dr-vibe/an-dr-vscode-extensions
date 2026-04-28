@@ -139,6 +139,13 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 			view.hideDiffPane();
 			sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
 		};
+		const showRestoreFileConfirmation = (buttonTitle: string, actionLabel: string, commitHash: string, filePath: string) => {
+			dialog.showConfirmation('Are you sure you want to restore <b><i>' + escapeHtml(filePath) + '</i></b> from commit <b><i>' + abbrevCommit(commitHash) + '</i></b>? Any uncommitted changes made to this file will be overwritten.', buttonTitle, () => {
+				runAction({ command: 'resetFileToRevision', repo: view.currentRepo, commitHash, filePath }, actionLabel);
+			}, { type: TargetType.CommitDetailsView, hash: commitHash, elem: fileElem });
+		};
+		const restoreAfterHash = getCommitHashForFile(file);
+		const restoreBeforeHash = restoreAfterHash + '^';
 
 		contextMenu.show([
 			[
@@ -168,13 +175,17 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 			],
 			[
 				{
-					title: 'Reset File to this Revision' + ELLIPSIS,
+					title: 'Restore Before Change' + ELLIPSIS,
+					visible: visibility.resetFileToThisRevision && file.type !== GG.GitFileStatus.Added && compareWithHash === null && !isUncommitted,
+					onClick: () => {
+						showRestoreFileConfirmation('Restore before change', 'Restoring file', restoreBeforeHash, file.oldFilePath);
+					}
+				},
+				{
+					title: 'Restore After Change' + ELLIPSIS,
 					visible: visibility.resetFileToThisRevision && fileExistsAtThisRevision && compareWithHash === null,
 					onClick: () => {
-						const hash = getCommitHashForFile(file);
-						dialog.showConfirmation('Are you sure you want to reset <b><i>' + escapeHtml(file.newFilePath) + '</i></b> to it\'s state at commit <b><i>' + abbrevCommit(hash) + '</i></b>? Any uncommitted changes made to this file will be overwritten.', 'Yes, reset file', () => {
-							runAction({ command: 'resetFileToRevision', repo: view.currentRepo, commitHash: hash, filePath: file.newFilePath }, 'Resetting file');
-						}, { type: TargetType.CommitDetailsView, hash: hash, elem: fileElem });
+						showRestoreFileConfirmation('Restore after change', 'Restoring file', restoreAfterHash, file.newFilePath);
 					}
 				}
 			],

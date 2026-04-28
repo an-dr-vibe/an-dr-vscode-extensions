@@ -41,6 +41,7 @@ export class CommitsView extends Disposable {
 
 	private loadRepoInfoRefreshId: number = 0;
 	private loadCommitsRefreshId: number = 0;
+	private messageHandlerChain: Promise<void> = Promise.resolve();
 
 	/**
 	 * If a Commits View already exists, show and update it. Otherwise, create a Commits View.
@@ -202,7 +203,11 @@ export class CommitsView extends Disposable {
 			}),
 
 			// Respond to messages sent from the Webview
-			this.panel.webview.onDidReceiveMessage((msg) => this.respondToMessage(msg)),
+			// Chain each handler on the previous one so only one runs at a time, preventing
+			// concurrent git operations from racing for index.lock.
+			this.panel.webview.onDidReceiveMessage((msg) => {
+				this.messageHandlerChain = this.messageHandlerChain.then(() => this.respondToMessage(msg));
+			}),
 
 			// Dispose the Webview Panel when disposed
 			this.panel

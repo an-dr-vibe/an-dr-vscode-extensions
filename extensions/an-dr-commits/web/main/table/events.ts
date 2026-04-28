@@ -47,7 +47,7 @@ function commitsHandleCommitDragEvents(view: any, tableElem: HTMLElement) {
 	tableElem.addEventListener('dragover', (e: DragEvent) => {
 		if (e.target === null || view.getDraggedRefFromEvent(e) === null) return;
 		const commitElem = (<Element>e.target).closest('.commit') as HTMLElement | null;
-		if (commitElem === null || commitElem.dataset.id === '0') return;
+		if (commitElem === null || commitElem.id === 'uncommittedChanges') return;
 
 		e.preventDefault();
 		if (e.dataTransfer !== null) e.dataTransfer.dropEffect = 'move';
@@ -67,7 +67,7 @@ function commitsHandleCommitDragEvents(view: any, tableElem: HTMLElement) {
 		const draggedRef = view.getDraggedRefFromEvent(e);
 		const commitElem = (<Element>e.target).closest('.commit') as HTMLElement | null;
 		view.clearCommitDropTarget();
-		if (draggedRef === null || commitElem === null || commitElem.dataset.id === '0') return;
+		if (draggedRef === null || commitElem === null || commitElem.id === 'uncommittedChanges') return;
 
 		e.preventDefault();
 		e.stopPropagation();

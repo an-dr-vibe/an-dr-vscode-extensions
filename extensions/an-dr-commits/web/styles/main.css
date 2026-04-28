@@ -900,6 +900,14 @@ li > .fileTreeFolderContents{
 	line-height:22px;
 	white-space:nowrap;
 }
+.fileTreeFileRecord.selected{
+	background-color:var(--vscode-list-inactiveSelectionBackground, rgba(128,128,128,0.12));
+}
+.fileTreeFileRecord.selected:hover,
+.fileTreeFileRecord.selected.contextMenuActive,
+.fileTreeFileRecord.selected.dialogActive{
+	background-color:var(--vscode-list-activeSelectionBackground, rgba(128,128,128,0.18));
+}
 .fileTreeFile{
 	display:inline;
 	white-space:nowrap;
@@ -1360,10 +1368,6 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 
 #branchPanelFilterHost{
 	padding:6px 6px 0 6px;
-}
-
-body.singleRepo #branchPanelRepoHost{
-	display:none;
 }
 
 #branchPanelRepoHost .dropdown,

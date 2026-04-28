@@ -1,12 +1,12 @@
 /* File Tree Methods (for the Commit Details & Comparison Views) */
 
-function generateFileViewHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, type: GG.FileViewType, isUncommitted: boolean) {
+function generateFileViewHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, type: GG.FileViewType, isUncommitted: boolean, selectedFilePath: string | null = null) {
 	return type === GG.FileViewType.List
-		? generateFileListHtml(folder, gitFiles, fileContextMenuOpen, isUncommitted)
-		: generateFileTreeHtml(folder, gitFiles, fileContextMenuOpen, isUncommitted, true);
+		? generateFileListHtml(folder, gitFiles, fileContextMenuOpen, isUncommitted, selectedFilePath)
+		: generateFileTreeHtml(folder, gitFiles, fileContextMenuOpen, isUncommitted, selectedFilePath, true);
 }
 
-function generateFileTreeHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, isUncommitted: boolean, topLevelFolder: boolean): string {
+function generateFileTreeHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, isUncommitted: boolean, selectedFilePath: string | null, topLevelFolder: boolean): string {
 	const curFolderInfo = topLevelFolder || !initialState.config.commitDetailsView.fileTreeCompactFolders
 		? { folder: folder, name: folder.name, pathSeg: folder.name }
 		: getCurrentFolderInfo(folder, folder.name, folder.name);
@@ -14,8 +14,8 @@ function generateFileTreeHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG
 	const children = sortFolderKeys(curFolderInfo.folder).map((key) => {
 		const cur = curFolderInfo.folder.contents[key];
 		return cur.type === 'folder'
-			? generateFileTreeHtml(cur, gitFiles, fileContextMenuOpen, isUncommitted, false)
-			: generateFileTreeLeafHtml(cur.name, cur, gitFiles, fileContextMenuOpen, isUncommitted);
+			? generateFileTreeHtml(cur, gitFiles, fileContextMenuOpen, isUncommitted, selectedFilePath, false)
+			: generateFileTreeLeafHtml(cur.name, cur, gitFiles, fileContextMenuOpen, isUncommitted, selectedFilePath);
 	});
 
 	return (topLevelFolder ? '' : '<li' + (curFolderInfo.folder.open ? '' : ' class="closed"') + ' data-pathseg="' + encodeURIComponent(curFolderInfo.pathSeg) + '"><span class="fileTreeFolder' + (curFolderInfo.folder.reviewed ? '' : ' pendingReview') + '" title="./' + escapeHtml(curFolderInfo.folder.folderPath) + '" data-folderpath="' + encodeURIComponent(curFolderInfo.folder.folderPath) + '"><span class="fileTreeFolderIcon">' + (curFolderInfo.folder.open ? ICONS.openFolder : ICONS.closedFolder) + '</span><span class="gitFolderName">' + escapeHtml(curFolderInfo.name) + '</span></span>') +
@@ -31,7 +31,7 @@ function getCurrentFolderInfo(folder: FileTreeFolder, name: string, pathSeg: str
 		: { folder: folder, name: name, pathSeg: pathSeg };
 }
 
-function generateFileListHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, isUncommitted: boolean) {
+function generateFileListHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, isUncommitted: boolean, selectedFilePath: string | null) {
 	const sortLeaves = (folder: FileTreeFolder, folderPath: string) => {
 		let keys = sortFolderKeys(folder);
 		let items: { relPath: string, leaf: FileTreeLeaf }[] = [];
@@ -49,19 +49,20 @@ function generateFileListHtml(folder: FileTreeFolder, gitFiles: ReadonlyArray<GG
 	let sortedLeaves = sortLeaves(folder, '');
 	let html = '';
 	for (let i = 0; i < sortedLeaves.length; i++) {
-		html += generateFileTreeLeafHtml(sortedLeaves[i].relPath, sortedLeaves[i].leaf, gitFiles, fileContextMenuOpen, isUncommitted);
+		html += generateFileTreeLeafHtml(sortedLeaves[i].relPath, sortedLeaves[i].leaf, gitFiles, fileContextMenuOpen, isUncommitted, selectedFilePath);
 	}
 	return '<ul class="fileTreeFolderContents">' + html + '</ul>';
 }
 
-function generateFileTreeLeafHtml(name: string, leaf: FileTreeLeaf, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, isUncommitted: boolean) {
+function generateFileTreeLeafHtml(name: string, leaf: FileTreeLeaf, gitFiles: ReadonlyArray<GG.GitFileChange>, fileContextMenuOpen: number, isUncommitted: boolean, selectedFilePath: string | null) {
 	let encodedName = encodeURIComponent(name), escapedName = escapeHtml(name);
 	if (leaf.type === 'file') {
 		const fileTreeFile = gitFiles[leaf.index];
 		const textFile = fileTreeFile.additions !== null && fileTreeFile.deletions !== null;
 		const diffPossible = fileTreeFile.type === GG.GitFileStatus.Untracked || textFile;
 		const changeTypeMessage = GIT_FILE_CHANGE_TYPES[fileTreeFile.type] + (fileTreeFile.type === GG.GitFileStatus.Renamed ? ' (' + escapeHtml(fileTreeFile.oldFilePath) + ' → ' + escapeHtml(fileTreeFile.newFilePath) + ')' : '');
-		return '<li data-pathseg="' + encodedName + '"><span class="fileTreeFileRecord' + (leaf.index === fileContextMenuOpen ? ' ' + CLASS_CONTEXT_MENU_ACTIVE : '') + '" data-index="' + leaf.index + '"><span class="fileTreeFile' + (diffPossible ? ' gitDiffPossible' : '') + (leaf.reviewed ? '' : ' ' + CLASS_PENDING_REVIEW) + '" title="' + (diffPossible ? 'Click to View Diff' : 'Unable to View Diff' + (fileTreeFile.type !== GG.GitFileStatus.Deleted ? ' (this is a binary file)' : '')) + ' • ' + changeTypeMessage + '"><span class="fileTreeFileIcon">' + ICONS.file + '</span><span class="gitFileName ' + fileTreeFile.type + '">' + escapedName + '</span></span>' +
+		const selectedClass = fileTreeFile.newFilePath === selectedFilePath ? ' ' + CLASS_SELECTED : '';
+		return '<li data-pathseg="' + encodedName + '"><span class="fileTreeFileRecord' + selectedClass + (leaf.index === fileContextMenuOpen ? ' ' + CLASS_CONTEXT_MENU_ACTIVE : '') + '" data-index="' + leaf.index + '"><span class="fileTreeFile' + (diffPossible ? ' gitDiffPossible' : '') + (leaf.reviewed ? '' : ' ' + CLASS_PENDING_REVIEW) + '" title="' + (diffPossible ? 'Click to View Diff' : 'Unable to View Diff' + (fileTreeFile.type !== GG.GitFileStatus.Deleted ? ' (this is a binary file)' : '')) + ' • ' + changeTypeMessage + '"><span class="fileTreeFileIcon">' + ICONS.file + '</span><span class="gitFileName ' + fileTreeFile.type + '">' + escapedName + '</span></span>' +
 			(initialState.config.enhancedAccessibility ? '<span class="fileTreeFileType" title="' + changeTypeMessage + '">' + fileTreeFile.type + '</span>' : '') +
 			(fileTreeFile.type !== GG.GitFileStatus.Added && fileTreeFile.type !== GG.GitFileStatus.Untracked && fileTreeFile.type !== GG.GitFileStatus.Deleted && textFile ? '<span class="fileTreeFileAddDel">(<span class="fileTreeFileAdd" title="' + fileTreeFile.additions + ' addition' + (fileTreeFile.additions !== 1 ? 's' : '') + '">+' + fileTreeFile.additions + '</span>|<span class="fileTreeFileDel" title="' + fileTreeFile.deletions + ' deletion' + (fileTreeFile.deletions !== 1 ? 's' : '') + '">-' + fileTreeFile.deletions + '</span>)</span>' : '') +
 			'</span></li>';

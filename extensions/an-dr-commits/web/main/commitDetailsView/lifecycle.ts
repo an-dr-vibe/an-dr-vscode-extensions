@@ -351,7 +351,7 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		html += '<div id="commitDetailsViewInlineFiles"><div id="commitDetailsViewInlineFilesHeader"></div><div id="commitDetailsViewInlineFilesContent"></div></div>';
 		const alreadyShowingThisCommit = view.filesPanelCommitHash === expandedCommit.commitHash && view.filesPanelCompareWithHash === expandedCommit.compareWithHash;
 		if (!alreadyShowingThisCommit || refresh) {
-			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED);
+			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED, view.currentDiffFilePath);
 		}
 		view.filesPanelCommitHash = expandedCommit.commitHash;
 		// Inline content is populated after elem.innerHTML is set (see below)
@@ -434,14 +434,14 @@ function commitsChangeFileViewType(view: any, type: GG.FileViewType) {
 		const isUncommitted = view.filesPanelCompareWithHash !== null
 			? (view.filesPanelCompareWithHash === UNCOMMITTED || view.filesPanelCommitHash === UNCOMMITTED)
 			: view.filesPanelCommitHash === UNCOMMITTED;
-		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, -1, type, isUncommitted);
+		view.filesPanel.update(view.filesPanelFileTree, view.filesPanelFileChanges, -1, type, isUncommitted, view.currentDiffFilePath);
 		return;
 	}
 	if (expandedCommit.fileTree === null || expandedCommit.fileChanges === null) return;
 	CommitsView.closeCommitDetailsViewContextMenuIfOpen(expandedCommit);
 	view.setFileViewType(type);
 	const commitOrder = view.getCommitOrder(expandedCommit.commitHash, expandedCommit.compareWithHash === null ? expandedCommit.commitHash : expandedCommit.compareWithHash);
-	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED);
+	view.filesPanel.update(expandedCommit.fileTree, expandedCommit.fileChanges, expandedCommit.contextMenuOpen.fileView, type, commitOrder.to === UNCOMMITTED, view.currentDiffFilePath);
 	const inlineContent = document.getElementById('commitDetailsViewInlineFilesContent');
 	if (inlineContent !== null) {
 		inlineContent.innerHTML = view.filesPanel.getContentHtml();

@@ -496,7 +496,7 @@ class CommitsView {
 		if (this.previewCommitHash !== commitDetails.hash) return;
 		this.previewCommitHash = null;
 		if (this.expandedCommit === null || this.expandedCommit.commitHash !== commitDetails.hash) {
-			this.filesPanel.update(fileTree, commitDetails.fileChanges, -1, commitsGetFileViewType(this), false);
+			this.filesPanel.update(fileTree, commitDetails.fileChanges, -1, commitsGetFileViewType(this), false, this.currentDiffFilePath);
 			this.filesPanelCommitHash = commitDetails.hash;
 			this.filesPanelCompareWithHash = null;
 			this.filesPanelFileChanges = commitDetails.fileChanges;

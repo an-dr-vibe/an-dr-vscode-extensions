@@ -117,7 +117,7 @@ function commitsApplyComparisonPreviewResponse(view: any, commitHash: string, co
 	view.filesPanelCompareWithHash = compareWithHash;
 	view.filesPanelCommitHash = commitHash;
 	const isUncommitted = compareWithHash === UNCOMMITTED || commitHash === UNCOMMITTED;
-	view.filesPanel.update(fileTree, fileChanges, -1, commitsGetFileViewType(view), isUncommitted);
+	view.filesPanel.update(fileTree, fileChanges, -1, commitsGetFileViewType(view), isUncommitted, view.currentDiffFilePath);
 	commitsPopulateFilesPanelHeader(view, false);
 	view.makeCommitDetailsViewFileViewInteractive();
 }

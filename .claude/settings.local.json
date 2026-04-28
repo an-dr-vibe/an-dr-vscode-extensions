@@ -43,9 +43,24 @@
       "Bash(head -5 grep -n \"commitsUpdateCdvFileState\\\\|currentDiffFilePath\\\\|gitDiffSelected\" /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/web/main/cdv/fileView.ts)",
       "Bash(ls /c/Users/mail/.vscode-an-dr/extensions/an-dr-commits/web/main/*.ts)",
       "Bash(grep -n \"cdvExternalDiff\\\\|cdvCodeReview\\\\|cdvControls\" web/main/cdv/*.ts web/main/diffPreview.ts)",
-      "Bash(powershell -Command \":*)"
-      
-      
+      "Bash(powershell -Command \":*)",
+      "Bash(grep -rn \"pull\\\\\\\\.rebase\\\\|rebase\" \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\\\\extensions\\\\an-dr-commits\\\\src\\\\config.ts\")",
+      "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" status)",
+      "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" diff --stat)",
+      "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" log --oneline -5)",
+      "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" add extensions/an-dr-commits/src/commitsView.ts extensions/an-dr-commits/src/dataSource.ts extensions/an-dr-commits/src/types/message-protocol.ts extensions/an-dr-commits/web/dialog.ts extensions/an-dr-commits/web/main/actions/pullPushActions.ts extensions/an-dr-commits/web/main/bootstrap.ts extensions/an-dr-commits/web/styles/dialog.css)",
+      "Bash(git -C 'c:\\\\Users\\\\mail\\\\.vscode-an-dr' commit -m ' *)",
+      "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" push)",
+      "Bash(npx tsc *)",
+      "Bash(node ./.vscode/package-web.js)",
+      "Bash(node ./.vscode/package-web.js debug)",
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(node bundle.js)",
+      "Bash(rm bundle.js)",
+      "Bash(grep -v \"^--$\")"
     ]
   }
 }

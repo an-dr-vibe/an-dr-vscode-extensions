@@ -201,6 +201,13 @@ function commitsMakeCommitDetailsViewFileViewInteractive(view: any) {
 	commitsHandleCommitDetailsViewFileContext(view, <Event><unknown>null);
 }
 
+function commitsSetSelectedFileRecord(record: HTMLElement) {
+	document.querySelectorAll('.fileTreeFileRecord.' + CLASS_SELECTED).forEach((elem) => {
+		elem.classList.remove(CLASS_SELECTED);
+	});
+	record.classList.add(CLASS_SELECTED);
+}
+
 function commitsRenderCommitDetailsViewExternalDiffBtn(view: any) {
 	const toolName = view.gitConfig !== null
 		? view.gitConfig.guiDiffTool !== null
@@ -241,6 +248,8 @@ function commitsHandleFilesPanelClick(view: any, e: MouseEvent) {
 	const hashes = commitsGetFilesPanelDiffHashes(view, target);
 	if (!hashes) return;
 	const { file, fromHash, toHash, fileStatus } = hashes;
+	const record = target.closest('.fileTreeFileRecord') as HTMLElement | null;
+	if (record !== null) commitsSetSelectedFileRecord(record);
 	view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
 	view.currentDiffFilePath = file.newFilePath;
 	view.currentFullDiffData = null;

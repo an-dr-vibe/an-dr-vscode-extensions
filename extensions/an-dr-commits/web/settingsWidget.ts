@@ -181,23 +181,7 @@ class SettingsWidget {
 				}
 				html += '</div>';
 
-				html += '<div class="settingsSection"><h3>Remote Configuration</h3><table><tr><th>Remote</th><th>URL</th><th>Type</th><th>Action</th></tr>';
-				if (this.config.remotes.length > 0) {
-					const hideRemotes = this.repo.hideRemotes;
-					this.config.remotes.forEach((remote, i) => {
-						const hidden = hideRemotes.includes(remote.name);
-						const fetchUrl = escapeHtml(remote.url || 'Not Set'), pushUrl = escapeHtml(remote.pushUrl || remote.url || 'Not Set');
-						html += '<tr class="lineAbove">' +
-							'<td class="left" rowspan="2"><span class="hideRemoteBtn" data-index="' + i + '" title="Click to ' + (hidden ? 'show' : 'hide') + ' branches of this remote.">' + (hidden ? SVG_ICONS.eyeClosed : SVG_ICONS.eyeOpen) + '</span>' + escapeHtml(remote.name) + '</td>' +
-							'<td class="leftWithEllipsis" title="Fetch URL: ' + fetchUrl + '">' + fetchUrl + '</td><td>Fetch</td>' +
-							'<td class="btns remoteBtns" rowspan="2" data-index="' + i + '"><div class="fetchRemote" title="Fetch from Remote' + ELLIPSIS + '">' + SVG_ICONS.download + '</div> <div class="pruneRemote" title="Prune Remote' + ELLIPSIS + '">' + SVG_ICONS.branch + '</div><br><div class="setDefaultRemoteBranch" title="Set Default Branch' + ELLIPSIS + '">' + SVG_ICONS.branch + '</div><br><div class="editRemote" title="Edit Remote' + ELLIPSIS + '">' + SVG_ICONS.pencil + '</div> <div class="deleteRemote" title="Delete Remote' + ELLIPSIS + '">' + SVG_ICONS.close + '</div></td>' +
-							'</tr><tr><td class="leftWithEllipsis" title="Push URL: ' + pushUrl + '">' + pushUrl + '</td><td>Push</td></tr>';
-					});
-				} else {
-					html += '<tr class="lineAbove"><td colspan="4">There are no remotes configured for this repository.</td></tr>';
-				}
-				html += '</table><div class="settingsSectionButtons lineAbove"><div id="settingsAddRemote" class="addBtn">' + SVG_ICONS.plus + 'Add Remote</div></div></div>';
-			}
+		}
 
 			html += '<div class="settingsSection centered"><h3>Issue Linking</h3>';
 			const issueLinkingConfig = this.repo.issueLinkingConfig || globalState.issueLinkingConfig;
@@ -368,114 +352,7 @@ class SettingsWidget {
 					});
 				}
 
-				const pushUrlPlaceholder = 'Leave blank to use the Fetch URL';
-				document.getElementById('settingsAddRemote')!.addEventListener('click', () => {
-					dialog.showForm('Add a new remote to this repository:', [
-						{ type: DialogInputType.Text, name: 'Name', default: '', placeholder: null },
-						{ type: DialogInputType.Text, name: 'Fetch URL', default: '', placeholder: null },
-						{ type: DialogInputType.Text, name: 'Push URL', default: '', placeholder: pushUrlPlaceholder },
-						{ type: DialogInputType.Checkbox, name: 'Fetch Immediately', value: true }
-					], 'Add Remote', (values) => {
-						if (this.currentRepo === null) return;
-						runAction({ command: 'addRemote', repo: this.currentRepo, name: <string>values[0], url: <string>values[1], pushUrl: <string>values[2] !== '' ? <string>values[2] : null, fetch: <boolean>values[3] }, 'Adding Remote');
-					}, { type: TargetType.Repo });
-				});
-
-				addListenerToClass('editRemote', 'click', (e) => {
-					const remote = this.getRemoteForBtnEvent(e);
-					if (remote === null) return;
-					dialog.showForm('Edit the remote <b><i>' + escapeHtml(remote.name) + '</i></b>:', [
-						{ type: DialogInputType.Text, name: 'Name', default: remote.name, placeholder: null },
-						{ type: DialogInputType.Text, name: 'Fetch URL', default: remote.url !== null ? remote.url : '', placeholder: null },
-						{ type: DialogInputType.Text, name: 'Push URL', default: remote.pushUrl !== null ? remote.pushUrl : '', placeholder: pushUrlPlaceholder }
-					], 'Save Changes', (values) => {
-						if (this.currentRepo === null) return;
-						runAction({ command: 'editRemote', repo: this.currentRepo, nameOld: remote.name, nameNew: <string>values[0], urlOld: remote.url, urlNew: <string>values[1] !== '' ? <string>values[1] : null, pushUrlOld: remote.pushUrl, pushUrlNew: <string>values[2] !== '' ? <string>values[2] : null }, 'Saving Changes to Remote');
-					}, { type: TargetType.Repo });
-				});
-
-				addListenerToClass('deleteRemote', 'click', (e) => {
-					const remote = this.getRemoteForBtnEvent(e);
-					if (remote === null) return;
-					dialog.showConfirmation('Are you sure you want to delete the remote <b><i>' + escapeHtml(remote.name) + '</i></b>?', 'Yes, delete', () => {
-						if (this.currentRepo === null) return;
-						runAction({ command: 'deleteRemote', repo: this.currentRepo, name: remote.name }, 'Deleting Remote');
-					}, { type: TargetType.Repo });
-				});
-
-				addListenerToClass('fetchRemote', 'click', (e) => {
-					const remote = this.getRemoteForBtnEvent(e);
-					if (remote === null) return;
-					dialog.showForm('Are you sure you want to fetch from the remote <b><i>' + escapeHtml(remote.name) + '</i></b>?', [
-						{ type: DialogInputType.Checkbox, name: 'Prune', value: initialState.config.dialogDefaults.fetchRemote.prune, info: 'Before fetching, remove any remote-tracking references that no longer exist on the remote.' },
-						{ type: DialogInputType.Checkbox, name: 'Prune Tags', value: initialState.config.dialogDefaults.fetchRemote.pruneTags, info: 'Before fetching, remove any local tags that no longer exist on the remote. Requires Git >= 2.17.0, and "Prune" to be enabled.' }
-					], 'Yes, fetch', (values) => {
-						if (this.currentRepo === null) return;
-						runAction({ command: 'fetch', repo: this.currentRepo, name: remote.name, prune: <boolean>values[0], pruneTags: <boolean>values[1] }, 'Fetching from Remote');
-					}, { type: TargetType.Repo });
-				});
-
-				addListenerToClass('pruneRemote', 'click', (e) => {
-					const remote = this.getRemoteForBtnEvent(e);
-					if (remote === null) return;
-					dialog.showConfirmation('Are you sure you want to prune remote-tracking references that no longer exist on the remote <b><i>' + escapeHtml(remote.name) + '</i></b>?', 'Yes, prune', () => {
-						if (this.currentRepo === null) return;
-						runAction({ command: 'pruneRemote', repo: this.currentRepo, name: remote.name }, 'Pruning Remote');
-					}, { type: TargetType.Repo });
-				});
-
-				addListenerToClass('setDefaultRemoteBranch', 'click', (e) => {
-					const remote = this.getRemoteForBtnEvent(e);
-					if (remote === null) return;
-					const prefix = 'remotes/' + remote.name + '/';
-					const branchOptions = Array.from(new Set(this.view.getBranches()
-						.filter((branch) => branch.startsWith(prefix) && branch !== prefix + 'HEAD')
-						.map((branch) => branch.substring(prefix.length))))
-						.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-						.map((branch) => ({ name: branch, value: branch }));
-					if (branchOptions.length === 0) {
-						dialog.showError('Unable to Set Remote Default Branch', 'No remote-tracking branches for remote "' + remote.name + '" are currently known. Fetch from this remote and try again.', null, null);
-						return;
-					}
-
-					const remoteHeadTarget = this.view.getRemoteHeadTargets()[remote.name];
-					const defaultBranch = typeof remoteHeadTarget === 'string' && remoteHeadTarget.startsWith(remote.name + '/')
-						? remoteHeadTarget.substring(remote.name.length + 1)
-						: branchOptions[0].value;
-					dialog.showForm('Set the default branch (remote HEAD) for remote <b><i>' + escapeHtml(remote.name) + '</i></b>:', [
-						{
-							type: DialogInputType.Select,
-							name: 'Branch',
-							options: branchOptions,
-							default: branchOptions.some((option) => option.value === defaultBranch) ? defaultBranch : branchOptions[0].value
-						}
-					], 'Set Default Branch', (values) => {
-						if (this.currentRepo === null) return;
-						runAction({
-							command: 'setRemoteDefaultBranch',
-							repo: this.currentRepo,
-							remote: remote.name,
-							branch: <string>values[0]
-						}, 'Setting Remote Default Branch');
-					}, { type: TargetType.Repo });
-				});
-
-				addListenerToClass('hideRemoteBtn', 'click', (e) => {
-					if (this.currentRepo === null || this.repo === null || this.config === null) return;
-					const source = <HTMLElement>(<Element>e.target).closest('.hideRemoteBtn')!;
-					const remote = this.config.remotes[parseInt(source.dataset.index!)].name;
-					const hideRemote = !this.repo.hideRemotes.includes(remote);
-					source.title = 'Click to ' + (hideRemote ? 'show' : 'hide') + ' branches of this remote.';
-					source.innerHTML = hideRemote ? SVG_ICONS.eyeClosed : SVG_ICONS.eyeOpen;
-					if (hideRemote) {
-						this.repo.hideRemotes.push(remote);
-					} else {
-						this.repo.hideRemotes.splice(this.repo.hideRemotes.indexOf(remote), 1);
-					}
-					this.view.saveRepoStateValue(this.currentRepo, 'hideRemotes', this.repo.hideRemotes);
-					this.view.refresh(true);
-				});
-			}
+		}
 
 			document.getElementById('editIssueLinking')!.addEventListener('click', () => {
 				if (this.repo === null) return;
@@ -620,17 +497,6 @@ class SettingsWidget {
 	 */
 	public showCreatePullRequestIntegrationDialog2(config: GG.DeepWriteable<GG.PullRequestConfig>) {
 		settingsWidgetShowCreatePullRequestIntegrationDialog2(this, config);
-	}
-
-	/**
-	 * Get the remote details corresponding to a mouse event.
-	 * @param e The mouse event.
-	 * @returns The details of the remote.
-	 */
-	private getRemoteForBtnEvent(e: Event) {
-		return this.config !== null
-			? this.config.remotes[parseInt((<HTMLElement>(<Element>e.target).closest('.remoteBtns')!).dataset.index!)]
-			: null;
 	}
 
 	/**

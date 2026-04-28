@@ -1,6 +1,7 @@
 # AGENTS.md — an-dr-commits
 
 > **Maintenance rule**: Update this file whenever you add, remove, or significantly change a file, feature, or data flow. Keep it accurate so future agents can skip exploratory reads.
+> **Commit rule**: Never create a git commit or push unless the user explicitly requests it ("commit", "push", "commit and push", etc.). Completing a coding task does NOT imply permission to commit.
 
 ---
 

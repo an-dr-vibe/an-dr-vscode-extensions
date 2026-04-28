@@ -93,7 +93,6 @@ function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 			view.renderGraph();
 		}
 	}
-	view.renderTopFullDiffButton();
 }
 
 function commitsShowCommitDetails(view: any, commitDetails: GG.GitCommitDetails, fileTree: FileTreeFolder, avatar: string | null, refresh: boolean) {
@@ -307,7 +306,6 @@ function commitsSetupCommitDetailsViewInteractivity(view: any, expandedCommit: a
 	if (expandedCommit.loading) return;
 	view.makeCommitDetailsViewFileViewInteractive();
 	view.renderCommitDetailsViewExternalDiffBtn();
-	if (view.fullDiffMode) view.createFullDiffPanel();
 	commitsSetupCommitDetailsViewScrollObservers(view, expandedCommit);
 }
 
@@ -365,7 +363,6 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 
 	view.makeCommitDetailsViewResizable();
 	commitsSetupCommitDetailsViewInteractivity(view, expandedCommit, externalDiffPossible);
-	view.renderTopFullDiffButton();
 }
 
 function commitsSetCommitDetailsViewHeight(view: any, elem: HTMLElement, isDocked: boolean) {

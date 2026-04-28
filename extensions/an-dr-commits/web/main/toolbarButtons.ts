@@ -16,15 +16,10 @@ function commitsRenderFetchButton(view: any) {
 		view.pushBtnElem.title = 'Push Current Branch (Right-Click for More Actions)';
 		view.pushBtnElem.innerHTML = SVG_ICONS.arrowUp;
 	}
-	view.renderTopFullDiffButton();
 	view.renderRepoInProgressBanner();
 	view.updateControlsLayout();
 }
 
-function commitsRenderTopFullDiffButton(view: any) {
-	view.topFullDiffBtnElem.title = view.fullDiffMode ? 'Hide Full Diff Panel' : 'Show Full Diff Panel';
-	alterClass(view.topFullDiffBtnElem, CLASS_ACTIVE, view.fullDiffMode);
-}
 
 function commitsRenderTagDetails(view: any, tagName: string, commitHash: string, details: GG.GitTagDetails) {
 	const textFormatter = new TextFormatter(view.commits, view.gitRepos[view.currentRepo].issueLinkingConfig, {

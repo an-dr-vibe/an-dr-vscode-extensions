@@ -74,7 +74,6 @@ class CommitsView {
 	public currentDiffRequest: CurrentDiffRequest | null = null;
 	public currentDiffText: string | null = null;
 	public currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null = null;
-	private fullDiffMode: boolean = initialState.config.commitDetailsView.defaultDiffMode === 'full';
 	public currentDiffFilePath: string | null = null;
 	public previewCommitHash: string | null = null;
 	public filesPanelCommitHash: string | null = null;
@@ -110,7 +109,6 @@ class CommitsView {
 	private readonly footerElem!: HTMLElement;
 	private readonly scrollShadowElem!: HTMLElement;
 	private readonly findWidgetToggleBtnElem!: HTMLElement;
-	private readonly topFullDiffBtnElem!: HTMLElement;
 	private readonly settingsBtnElem!: HTMLElement;
 	private readonly pullBtnElem!: HTMLElement;
 	private readonly pushBtnElem!: HTMLElement;
@@ -342,7 +340,6 @@ class CommitsView {
 	private executeRepoInProgressAction(action: GG.GitRepoInProgressAction) { commitsExecuteRepoInProgressAction(this, action); }
 
 	private renderFetchButton() { commitsRenderFetchButton(this); }
-	private renderTopFullDiffButton() { commitsRenderTopFullDiffButton(this); }
 	public renderRefreshButton() {
 		// Refresh now lives in the Settings context menu.
 		// Keep this method so existing refresh call sites stay unchanged.
@@ -535,8 +532,7 @@ class CommitsView {
 	public compactFullDiffUnifiedRows<T extends { changed: boolean }>(rows: T[]): (T | { spacer: string })[] { return commitsCompactFullDiffUnifiedRows(this, rows); }
 	public buildFullSideBySideFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string { return commitsBuildFullSideBySideFileView(this, oldLines, newLines, hunks); }
 
-	private toggleFullDiffMode(on: boolean) { commitsToggleFullDiffMode(this, on); }
-	private createFullDiffPanel() { commitsCreateFullDiffPanel(this); }
+	public createFullDiffPanel() { commitsCreateFullDiffPanel(this); }
 	public renderFullDiffCompactBtn() { commitsRenderFullDiffCompactBtn(this); }
 	public renderFullDiffViewBtns() { commitsRenderFullDiffViewBtns(this); }
 	public changeFullDiffViewMode(mode: 'unified' | 'sideBySide') { commitsChangeFullDiffViewMode(this, mode); }

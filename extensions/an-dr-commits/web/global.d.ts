@@ -65,7 +65,6 @@ declare global {
 		readonly maxCommits: number;
 		readonly onlyFollowFirstParent: boolean;
 		readonly expandedCommit: ExpandedCommit | null;
-		readonly fullDiffMode?: boolean;
 		readonly scrollTop: number;
 		readonly branchPanel: GG.CommitsBranchPanelState;
 		readonly findWidget: FindWidgetState;

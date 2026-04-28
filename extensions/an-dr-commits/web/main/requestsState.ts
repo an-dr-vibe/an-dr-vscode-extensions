@@ -293,7 +293,6 @@ function commitsSaveState(view: any) {
 		maxCommits: view.maxCommits,
 		onlyFollowFirstParent: view.onlyFollowFirstParent,
 		expandedCommit: expandedCommit,
-		fullDiffMode: view.fullDiffMode,
 		scrollTop: view.scrollTop,
 		branchPanel: view.branchDropdown.getState(),
 		findWidget: view.findWidget.getState(),

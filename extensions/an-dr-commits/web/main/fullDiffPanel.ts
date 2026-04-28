@@ -233,19 +233,6 @@ function commitsCompactSbsPairedRows<T extends { changed: boolean }>(view: any, 
 	return output;
 }
 
-function commitsToggleFullDiffMode(view: any, on: boolean) {
-	view.fullDiffMode = on;
-	if (on) {
-		view.createFullDiffPanel();
-		if (view.currentDiffRequest !== null && view.currentFullDiffData !== null) {
-			view.renderFullDiffContent(view.currentFullDiffData);
-		}
-	} else {
-		view.destroyFullDiffPanel();
-	}
-	view.renderTopFullDiffButton();
-	view.saveState();
-}
 
 function commitsCreateFullDiffPanel(view: any) {
 	if (document.getElementById('fullDiffPanel')) return;
@@ -314,14 +301,7 @@ function commitsResetDiffState(view: any) {
 	view.currentDiffText = null;
 	view.currentFullDiffData = null;
 	view.currentDiffFilePath = null;
-	if (view.fullDiffMode) {
-		const filenameElem = document.getElementById('fullDiffFilename');
-		const contentElem = document.getElementById('fullDiffContent');
-		if (filenameElem) filenameElem.textContent = 'Select a file to view its contents';
-		if (contentElem) contentElem.innerHTML = '<div class="commitDetailsViewDiffMessage">Select a file to view the diff</div>';
-	} else {
-		view.destroyFullDiffPanel();
-	}
+	view.destroyFullDiffPanel();
 }
 
 function commitsSetFullDiffPanelHeight(view: any, height: number) {

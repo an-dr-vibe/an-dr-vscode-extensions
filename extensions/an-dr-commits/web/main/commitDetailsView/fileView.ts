@@ -135,13 +135,9 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 			view.currentDiffFilePath = file.newFilePath;
 			view.currentDiffText = null;
 			view.currentFullDiffData = null;
-			if (view.fullDiffMode) {
-				view.createFullDiffPanel();
-				view.hideDiffPane();
-				sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
-			} else {
-				sendMessage({ command: 'getFileDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath });
-			}
+			view.createFullDiffPanel();
+			view.hideDiffPane();
+			sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
 		};
 
 		contextMenu.show([

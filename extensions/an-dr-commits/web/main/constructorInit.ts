@@ -10,7 +10,6 @@ function commitsInitDomElements(view: any) {
 	view.footerElem = document.getElementById('footer')!;
 	view.scrollShadowElem = document.getElementById('scrollShadow')!;
 	view.findWidgetToggleBtnElem = document.getElementById('findWidgetToggleBtn')!;
-	view.topFullDiffBtnElem = document.getElementById('topFullDiffBtn')!;
 	view.settingsBtnElem = document.getElementById('settingsBtn')!;
 	view.pullBtnElem = document.getElementById('pullBtn')!;
 	view.pushBtnElem = document.getElementById('pushBtn')!;
@@ -75,7 +74,6 @@ function commitsRestoreFromPrevState(view: any, prevState: any) {
 	view.currentTags = prevState.currentTags || [];
 	view.maxCommits = prevState.maxCommits;
 	view.expandedCommit = prevState.expandedCommit;
-	view.fullDiffMode = !!prevState.fullDiffMode;
 	view.avatars = prevState.avatars;
 	view.gitConfig = prevState.gitConfig;
 	view.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitRemoteUrls || {}, prevState.gitStashes, true);
@@ -135,10 +133,6 @@ function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.innerHTML = SVG_ICONS.search;
 	view.findWidgetToggleBtnElem.addEventListener('click', () => view.showFindWidgetFromToggle());
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
-	view.topFullDiffBtnElem.innerHTML = SVG_ICONS.fullDiff;
-	view.topFullDiffBtnElem.addEventListener('click', () => view.toggleFullDiffMode(!view.fullDiffMode));
-	if (view.fullDiffMode && view.currentRepo && view.gitRepos[view.currentRepo]) view.createFullDiffPanel();
-	view.topFullDiffBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.pullBtnElem.title = 'Fetch from Remote(s) · Double-click to Pull';
 	view.pullBtnElem.innerHTML = SVG_ICONS.arrowDown;
 	addSingleDblClick(view.pullBtnElem,

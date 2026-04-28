@@ -77,7 +77,6 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 							<div id="pushBtn"></div>
 							<div id="settingsBtn" title="Repository Settings"></div>
 							<div id="moreBtn" title="More Actions"></div>
-							<div id="topFullDiffBtn" title="Full Diff Panel"></div>
 							<div id="filesPanelToggleBtn"></div>
 						</div>
 					</div>

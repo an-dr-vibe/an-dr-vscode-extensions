@@ -77,4 +77,5 @@ export interface CommitsBranchPanelState {
 	readonly sidebarWidth: number;
 	readonly sidebarHidden: boolean;
 	readonly scrollTop: number;
+	readonly inProgressFilterActive?: boolean;
 }

@@ -47,6 +47,10 @@ class BranchPanel {
 	private sidebarWidth: number = 200;
 	private sidebarHidden: boolean = false;
 	private remoteUrls: { [remoteName: string]: string | null } = {};
+	private inProgressBranches: ReadonlyArray<string> = [];
+	private inProgressFilterActive: boolean = true;
+	private inProgressFilterRow: HTMLElement | null = null;
+	private inProgressFilterCheckbox: HTMLInputElement | null = null;
 	private actionSelection: Set<string> = new Set();
 	private actionSelectionAnchor: string | null = null;
 	private actionSelectionActive: string | null = null;
@@ -98,6 +102,22 @@ class BranchPanel {
 			this.filterValue = this.filterInput.value.toLowerCase();
 			this.render();
 		});
+
+		// Active-branches filter — shown only while a git operation is in progress
+		const inProgressRow = (this.filterHost ?? elem).appendChild(document.createElement('div'));
+		inProgressRow.className = 'branchPanelInProgressFilter hidden';
+		const inProgressLabel = inProgressRow.appendChild(document.createElement('label'));
+		inProgressLabel.className = 'branchPanelInProgressFilterLabel';
+		const inProgressCheckbox = inProgressLabel.appendChild(document.createElement('input'));
+		inProgressCheckbox.type = 'checkbox';
+		inProgressCheckbox.checked = true;
+		inProgressCheckbox.addEventListener('change', () => {
+			this.inProgressFilterActive = inProgressCheckbox.checked;
+			this.render();
+		});
+		inProgressLabel.appendChild(document.createTextNode(' Active branches'));
+		this.inProgressFilterRow = inProgressRow;
+		this.inProgressFilterCheckbox = inProgressCheckbox;
 
 		this.listElem = elem.appendChild(document.createElement('div'));
 		this.listElem.className = 'branchPanelList';
@@ -299,7 +319,8 @@ class BranchPanel {
 			folderCollapsed: Object.assign({}, this.folderCollapsed),
 			sidebarWidth: this.sidebarWidth,
 			sidebarHidden: this.sidebarHidden,
-			scrollTop: this.listScrollTop
+			scrollTop: this.listScrollTop,
+			inProgressFilterActive: this.inProgressFilterActive
 		};
 	}
 
@@ -316,6 +337,28 @@ class BranchPanel {
 			this.toggleSidebar();
 		}
 		this.listScrollTop = state.scrollTop;
+		if (typeof state.inProgressFilterActive === 'boolean') {
+			this.inProgressFilterActive = state.inProgressFilterActive;
+			if (this.inProgressFilterCheckbox !== null) this.inProgressFilterCheckbox.checked = this.inProgressFilterActive;
+		}
+		this.render();
+	}
+
+	/**
+	 * Called whenever the repository's in-progress operation changes.
+	 * @param branches The branch names involved in the operation (empty when no operation is active).
+	 */
+	public setInProgressState(branches: ReadonlyArray<string>) {
+		const hadBranches = this.inProgressBranches.length > 0;
+		this.inProgressBranches = branches;
+		if (branches.length > 0 && !hadBranches) {
+			// New operation started — auto-enable the filter
+			this.inProgressFilterActive = true;
+			if (this.inProgressFilterCheckbox !== null) this.inProgressFilterCheckbox.checked = true;
+		}
+		if (this.inProgressFilterRow !== null) {
+			this.inProgressFilterRow.classList.toggle('hidden', branches.length === 0);
+		}
 		this.render();
 	}
 

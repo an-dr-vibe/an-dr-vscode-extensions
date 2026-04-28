@@ -96,6 +96,25 @@ body.branchPanelHidden #sidebarResizeHandle{
 	line-height:17px;
 	color:var(--vscode-editor-foreground);
 }
+.branchPanelInProgressFilter{
+	padding:5px 0 2px 0;
+}
+.branchPanelInProgressFilter.hidden{
+	display:none;
+}
+.branchPanelInProgressFilterLabel{
+	display:flex;
+	align-items:center;
+	gap:5px;
+	font-size:12px;
+	cursor:pointer;
+	-webkit-user-select:none;
+	user-select:none;
+	opacity:0.85;
+}
+.branchPanelInProgressFilterLabel:hover{
+	opacity:1;
+}
 .branchPanelList{
 	padding-top:4px;
 	padding-bottom:8px;

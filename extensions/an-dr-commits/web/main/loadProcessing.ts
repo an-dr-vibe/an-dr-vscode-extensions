@@ -128,6 +128,7 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 
 	view.saveState();
 	view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
+	view.branchDropdown.setInProgressState(commitsGetInProgressBranches(view, repoInProgressState));
 	view.branchDropdown.setRemoteUrls(view.gitRemoteUrls);
 	if (view.pendingBranchPanelState !== null) view.branchDropdown.restoreState(view.pendingBranchPanelState);
 
@@ -375,4 +376,17 @@ function commitsDisplayLoadDataError(view: any, message: string, reason: string)
 	dialog.showError(message, reason, 'Retry', () => {
 		view.refresh(true);
 	});
+}
+
+function commitsGetInProgressBranches(view: any, state: GG.GitRepoInProgressState | null): string[] {
+	if (state === null) return [];
+	const branches: string[] = [];
+	const head = view.gitBranchHead;
+	if (head !== null && head !== 'HEAD') branches.push(head);
+	if (state.rebaseContext !== null && state.rebaseContext !== undefined) {
+		const ctx = state.rebaseContext;
+		if (ctx.branch !== null && ctx.branch !== undefined && !branches.includes(ctx.branch)) branches.push(ctx.branch);
+		if (ctx.onto !== null && ctx.onto !== undefined && !branches.includes(ctx.onto)) branches.push(ctx.onto);
+	}
+	return branches;
 }

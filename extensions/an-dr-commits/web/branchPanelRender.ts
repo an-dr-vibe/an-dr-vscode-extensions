@@ -176,11 +176,23 @@ function branchPanelRenderTagTreeHtml(view: any, nodes: BranchTreeNode[], indent
 	return html;
 }
 
+function branchPanelMatchesInProgress(value: string, branches: ReadonlyArray<string>): boolean {
+	for (let i = 0; i < branches.length; i++) {
+		const b = branches[i];
+		if (value === b) return true;
+		// remote branch stored as 'remotes/origin/main', rebaseContext stores 'origin/main'
+		if (value === 'remotes/' + b) return true;
+	}
+	return false;
+}
+
 function branchPanelBuildSectionGroups(view: any): BranchPanelSectionGroups {
 	const groups: BranchPanelSectionGroups = { locals: [], remotes: [], globs: [] };
+	const inProgressActive = view.inProgressFilterActive && view.inProgressBranches.length > 0;
 	for (let i = 1; i < view.options.length; i++) {
 		const opt = view.options[i];
 		if (opt.value === 'HEAD') continue;
+		if (inProgressActive && !branchPanelMatchesInProgress(opt.value, view.inProgressBranches)) continue;
 		if (opt.name.startsWith('Glob: ')) {
 			groups.globs.push({ opt, idx: i });
 		} else if (opt.value.startsWith('remotes/')) {

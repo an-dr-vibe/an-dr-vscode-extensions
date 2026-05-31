@@ -500,9 +500,10 @@ class CommitsView {
 		if (this.expandedCommit === null || this.expandedCommit.commitHash !== commitDetails.hash) {
 			if (commitDetails.hash === UNCOMMITTED) {
 				this.filesPanel.show();
-				this.filesPanel.getHeaderElem().innerHTML = changesPanelGetHeaderHtml();
+				this.filesPanel.getHeaderElem().innerHTML = '';
+				this.filesPanel.getFooterElem().innerHTML = changesPanelGetFooterHtml();
 				this.filesPanel.getContentElem().innerHTML = '<div class="cpPlaceholder">Loading…</div>';
-				changesPanelAttachListeners(this.filesPanel.getHeaderElem(), this.filesPanel.getContentElem());
+				changesPanelAttachListeners(this.filesPanel.getFooterElem(), this.filesPanel.getContentElem());
 				changesPanelActivate();
 			} else {
 				this.filesPanel.update(fileTree, commitDetails.fileChanges, -1, commitsGetFileViewType(this), false, this.currentDiffFilePath);

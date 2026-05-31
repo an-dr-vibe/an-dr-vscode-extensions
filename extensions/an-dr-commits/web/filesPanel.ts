@@ -5,6 +5,7 @@
 class FilesPanel {
 	private readonly panel: HTMLElement;
 	private readonly headerElem: HTMLElement;
+	private readonly footerElem: HTMLElement;
 	private readonly contentElem: HTMLElement;
 	private readonly toggleBtn: HTMLElement;
 	private panelHidden: boolean;
@@ -33,6 +34,10 @@ class FilesPanel {
 		this.contentElem = document.createElement('div');
 		this.contentElem.id = 'filesPanelContent';
 		this.panel.appendChild(this.contentElem);
+
+		this.footerElem = document.createElement('div');
+		this.footerElem.id = 'filesPanelFooter';
+		this.panel.appendChild(this.footerElem);
 
 		this.contentElem.addEventListener('scroll', () => {
 			this.scrollTop = this.contentElem.scrollTop;
@@ -123,7 +128,9 @@ class FilesPanel {
 	/** Recalculate content top offset to match the actual header height. */
 	public syncContentTop() {
 		const h = this.headerElem.offsetHeight;
+		const f = this.footerElem.offsetHeight;
 		this.contentElem.style.top = h > 0 ? h + 'px' : '';
+		this.contentElem.style.bottom = f > 0 ? f + 'px' : '';
 	}
 
 	public setContentLoading() {
@@ -135,6 +142,7 @@ class FilesPanel {
 	}
 
 	public update(fileTree: FileTreeFolder, fileChanges: ReadonlyArray<GG.GitFileChange>, contextMenuOpen: number, fileViewType: GG.FileViewType, isUncommitted: boolean, selectedFilePath: string | null = null) {
+		this.clearFooter();
 		const html = generateFileViewHtml(fileTree, fileChanges, contextMenuOpen, fileViewType, isUncommitted, selectedFilePath);
 		this.contentElem.innerHTML = html;
 		this.contentElem.scrollTop = this.scrollTop;
@@ -146,11 +154,22 @@ class FilesPanel {
 
 	public clearHeader() {
 		this.headerElem.innerHTML = '';
+		this.syncContentTop();
+	}
+
+	public getFooterElem(): HTMLElement {
+		return this.footerElem;
+	}
+
+	public clearFooter() {
+		this.footerElem.innerHTML = '';
+		this.syncContentTop();
 	}
 
 	public clear() {
 		this.scrollTop = 0;
 		this.clearHeader();
+		this.clearFooter();
 		this.showPlaceholder();
 	}
 

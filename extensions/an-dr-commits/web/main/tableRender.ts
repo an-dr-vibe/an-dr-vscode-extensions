@@ -208,7 +208,7 @@ function commitsRenderTableRestoreExpandedCommit(view: any) {
 function commitsRenderUncommittedChanges(view: any) {
 	const colVisibility = view.getColumnVisibility(), date = formatShortDate(view.commits[0].date);
 	const dateParts = view.getCommittedDateParts(date.formatted);
-	document.getElementById('uncommittedChanges')!.innerHTML = '<td></td><td><b>' + escapeHtml(view.commits[0].message) + '</b><span class="uncommittedHint"> · Double-click to commit</span></td>' +
+	document.getElementById('uncommittedChanges')!.innerHTML = '<td></td><td><b>' + escapeHtml(view.commits[0].message) + '</b></td>' +
 		(colVisibility.committed ? '<td class="committedCol text" title="' + escapeHtml(date.title) + '"><span class="committedMeta"><span class="committedDate">' + escapeHtml(dateParts.date) + '</span>' + (dateParts.time !== null ? '<span class="committedTime">' + escapeHtml(dateParts.time) + '</span>' : '') + '</span></td>' : '') +
 		(colVisibility.id ? '<td class="text" title="*">*</td>' : '');
 }

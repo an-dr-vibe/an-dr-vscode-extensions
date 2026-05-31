@@ -1601,6 +1601,18 @@ body.filesPanelHidden #filesPanel{
 #filesPanelHeader:not(:empty){
 	display:flex;
 }
+#filesPanelFooter{
+	position:absolute;
+	left:0;
+	right:0;
+	bottom:0;
+	display:none;
+	border-top:1px solid rgba(128,128,128,0.2);
+	box-sizing:border-box;
+}
+#filesPanelFooter:not(:empty){
+	display:block;
+}
 #filesPanelContent{
 	position:absolute;
 	top:0;

@@ -281,6 +281,22 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 	const record = target.closest('.fileTreeFileRecord') as HTMLElement | null;
 	if (!record) return null;
 
+	if (typeof record.dataset.index === 'undefined') {
+		const workingTreeChange = _cpChanges.find((change) =>
+			change.path === record.dataset.path &&
+			String(change.staged) === record.dataset.staged
+		);
+		if (!workingTreeChange) return null;
+		const file: GG.GitFileChange = {
+			oldFilePath: workingTreeChange.oldPath || workingTreeChange.path,
+			newFilePath: workingTreeChange.path,
+			type: <GG.GitFileStatus>workingTreeChange.status,
+			additions: workingTreeChange.additions,
+			deletions: workingTreeChange.deletions
+		};
+		return { file, fromHash: UNCOMMITTED, toHash: UNCOMMITTED, fileStatus: file.type };
+	}
+
 	const fileIndex = parseInt(record.dataset.index!);
 	const expandedCommit = view.expandedCommit;
 	const fileChanges: ReadonlyArray<GG.GitFileChange> | null = expandedCommit !== null ? expandedCommit.fileChanges : view.filesPanelFileChanges;

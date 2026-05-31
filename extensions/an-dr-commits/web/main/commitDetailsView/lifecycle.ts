@@ -72,6 +72,7 @@ function commitsPopulateFilesPanelHeader(view: any, externalDiffPossible: boolea
 	const headerElem = view.filesPanel.getHeaderElem();
 	headerElem.innerHTML = headerHtml;
 	commitsAttachHeaderListeners(headerElem, view, externalDiffPossible);
+	view.filesPanel.syncContentTop();
 }
 
 function commitsPopulateFilesPanelHeaderForPreview(view: any, commitDetails: GG.GitCommitDetails) {
@@ -362,9 +363,10 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 			// Show and activate the changes panel in the files panel (idempotent)
 			view.filesPanel.show();
 			if (!alreadyShowingThisCommit) {
-				view.filesPanel.getHeaderElem().innerHTML = changesPanelGetHeaderHtml();
+				view.filesPanel.getHeaderElem().innerHTML = '';
+				view.filesPanel.getFooterElem().innerHTML = changesPanelGetFooterHtml();
 				view.filesPanel.getContentElem().innerHTML = '<div class="cpPlaceholder">Loading…</div>';
-				changesPanelAttachListeners(view.filesPanel.getHeaderElem(), view.filesPanel.getContentElem());
+				changesPanelAttachListeners(view.filesPanel.getFooterElem(), view.filesPanel.getContentElem());
 				changesPanelActivate();
 			}
 		} else {

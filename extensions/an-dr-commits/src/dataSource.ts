@@ -1124,42 +1124,61 @@ export class DataSource extends Disposable {
 	}
 
 	public getWorkingTreeChanges(repo: string): Promise<GitWorkingTreeChangesData> {
-		return this.spawnGit(
-			['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+		const getNumStatLookup = (cached: boolean) => this.spawnGit(
+			['diff', '--numstat', '--find-renames', '-z', ...(cached ? ['--cached'] : [])],
 			repo,
 			(stdout) => {
-				const changes: GitWorkingTreeChange[] = [];
-				const entries = stdout.split('\0');
-				let i = 0;
-				while (i < entries.length && entries[i] !== '') {
-					const entry = entries[i];
-					if (entry.length < 4) { i++; continue; }
-					const x = entry[0]; // index status
-					const y = entry[1]; // worktree status
-					const filePath = entry.substring(3);
-					const isRenamed = (x === 'R' || x === 'C');
-					const oldPath = isRenamed && entries[i + 1] !== undefined ? entries[i + 1] : undefined;
-					if (isRenamed) i++;
-
-					if (x !== ' ' && x !== '?') {
-						// staged change
-						const status = x === 'D' ? 'D' : x === 'A' ? 'A' : x === 'R' || x === 'C' ? 'R' : 'M';
-						changes.push({ path: filePath, oldPath, status: status as GitWorkingTreeChange['status'], staged: true });
-					}
-					if (y !== ' ' && y !== '?' && !isRenamed) {
-						// unstaged change
-						const status = y === 'D' ? 'D' : 'M';
-						changes.push({ path: filePath, status: status as GitWorkingTreeChange['status'], staged: false });
-					}
-					if (x === '?' && y === '?') {
-						changes.push({ path: filePath, status: 'U', staged: false });
-					}
-					i++;
+				const lookup: { [filePath: string]: { additions: number | null; deletions: number | null } } = {};
+				const records = parseDiffNumStatOutput(stdout.split('\0'));
+				for (let i = 0; i < records.length; i++) {
+					lookup[records[i].filePath] = {
+						additions: Number.isFinite(records[i].additions) ? records[i].additions : null,
+						deletions: Number.isFinite(records[i].deletions) ? records[i].deletions : null
+					};
 				}
-				return changes;
+				return lookup;
 			}
-		).then((changes) => ({ changes, error: null }))
-		 .catch((errorMessage) => ({ changes: [], error: errorMessage }));
+		);
+
+		return Promise.all([
+			this.spawnGit(['status', '--porcelain=v1', '-z', '--untracked-files=all'], repo, (stdout) => stdout),
+			getNumStatLookup(true),
+			getNumStatLookup(false)
+		]).then((results) => {
+			const stdout = results[0];
+			const stagedStats = results[1];
+			const unstagedStats = results[2];
+			const changes: GitWorkingTreeChange[] = [];
+			const entries = stdout.split('\0');
+			const getStats = (filePath: string, staged: boolean) => (staged ? stagedStats[filePath] : unstagedStats[filePath]) || { additions: null, deletions: null };
+			let i = 0;
+			while (i < entries.length && entries[i] !== '') {
+				const entry = entries[i];
+				if (entry.length < 4) { i++; continue; }
+				const x = entry[0]; // index status
+				const y = entry[1]; // worktree status
+				const filePath = entry.substring(3);
+				const isRenamed = (x === 'R' || x === 'C');
+				const oldPath = isRenamed && entries[i + 1] !== undefined ? entries[i + 1] : undefined;
+				if (isRenamed) i++;
+
+				if (x !== ' ' && x !== '?') {
+					// staged change
+					const status = x === 'D' ? 'D' : x === 'A' ? 'A' : x === 'R' || x === 'C' ? 'R' : 'M';
+					changes.push({ path: filePath, oldPath, status: status as GitWorkingTreeChange['status'], staged: true, ...getStats(filePath, true) });
+				}
+				if (y !== ' ' && y !== '?' && !isRenamed) {
+					// unstaged change
+					const status = y === 'D' ? 'D' : 'M';
+					changes.push({ path: filePath, status: status as GitWorkingTreeChange['status'], staged: false, ...getStats(filePath, false) });
+				}
+				if (x === '?' && y === '?') {
+					changes.push({ path: filePath, status: 'U', staged: false, additions: null, deletions: null });
+				}
+				i++;
+			}
+			return { changes, error: null };
+		}).catch((errorMessage) => ({ changes: [], error: errorMessage }));
 	}
 
 	public stageFiles(repo: string, files: string[]): Promise<ErrorInfo> {

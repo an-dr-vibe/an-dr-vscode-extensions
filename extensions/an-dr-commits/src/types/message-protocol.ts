@@ -844,6 +844,8 @@ export interface GitWorkingTreeChangeMsg {
 	readonly oldPath?: string;
 	readonly status: 'A' | 'M' | 'D' | 'R' | 'U';
 	readonly staged: boolean;
+	readonly additions: number | null;
+	readonly deletions: number | null;
 }
 
 export interface RequestLoadWorkingTreeChanges extends RepoRequest {

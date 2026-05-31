@@ -42,6 +42,8 @@ export interface GitWorkingTreeChange {
 	oldPath?: string;
 	status: 'A' | 'M' | 'D' | 'R' | 'U';
 	staged: boolean;
+	additions: number | null;
+	deletions: number | null;
 }
 
 export interface GitWorkingTreeChangesData {

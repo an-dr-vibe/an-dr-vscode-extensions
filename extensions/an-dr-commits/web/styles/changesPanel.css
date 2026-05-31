@@ -1,0 +1,211 @@
+/* ── Changes Panel — shown in #filesPanel when uncommitted row is selected ── */
+
+/* Header: commit message + commit button */
+#cpHeader{
+	display:flex;
+	flex-direction:column;
+	gap:4px;
+	padding:6px 8px 6px;
+	width:100%;
+	box-sizing:border-box;
+}
+
+#cpMessage{
+	width:100%;
+	min-height:52px;
+	max-height:130px;
+	resize:vertical;
+	box-sizing:border-box;
+	background:var(--vscode-input-background, rgba(128,128,128,0.1));
+	color:var(--vscode-input-foreground, inherit);
+	border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));
+	border-radius:2px;
+	padding:5px 7px;
+	font-size:12px;
+	font-family:inherit;
+	outline:none;
+	display:block;
+}
+
+#cpMessage:focus{
+	border-color:var(--vscode-focusBorder, rgba(0,120,215,0.6));
+}
+
+#cpCommitRow{
+	display:flex;
+}
+
+#cpCommitBtn{
+	flex:1;
+	padding:4px 10px;
+	border:none;
+	border-radius:2px;
+	background:var(--vscode-button-background, rgba(14,99,156,0.85));
+	color:var(--vscode-button-foreground, #fff);
+	font-size:12px;
+	font-family:inherit;
+	cursor:pointer;
+}
+
+#cpCommitBtn:hover:not(:disabled){
+	background:var(--vscode-button-hoverBackground, rgba(14,99,156,1));
+}
+
+#cpCommitBtn:disabled{
+	opacity:0.4;
+	cursor:not-allowed;
+}
+
+/* Content: sections */
+.cpSection{
+	user-select:none;
+}
+
+.cpSectionHeader{
+	display:flex;
+	align-items:center;
+	gap:4px;
+	padding:4px 8px 4px 6px;
+	cursor:pointer;
+	font-size:11px;
+	font-weight:600;
+	opacity:0.75;
+}
+
+.cpSectionHeader:hover{
+	opacity:1;
+	background:var(--vscode-list-hoverBackground, rgba(128,128,128,0.08));
+}
+
+.cpSectionArrow{
+	font-size:10px;
+	width:12px;
+	flex-shrink:0;
+	line-height:1;
+}
+
+.cpSectionTitle{
+	flex:1;
+}
+
+.cpSectionCount{
+	font-size:11px;
+	font-weight:400;
+	opacity:0.7;
+	margin-right:2px;
+}
+
+.cpSectionBtn{
+	margin-left:2px;
+	flex-shrink:0;
+}
+
+.cpCollapsed .cpSectionFiles{
+	display:none;
+}
+
+/* Files */
+.cpFile{
+	display:flex;
+	align-items:center;
+	padding:2px 6px 2px 20px;
+	gap:5px;
+	font-size:12px;
+	cursor:default;
+	position:relative;
+}
+
+.cpFile:hover{
+	background:var(--vscode-list-hoverBackground, rgba(128,128,128,0.08));
+}
+
+.cpFile:hover .cpFileActions{
+	display:flex;
+}
+
+.cpFileStatus{
+	font-size:10px;
+	font-weight:700;
+	width:13px;
+	flex-shrink:0;
+	text-align:center;
+}
+
+.cpA{ color:var(--vscode-gitDecoration-addedResourceForeground, #81b88b); }
+.cpM{ color:var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
+.cpD{ color:var(--vscode-gitDecoration-deletedResourceForeground, #c74e39); }
+.cpR{ color:var(--vscode-gitDecoration-renamedResourceForeground, #73c991); }
+.cpU{ color:var(--vscode-gitDecoration-untrackedResourceForeground, #73c991); }
+
+.cpFileName{
+	flex:1;
+	overflow:hidden;
+	text-overflow:ellipsis;
+	white-space:nowrap;
+}
+
+.cpFileDir{
+	font-size:11px;
+	opacity:0.5;
+	padding-left:2px;
+}
+
+.cpFileActions{
+	display:none;
+	gap:1px;
+	align-items:center;
+	position:absolute;
+	right:4px;
+	top:50%;
+	transform:translateY(-50%);
+}
+
+.cpFileBtn{
+	background:none;
+	border:none;
+	cursor:pointer;
+	padding:2px 3px;
+	opacity:0.65;
+	border-radius:2px;
+	color:inherit;
+	line-height:1;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+.cpFileBtn:hover{
+	opacity:1;
+	background:var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2));
+}
+
+.cpFileBtn .codicon{
+	font-size:14px;
+}
+
+/* Misc */
+.cpPlaceholder{
+	padding:12px 10px;
+	font-size:12px;
+	opacity:0.5;
+	font-style:italic;
+	user-select:none;
+}
+
+.cpError{
+	padding:10px;
+	font-size:12px;
+	color:var(--vscode-errorForeground, #f48771);
+	user-select:none;
+}
+
+/* Override: header grows to hold the commit area */
+#filesPanelHeader:not(:empty){
+	height:auto;
+	padding:0;
+	align-items:stretch;
+}
+
+#filesPanelHeader:not(:empty) ~ #filesPanelContent{
+	top:auto;
+}

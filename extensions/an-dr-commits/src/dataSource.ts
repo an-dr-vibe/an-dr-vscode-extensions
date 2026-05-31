@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
-import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GpgStatusCodeParsingDetails } from './data-source/models';
+import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails } from './data-source/models';
 import { applyBranchUpstreams, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
@@ -1121,6 +1121,64 @@ export class DataSource extends Disposable {
 		return result.split('\n')
 			.filter((line) => line.length > 0)
 			.map((line) => line.substring(3));
+	}
+
+	public getWorkingTreeChanges(repo: string): Promise<GitWorkingTreeChangesData> {
+		return this.spawnGit(
+			['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+			repo,
+			(stdout) => {
+				const changes: GitWorkingTreeChange[] = [];
+				const entries = stdout.split('\0');
+				let i = 0;
+				while (i < entries.length && entries[i] !== '') {
+					const entry = entries[i];
+					if (entry.length < 4) { i++; continue; }
+					const x = entry[0]; // index status
+					const y = entry[1]; // worktree status
+					const filePath = entry.substring(3);
+					const isRenamed = (x === 'R' || x === 'C');
+					const oldPath = isRenamed && entries[i + 1] !== undefined ? entries[i + 1] : undefined;
+					if (isRenamed) i++;
+
+					if (x !== ' ' && x !== '?') {
+						// staged change
+						const status = x === 'D' ? 'D' : x === 'A' ? 'A' : x === 'R' || x === 'C' ? 'R' : 'M';
+						changes.push({ path: filePath, oldPath, status: status as GitWorkingTreeChange['status'], staged: true });
+					}
+					if (y !== ' ' && y !== '?' && !isRenamed) {
+						// unstaged change
+						const status = y === 'D' ? 'D' : 'M';
+						changes.push({ path: filePath, status: status as GitWorkingTreeChange['status'], staged: false });
+					}
+					if (x === '?' && y === '?') {
+						changes.push({ path: filePath, status: 'U', staged: false });
+					}
+					i++;
+				}
+				return changes;
+			}
+		).then((changes) => ({ changes, error: null }))
+		 .catch((errorMessage) => ({ changes: [], error: errorMessage }));
+	}
+
+	public stageFiles(repo: string, files: string[]): Promise<ErrorInfo> {
+		return this.runGitCommand(['add', '--', ...files], repo);
+	}
+
+	public unstageFiles(repo: string, files: string[]): Promise<ErrorInfo> {
+		return this.runGitCommand(['reset', 'HEAD', '--', ...files], repo);
+	}
+
+	public commitChanges(repo: string, message: string): Promise<ErrorInfo> {
+		return this.runGitCommand(['commit', '-m', message], repo);
+	}
+
+	public discardFileChanges(repo: string, filePaths: string[], isUntracked: boolean): Promise<ErrorInfo> {
+		if (isUntracked) {
+			return this.runGitCommand(['clean', '-f', '--', ...filePaths], repo);
+		}
+		return this.runGitCommand(['checkout', 'HEAD', '--', ...filePaths], repo);
 	}
 
 	/**
@@ -2473,7 +2531,7 @@ export class DataSource extends Disposable {
 	}
 }
 
-export type { GitCommitDetailsData } from './data-source/models';
+export type { GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData } from './data-source/models';
 
 export interface BlameLineInfo {
 	readonly author: string;

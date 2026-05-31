@@ -55,7 +55,6 @@ export class CommitsView extends Disposable {
 	 */
 	public static async createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadCommitsViewTo) {
 		const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
-
 		if (CommitsView.currentPanel) {
 			// If Commits panel already exists
 			if (CommitsView.currentPanel.isPanelVisible) {
@@ -876,6 +875,40 @@ export class CommitsView extends Disposable {
 					error: await viewScm()
 				});
 				break;
+			case 'loadWorkingTreeChanges': {
+				const wtData = await this.dataSource.getWorkingTreeChanges(msg.repo);
+				this.sendMessage({
+					command: 'loadWorkingTreeChanges',
+					changes: wtData.changes,
+					error: wtData.error
+				});
+				break;
+			}
+			case 'stageFiles': {
+				const stageError = await this.dataSource.stageFiles(msg.repo, msg.files);
+				this.sendMessage({ command: 'stageFiles', error: stageError });
+				break;
+			}
+			case 'unstageFiles': {
+				const unstageError = await this.dataSource.unstageFiles(msg.repo, msg.files);
+				this.sendMessage({ command: 'unstageFiles', error: unstageError });
+				break;
+			}
+			case 'commitChanges': {
+				const commitError = await this.dataSource.commitChanges(msg.repo, msg.message);
+				this.sendMessage({ command: 'commitChanges', error: commitError });
+				if (commitError === null) {
+					// Refresh commits after a successful commit
+					this.respondLoadRepos(this.repoManager.getRepos(), null);
+					this.sendMessage({ command: 'refresh' });
+				}
+				break;
+			}
+			case 'discardFileChanges': {
+				const discardError = await this.dataSource.discardFileChanges(msg.repo, msg.files, msg.isUntracked);
+				this.sendMessage({ command: 'discardFileChanges', error: discardError });
+				break;
+			}
 		}
 
 		this.repoFileWatcher.unmute();

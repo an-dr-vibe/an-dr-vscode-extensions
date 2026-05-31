@@ -294,6 +294,8 @@ class CommitsView {
 
 	/* Refresh */
 
+	public getCurrentRepo() { return this.currentRepo; }
+
 	public refresh(hard: boolean, configChanges: boolean = false) { commitsRefresh(this, hard, configChanges); }
 
 
@@ -496,13 +498,21 @@ class CommitsView {
 		if (this.previewCommitHash !== commitDetails.hash) return;
 		this.previewCommitHash = null;
 		if (this.expandedCommit === null || this.expandedCommit.commitHash !== commitDetails.hash) {
-			this.filesPanel.update(fileTree, commitDetails.fileChanges, -1, commitsGetFileViewType(this), false, this.currentDiffFilePath);
+			if (commitDetails.hash === UNCOMMITTED) {
+				this.filesPanel.show();
+				this.filesPanel.getHeaderElem().innerHTML = changesPanelGetHeaderHtml();
+				this.filesPanel.getContentElem().innerHTML = '<div class="cpPlaceholder">Loading…</div>';
+				changesPanelAttachListeners(this.filesPanel.getHeaderElem(), this.filesPanel.getContentElem());
+				changesPanelActivate();
+			} else {
+				this.filesPanel.update(fileTree, commitDetails.fileChanges, -1, commitsGetFileViewType(this), false, this.currentDiffFilePath);
+				commitsPopulateFilesPanelHeaderForPreview(this, commitDetails);
+				this.makeCommitDetailsViewFileViewInteractive();
+			}
 			this.filesPanelCommitHash = commitDetails.hash;
 			this.filesPanelCompareWithHash = null;
 			this.filesPanelFileChanges = commitDetails.fileChanges;
 			this.filesPanelFileTree = fileTree;
-			commitsPopulateFilesPanelHeaderForPreview(this, commitDetails);
-			this.makeCommitDetailsViewFileViewInteractive();
 		}
 	}
 	public closeCommitDetails(saveAndRender: boolean) { commitsCloseCommitDetails(this, saveAndRender); }

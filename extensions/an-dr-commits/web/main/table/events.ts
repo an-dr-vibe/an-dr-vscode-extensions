@@ -121,7 +121,12 @@ function commitsHandleTableDblClick(view: any, e: MouseEvent) {
 		const dblCommit = view.getCommitOfElem(eventElem);
 		if (dblCommit === null) return;
 		if (dblCommit.hash === UNCOMMITTED) {
-			sendMessage({ command: 'viewScm' });
+			// Toggle expand — same as single-click expand, so changes panel shows in files panel
+			if (view.expandedCommit !== null && view.expandedCommit.commitHash === UNCOMMITTED) {
+				view.closeCommitDetails(true);
+			} else {
+				view.loadCommitDetails(eventElem);
+			}
 			return;
 		}
 		if (view.expandedCommit !== null && view.expandedCommit.commitHash === dblCommit.hash) {

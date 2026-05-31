@@ -24,7 +24,8 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push · Double-click to Force Push (Right-Click for More Actions)',
 			onClick: () => view.pushCurrentBranchAction()
 		},
-		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings · Double-click to Refresh', onClick: () => view.settingsBtnElem.click() }
+		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings · Double-click to Refresh', onClick: () => view.settingsBtnElem.click() },
+		{ id: 'filesPanelToggleBtn', elem: document.getElementById('filesPanelToggleBtn')!, visible: true, title: 'Toggle Files Panel', onClick: () => (document.getElementById('filesPanelToggle') as HTMLElement)?.click() }
 	];
 }
 
@@ -52,6 +53,8 @@ function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButto
 			{ title: 'Repository Settings', visible: true, onClick: () => view.settingsWidget.show(view.currentRepo) },
 			{ title: 'Refresh', visible: true, onClick: () => view.refresh(true, true) }
 		];
+	} else if (button.id === 'filesPanelToggleBtn') {
+		return [{ title: 'Toggle Files Panel', visible: true, onClick: button.onClick }];
 	} else {
 		return [{ title: button.title, visible: true, onClick: button.onClick }];
 	}
@@ -91,7 +94,7 @@ function commitsUpdateControlsLayout(view: any) {
 			overflow = isOverflowing();
 		}
 
-		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn'];
+		const hideOrder = ['filesPanelToggleBtn', 'settingsBtn', 'pushBtn', 'pullBtn'];
 		for (let i = 0; i < hideOrder.length && overflow; i++) {
 			const button = buttons.find((item) => item.id === hideOrder[i]);
 			if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;

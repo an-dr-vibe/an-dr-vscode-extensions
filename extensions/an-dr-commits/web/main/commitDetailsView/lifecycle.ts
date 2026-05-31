@@ -83,12 +83,16 @@ function commitsPopulateFilesPanelHeaderForPreview(view: any, commitDetails: GG.
 function commitsCloseCommitDetails(view: any, saveAndRender: boolean) {
 	const expandedCommit = view.expandedCommit;
 	if (expandedCommit === null) {
+		changesPanelDeactivate();
 		view.filesPanel.clear();
 		view.filesPanelCommitHash = null;
 		view.filesPanelFileChanges = null;
 		view.filesPanelFileTree = null;
 		view.filesPanelCompareWithHash = null;
 		return;
+	}
+	if (expandedCommit.commitHash === UNCOMMITTED) {
+		changesPanelDeactivate();
 	}
 
 	const elem = document.getElementById('commitDetailsView'), isDocked = view.isCommitDetailsViewDocked();
@@ -343,18 +347,32 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 		else insertAfter(elem, expandedCommit.commitElem);
 	}
 
+	const isUncommittedChanges = commitOrder.to === UNCOMMITTED;
+
 	let html = '<div id="commitDetailsViewContent"><div id="commitDetailsViewTopRow">';
 	if (expandedCommit.loading) {
 		html += '<div id="commitDetailsViewLoading">' + ICONS.loading + ' Loading ' + (expandedCommit.compareWithHash === null ? expandedCommit.commitHash !== UNCOMMITTED ? 'Commit Details' : 'Uncommitted Changes' : 'Commit Comparison') + ' ...</div>';
 	} else {
 		html += '<div id="commitDetailsViewSummary">' + commitsRenderCommitDetailsViewSummary(view, expandedCommit) + '</div>';
-		html += '<div id="commitDetailsViewInlineFiles"><div id="commitDetailsViewInlineFilesHeader"></div><div id="commitDetailsViewInlineFilesContent"></div></div>';
+		if (!isUncommittedChanges) {
+			html += '<div id="commitDetailsViewInlineFiles"><div id="commitDetailsViewInlineFilesHeader"></div><div id="commitDetailsViewInlineFilesContent"></div></div>';
+		}
 		const alreadyShowingThisCommit = view.filesPanelCommitHash === expandedCommit.commitHash && view.filesPanelCompareWithHash === expandedCommit.compareWithHash;
-		if (!alreadyShowingThisCommit || refresh) {
-			view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), commitOrder.to === UNCOMMITTED, view.currentDiffFilePath);
+		if (isUncommittedChanges) {
+			// Show and activate the changes panel in the files panel (idempotent)
+			view.filesPanel.show();
+			if (!alreadyShowingThisCommit) {
+				view.filesPanel.getHeaderElem().innerHTML = changesPanelGetHeaderHtml();
+				view.filesPanel.getContentElem().innerHTML = '<div class="cpPlaceholder">Loading…</div>';
+				changesPanelAttachListeners(view.filesPanel.getHeaderElem(), view.filesPanel.getContentElem());
+				changesPanelActivate();
+			}
+		} else {
+			if (!alreadyShowingThisCommit || refresh) {
+				view.filesPanel.update(expandedCommit.fileTree!, expandedCommit.fileChanges!, expandedCommit.contextMenuOpen.fileView, view.getFileViewType(), false, view.currentDiffFilePath);
+			}
 		}
 		view.filesPanelCommitHash = expandedCommit.commitHash;
-		// Inline content is populated after elem.innerHTML is set (see below)
 		view.filesPanelCompareWithHash = expandedCommit.compareWithHash;
 		view.filesPanelFileChanges = expandedCommit.fileChanges;
 		view.filesPanelFileTree = expandedCommit.fileTree;
@@ -363,14 +381,14 @@ function commitsRenderCommitDetailsView(view: any, refresh: boolean) {
 
 	if (expandedCommit.loading) {
 		view.filesPanel.getHeaderElem().innerHTML = '';
-	} else {
+	} else if (!isUncommittedChanges) {
 		commitsPopulateFilesPanelHeader(view, externalDiffPossible);
 	}
 
 	elem.innerHTML = isDocked ? html : '<td><div class="commitDetailsViewHeightResize"></div></td><td colspan="' + (view.getNumColumns() - 1) + '">' + html + '</td>';
 
-	// Populate inline files pane (reuses FilesPanel's rendered content — no duplication)
-	if (!expandedCommit.loading) {
+	// Populate inline files pane (reuses FilesPanel's rendered content — no duplication; skip for changes panel)
+	if (!expandedCommit.loading && !isUncommittedChanges) {
 		const inlineHeader = document.getElementById('commitDetailsViewInlineFilesHeader');
 		if (inlineHeader !== null) {
 			inlineHeader.innerHTML = commitsGetFilesPanelHeaderHtml(view, externalDiffPossible);

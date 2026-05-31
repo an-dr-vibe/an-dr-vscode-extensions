@@ -272,6 +272,17 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'viewScm':
 				finishOrDisplayError(msg.error, 'Unable to open the Source Control View');
 				break;
+			case 'loadWorkingTreeChanges':
+				filesPanelHandleWorkingTreeChanges(msg.changes, msg.error);
+				break;
+			case 'stageFiles':
+			case 'unstageFiles':
+			case 'discardFileChanges':
+				filesPanelHandleStageUnstageResponse(msg.error);
+				break;
+			case 'commitChanges':
+				filesPanelHandleCommitResponse(msg.error);
+				break;
 		}
 	});
 }

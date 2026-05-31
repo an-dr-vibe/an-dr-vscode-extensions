@@ -839,6 +839,59 @@ export interface ResponseViewScm extends ResponseWithErrorInfo {
 	readonly command: 'viewScm';
 }
 
+export interface GitWorkingTreeChangeMsg {
+	readonly path: string;
+	readonly oldPath?: string;
+	readonly status: 'A' | 'M' | 'D' | 'R' | 'U';
+	readonly staged: boolean;
+}
+
+export interface RequestLoadWorkingTreeChanges extends RepoRequest {
+	readonly command: 'loadWorkingTreeChanges';
+}
+export interface ResponseLoadWorkingTreeChanges {
+	readonly command: 'loadWorkingTreeChanges';
+	readonly changes: GitWorkingTreeChangeMsg[];
+	readonly error: ErrorInfo;
+}
+
+export interface RequestStageFiles extends RepoRequest {
+	readonly command: 'stageFiles';
+	readonly files: string[];
+}
+export interface ResponseStageFiles {
+	readonly command: 'stageFiles';
+	readonly error: ErrorInfo;
+}
+
+export interface RequestUnstageFiles extends RepoRequest {
+	readonly command: 'unstageFiles';
+	readonly files: string[];
+}
+export interface ResponseUnstageFiles {
+	readonly command: 'unstageFiles';
+	readonly error: ErrorInfo;
+}
+
+export interface RequestCommitChanges extends RepoRequest {
+	readonly command: 'commitChanges';
+	readonly message: string;
+}
+export interface ResponseCommitChanges {
+	readonly command: 'commitChanges';
+	readonly error: ErrorInfo;
+}
+
+export interface RequestDiscardFileChanges extends RepoRequest {
+	readonly command: 'discardFileChanges';
+	readonly files: string[];
+	readonly isUntracked: boolean;
+}
+export interface ResponseDiscardFileChanges {
+	readonly command: 'discardFileChanges';
+	readonly error: ErrorInfo;
+}
+
 export type RequestMessage =
 	RequestAddRemote
 	| RequestAddTag
@@ -911,7 +964,12 @@ export type RequestMessage =
 	| RequestGetFullDiffContent
 	| RequestViewDiffWithWorkingFile
 	| RequestViewFileAtRevision
-	| RequestViewScm;
+	| RequestViewScm
+	| RequestLoadWorkingTreeChanges
+	| RequestStageFiles
+	| RequestUnstageFiles
+	| RequestCommitChanges
+	| RequestDiscardFileChanges;
 
 export type ResponseMessage =
 	ResponseAddRemote
@@ -983,6 +1041,11 @@ export type ResponseMessage =
 	| ResponseGetFullDiffContent
 	| ResponseViewDiffWithWorkingFile
 	| ResponseViewFileAtRevision
-	| ResponseViewScm;
+	| ResponseViewScm
+	| ResponseLoadWorkingTreeChanges
+	| ResponseStageFiles
+	| ResponseUnstageFiles
+	| ResponseCommitChanges
+	| ResponseDiscardFileChanges;
 
 export { DeepReadonly, DeepWriteable, Writeable };

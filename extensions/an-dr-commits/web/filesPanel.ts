@@ -111,6 +111,21 @@ class FilesPanel {
 		updateGlobalViewState('filesPanelHidden', this.panelHidden);
 	}
 
+	public show() {
+		if (!this.panelHidden) return;
+		this.panelHidden = false;
+		document.body.classList.remove('filesPanelHidden');
+		this.applyWidth(this.panelWidth);
+		this.toggleBtn.classList.add('active');
+		updateGlobalViewState('filesPanelHidden', false);
+	}
+
+	/** Recalculate content top offset to match the actual header height. */
+	public syncContentTop() {
+		const h = this.headerElem.offsetHeight;
+		this.contentElem.style.top = h > 0 ? h + 'px' : '';
+	}
+
 	public setContentLoading() {
 		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder">Loading...</div>';
 	}

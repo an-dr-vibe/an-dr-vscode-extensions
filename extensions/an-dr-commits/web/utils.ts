@@ -47,6 +47,8 @@ const ICONS = {
 	linkExternal: codicon('link-external'),
 	passed: codicon('pass'),
 	plus: codicon('add'),
+	minus: codicon('remove'),
+	discard: codicon('discard'),
 	review: codicon('inspect')
 };
 const GIT_FILE_CHANGE_TYPES = { 'A': 'Added', 'M': 'Modified', 'D': 'Deleted', 'R': 'Renamed', 'U': 'Untracked' };

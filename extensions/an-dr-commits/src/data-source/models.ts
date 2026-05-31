@@ -37,6 +37,18 @@ export interface GitCommitComparisonData {
 	error: ErrorInfo;
 }
 
+export interface GitWorkingTreeChange {
+	path: string;
+	oldPath?: string;
+	status: 'A' | 'M' | 'D' | 'R' | 'U';
+	staged: boolean;
+}
+
+export interface GitWorkingTreeChangesData {
+	changes: GitWorkingTreeChange[];
+	error: ErrorInfo;
+}
+
 export interface GitRef {
 	hash: string;
 	name: string;

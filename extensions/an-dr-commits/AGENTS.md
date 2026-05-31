@@ -104,6 +104,7 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `findWidget.ts` | Ctrl+F find bar |
 | `settingsWidget.ts` | Repository settings panel |
 | `settingsWidgetDialogs.ts` | Settings widget issue-linking and pull-request dialog flows |
+| `changesPanel.ts` | Uncommitted-changes mode for the Files Panel: staged/unstaged sections, commit message textarea, stage/unstage/discard/commit actions — shown in `#filesPanel` when the uncommitted row is selected |
 | `textFormatter.ts` | Commit message formatting (issue links, etc.) |
 | `utils.ts` | Frontend globals: `ICONS` object, `escapeHtml`, `VSCODE_API`, helpers |
 | `branchPanelRender.ts` | Branch panel tree building and HTML rendering helpers |

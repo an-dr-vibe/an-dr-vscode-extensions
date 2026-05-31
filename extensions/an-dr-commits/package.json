@@ -472,12 +472,12 @@
 							"emoji": {
 								"type": "string",
 								"title": "Emoji",
-								"description": "Emoji (e.g. \"\u2728\")"
+								"description": "Emoji (e.g. \"✨\")"
 							}
 						}
 					},
 					"default": [],
-					"description": "An array of custom Emoji Shortcode mappings. Example: [{\"shortcode\": \":sparkles:\", \"emoji\":\"\u2728\"}]"
+					"description": "An array of custom Emoji Shortcode mappings. Example: [{\"shortcode\": \":sparkles:\", \"emoji\":\"✨\"}]"
 				},
 				"an-dr-commits.customPullRequestProviders": {
 					"type": "array",
@@ -979,16 +979,6 @@
 					"default": 2,
 					"description": "The amount of margin between the line and the inline blame message."
 				},
-				"an-dr-commits.blame.statusBarMessageFormat": {
-					"type": "string",
-					"default": "${commit.hash_short}",
-					"description": "Customize the current-commit text shown in the Commits status bar item."
-				},
-				"an-dr-commits.blame.statusBarMessageNoCommit": {
-					"type": "string",
-					"default": "Not Committed Yet",
-					"description": "Customize the status bar message for uncommitted lines."
-				},
 				"an-dr-commits.blame.currentUserAlias": {
 					"type": "string",
 					"default": "",
@@ -1321,31 +1311,6 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Show a status bar item that opens Commits when clicked."
-				},
-				"an-dr-commits.statusBarIconOnly": {
-					"type": "boolean",
-					"default": true,
-					"description": "Show only the icon in the status bar item. The full name is still shown in the tooltip."
-				},
-				"an-dr-commits.statusBarShowCurrentCommit": {
-					"type": "boolean",
-					"default": false,
-					"description": "Deprecated compatibility alias for an-dr-commits.blame.statusBarShowCurrentCommit."
-				},
-				"an-dr-commits.blame.statusBarShowCurrentCommit": {
-					"type": "boolean",
-					"default": false,
-					"description": "Show the current line's blamed commit in the Commits status bar item. Clicking it still opens Commits."
-				},
-				"an-dr-commits.blame.statusBarItemEnabled": {
-					"type": "boolean",
-					"default": true,
-					"description": "Show a separate Blame status bar item for the current line. Clicking it opens that commit in Commits."
-				},
-				"an-dr-commits.blame.statusBarIconOnly": {
-					"type": "boolean",
-					"default": true,
-					"description": "For the Blame status bar item, show only the icon and commit text without the \"Blame\" label."
 				},
 				"an-dr-commits.sourceCodeProviderIntegrationLocation": {
 					"type": "string",

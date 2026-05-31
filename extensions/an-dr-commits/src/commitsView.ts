@@ -895,7 +895,7 @@ export class CommitsView extends Disposable {
 				break;
 			}
 			case 'commitChanges': {
-				const commitError = await this.dataSource.commitChanges(msg.repo, msg.message);
+				const commitError = await this.dataSource.commitChanges(msg.repo, msg.message, msg.amend);
 				this.sendMessage({ command: 'commitChanges', error: commitError });
 				if (commitError === null) {
 					// Refresh commits after a successful commit

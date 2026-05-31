@@ -376,14 +376,6 @@ class Config {
 		return this.config.get('blame.inlineMessageMargin', 2);
 	}
 
-	get blameStatusBarMessageFormat() {
-		return this.config.get('blame.statusBarMessageFormat', '${commit.hash_short}');
-	}
-
-	get blameStatusBarMessageNoCommit() {
-		return this.config.get('blame.statusBarMessageNoCommit', 'Not Committed Yet');
-	}
-
 	get blameCurrentUserAlias() {
 		return this.config.get('blame.currentUserAlias', '');
 	}
@@ -666,28 +658,6 @@ class Config {
 	 */
 	get showStatusBarItem() {
 		return !!this.config.get('showStatusBarItem', true);
-	}
-
-	/**
-	 * Get the value of the `an-dr-commits.statusBarIconOnly` Extension Setting.
-	 */
-	get statusBarIconOnly() {
-		return !!this.config.get('statusBarIconOnly', true);
-	}
-
-	/**
-	 * Get the value of the `an-dr-commits.blame.statusBarShowCurrentCommit` Extension Setting.
-	 */
-	get statusBarShowCurrentCommit() {
-		return !!this.getRenamedExtensionSetting('blame.statusBarShowCurrentCommit', 'statusBarShowCurrentCommit', false);
-	}
-
-	get blameStatusBarItemEnabled() {
-		return !!this.config.get('blame.statusBarItemEnabled', true);
-	}
-
-	get blameStatusBarIconOnly() {
-		return !!this.config.get('blame.statusBarIconOnly', true);
 	}
 
 	/**

@@ -878,6 +878,7 @@ export interface ResponseUnstageFiles {
 export interface RequestCommitChanges extends RepoRequest {
 	readonly command: 'commitChanges';
 	readonly message: string;
+	readonly amend: boolean;
 }
 export interface ResponseCommitChanges {
 	readonly command: 'commitChanges';

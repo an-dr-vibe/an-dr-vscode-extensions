@@ -15,6 +15,7 @@
 
 let _cpChanges: GG.GitWorkingTreeChangeMsg[] = [];
 let _cpActive = false;   // true while uncommitted row is expanded
+let _cpCloseMenuListener: (() => void) | null = null;
 
 type CpTreeFolder = {
 	folders: { [name: string]: CpTreeFolder };
@@ -113,6 +114,10 @@ function changesPanelGetFooterHtml(): string {
 		`<textarea id="cpMessage" placeholder="Message (Ctrl+Enter to commit)" rows="3"></textarea>` +
 		`<div id="cpCommitRow">` +
 		`<button id="cpCommitBtn" disabled>&#10003;&nbsp;Commit</button>` +
+		`<button id="cpCommitArrow" disabled title="More commit options">&#9660;</button>` +
+		`<div id="cpCommitMenu" class="hidden">` +
+		`<button id="cpAmendBtn">Amend Previous Commit</button>` +
+		`</div>` +
 		`</div>` +
 		`</div>`;
 }
@@ -142,7 +147,10 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 		if (!commitBtn) return;
 		const hasStagedChanges = _cpChanges.some((c) => c.staged);
 		const hasMessage = !!(msgEl && msgEl.value.trim());
-		commitBtn.disabled = !hasStagedChanges || !hasMessage;
+		const canCommit = hasStagedChanges && hasMessage;
+		commitBtn.disabled = !canCommit;
+		const arrow = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
+		if (arrow) arrow.disabled = !canCommit;
 	}
 
 	if (msgEl) {
@@ -154,15 +162,47 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 		});
 	}
 
+	const arrowBtn = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
+	const commitMenu = footerElem.querySelector<HTMLElement>('#cpCommitMenu');
+	const amendBtn = footerElem.querySelector<HTMLButtonElement>('#cpAmendBtn');
+
+	function closeMenu() {
+		commitMenu?.classList.add('hidden');
+	}
+
 	if (commitBtn) {
 		updateCommitBtn();
 		commitBtn.addEventListener('click', () => {
 			const msg = msgEl ? msgEl.value.trim() : '';
 			const repo = commits.getCurrentRepo();
 			if (!msg || !repo || commitBtn.disabled) return;
-			runAction({ command: 'commitChanges', repo, message: msg }, 'Committing Changes');
+			runAction({ command: 'commitChanges', repo, message: msg, amend: false }, 'Committing Changes');
 		});
 	}
+
+	if (arrowBtn && commitMenu) {
+		arrowBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			commitMenu.classList.toggle('hidden');
+		});
+	}
+
+	if (amendBtn) {
+		amendBtn.addEventListener('click', () => {
+			const msg = msgEl ? msgEl.value.trim() : '';
+			const repo = commits.getCurrentRepo();
+			if (!repo) return;
+			closeMenu();
+			runAction({ command: 'commitChanges', repo, message: msg, amend: true }, 'Amending Previous Commit');
+		});
+	}
+
+	// Close menu when clicking outside — remove the previous listener first
+	if (_cpCloseMenuListener) {
+		document.removeEventListener('click', _cpCloseMenuListener);
+	}
+	_cpCloseMenuListener = () => closeMenu();
+	document.addEventListener('click', _cpCloseMenuListener);
 
 	// Section collapse toggle
 	contentElem.querySelectorAll('.cpSectionHeader').forEach((hdr) => {
@@ -274,10 +314,13 @@ function filesPanelHandleWorkingTreeChanges(changes: GG.GitWorkingTreeChangeMsg[
 	}
 
 	// Re-evaluate commit button state after restoring message
-	const commitBtn = footerElem.querySelector<HTMLButtonElement>('#cpCommitBtn');
-	const msgEl = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
-	if (commitBtn && msgEl) {
-		commitBtn.disabled = !_cpChanges.some((c) => c.staged) || !msgEl.value.trim();
+	const commitBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpCommitBtn');
+	const arrowBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
+	const msgEl2 = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
+	if (commitBtn2 && msgEl2) {
+		const canCommit = _cpChanges.some((c) => c.staged) && !!msgEl2.value.trim();
+		commitBtn2.disabled = !canCommit;
+		if (arrowBtn2) arrowBtn2.disabled = !canCommit;
 	}
 }
 

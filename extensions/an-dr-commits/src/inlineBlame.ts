@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import { getConfig } from './config';
-import { BlameLineInfo, CommitDisplayInfo, DataSource } from './dataSource';
+import { BlameLineInfo, DataSource } from './dataSource';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
-import { StatusBarItem } from './statusBarItem';
 import { abbrevCommit, getPathFromUri, getRelativeTimeDiff } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -22,19 +21,17 @@ export class InlineBlameController extends Disposable {
 	private readonly dataSource: DataSource;
 	private readonly logger: Logger;
 	private readonly repoManager: RepoManager;
-	private readonly statusBarItem: StatusBarItem;
 	private readonly decorationType: vscode.TextEditorDecorationType;
 	private readonly currentUserCache = new Map<string, Promise<CurrentUserIdentity | null>>();
 
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private requestId: number = 0;
 
-	constructor(dataSource: DataSource, repoManager: RepoManager, statusBarItem: StatusBarItem, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
+	constructor(dataSource: DataSource, repoManager: RepoManager, _statusBarItem: unknown, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
 		super();
 		this.dataSource = dataSource;
 		this.logger = logger;
 		this.repoManager = repoManager;
-		this.statusBarItem = statusBarItem;
 		this.decorationType = vscode.window.createTextEditorDecorationType({});
 
 		this.registerDisposables(
@@ -61,7 +58,7 @@ export class InlineBlameController extends Disposable {
 				}
 			}),
 			onDidChangeConfiguration((event) => {
-				if (event.affectsConfiguration('an-dr-commits.blame') || event.affectsConfiguration('an-dr-commits.inlineBlame.enabled') || event.affectsConfiguration('an-dr-commits.statusBarShowCurrentCommit')) {
+				if (event.affectsConfiguration('an-dr-commits.blame') || event.affectsConfiguration('an-dr-commits.inlineBlame.enabled')) {
 					this.currentUserCache.clear();
 					this.scheduleRefresh(vscode.window.activeTextEditor, 0);
 				}
@@ -97,7 +94,7 @@ export class InlineBlameController extends Disposable {
 	private async update(editor: vscode.TextEditor | undefined) {
 		const currentRequestId = ++this.requestId;
 		const config = getConfig();
-		if (!config.inlineBlameEnabled && !config.statusBarShowCurrentCommit && !config.blameStatusBarItemEnabled) {
+		if (!config.inlineBlameEnabled) {
 			this.clear(editor);
 			return;
 		}
@@ -120,17 +117,12 @@ export class InlineBlameController extends Disposable {
 		}
 
 		try {
-			const [repoCommit, blame] = await Promise.all([
-				config.statusBarShowCurrentCommit ? this.dataSource.getCommitDisplayInfo(repo, 'HEAD') : Promise.resolve(null),
-				(config.inlineBlameEnabled || config.blameStatusBarItemEnabled) ? this.dataSource.getBlameLine(repo, filePath, editor.selection.active.line) : Promise.resolve(null)
-			]);
+			const blame = await this.dataSource.getBlameLine(repo, filePath, editor.selection.active.line);
 			if (this.isDisposed() || currentRequestId !== this.requestId || vscode.window.activeTextEditor !== editor) {
 				return;
 			}
 
-			this.statusBarItem.setRepoCommit(this.getRepoCommitDisplay(repo, repoCommit));
 			if (blame === null) {
-				this.statusBarItem.setBlameCommit(null);
 				editor.setDecorations(this.decorationType, []);
 				return;
 			}
@@ -139,28 +131,19 @@ export class InlineBlameController extends Disposable {
 			if (this.isDisposed() || currentRequestId !== this.requestId || vscode.window.activeTextEditor !== editor) {
 				return;
 			}
-			const statusBarDisplay = this.getStatusBarDisplay(blame, displayAuthor);
-			this.statusBarItem.setBlameCommit({
-				...statusBarDisplay,
-				repo: repo
-			});
-			if (config.inlineBlameEnabled) {
-				const line = editor.document.lineAt(editor.selection.active.line);
-				const hoverMessage = this.shouldShowInlineHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : undefined;
-				editor.setDecorations(this.decorationType, [{
-					hoverMessage: hoverMessage,
-					range: line.range,
-					renderOptions: {
-						after: {
-							contentText: this.getInlineText(blame, displayAuthor),
-							margin: '0 0 0 ' + config.blameInlineMessageMargin + 'rem',
-							color: new vscode.ThemeColor('gitblame.inlineMessage')
-						}
+			const line = editor.document.lineAt(editor.selection.active.line);
+			const hoverMessage = this.shouldShowInlineHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : undefined;
+			editor.setDecorations(this.decorationType, [{
+				hoverMessage: hoverMessage,
+				range: line.range,
+				renderOptions: {
+					after: {
+						contentText: this.getInlineText(blame, displayAuthor),
+						margin: '0 0 0 ' + config.blameInlineMessageMargin + 'rem',
+						color: new vscode.ThemeColor('gitblame.inlineMessage')
 					}
-				}]);
-			} else {
-				editor.setDecorations(this.decorationType, []);
-			}
+				}
+			}]);
 		} catch (error) {
 			if (currentRequestId !== this.requestId) {
 				return;
@@ -172,22 +155,9 @@ export class InlineBlameController extends Disposable {
 
 	private clear(editor: vscode.TextEditor | undefined) {
 		this.requestId++;
-		this.statusBarItem.setRepoCommit(null);
-		this.statusBarItem.setBlameCommit(null);
 		if (editor) {
 			editor.setDecorations(this.decorationType, []);
 		}
-	}
-
-	private getRepoCommitDisplay(repo: string, repoCommit: CommitDisplayInfo | null) {
-		if (repoCommit === null) {
-			return null;
-		}
-		return {
-			repo: repo,
-			text: abbrevCommit(repoCommit.hash),
-			tooltip: repoCommit.summary || abbrevCommit(repoCommit.hash)
-		};
 	}
 
 	private getInlineText(blame: BlameLineInfo, displayAuthor: string) {
@@ -196,26 +166,6 @@ export class InlineBlameController extends Disposable {
 			return config.blameInlineMessageNoCommit;
 		}
 		return formatBlameText(config.blameInlineMessageFormat, blame, displayAuthor);
-	}
-
-	private getStatusBarDisplay(blame: BlameLineInfo, displayAuthor: string) {
-		const config = getConfig();
-		if (!blame.committed) {
-			return {
-				repo: '',
-				hash: null,
-				text: config.blameStatusBarMessageNoCommit,
-				tooltip: this.shouldShowStatusHover(config.blameExtendedHoverInformation)
-					? 'Commits\n' + config.blameStatusBarMessageNoCommit
-					: 'Commits'
-			};
-		}
-		return {
-			repo: '',
-			hash: blame.hash,
-			text: formatBlameText(config.blameStatusBarMessageFormat, blame, displayAuthor),
-			tooltip: this.shouldShowStatusHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : 'Commits'
-		};
 	}
 
 	private getTooltip(blame: BlameLineInfo, displayAuthor: string) {
@@ -278,9 +228,7 @@ export class InlineBlameController extends Disposable {
 		return mode === 'inline' || mode === 'inline-status';
 	}
 
-	private shouldShowStatusHover(mode: HoverMode) {
-		return mode === 'status' || mode === 'inline-status';
-	}
+
 }
 
 function formatBlameText(template: string, blame: BlameLineInfo, displayAuthor: string) {

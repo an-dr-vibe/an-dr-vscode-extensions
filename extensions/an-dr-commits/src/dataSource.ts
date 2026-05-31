@@ -1189,8 +1189,12 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['reset', 'HEAD', '--', ...files], repo);
 	}
 
-	public commitChanges(repo: string, message: string): Promise<ErrorInfo> {
-		return this.runGitCommand(['commit', '-m', message], repo);
+	public commitChanges(repo: string, message: string, amend: boolean): Promise<ErrorInfo> {
+		const args = ['commit'];
+		if (amend) args.push('--amend');
+		if (message) args.push('-m', message);
+		else if (amend) args.push('--no-edit');
+		return this.runGitCommand(args, repo);
 	}
 
 	public discardFileChanges(repo: string, filePaths: string[], isUntracked: boolean): Promise<ErrorInfo> {

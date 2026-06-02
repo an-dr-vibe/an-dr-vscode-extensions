@@ -1499,7 +1499,7 @@ export class DataSource extends Disposable {
 	 * Find the Node.js executable by searching PATH directories.
 	 * Falls back to 'node' if not found (relies on it being in PATH at shell time).
 	 */
-	private findNodeExecutable(): string {
+	private findNodeExecutable(): string | null {
 		const pathDirs = (process.env.PATH || '').split(path.delimiter);
 		const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
 		for (const dir of pathDirs) {
@@ -1510,7 +1510,14 @@ export class DataSource extends Disposable {
 				return candidate;
 			} catch (_) { /* not found here */ }
 		}
-		return 'node'; // fallback: hope it's in PATH for git's sh
+		// Fall back to the runtime VS Code's extension host is already using.
+		// On remote/Docker this is a plain node binary; on desktop it's Electron,
+		// which can execute plain Node.js scripts the same way.
+		try {
+			fs.accessSync(process.execPath, fs.constants.X_OK);
+			return process.execPath;
+		} catch (_) { }
+		return null;
 	}
 
 	/**
@@ -1544,6 +1551,9 @@ export class DataSource extends Disposable {
 		}
 
 		const nodeExe = this.findNodeExecutable();
+		if (nodeExe === null) {
+			return 'Unable to squash commits: Node.js was not found on PATH. Please install Node.js and ensure it is accessible.';
+		}
 		const uid = Date.now() + '-' + Math.random().toString(36).slice(2);
 		const seqScript = path.join(os.tmpdir(), 'an-dr-commits-seq-' + uid + '.js');
 		const msgScript = path.join(os.tmpdir(), 'an-dr-commits-msg-' + uid + '.js');

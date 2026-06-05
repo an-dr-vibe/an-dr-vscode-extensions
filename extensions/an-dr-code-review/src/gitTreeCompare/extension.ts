@@ -134,7 +134,8 @@ export function activate(context: ExtensionContext, onSelectedSelectionChange?: 
         commands.executeCommand('setContext', CONTEXT_NAMESPACE + '.viewAsList', false);
         commands.executeCommand('setContext', CONTEXT_NAMESPACE + '.isFiltered', false);
 
-        provider = new GitTreeCompareProvider(git, gitApi, outputChannel, context.globalState, context.asAbsolutePath);
+        const fileIconsExt = extensions.getExtension('an-dr.an-dr-file-icons');
+        provider = new GitTreeCompareProvider(git, gitApi, outputChannel, context.globalState, context.asAbsolutePath, fileIconsExt?.extensionUri.fsPath);
 
         const treeView = window.createTreeView(
             VIEW_ID,

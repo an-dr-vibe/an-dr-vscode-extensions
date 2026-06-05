@@ -25,6 +25,7 @@ export interface CommitsViewInitialState {
 	readonly repos: GitRepoSet;
 	readonly loadRepoInfoRefreshId: number;
 	readonly loadCommitsRefreshId: number;
+	readonly fileIcons: { readonly [extOrName: string]: string };
 }
 
 export const enum GitRepoInProgressStateType {

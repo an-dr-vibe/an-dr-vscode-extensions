@@ -53,6 +53,15 @@ const ICONS = {
 	discard: codicon('discard'),
 	review: codicon('inspect')
 };
+function getFileIcon(name: string): string {
+	const icons = initialState.fileIcons as Record<string, string>;
+	if (!icons) { return ICONS.file; }
+	const basename = name.split('/').pop() ?? name;
+	const ext = basename.includes('.') ? basename.split('.').pop()!.toLowerCase() : '';
+	const svg = icons[basename] ?? icons[ext] ?? icons[''];
+	return svg || ICONS.file;
+}
+
 const GIT_FILE_CHANGE_TYPES = { 'A': 'Added', 'M': 'Modified', 'D': 'Deleted', 'R': 'Renamed', 'U': 'Untracked' };
 const GIT_SIGNATURE_STATUS_DESCRIPTIONS = {
 	'G': 'Valid Signature',

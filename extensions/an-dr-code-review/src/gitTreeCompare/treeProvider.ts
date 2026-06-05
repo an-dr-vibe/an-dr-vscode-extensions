@@ -179,7 +179,8 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     private readonly disposables: Disposable[] = [];
 
     constructor(private readonly git: Git, private readonly gitApi: GitAPI, private readonly outputChannel: OutputChannel, private readonly globalState: Memento,
-                private readonly asAbsolutePath: (relPath: string) => string) {
+                private readonly asAbsolutePath: (relPath: string) => string,
+                private readonly fileIconsPath: string | undefined = undefined) {
         this.readConfig();
     }
 
@@ -470,7 +471,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             element.commentCount = this.commentCounts.get(this.toReviewFilePath(element.dstAbsPath)) ?? 0;
             element.hasNewVersion = this.reviewedFiles.get(this.toReviewFilePath(element.dstAbsPath))?.outdated ?? false;
         }
-        return toTreeItem(element, this.openChangesOnSelect, this.iconsMinimal, this.showCollapsed, this.viewAsList, checkboxState, this.asAbsolutePath);
+        return toTreeItem(element, this.openChangesOnSelect, this.iconsMinimal, this.showCollapsed, this.viewAsList, checkboxState, this.asAbsolutePath, this.fileIconsPath);
     }
 
     private async refreshCommentCounts(): Promise<void> {
@@ -1788,7 +1789,8 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
 function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal: boolean,
                     showCollapsed: boolean, viewAsList: boolean,
                     checkboxState: TreeItemCheckboxState | undefined,
-                    asAbsolutePath: (relPath: string) => string): TreeItem {
+                    asAbsolutePath: (relPath: string) => string,
+                    fileIconsPath: string | undefined = undefined): TreeItem {
     const gitIconRoot = asAbsolutePath('resources/git-icons');
     if (element instanceof FileElement) {
         const item = new TreeItem(element.label);
@@ -1797,7 +1799,7 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
         if (element.srcAbsPath !== element.dstAbsPath) {
             item.tooltip = `${element.srcAbsPath} → ${item.tooltip}`;
         }
-        const descriptionParts: string[] = [];
+        const descriptionParts: string[] = [element.status];
         if (element.commentCount > 0) {
             descriptionParts.push(element.commentCount >= 10 ? '+' : String(element.commentCount));
         }
@@ -1814,7 +1816,11 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
         }
         item.contextValue = element.isSubmodule ? 'submodule' : 'file';
         item.id = element.dstAbsPath;
-        item.iconPath = path.join(gitIconRoot,	toIconName(element) + '.svg');
+        if (fileIconsPath) {
+            item.iconPath = path.join(fileIconsPath, 'fileicons', 'icons', getFileIconName(element.dstRelPath));
+        } else {
+            item.iconPath = path.join(gitIconRoot, toIconName(element) + '.svg');
+        }
         if (checkboxState !== undefined) {
             item.checkboxState = checkboxState;
         }
@@ -1861,6 +1867,35 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
         return item;
     }
     throw new Error('unsupported element type');
+}
+
+function getFileIconName(filePath: string): string {
+    const basename = path.basename(filePath);
+    const NAME_MAP: Record<string, string> = {
+        '.gitignore': 'git.svg', '.gitattributes': 'git.svg', '.gitmodules': 'git.svg',
+        'package.json': 'package-file.svg',
+        'package-lock.json': 'lock.svg', 'yarn.lock': 'lock.svg', 'pnpm-lock.yaml': 'lock.svg',
+        'tsconfig.json': 'config.svg', 'jsconfig.json': 'config.svg',
+        '.eslintrc': 'config.svg', '.eslintrc.json': 'config.svg',
+        '.prettierrc': 'config.svg', '.editorconfig': 'config.svg', '.env': 'config.svg',
+    };
+    if (NAME_MAP[basename]) { return NAME_MAP[basename]; }
+    const ext = basename.includes('.') ? basename.split('.').pop()!.toLowerCase() : '';
+    const EXT_MAP: Record<string, string> = {
+        ts: 'typescript.svg', tsx: 'typescript.svg', mts: 'typescript.svg',
+        js: 'javascript.svg', jsx: 'javascript.svg', mjs: 'javascript.svg',
+        json: 'json.svg', jsonc: 'json.svg',
+        md: 'markdown.svg', mdx: 'markdown.svg',
+        css: 'css.svg', scss: 'css.svg', sass: 'css.svg', less: 'css.svg',
+        html: 'html.svg', htm: 'html.svg',
+        ps1: 'shell.svg', sh: 'shell.svg', bash: 'shell.svg', bat: 'shell.svg', cmd: 'shell.svg',
+        yaml: 'yaml.svg', yml: 'yaml.svg',
+        svg: 'svg-file.svg',
+        png: 'image.svg', jpg: 'image.svg', jpeg: 'image.svg', gif: 'image.svg', webp: 'image.svg', ico: 'image.svg',
+        zip: 'archive.svg', tar: 'archive.svg', gz: 'archive.svg',
+        txt: 'text.svg', log: 'text.svg',
+    };
+    return EXT_MAP[ext] ?? 'file-default.svg';
 }
 
 function toIconName(element: FileElement) {

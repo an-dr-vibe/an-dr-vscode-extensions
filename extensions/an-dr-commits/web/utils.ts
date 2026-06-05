@@ -26,6 +26,8 @@ const ICONS = {
 	target: codicon('target'),
 	loading: codicon('loading', 'codicon-modifier-spin'),
 	refresh: codicon('sync'),
+	home: codicon('home'),
+	gitMerge: codicon('git-merge'),
 
 	openFolder: codicon('folder-opened', 'fileTreeCodicon openFolderIcon'),
 	closedFolder: codicon('folder', 'fileTreeCodicon closedFolderIcon'),

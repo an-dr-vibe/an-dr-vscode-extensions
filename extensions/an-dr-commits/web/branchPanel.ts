@@ -33,10 +33,12 @@ class BranchPanel {
 	private readonly doubleClickCallback: (type: 'branch' | 'tag', name: string) => void;
 	private readonly showMergedChangeCallback: (showMerged: boolean) => void;
 	private readonly defaultBranchChangeCallback: (show: boolean) => void;
-	private showMergedCheckbox: HTMLInputElement | null = null;
-	private mainCheckbox: HTMLInputElement | null = null;
-	private mainLabelElem: HTMLElement | null = null;
+	private readonly showRemotesForAllLocalsChangeCallback: (show: boolean) => void;
+	private showMergedBtn: HTMLElement | null = null;
+	private mainBtn: HTMLElement | null = null;
 	private mainBranch: string | null = null;
+	private showRemotesForAllLocalsBtn: HTMLElement | null = null;
+	private showRemotesForAllLocalsActive: boolean = false;
 	private options: ReadonlyArray<DropdownOption> = [];
 	private optionsSelected: boolean[] = [];
 	private tagNames: ReadonlyArray<string> = [];
@@ -69,11 +71,12 @@ class BranchPanel {
 	private readonly filterHost: HTMLElement | null;
 	private pendingScrollRestoreHandle: number | null = null;
 
-	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean, showMergedChangeCallback: (showMerged: boolean) => void, defaultBranchChangeCallback: (show: boolean) => void) {
+	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean, showMergedChangeCallback: (showMerged: boolean) => void, defaultBranchChangeCallback: (show: boolean) => void, showRemotesForAllLocalsChangeCallback: (show: boolean) => void) {
 		this.branchChangeCallback = branchChangeCallback;
 		this.tagChangeCallback = tagChangeCallback;
 		this.showMergedChangeCallback = showMergedChangeCallback;
 		this.defaultBranchChangeCallback = defaultBranchChangeCallback;
+		this.showRemotesForAllLocalsChangeCallback = showRemotesForAllLocalsChangeCallback;
 		this.contextMenuCallback = contextMenuCallback;
 		this.doubleClickCallback = doubleClickCallback;
 		this.flattenSingleChildGroups = flattenSingleChildGroups;
@@ -111,35 +114,41 @@ class BranchPanel {
 			this.render();
 		});
 
-		// Quick-filter row: [ ] Default  [ ] Merged
+		// Quick-filter row: [home] [git-merge] [cloud]
 		const quickFilterRow = (this.filterHost ?? elem).appendChild(document.createElement('div'));
 		quickFilterRow.className = 'branchPanelQuickFilters';
 
-		const mainLabel = quickFilterRow.appendChild(document.createElement('label'));
-		mainLabel.className = 'branchPanelInProgressFilterLabel';
-		const mainCheckbox = mainLabel.appendChild(document.createElement('input'));
-		mainCheckbox.type = 'checkbox';
-		mainCheckbox.checked = false;
-		mainCheckbox.disabled = true;
-		mainCheckbox.addEventListener('change', () => {
-			this.defaultBranchChangeCallback(mainCheckbox.checked);
+		const mainBtn = quickFilterRow.appendChild(document.createElement('div'));
+		mainBtn.className = 'branchPanelQuickFilterBtn disabled';
+		mainBtn.title = 'Default branch';
+		mainBtn.innerHTML = ICONS.home;
+		mainBtn.addEventListener('click', () => {
+			if (mainBtn.classList.contains('disabled')) return;
+			this.defaultBranchChangeCallback(!mainBtn.classList.contains('active'));
 		});
-		mainLabel.appendChild(document.createElement('span')).className = 'customCheckbox';
-		mainLabel.appendChild(document.createTextNode(' Default'));
-		this.mainCheckbox = mainCheckbox;
-		this.mainLabelElem = mainLabel;
+		this.mainBtn = mainBtn;
 
-		const showMergedLabel = quickFilterRow.appendChild(document.createElement('label'));
-		showMergedLabel.className = 'branchPanelInProgressFilterLabel';
-		const showMergedCheckbox = showMergedLabel.appendChild(document.createElement('input'));
-		showMergedCheckbox.type = 'checkbox';
-		showMergedCheckbox.checked = false;
-		showMergedCheckbox.addEventListener('change', () => {
-			this.showMergedChangeCallback(showMergedCheckbox.checked);
+		const showMergedBtn = quickFilterRow.appendChild(document.createElement('div'));
+		showMergedBtn.className = 'branchPanelQuickFilterBtn';
+		showMergedBtn.title = 'Show merged commits';
+		showMergedBtn.innerHTML = ICONS.gitMerge;
+		showMergedBtn.addEventListener('click', () => {
+			const newState = !showMergedBtn.classList.contains('active');
+			showMergedBtn.classList.toggle('active', newState);
+			this.showMergedChangeCallback(newState);
 		});
-		showMergedLabel.appendChild(document.createElement('span')).className = 'customCheckbox';
-		showMergedLabel.appendChild(document.createTextNode(' Merged'));
-		this.showMergedCheckbox = showMergedCheckbox;
+		this.showMergedBtn = showMergedBtn;
+
+		const showRemotesBtn = quickFilterRow.appendChild(document.createElement('div'));
+		showRemotesBtn.className = 'branchPanelQuickFilterBtn';
+		showRemotesBtn.title = 'Show remote tracking branches for all local branches';
+		showRemotesBtn.innerHTML = ICONS.cloud;
+		showRemotesBtn.addEventListener('click', () => {
+			this.showRemotesForAllLocalsActive = !this.showRemotesForAllLocalsActive;
+			showRemotesBtn.classList.toggle('active', this.showRemotesForAllLocalsActive);
+			this.showRemotesForAllLocalsChangeCallback(this.showRemotesForAllLocalsActive);
+		});
+		this.showRemotesForAllLocalsBtn = showRemotesBtn;
 
 		const quickFilterDivider = (this.filterHost ?? elem).appendChild(document.createElement('div'));
 		quickFilterDivider.className = 'branchPanelDivider';
@@ -404,34 +413,39 @@ class BranchPanel {
 	}
 
 	public setShowMerged(showMerged: boolean) {
-		if (this.showMergedCheckbox !== null) this.showMergedCheckbox.checked = showMerged;
+		if (this.showMergedBtn !== null) this.showMergedBtn.classList.toggle('active', showMerged);
 	}
 
 	public setMainBranch(name: string | null) {
 		this.mainBranch = name;
-		if (this.mainLabelElem !== null) {
-			this.mainLabelElem.title = name !== null ? name : '';
-		}
-		this.syncMainCheckbox();
+		this.syncMainBtn();
 	}
 
-	private syncMainCheckbox() {
-		if (this.mainCheckbox === null) return;
+	public setShowRemotesForAllLocals(show: boolean) {
+		this.showRemotesForAllLocalsActive = show;
+		if (this.showRemotesForAllLocalsBtn !== null) this.showRemotesForAllLocalsBtn.classList.toggle('active', show);
+	}
+
+	private syncMainBtn() {
+		if (this.mainBtn === null) return;
 		if (this.mainBranch === null) {
-			this.mainCheckbox.disabled = true;
-			this.mainCheckbox.checked = false;
+			this.mainBtn.classList.add('disabled');
+			this.mainBtn.classList.remove('active');
+			this.mainBtn.title = 'Default branch';
 			return;
 		}
 		const idx = this.options.findIndex((o) => o.value === this.mainBranch);
-		const showingAll = this.optionsSelected.length > 0 && this.optionsSelected[0];
-		if (idx <= 0 || showingAll) {
-			// Not found, or Show All is active — disable; Default only tracks explicit selection
-			this.mainCheckbox.disabled = true;
-			this.mainCheckbox.checked = false;
+		if (idx <= 0) {
+			this.mainBtn.classList.add('disabled');
+			this.mainBtn.classList.remove('active');
+			this.mainBtn.title = 'Default branch: ' + this.mainBranch;
 			return;
 		}
-		this.mainCheckbox.disabled = false;
-		this.mainCheckbox.checked = this.optionsSelected[idx];
+		// Button is always clickable when a main branch exists — active only when explicitly selected
+		const showingAll = this.optionsSelected.length > 0 && this.optionsSelected[0];
+		this.mainBtn.classList.remove('disabled');
+		this.mainBtn.classList.toggle('active', !showingAll && this.optionsSelected[idx]);
+		this.mainBtn.title = 'Default branch: ' + this.mainBranch;
 	}
 
 	public isOpen() { return false; }
@@ -611,7 +625,7 @@ class BranchPanel {
 
 	private render() {
 		branchPanelRender(this);
-		this.syncMainCheckbox();
+		this.syncMainBtn();
 	}
 
 	private scheduleScrollRestore() {

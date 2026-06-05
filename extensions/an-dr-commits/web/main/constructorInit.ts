@@ -82,6 +82,36 @@ function commitsInitDropdowns(view: any) {
 		view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
 		view.saveState();
 		view.requestLoadRepoInfoAndCommits(false, true);
+	}, (showRemotesForAllLocals: boolean) => {
+		const allLocals: string[] = (view.gitBranches as string[]).filter((b: string) => b !== '' && b !== 'HEAD' && !b.startsWith('remotes/') && !b.startsWith('--glob='));
+		const remoteSet = new Set<string>();
+		for (const branch of allLocals) {
+			const upstream: string = view.gitBranchUpstreams[branch];
+			if (typeof upstream !== 'string' || upstream === '') continue;
+			const remoteBranch = (view.gitBranches as string[]).includes('remotes/' + upstream) ? 'remotes/' + upstream : null;
+			if (remoteBranch !== null) remoteSet.add(remoteBranch);
+		}
+		if (remoteSet.size === 0) return;
+		const current: string[] = Array.isArray(view.currentBranches) ? view.currentBranches : [];
+		const isShowAll = current.length === 1 && current[0] === SHOW_ALL_BRANCHES;
+		if (showRemotesForAllLocals) {
+			const base: string[] = isShowAll ? allLocals : current;
+			const expanded = [...base];
+			remoteSet.forEach((remote) => {
+				if (!expanded.includes(remote)) expanded.push(remote);
+			});
+			view.currentBranches = expanded;
+			view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
+		} else {
+			if (isShowAll) return;
+			const filtered = current.filter((b: string) => !remoteSet.has(b));
+			view.currentBranches = filtered.length > 0 ? filtered : [SHOW_ALL_BRANCHES];
+			view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
+		}
+		view.maxCommits = view.config.initialLoadCommits;
+		view.saveState();
+		view.clearCommits();
+		view.requestLoadRepoInfoAndCommits(true, true);
 	});
 }
 

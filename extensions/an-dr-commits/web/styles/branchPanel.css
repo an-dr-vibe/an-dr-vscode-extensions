@@ -100,17 +100,44 @@ body.branchPanelHidden #sidebarResizeHandle{
 }
 .branchPanelQuickFilters{
 	display:flex;
-	flex-wrap:wrap;
-	gap:0 10px;
-	padding:5px 0 2px 0;
+	gap:2px;
+	padding:4px 0 2px 0;
 }
-.branchPanelQuickFilters label > input[type=checkbox]:disabled ~ .customCheckbox{
-	opacity:0.35;
+.branchPanelQuickFilterBtn{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	width:22px;
+	height:22px;
+	border-radius:4px;
+	cursor:pointer;
+	-webkit-user-select:none;
+	user-select:none;
+	opacity:0.4;
+}
+.branchPanelQuickFilterBtn:hover{
+	opacity:0.75;
+	background-color:var(--vscode-list-hoverBackground, rgba(128,128,128,0.1));
+}
+.branchPanelQuickFilterBtn.active{
+	opacity:1;
+}
+.branchPanelQuickFilterBtn.active:hover{
+	opacity:1;
+}
+.branchPanelQuickFilterBtn.disabled{
+	opacity:0.2;
 	cursor:not-allowed;
 }
-.branchPanelQuickFilters label:has(input[type=checkbox]:disabled){
-	opacity:0.5;
-	cursor:not-allowed;
+.branchPanelQuickFilterBtn.disabled:hover{
+	opacity:0.2;
+	background-color:transparent;
+}
+.branchPanelQuickFilterBtn .codicon{
+	font-size:14px;
+	line-height:14px;
+	width:14px;
+	height:14px;
 }
 .branchPanelDivider{
 	border-top:1px solid rgba(128,128,128,0.25);

@@ -98,6 +98,24 @@ body.branchPanelHidden #sidebarResizeHandle{
 	line-height:17px;
 	color:var(--vscode-editor-foreground);
 }
+.branchPanelQuickFilters{
+	display:flex;
+	flex-wrap:wrap;
+	gap:0 10px;
+	padding:5px 0 2px 0;
+}
+.branchPanelQuickFilters label > input[type=checkbox]:disabled ~ .customCheckbox{
+	opacity:0.35;
+	cursor:not-allowed;
+}
+.branchPanelQuickFilters label:has(input[type=checkbox]:disabled){
+	opacity:0.5;
+	cursor:not-allowed;
+}
+.branchPanelDivider{
+	border-top:1px solid rgba(128,128,128,0.25);
+	margin:4px 0 0 0;
+}
 .branchPanelInProgressFilter{
 	padding:5px 0 2px 0;
 }

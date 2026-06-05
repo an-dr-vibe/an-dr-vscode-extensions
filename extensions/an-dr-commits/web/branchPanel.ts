@@ -31,6 +31,12 @@ class BranchPanel {
 	private readonly tagChangeCallback: (values: string[]) => void;
 	private readonly contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void;
 	private readonly doubleClickCallback: (type: 'branch' | 'tag', name: string) => void;
+	private readonly showMergedChangeCallback: (showMerged: boolean) => void;
+	private readonly defaultBranchChangeCallback: (show: boolean) => void;
+	private showMergedCheckbox: HTMLInputElement | null = null;
+	private mainCheckbox: HTMLInputElement | null = null;
+	private mainLabelElem: HTMLElement | null = null;
+	private mainBranch: string | null = null;
 	private options: ReadonlyArray<DropdownOption> = [];
 	private optionsSelected: boolean[] = [];
 	private tagNames: ReadonlyArray<string> = [];
@@ -63,9 +69,11 @@ class BranchPanel {
 	private readonly filterHost: HTMLElement | null;
 	private pendingScrollRestoreHandle: number | null = null;
 
-	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean) {
+	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean, showMergedChangeCallback: (showMerged: boolean) => void, defaultBranchChangeCallback: (show: boolean) => void) {
 		this.branchChangeCallback = branchChangeCallback;
 		this.tagChangeCallback = tagChangeCallback;
+		this.showMergedChangeCallback = showMergedChangeCallback;
+		this.defaultBranchChangeCallback = defaultBranchChangeCallback;
 		this.contextMenuCallback = contextMenuCallback;
 		this.doubleClickCallback = doubleClickCallback;
 		this.flattenSingleChildGroups = flattenSingleChildGroups;
@@ -102,6 +110,39 @@ class BranchPanel {
 			this.filterValue = this.filterInput.value.toLowerCase();
 			this.render();
 		});
+
+		// Quick-filter row: [ ] Default  [ ] Merged
+		const quickFilterRow = (this.filterHost ?? elem).appendChild(document.createElement('div'));
+		quickFilterRow.className = 'branchPanelQuickFilters';
+
+		const mainLabel = quickFilterRow.appendChild(document.createElement('label'));
+		mainLabel.className = 'branchPanelInProgressFilterLabel';
+		const mainCheckbox = mainLabel.appendChild(document.createElement('input'));
+		mainCheckbox.type = 'checkbox';
+		mainCheckbox.checked = false;
+		mainCheckbox.disabled = true;
+		mainCheckbox.addEventListener('change', () => {
+			this.defaultBranchChangeCallback(mainCheckbox.checked);
+		});
+		mainLabel.appendChild(document.createElement('span')).className = 'customCheckbox';
+		mainLabel.appendChild(document.createTextNode(' Default'));
+		this.mainCheckbox = mainCheckbox;
+		this.mainLabelElem = mainLabel;
+
+		const showMergedLabel = quickFilterRow.appendChild(document.createElement('label'));
+		showMergedLabel.className = 'branchPanelInProgressFilterLabel';
+		const showMergedCheckbox = showMergedLabel.appendChild(document.createElement('input'));
+		showMergedCheckbox.type = 'checkbox';
+		showMergedCheckbox.checked = false;
+		showMergedCheckbox.addEventListener('change', () => {
+			this.showMergedChangeCallback(showMergedCheckbox.checked);
+		});
+		showMergedLabel.appendChild(document.createElement('span')).className = 'customCheckbox';
+		showMergedLabel.appendChild(document.createTextNode(' Merged'));
+		this.showMergedCheckbox = showMergedCheckbox;
+
+		const quickFilterDivider = (this.filterHost ?? elem).appendChild(document.createElement('div'));
+		quickFilterDivider.className = 'branchPanelDivider';
 
 		// Active-branches filter — shown only while a git operation is in progress
 		const inProgressRow = (this.filterHost ?? elem).appendChild(document.createElement('div'));
@@ -362,6 +403,37 @@ class BranchPanel {
 		this.render();
 	}
 
+	public setShowMerged(showMerged: boolean) {
+		if (this.showMergedCheckbox !== null) this.showMergedCheckbox.checked = showMerged;
+	}
+
+	public setMainBranch(name: string | null) {
+		this.mainBranch = name;
+		if (this.mainLabelElem !== null) {
+			this.mainLabelElem.title = name !== null ? name : '';
+		}
+		this.syncMainCheckbox();
+	}
+
+	private syncMainCheckbox() {
+		if (this.mainCheckbox === null) return;
+		if (this.mainBranch === null) {
+			this.mainCheckbox.disabled = true;
+			this.mainCheckbox.checked = false;
+			return;
+		}
+		const idx = this.options.findIndex((o) => o.value === this.mainBranch);
+		const showingAll = this.optionsSelected.length > 0 && this.optionsSelected[0];
+		if (idx <= 0 || showingAll) {
+			// Not found, or Show All is active — disable; Default only tracks explicit selection
+			this.mainCheckbox.disabled = true;
+			this.mainCheckbox.checked = false;
+			return;
+		}
+		this.mainCheckbox.disabled = false;
+		this.mainCheckbox.checked = this.optionsSelected[idx];
+	}
+
 	public isOpen() { return false; }
 	public close() { /* no-op: sidebar is always visible */ }
 
@@ -539,6 +611,7 @@ class BranchPanel {
 
 	private render() {
 		branchPanelRender(this);
+		this.syncMainCheckbox();
 	}
 
 	private scheduleScrollRestore() {

@@ -89,6 +89,7 @@ function commitsGetRebaseSequenceBadgeHtml(view: any, commitHash: string) {
 function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, branchUpstreams: { readonly [branchName: string]: string }, goneUpstreamBranches: ReadonlyArray<string>, remoteHeadTargets: { readonly [remoteName: string]: string }, repoInProgressState: GG.GitRepoInProgressState | null, branchHead: string | null, remotes: ReadonlyArray<string>, remoteUrls: { readonly [remoteName: string]: string | null }, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
 	view.gitStashes = stashes;
 	if (!isRepo || (!view.currentRepoRefreshState.hard && arraysStrictlyEqual(view.gitBranches, branchOptions) && shallowStringMapEqual(view.gitBranchUpstreams, branchUpstreams) && arraysStrictlyEqual(view.gitGoneUpstreamBranches, goneUpstreamBranches) && shallowStringMapEqual(view.gitRemoteHeadTargets, remoteHeadTargets) && commitsIsSameRepoInProgressState(view.gitRepoInProgressState, repoInProgressState) && view.gitBranchHead === branchHead && arraysStrictlyEqual(view.gitRemotes, remotes))) {
+		view.branchDropdown.setMainBranch(findMainlineBranch(view));
 		view.saveState();
 		view.finaliseLoadRepoInfo(false, isRepo);
 		return;
@@ -130,6 +131,8 @@ function commitsLoadRepoInfo(view: any, branchOptions: ReadonlyArray<string>, br
 	view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
 	view.branchDropdown.setInProgressState(commitsGetInProgressBranches(view, repoInProgressState));
 	view.branchDropdown.setRemoteUrls(view.gitRemoteUrls);
+	view.branchDropdown.setShowMerged(!getOnlyFollowFirstParent(view.gitRepos[view.currentRepo].onlyFollowFirstParent));
+	view.branchDropdown.setMainBranch(findMainlineBranch(view));
 	if (view.pendingBranchPanelState !== null) view.branchDropdown.restoreState(view.pendingBranchPanelState);
 
 	const hiddenRemotes = view.gitRepos[view.currentRepo].hideRemotes;

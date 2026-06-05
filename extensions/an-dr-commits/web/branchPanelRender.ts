@@ -214,8 +214,9 @@ function branchPanelRenderSectionHeader(section: string, collapsed: boolean, lab
 function branchPanelRenderLocals(view: any, filter: string, locals: { opt: DropdownOption; idx: number }[]): string {
 	const localTree = branchPanelTransformTree(view, branchPanelBuildTree(view, locals.map((item) => ({ name: item.opt.name, idx: item.idx }))));
 	const localTreeVisible = filter === '' || branchPanelTreeMatchesFilter(view, localTree, filter);
-	let html = branchPanelRenderSectionHeader('local', view.localCollapsed, 'Local (' + locals.length + ')');
-	if (view.localCollapsed) return html;
+	const collapsed = view.localCollapsed && filter === '';
+	let html = branchPanelRenderSectionHeader('local', collapsed, 'Local (' + locals.length + ')');
+	if (collapsed) return html;
 	if (localTreeVisible) return html + branchPanelRenderBranchTreeHtml(view, localTree, 1, filter, 'local');
 	if (filter !== '') html += '<div class="branchPanelNoResults">No matches</div>';
 	return html;
@@ -229,8 +230,9 @@ function branchPanelRenderRemotes(view: any, filter: string, remotes: { opt: Dro
 	})));
 	const transformedRemoteTree = branchPanelTransformTree(view, remoteTree, true);
 	const remoteTreeVisible = filter === '' || branchPanelTreeMatchesFilter(view, transformedRemoteTree, filter);
-	let html = branchPanelRenderSectionHeader('remote', view.remoteCollapsed, 'Remote (' + remotes.length + ')');
-	if (view.remoteCollapsed) return html;
+	const collapsed = view.remoteCollapsed && filter === '';
+	let html = branchPanelRenderSectionHeader('remote', collapsed, 'Remote (' + remotes.length + ')');
+	if (collapsed) return html;
 	if (remoteTreeVisible) return html + branchPanelRenderBranchTreeHtml(view, transformedRemoteTree, 1, filter, 'remote');
 	if (filter !== '') html += '<div class="branchPanelNoResults">No matches</div>';
 	return html;
@@ -240,11 +242,12 @@ function branchPanelRenderTags(view: any, filter: string): string {
 	if (view.tagNames.length === 0) return '';
 	const tagTree = branchPanelTransformTree(view, branchPanelBuildTree(view, view.tagNames.map((name: string, i: number) => ({ name, idx: i }))));
 	const tagTreeVisible = filter === '' || branchPanelTreeMatchesFilter(view, tagTree, filter);
-	let html = '<div class="branchPanelSectionHeader' + (view.tagsCollapsed ? ' collapsed' : '') + '" data-section="tags">' +
-		'<span class="branchPanelArrow">' + (view.tagsCollapsed ? '&#9654;' : '&#9660;') + '</span>' +
+	const collapsed = view.tagsCollapsed && filter === '';
+	let html = '<div class="branchPanelSectionHeader' + (collapsed ? ' collapsed' : '') + '" data-section="tags">' +
+		'<span class="branchPanelArrow">' + (collapsed ? '&#9654;' : '&#9660;') + '</span>' +
 		'<span class="branchPanelSectionTitle">Tags (' + view.tagNames.length + ')</span>' +
 		'</div>';
-	if (view.tagsCollapsed) return html;
+	if (collapsed) return html;
 	html += branchPanelBuildAutoTagItemHtml(view, 1);
 	if (tagTreeVisible) return html + branchPanelRenderTagTreeHtml(view, tagTree, 1, filter);
 	return html + '<div class="branchPanelNoResults">' + (filter !== '' ? 'No matches' : branchPanelGetEmptyTagMessage()) + '</div>';

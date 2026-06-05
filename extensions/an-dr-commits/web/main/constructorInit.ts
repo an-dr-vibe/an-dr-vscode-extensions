@@ -65,7 +65,24 @@ function commitsInitDropdowns(view: any) {
 			if (view.gitBranchHead === name) return;
 			view.checkoutBranchAction(name, null, null, target);
 		}
-	}, view.config.branchPanel.flattenSingleChildGroups, view.config.branchPanel.groupsFirst);
+	}, view.config.branchPanel.flattenSingleChildGroups, view.config.branchPanel.groupsFirst, (showMerged: boolean) => {
+		view.saveRepoStateValue(view.currentRepo, 'onlyFollowFirstParent', showMerged ? GG.BooleanOverride.Disabled : GG.BooleanOverride.Enabled);
+		view.requestLoadRepoInfoAndCommits(false, true);
+	}, (showDefault: boolean) => {
+		const mainBranch = findMainlineBranch(view);
+		if (mainBranch === null) return;
+		const isShowAll = view.currentBranches === null || (view.currentBranches.length === 1 && view.currentBranches[0] === SHOW_ALL_BRANCHES);
+		let branches: string[] = isShowAll ? [] : view.currentBranches.filter((b: string) => b !== SHOW_ALL_BRANCHES);
+		if (showDefault) {
+			if (!branches.includes(mainBranch)) branches.push(mainBranch);
+		} else {
+			branches = branches.filter((b: string) => b !== mainBranch);
+		}
+		view.currentBranches = branches.length > 0 ? branches : [SHOW_ALL_BRANCHES];
+		view.branchDropdown.setOptions(view.getBranchOptions(true), view.currentBranches);
+		view.saveState();
+		view.requestLoadRepoInfoAndCommits(false, true);
+	});
 }
 
 function commitsRestoreFromPrevState(view: any, prevState: any) {
@@ -78,6 +95,7 @@ function commitsRestoreFromPrevState(view: any, prevState: any) {
 	view.gitConfig = prevState.gitConfig;
 	view.loadRepoInfo(prevState.gitBranches, prevState.gitBranchUpstreams || {}, prevState.gitGoneUpstreamBranches || [], prevState.gitRemoteHeadTargets || {}, prevState.gitRepoInProgressState || null, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitRemoteUrls || {}, prevState.gitStashes, true);
 	view.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
+	view.branchDropdown.setShowMerged(!prevState.onlyFollowFirstParent);
 	view.branchDropdown.restoreState(prevState.branchPanel);
 	view.findWidget.restoreState(prevState.findWidget);
 	view.settingsWidget.restoreState(prevState.settingsWidget);

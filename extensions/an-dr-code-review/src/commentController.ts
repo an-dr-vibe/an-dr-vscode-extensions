@@ -248,6 +248,9 @@ async function syncAutoExports(): Promise<void> {
 
     const cfg = vscode.workspace.getConfiguration('codeReview');
     const data = await loadReviewData();
+    if (data.threads.length === 0) {
+        return;
+    }
     const behavior: ExportBehavior = {
         showDocument: false,
         showNotification: false,

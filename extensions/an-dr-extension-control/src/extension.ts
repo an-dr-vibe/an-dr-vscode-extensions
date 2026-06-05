@@ -217,6 +217,70 @@ async function showRepoPath(config: vscode.WorkspaceConfiguration): Promise<void
     }
 }
 
+// ── Auto-operations ───────────────────────────────────────────────────────────
+
+async function autoWipCommit(root: string): Promise<void> {
+    const status = await exec('git status --porcelain', root);
+    if (status.code !== 0 || !status.stdout) { return; }
+    await exec('git add -A', root);
+    const ts = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const commit = await exec(`git commit -m "WIP [${ts}]"`, root);
+    if (commit.code !== 0) {
+        vscode.window.showErrorMessage(
+            `Extension Control: WIP commit failed.\n${commit.stderr || commit.stdout}`
+        );
+    }
+}
+
+async function autoPush(root: string): Promise<void> {
+    const status = await exec('git status -b --short', root);
+    if (status.code !== 0 || !status.stdout.includes('ahead')) { return; }
+    const push = await exec('git push', root);
+    if (push.code !== 0) {
+        vscode.window.showErrorMessage(
+            `Extension Control: auto-push failed.\n${push.stderr || push.stdout}`
+        );
+    }
+}
+
+function startAutoTimers(
+    context: vscode.ExtensionContext,
+    getConfig: () => vscode.WorkspaceConfiguration
+): void {
+    let wipTimer: ReturnType<typeof setInterval> | undefined;
+    let pushTimer: ReturnType<typeof setInterval> | undefined;
+
+    function restart(): void {
+        clearInterval(wipTimer);
+        clearInterval(pushTimer);
+        wipTimer = undefined;
+        pushTimer = undefined;
+
+        const cfg = getConfig();
+        const root = findRepoRoot(cfg);
+        if (!root) { return; }
+
+        if (cfg.get<boolean>('autoWipCommit', true)) {
+            const ms = cfg.get<number>('autoWipCommitIntervalMinutes', 30) * 60_000;
+            wipTimer = setInterval(() => { void autoWipCommit(root); }, ms);
+        }
+
+        if (cfg.get<boolean>('autoPush', true)) {
+            const ms = cfg.get<number>('autoPushIntervalMinutes', 30) * 60_000;
+            pushTimer = setInterval(() => { void autoPush(root); }, ms);
+        }
+    }
+
+    restart();
+
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('extensionControl')) { restart(); }
+        }),
+        { dispose: () => { clearInterval(wipTimer); clearInterval(pushTimer); } }
+    );
+}
+
 // ── Activate ──────────────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -241,6 +305,8 @@ export function activate(context: vscode.ExtensionContext): void {
             )
         );
     }
+
+    startAutoTimers(context, cfg);
 }
 
 export function deactivate(): void {}

@@ -44,6 +44,28 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to the extensions repo root. Leave empty to auto-detect via symlink/junction resolution from ~/.vscode/extensions."
+        },
+        "extensionControl.autoWipCommit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically stage and commit all changes as a WIP commit on a timer."
+        },
+        "extensionControl.autoWipCommitIntervalMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "description": "Interval in minutes between automatic WIP commits."
+        },
+        "extensionControl.autoPush": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically push unpushed commits on a timer."
+        },
+        "extensionControl.autoPushIntervalMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "description": "Interval in minutes between automatic pushes."
         }
       }
     }

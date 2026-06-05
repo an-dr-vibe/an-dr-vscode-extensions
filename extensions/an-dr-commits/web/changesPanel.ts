@@ -47,7 +47,7 @@ function _cpRenderFileRow(f: GG.GitWorkingTreeChangeMsg, isStaged: boolean): str
 	const changeTypeMessage = _cpStatusTitle(f.status) + (f.oldPath ? ' (' + escapeHtml(f.oldPath) + ' → ' + encodedPath + ')' : '');
 	return `<div class="cpFile fileTreeFileRecord" data-path="${encodedPath}" data-staged="${isStaged}">` +
 		`<span class="fileTreeFile gitDiffPossible" title="Click to View Diff • ${changeTypeMessage}">` +
-		`<span class="fileTreeFileIcon">${ICONS.file}</span>` +
+		`<span class="fileTreeFileIcon">${getFileIcon(f.path)}</span>` +
 		`<span class="gitFileName ${f.status}" title="${encodedPath + (f.oldPath ? ' ← ' + escapeHtml(f.oldPath) : '')}">${name}</span>` +
 		`</span>` +
 		(initialState.config.enhancedAccessibility ? `<span class="fileTreeFileType" title="${changeTypeMessage}">${f.status}</span>` : '') +

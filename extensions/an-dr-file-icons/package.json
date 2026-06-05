@@ -1,0 +1,21 @@
+{
+  "name": "an-dr-file-icons",
+  "displayName": "an-dr: File Icons",
+  "description": "Unified file icon theme for the an-dr extension suite, using Tabler Icons (MIT).",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Themes"],
+  "scripts": {
+    "compile": "node -e \"\""
+  },
+  "contributes": {
+    "iconThemes": [
+      {
+        "id": "an-dr-file-icons",
+        "label": "an-dr File Icons",
+        "path": "./fileicons/theme.json"
+      }
+    ]
+  }
+}

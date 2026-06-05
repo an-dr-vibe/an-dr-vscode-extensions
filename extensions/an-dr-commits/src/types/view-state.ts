@@ -73,6 +73,7 @@ export interface CommitsViewConfig {
 	readonly customEmojiShortcodeMappings: ReadonlyArray<CustomEmojiShortcodeMapping>;
 	readonly customPullRequestProviders: ReadonlyArray<CustomPullRequestProvider>;
 	readonly dateFormat: DateFormat;
+	readonly defaultCommitMessage: string;
 	readonly dialogDefaults: DialogDefaults;
 	readonly enhancedAccessibility: boolean;
 	readonly fetchAndPrune: boolean;

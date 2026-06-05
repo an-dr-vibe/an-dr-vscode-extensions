@@ -16,6 +16,7 @@
 let _cpChanges: GG.GitWorkingTreeChangeMsg[] = [];
 let _cpActive = false;   // true while uncommitted row is expanded
 let _cpCloseMenuListener: (() => void) | null = null;
+let _cpPendingCommit: { msg: string; amend: boolean } | null = null;
 
 type CpTreeFolder = {
 	folders: { [name: string]: CpTreeFolder };
@@ -145,9 +146,9 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 
 	function updateCommitBtn() {
 		if (!commitBtn) return;
-		const hasStagedChanges = _cpChanges.some((c) => c.staged);
 		const hasMessage = !!(msgEl && msgEl.value.trim());
-		const canCommit = hasStagedChanges && hasMessage;
+		const hasDefault = !!(initialState.config.defaultCommitMessage);
+		const canCommit = _cpChanges.length > 0 && (hasMessage || hasDefault);
 		commitBtn.disabled = !canCommit;
 		const arrow = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
 		if (arrow) arrow.disabled = !canCommit;
@@ -173,9 +174,24 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 	if (commitBtn) {
 		updateCommitBtn();
 		commitBtn.addEventListener('click', () => {
-			const msg = msgEl ? msgEl.value.trim() : '';
+			let msg = msgEl ? msgEl.value.trim() : '';
+			if (!msg && initialState.config.defaultCommitMessage) {
+				const now = new Date();
+				const pad = (n: number) => String(n).padStart(2, '0');
+				const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) +
+					' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+				msg = initialState.config.defaultCommitMessage + ' (' + ts + ')';
+			}
 			const repo = commits.getCurrentRepo();
 			if (!msg || !repo || commitBtn.disabled) return;
+			const hasStagedChanges = _cpChanges.some((c) => c.staged);
+			if (!hasStagedChanges) {
+				const files = _cpChanges.map((c) => c.path);
+				if (!files.length) return;
+				_cpPendingCommit = { msg, amend: false };
+				sendMessage({ command: 'stageFiles', repo, files });
+				return;
+			}
 			runAction({ command: 'commitChanges', repo, message: msg, amend: false }, 'Committing Changes');
 		});
 	}
@@ -316,11 +332,22 @@ function filesPanelHandleWorkingTreeChanges(changes: GG.GitWorkingTreeChangeMsg[
 	// Re-evaluate commit button state after restoring message
 	const commitBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpCommitBtn');
 	const arrowBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
-	const msgEl2 = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
-	if (commitBtn2 && msgEl2) {
-		const canCommit = _cpChanges.some((c) => c.staged) && !!msgEl2.value.trim();
+	if (commitBtn2) {
+		const msgEl2 = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
+		const hasMessage2 = !!(msgEl2 && msgEl2.value.trim());
+		const hasDefault2 = !!(initialState.config.defaultCommitMessage);
+		const canCommit = _cpChanges.length > 0 && (hasMessage2 || hasDefault2);
 		commitBtn2.disabled = !canCommit;
 		if (arrowBtn2) arrowBtn2.disabled = !canCommit;
+	}
+
+	if (_cpPendingCommit !== null) {
+		const pending = _cpPendingCommit;
+		_cpPendingCommit = null;
+		const repo = commits.getCurrentRepo();
+		if (repo) {
+			runAction({ command: 'commitChanges', repo, message: pending.msg, amend: pending.amend }, 'Committing Changes');
+		}
 	}
 }
 

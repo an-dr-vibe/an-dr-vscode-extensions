@@ -696,6 +696,11 @@
 					"default": true,
 					"description": "Default state of the \"Include Untracked\" checkbox."
 				},
+				"an-dr-commits.defaultCommitMessage": {
+					"type": "string",
+					"default": "WIP",
+					"description": "Default commit message used when the message field is empty. The current date and time will be appended automatically. Leave empty to require a message."
+				},
 				"an-dr-commits.enhancedAccessibility": {
 					"type": "boolean",
 					"default": false,

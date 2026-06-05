@@ -176,6 +176,13 @@ class Config {
 	}
 
 	/**
+	 * Get the value of the `an-dr-commits.defaultCommitMessage` Extension Setting.
+	 */
+	get defaultCommitMessage() {
+		return this.config.get('defaultCommitMessage', 'WIP');
+	}
+
+	/**
 	 * Get the value of the `an-dr-commits.dialog.*` Extension Settings.
 	 */
 	get dialogDefaults(): DialogDefaults {

@@ -1026,6 +1026,7 @@ export class CommitsView extends Disposable {
 				customEmojiShortcodeMappings: config.customEmojiShortcodeMappings,
 				customPullRequestProviders: config.customPullRequestProviders,
 				dateFormat: config.dateFormat,
+				defaultCommitMessage: config.defaultCommitMessage,
 				dialogDefaults: config.dialogDefaults,
 				enhancedAccessibility: config.enhancedAccessibility,
 				fetchAndPrune: config.fetchAndPrune,

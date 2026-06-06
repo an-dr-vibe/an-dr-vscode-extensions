@@ -34,6 +34,7 @@ class BranchPanel {
 	private readonly showMergedChangeCallback: (showMerged: boolean) => void;
 	private readonly defaultBranchChangeCallback: (show: boolean) => void;
 	private readonly showRemotesForAllLocalsChangeCallback: (show: boolean) => void;
+	private readonly layoutChangeCallback: () => void;
 	private showMergedBtn: HTMLElement | null = null;
 	private mainBtn: HTMLElement | null = null;
 	private mainBranch: string | null = null;
@@ -63,6 +64,7 @@ class BranchPanel {
 	private actionSelectionAnchor: string | null = null;
 	private actionSelectionActive: string | null = null;
 	private actionSelectionVisible: boolean = false;
+	private layoutChangeHandle: number | null = null;
 
 	private readonly filterInput: HTMLInputElement;
 	private readonly listElem: HTMLElement;
@@ -71,12 +73,13 @@ class BranchPanel {
 	private readonly filterHost: HTMLElement | null;
 	private pendingScrollRestoreHandle: number | null = null;
 
-	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean, showMergedChangeCallback: (showMerged: boolean) => void, defaultBranchChangeCallback: (show: boolean) => void, showRemotesForAllLocalsChangeCallback: (show: boolean) => void) {
+	constructor(id: string, branchChangeCallback: (values: string[]) => void, tagChangeCallback: (values: string[]) => void, contextMenuCallback: (type: BranchPanelEntryType, name: string, event: MouseEvent) => void, doubleClickCallback: (type: 'branch' | 'tag', name: string) => void, flattenSingleChildGroups: boolean, groupsFirst: boolean, showMergedChangeCallback: (showMerged: boolean) => void, defaultBranchChangeCallback: (show: boolean) => void, showRemotesForAllLocalsChangeCallback: (show: boolean) => void, layoutChangeCallback: () => void = () => {}) {
 		this.branchChangeCallback = branchChangeCallback;
 		this.tagChangeCallback = tagChangeCallback;
 		this.showMergedChangeCallback = showMergedChangeCallback;
 		this.defaultBranchChangeCallback = defaultBranchChangeCallback;
 		this.showRemotesForAllLocalsChangeCallback = showRemotesForAllLocalsChangeCallback;
+		this.layoutChangeCallback = layoutChangeCallback;
 		this.contextMenuCallback = contextMenuCallback;
 		this.doubleClickCallback = doubleClickCallback;
 		this.flattenSingleChildGroups = flattenSingleChildGroups;
@@ -141,7 +144,7 @@ class BranchPanel {
 
 		const showRemotesBtn = quickFilterRow.appendChild(document.createElement('div'));
 		showRemotesBtn.className = 'branchPanelQuickFilterBtn';
-		showRemotesBtn.title = 'Show remote tracking branches for all local branches';
+		showRemotesBtn.title = 'Show remote tracking branches for selected local branches';
 		showRemotesBtn.innerHTML = ICONS.cloud;
 		showRemotesBtn.addEventListener('click', () => {
 			this.showRemotesForAllLocalsActive = !this.showRemotesForAllLocalsActive;
@@ -241,6 +244,7 @@ class BranchPanel {
 
 	private applyLayoutWidth(width: number) {
 		document.body.style.setProperty('--branch-panel-width', width + 'px');
+		this.scheduleLayoutChange();
 	}
 
 	public setRemoteUrls(urls: { [remoteName: string]: string | null }) {
@@ -639,6 +643,14 @@ class BranchPanel {
 				this.sidebar.scrollTop = this.listScrollTop;
 				this.pendingScrollRestoreHandle = null;
 			});
+		});
+	}
+
+	private scheduleLayoutChange() {
+		if (this.layoutChangeHandle !== null) return;
+		this.layoutChangeHandle = requestAnimationFrame(() => {
+			this.layoutChangeHandle = null;
+			this.layoutChangeCallback();
 		});
 	}
 

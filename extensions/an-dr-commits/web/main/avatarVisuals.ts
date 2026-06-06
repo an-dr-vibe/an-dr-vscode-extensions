@@ -38,25 +38,143 @@ function commitsGetAuthorAvatarSizeClass(view: any) {
 	return view.config.avatarSize === GG.AuthorAvatarSize.Small ? 'small' : 'normal';
 }
 
-function commitsUpdateCommittedColumnDisplayMode(view: any) {
-	view.tableElem.classList.remove('committedHideTime');
-	if (view.config.dateFormat.type !== GG.DateFormatType.DateAndTime || !view.getColumnVisibility().committed) return;
-	const committedCells = <NodeListOf<HTMLElement>>view.tableElem.querySelectorAll('tr.commit td.committedCol');
-	for (let i = 0; i < committedCells.length; i++) {
-		const cell = committedCells[i];
-		const meta = <HTMLElement | null>cell.querySelector('.committedMeta');
-		if (meta === null) continue;
-		const avatar = <HTMLElement | null>cell.querySelector('.avatar');
-		const avatarWidth = avatar !== null ? avatar.offsetWidth + 4 : 0;
-		const style = window.getComputedStyle(cell);
-		const paddingLeft = parseFloat(style.paddingLeft) || 0;
-		const paddingRight = parseFloat(style.paddingRight) || 0;
-		const availableWidth = cell.clientWidth - paddingLeft - paddingRight - avatarWidth;
-		if (availableWidth <= 0 || meta.scrollWidth > availableWidth + 1) {
-			view.tableElem.classList.add('committedHideTime');
-			return;
+function commitsGetIdColStyleWidth(): number {
+	// Measure the pixel width of 8 hex chars in the editor monospace font at the table font size.
+	// th.style.width = td_content_needed - (th_padding - td_padding) = content - (24 - 8) = content - 16
+	const probe = document.createElement('span');
+	const editorFont = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-font-family').trim() || 'monospace';
+	probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:13px;';
+	probe.style.fontFamily = editorFont;
+	probe.textContent = 'ffffffff';
+	document.body.appendChild(probe);
+	const contentW = Math.ceil(probe.getBoundingClientRect().width) + 6;  // +6px breathing room
+	document.body.removeChild(probe);
+	return contentW - 16;  // convert td content width → th style.width
+}
+
+function commitsMeasureCommittedColumnStateWidth(view: any, hideTime: boolean, hideDate: boolean) {
+	const sample = <HTMLElement | null>view.tableElem.querySelector('td.committedCol');
+	const header = <HTMLElement | null>view.tableElem.querySelector('th.committedCol');
+	if (sample === null || header === null) return 40;
+
+	const avatar = <HTMLElement | null>sample.querySelector('.avatar:not(.empty)');
+	const meta = <HTMLElement | null>sample.querySelector('.committedMeta');
+	const date = <HTMLElement | null>sample.querySelector('.committedDate');
+	const time = <HTMLElement | null>sample.querySelector('.committedTime');
+	const font = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-font-family').trim() || 'monospace';
+	const fontSize = getComputedStyle(sample).fontSize || '13px';
+	const measureText = (text: string) => {
+		const probe = document.createElement('span');
+		probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:' + fontSize + ';font-family:' + font + ';left:-10000px;top:-10000px;';
+		probe.textContent = text;
+		document.body.appendChild(probe);
+		const width = Math.ceil(probe.getBoundingClientRect().width);
+		document.body.removeChild(probe);
+		return width;
+	};
+
+	let cellContentWidth = 0;
+	if (avatar !== null) {
+		const avatarStyle = getComputedStyle(avatar);
+		cellContentWidth += Math.ceil(avatar.getBoundingClientRect().width)
+			+ (parseFloat(avatarStyle.marginLeft) || 0)
+			+ (parseFloat(avatarStyle.marginRight) || 0);
+	}
+	if (!hideDate && meta !== null && date !== null) {
+		cellContentWidth += measureText(date.textContent || '');
+		if (!hideTime && time !== null) {
+			const dateStyle = getComputedStyle(date);
+			cellContentWidth += (parseFloat(dateStyle.marginRight) || 0) + measureText(time.textContent || '');
 		}
 	}
+
+	const headerProbe = document.createElement('span');
+	headerProbe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:13px;font-weight:700;left:-10000px;top:-10000px;';
+	headerProbe.textContent = header.textContent || 'Dev';
+	document.body.appendChild(headerProbe);
+	const headerContentWidth = Math.ceil(headerProbe.getBoundingClientRect().width);
+	document.body.removeChild(headerProbe);
+
+	if (hideDate) return Math.max(headerContentWidth + COLUMN_LEFT_RIGHT_PADDING, 40);
+	const cellWidthWithPadding = Math.ceil(cellContentWidth) + 16;
+	return Math.max(cellWidthWithPadding, headerContentWidth + COLUMN_LEFT_RIGHT_PADDING, 40);
+}
+
+function commitsGetVisibleCommitTableWidth(view: any) {
+	const tableRect = view.tableElem.getBoundingClientRect();
+	const contentElem = view.tableElem.parentElement;
+	const contentWidth = contentElem !== null ? contentElem.clientWidth : tableRect.width;
+	const viewWidth = view.viewElem.clientWidth || tableRect.width;
+	return Math.max(0, Math.floor(Math.min(tableRect.width, contentWidth, viewWidth)));
+}
+
+function commitsGetDescriptionTargetWidth(view: any, availableWidth: number, avatarWidth: number) {
+	const descElem = <HTMLElement | null>view.tableElem.querySelector('td:nth-child(2), th[data-col="1"]');
+	const textWidth = descElem !== null ? descElem.scrollWidth : 0;
+	const maxPossible = Math.max(0, availableWidth - avatarWidth);
+	const preferred = Math.max(240, Math.min(textWidth, 380));
+	return Math.max(120, Math.min(preferred, maxPossible));
+}
+
+function commitsUpdateCommittedColumnDisplayMode(view: any) {
+	view.tableElem.classList.remove('committedHideTime');
+	view.tableElem.classList.remove('committedHideDate');
+
+	// Always enforce the correct fixed width for the ID column
+	if (view.getColumnVisibility().id) {
+		const idTh = <HTMLElement | null>view.tableElem.querySelector('th[data-col="3"]');
+		if (idTh !== null) idTh.style.width = commitsGetIdColStyleWidth() + 'px';
+	}
+
+	if (!view.getColumnVisibility().committed) return;
+
+	const devTh = <HTMLElement | null>view.tableElem.querySelector('th.committedCol');
+	if (devTh === null) return;
+
+	// Ensure fixedLayout so th.style.width is authoritative for the column
+	if (!view.tableElem.classList.contains('fixedLayout')) {
+		const cols = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName('tableColHeader');
+		for (let i = 0; i < cols.length; i++) {
+			const col = parseInt(cols[i].dataset.col!);
+			if (col === 0) {
+				cols[i].style.width = (cols[i].clientWidth - COLUMN_LEFT_RIGHT_PADDING) + 'px';
+			}
+		}
+		view.tableElem.classList.remove('autoLayout');
+		view.tableElem.classList.add('fixedLayout');
+	}
+
+	const tableWidth = commitsGetVisibleCommitTableWidth(view);
+	if (tableWidth === 0) return;
+
+	const graphTh = <HTMLElement | null>view.tableElem.querySelector('th[data-col="0"]');
+	const idTh = view.getColumnVisibility().id
+		? <HTMLElement | null>view.tableElem.querySelector('th[data-col="3"]')
+		: null;
+	const graphWidth = graphTh ? graphTh.clientWidth : 50;
+	const idWidth = idTh ? idTh.clientWidth : 0;
+	const available = tableWidth - graphWidth - idWidth;
+
+	const fullWidth = commitsMeasureCommittedColumnStateWidth(view, false, false);
+	const dateWidth = commitsMeasureCommittedColumnStateWidth(view, true, false);
+	const avatarWidth = commitsMeasureCommittedColumnStateWidth(view, true, true);
+	const descriptionTargetWidth = commitsGetDescriptionTargetWidth(view, available, avatarWidth);
+	let devVisW = fullWidth;
+	let hideTime = false;
+	let hideDate = false;
+
+	if (available - fullWidth < descriptionTargetWidth) {
+		devVisW = dateWidth;
+		hideTime = true;
+	}
+	if (available - dateWidth < descriptionTargetWidth) {
+		devVisW = avatarWidth;
+		hideDate = true;
+	}
+
+	view.tableElem.classList.toggle('committedHideTime', hideTime);
+	view.tableElem.classList.toggle('committedHideDate', hideDate);
+	devTh.style.width = (devVisW - COLUMN_LEFT_RIGHT_PADDING) + 'px';
 }
 
 function commitsGetAuthorAvatarSeed(_view: any, author: string, email: string) {

@@ -284,7 +284,7 @@ function formatShortDate(unixTimestamp: number) {
 	const date = new Date(unixTimestamp * 1000), format = initialState.config.dateFormat;
 	let dateStr = format.iso
 		? date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate())
-		: date.getDate() + ' ' + MONTHS[date.getMonth()] + ' ' + date.getFullYear();
+		: pad2(date.getDate()) + '-' + MONTHS[date.getMonth()] + '-' + date.getFullYear();
 	let hourMinsStr = pad2(date.getHours()) + ':' + pad2(date.getMinutes());
 	let formatted;
 

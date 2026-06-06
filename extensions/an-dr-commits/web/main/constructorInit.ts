@@ -20,7 +20,7 @@ function commitsInitDropdowns(view: any) {
 	view.repoDropdown = new Dropdown('repoDropdown', true, false, 'Repos', (values: string[]) => {
 		view.loadRepo(values[0]);
 	});
-	view.filesPanel = new FilesPanel();
+	view.filesPanel = new FilesPanel(() => view.updateCommittedColumnDisplayMode());
 	view.filesPanel.getContentElem().addEventListener('click', (e: MouseEvent) => commitsHandleFilesPanelClick(view, e));
 	view.filesPanel.getContentElem().addEventListener('dblclick', (e: MouseEvent) => commitsHandleFilesPanelDblClick(view, e));
 	view.branchDropdown = new BranchPanel('branchPanel', (values: string[]) => {
@@ -83,19 +83,22 @@ function commitsInitDropdowns(view: any) {
 		view.saveState();
 		view.requestLoadRepoInfoAndCommits(false, true);
 	}, (showRemotesForAllLocals: boolean) => {
-		const allLocals: string[] = (view.gitBranches as string[]).filter((b: string) => b !== '' && b !== 'HEAD' && !b.startsWith('remotes/') && !b.startsWith('--glob='));
+		const current: string[] = Array.isArray(view.currentBranches) ? view.currentBranches : [];
+		const isShowAll = current.length === 1 && current[0] === SHOW_ALL_BRANCHES;
+		// When nothing specific is selected, fall back to all locals; otherwise use only selected locals.
+		const sourceBranches: string[] = isShowAll
+			? (view.gitBranches as string[]).filter((b: string) => b !== '' && b !== 'HEAD' && !b.startsWith('remotes/') && !b.startsWith('--glob='))
+			: current.filter((b: string) => b !== SHOW_ALL_BRANCHES && !b.startsWith('remotes/') && !b.startsWith('--glob=') && b !== 'HEAD');
 		const remoteSet = new Set<string>();
-		for (const branch of allLocals) {
+		for (const branch of sourceBranches) {
 			const upstream: string = view.gitBranchUpstreams[branch];
 			if (typeof upstream !== 'string' || upstream === '') continue;
 			const remoteBranch = (view.gitBranches as string[]).includes('remotes/' + upstream) ? 'remotes/' + upstream : null;
 			if (remoteBranch !== null) remoteSet.add(remoteBranch);
 		}
 		if (remoteSet.size === 0) return;
-		const current: string[] = Array.isArray(view.currentBranches) ? view.currentBranches : [];
-		const isShowAll = current.length === 1 && current[0] === SHOW_ALL_BRANCHES;
 		if (showRemotesForAllLocals) {
-			const base: string[] = isShowAll ? allLocals : current;
+			const base: string[] = isShowAll ? sourceBranches : current;
 			const expanded = [...base];
 			remoteSet.forEach((remote) => {
 				if (!expanded.includes(remote)) expanded.push(remote);
@@ -112,7 +115,7 @@ function commitsInitDropdowns(view: any) {
 		view.saveState();
 		view.clearCommits();
 		view.requestLoadRepoInfoAndCommits(true, true);
-	});
+	}, () => view.updateCommittedColumnDisplayMode());
 }
 
 function commitsRestoreFromPrevState(view: any, prevState: any) {

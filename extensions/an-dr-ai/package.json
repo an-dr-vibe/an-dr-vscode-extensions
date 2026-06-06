@@ -1,0 +1,94 @@
+{
+  "name": "an-dr-ai",
+  "displayName": "an-dr: AI Hub",
+  "description": "Unified AI CLI interface. Detects Claude, Codex, and GitHub Copilot CLIs and exposes a shared API for other extensions.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "author": {
+    "name": "an-dr",
+    "email": "mail@agramakov.me"
+  },
+  "homepage": "https://github.com/an-dr/an-dr-vscode-extensions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/an-dr/an-dr-vscode-extensions.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["ai", "claude", "codex", "copilot", "hub"],
+  "activationEvents": ["*"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "an-dr-ai.explainSelection",
+        "title": "Explain Selection",
+        "category": "AI"
+      },
+      {
+        "command": "an-dr-ai.generateCommitMessage",
+        "title": "Generate Commit Message",
+        "category": "AI"
+      },
+      {
+        "command": "an-dr-ai.explainCommit",
+        "title": "Explain Commit",
+        "category": "AI"
+      },
+      {
+        "command": "an-dr-ai.findFlaws",
+        "title": "Find Flaws in Commit",
+        "category": "AI"
+      },
+      {
+        "command": "an-dr-ai.reviewFile",
+        "title": "Review File",
+        "category": "AI"
+      },
+      {
+        "command": "an-dr-ai.askSelection",
+        "title": "Ask About Selection",
+        "category": "AI"
+      }
+    ],
+    "configuration": {
+      "title": "AI Hub",
+      "properties": {
+        "an-dr-ai.preferredCli": {
+          "type": "string",
+          "enum": ["auto", "claude", "codex", "gh-copilot"],
+          "default": "auto",
+          "description": "Preferred AI CLI. 'auto' uses the first detected one (claude → codex → gh-copilot)."
+        },
+        "an-dr-ai.prompts.findFlaws": {
+          "type": "string",
+          "editPresentation": "multilineText",
+          "default": "You are a senior code reviewer. Review this diff for:\n- Logic errors and edge cases\n- Security issues (injection, auth, data exposure)\n- Breaking changes not obvious from the diff\n- Missing error handling\n- Test coverage gaps\n- Anything that will cause pain in 3 months\n\nBe blunt. No praise. Flag unknowns explicitly.",
+          "description": "Prompt used by the 'Find Flaws in Commit' command."
+        },
+        "an-dr-ai.prompts.reviewFile": {
+          "type": "string",
+          "editPresentation": "multilineText",
+          "default": "You are a senior code reviewer. Review this file for:\n- Architecture and structural issues\n- Security vulnerabilities\n- Dead code or unnecessary complexity\n- Missing error handling\n- Anything that should be refactored before this goes to production\n\nBe blunt. No praise. Flag unknowns explicitly.",
+          "description": "Prompt used by the 'Review File' command."
+        },
+        "an-dr-ai.outputChannel": {
+          "type": "string",
+          "default": "an-dr-ai",
+          "description": "Name of the VS Code output channel used to display AI responses."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -12,8 +12,11 @@ class FilesPanel {
 	private panelWidth: number;
 	private scrollTop: number = 0;
 	private onScroll: () => void = () => {};
+	private layoutChangeCallback: () => void;
+	private layoutChangeHandle: number | null = null;
 
-	constructor() {
+	constructor(layoutChangeCallback: () => void = () => {}) {
+		this.layoutChangeCallback = layoutChangeCallback;
 		this.panelHidden = globalState.filesPanelHidden;
 		this.panelWidth = globalState.filesPanelWidth;
 
@@ -92,6 +95,7 @@ class FilesPanel {
 
 	private applyWidth(width: number) {
 		document.body.style.setProperty('--files-panel-width', width + 'px');
+		this.scheduleLayoutChange();
 	}
 
 	private applyInlineWidth(width: number) {
@@ -196,5 +200,13 @@ class FilesPanel {
 
 	public isHidden(): boolean {
 		return this.panelHidden;
+	}
+
+	private scheduleLayoutChange() {
+		if (this.layoutChangeHandle !== null) return;
+		this.layoutChangeHandle = requestAnimationFrame(() => {
+			this.layoutChangeHandle = null;
+			this.layoutChangeCallback();
+		});
 	}
 }

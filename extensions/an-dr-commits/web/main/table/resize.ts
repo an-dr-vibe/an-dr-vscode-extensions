@@ -1,6 +1,8 @@
 /* Table resize helpers extracted from CommitsView */
 
 function commitsApplyColumnWidths(view: any, cols: HTMLCollectionOf<HTMLElement>, columnWidths: GG.ColumnWidth[]) {
+	cols[0].style.minWidth = '';
+	cols[0].style.maxWidth = '';
 	cols[0].style.width = columnWidths[0] + 'px';
 	cols[0].style.padding = '';
 	for (let i = 2; i < cols.length; i++) {
@@ -77,7 +79,7 @@ function commitsMakeTableResizable(view: any) {
 
 	for (let i = 0; i < cols.length; i++) {
 		let col = parseInt(cols[i].dataset.col!);
-		cols[i].innerHTML += (i > 0 ? '<span class="resizeCol left" data-col="' + (col - 1) + '"></span>' : '') + (i < cols.length - 1 ? '<span class="resizeCol right" data-col="' + col + '"></span>' : '');
+		cols[i].innerHTML += (i > 0 && col - 1 !== 0 ? '<span class="resizeCol left" data-col="' + (col - 1) + '"></span>' : '') + (i < cols.length - 1 && col !== 0 ? '<span class="resizeCol right" data-col="' + col + '"></span>' : '');
 	}
 
 	let cWidths = view.gitRepos[view.currentRepo].columnWidths;
@@ -85,18 +87,14 @@ function commitsMakeTableResizable(view: any) {
 		columnWidths = [COLUMN_AUTO, COLUMN_AUTO, COLUMN_AUTO, COLUMN_AUTO];
 		view.saveColumnWidths(columnWidths);
 	} else if (cWidths.length >= 4) {
-		const dateWidth = cWidths[1], authorWidth = cWidths[2];
-		let committedWidth = COLUMN_AUTO;
-		if (dateWidth > 0 || authorWidth > 0) {
-			committedWidth = Math.max(dateWidth > 0 ? dateWidth : 0, authorWidth > 0 ? authorWidth : 0);
-		}
-		columnWidths = [cWidths[0] > COLUMN_HIDDEN ? cWidths[0] : COLUMN_AUTO, COLUMN_AUTO, committedWidth, cWidths[3] > COLUMN_HIDDEN ? cWidths[3] : COLUMN_AUTO];
+		// Graph and Dev columns are always responsive — ignore any saved widths.
+		columnWidths = [COLUMN_AUTO, COLUMN_AUTO, COLUMN_AUTO, cWidths[3] > COLUMN_HIDDEN ? cWidths[3] : COLUMN_AUTO];
 		view.saveColumnWidths(columnWidths);
 	} else {
 		columnWidths = [
-			cWidths[0] > COLUMN_HIDDEN ? cWidths[0] : COLUMN_AUTO,
 			COLUMN_AUTO,
-			cWidths[1] > COLUMN_HIDDEN ? cWidths[1] : COLUMN_AUTO,
+			COLUMN_AUTO,
+			COLUMN_AUTO,  // Dev: always responsive, ignore saved
 			cWidths[2] > COLUMN_HIDDEN ? cWidths[2] : COLUMN_AUTO
 		];
 	}
@@ -109,9 +107,9 @@ function commitsMakeTableResizable(view: any) {
 	} else {
 		view.tableElem.className = 'autoLayout';
 
-		let colWidth = cols[0].offsetWidth, graphWidth = view.graph.getContentWidth();
+		let graphWidth = view.graph.getContentWidth();
 		let maxWidth = Math.round(view.viewElem.clientWidth * 0.333);
-		if (Math.max(graphWidth, colWidth) > maxWidth) {
+		if (graphWidth > maxWidth) {
 			view.graph.limitMaxWidth(maxWidth);
 			graphWidth = maxWidth;
 			view.tableElem.className += ' limitGraphWidth';
@@ -120,10 +118,10 @@ function commitsMakeTableResizable(view: any) {
 			view.graph.limitMaxWidth(-1);
 			view.tableElem.style.removeProperty(CSS_PROP_LIMIT_GRAPH_WIDTH);
 		}
-
-		if (colWidth < Math.max(graphWidth, 64)) {
-			cols[0].style.padding = '6px ' + Math.floor((Math.max(graphWidth, 64) - (colWidth - COLUMN_LEFT_RIGHT_PADDING)) / 2) + 'px';
-		}
+		cols[0].style.width = '';
+		const colMinWidth = Math.max(graphWidth - COLUMN_LEFT_RIGHT_PADDING, COLUMN_MIN_WIDTH) + 'px';
+		cols[0].style.minWidth = colMinWidth;
+		cols[0].style.maxWidth = colMinWidth;
 	}
 
 	commitsInitColumnDrag(view, cols, columnWidths);

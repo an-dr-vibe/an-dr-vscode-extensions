@@ -992,13 +992,14 @@ li > .fileTreeFolderContents{
 	max-width:100%;
 	overflow:hidden;
 	text-overflow:ellipsis;
+	font-family:var(--vscode-editor-font-family,monospace);
 }
 #commitTable td.committedCol .committedDate, #commitTable td.committedCol .committedTime{
 	display:inline-block;
 	vertical-align:top;
 }
 #commitTable td.committedCol .committedDate{
-	margin-right:4px;
+	margin-right:2px;
 }
 #commitTable td.committedCol .avatar.normal + .committedMeta{
 	max-width:calc(100% - 22px);
@@ -1006,7 +1007,16 @@ li > .fileTreeFolderContents{
 #commitTable td.committedCol .avatar.small + .committedMeta{
 	max-width:calc(100% - 18px);
 }
+#commitTable td.committedCol, #commitTable th.committedCol{
+	text-align:center;
+}
+#commitTable td.idCol{
+	font-family:var(--vscode-editor-font-family,monospace);
+}
 #commitTable.committedHideTime td.committedCol .committedTime{
+	display:none;
+}
+#commitTable.committedHideDate td.committedCol .committedMeta{
 	display:none;
 }
 .commit .avatar.initials{

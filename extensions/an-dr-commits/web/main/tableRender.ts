@@ -84,9 +84,9 @@ function commitsCollapseReferenceBadgesToFit(view: any) {
 
 function commitsRenderTableHeader(view: any): string {
 	const colVisibility = view.getColumnVisibility();
-	return '<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader" data-col="0">Graph</th><th class="tableColHeader" data-col="1">Description</th>' +
-		(colVisibility.committed ? '<th class="tableColHeader committedCol" data-col="2">Committed</th>' : '') +
-		(colVisibility.id ? '<th class="tableColHeader" data-col="3">ID</th>' : '') +
+	return '<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader" data-col="0"></th><th class="tableColHeader" data-col="1">Graph</th>' +
+		(colVisibility.committed ? '<th class="tableColHeader committedCol" data-col="2">Dev</th>' : '') +
+		(colVisibility.id ? '<th class="tableColHeader idCol" data-col="3">ID</th>' : '') +
 		'</tr>';
 }
 
@@ -137,7 +137,7 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 	return '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
 		(view.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td><span class="description">' : '<td></td><td><span class="description">' + refBranches) + (view.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
 		(colVisibility.committed ? view.getCommittedCellHtml(commit) : '') +
-		(colVisibility.id ? '<td class="text" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
+		(colVisibility.id ? '<td class="text idCol" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
 		'</tr>';
 }
 
@@ -210,5 +210,5 @@ function commitsRenderUncommittedChanges(view: any) {
 	const dateParts = view.getCommittedDateParts(date.formatted);
 	document.getElementById('uncommittedChanges')!.innerHTML = '<td></td><td><b>' + escapeHtml(view.commits[0].message) + '</b></td>' +
 		(colVisibility.committed ? '<td class="committedCol text" title="' + escapeHtml(date.title) + '"><span class="committedMeta"><span class="committedDate">' + escapeHtml(dateParts.date) + '</span>' + (dateParts.time !== null ? '<span class="committedTime">' + escapeHtml(dateParts.time) + '</span>' : '') + '</span></td>' : '') +
-		(colVisibility.id ? '<td class="text" title="*">*</td>' : '');
+		(colVisibility.id ? '<td class="text idCol" title="*">*</td>' : '');
 }

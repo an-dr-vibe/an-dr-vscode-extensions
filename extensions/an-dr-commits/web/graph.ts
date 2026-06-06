@@ -148,12 +148,16 @@ class Graph {
 	/* Get */
 
 	public getContentWidth() {
+		return 2 * this.config.grid.offsetX + (this.getLaneCount() - 1) * this.config.grid.x;
+	}
+
+	public getLaneCount() {
 		let x = 0, i, p;
 		for (i = 0; i < this.vertices.length; i++) {
 			p = this.vertices[i].getNextPoint();
 			if (p.x > x) x = p.x;
 		}
-		return 2 * this.config.grid.offsetX + (x - 1) * this.config.grid.x;
+		return Math.max(1, x);
 	}
 
 	public getHeight(expandedCommit: ExpandedCommit | null) {

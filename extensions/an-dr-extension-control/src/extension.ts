@@ -97,17 +97,44 @@ async function pullAndReload(config: vscode.WorkspaceConfiguration): Promise<voi
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'Extension Control', cancellable: false },
         async progress => {
+            // Stash uncommitted changes if any
+            const status = await exec('git status --porcelain', root);
+            let stashed = false;
+            if (status.stdout) {
+                progress.report({ message: 'Stashing local changes…' });
+                const stash = await exec('git stash', root);
+                if (stash.code !== 0) {
+                    vscode.window.showErrorMessage(`git stash failed:\n${stash.stderr || stash.stdout}`);
+                    return;
+                }
+                stashed = true;
+            }
+
             progress.report({ message: 'Pulling from remote…' });
             const pull = await exec('git pull', root);
 
             if (pull.code !== 0) {
+                if (stashed) { await exec('git stash pop', root); }
                 vscode.window.showErrorMessage(`git pull failed:\n${pull.stderr || pull.stdout}`);
                 return;
             }
 
             if (pull.stdout.toLowerCase().includes('already up to date')) {
+                if (stashed) { await exec('git stash pop', root); }
                 vscode.window.showInformationMessage('Extensions are already up to date.');
                 return;
+            }
+
+            if (stashed) {
+                progress.report({ message: 'Restoring local changes…' });
+                const pop = await exec('git stash pop', root);
+                if (pop.code !== 0) {
+                    vscode.window.showWarningMessage(
+                        'Extensions updated, but your local changes could not be re-applied automatically. ' +
+                        'Your stash is still saved — run `git stash pop` and resolve conflicts manually when ready.'
+                    );
+                    return;
+                }
             }
 
             progress.report({ message: 'Rebuilding extensions…' });

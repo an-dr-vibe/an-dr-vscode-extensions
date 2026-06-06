@@ -60,7 +60,9 @@
       "Bash(git push *)",
       "Bash(node bundle.js)",
       "Bash(rm bundle.js)",
-      "Bash(grep -v \"^--$\")"
+      "Bash(grep -v \"^--$\")",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ]
   }
 }

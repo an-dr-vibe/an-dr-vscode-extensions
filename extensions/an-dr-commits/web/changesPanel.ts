@@ -246,6 +246,89 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 		});
 	});
 
+	// File right-click context menu (mirrors native VS Code Changes panel)
+	contentElem.querySelectorAll<HTMLElement>('.cpFile').forEach((fileRow) => {
+		fileRow.addEventListener('contextmenu', (e) => {
+			handledEvent(e);
+			const repo = commits.getCurrentRepo();
+			if (!repo) return;
+			const filePath = fileRow.dataset['path'];
+			if (!filePath) return;
+			const isStaged = fileRow.dataset['staged'] === 'true';
+			const fileEntry = _cpChanges.find((c) => c.path === filePath);
+			if (!fileEntry) return;
+			const isUntracked = fileEntry.status === 'U';
+			const isDeleted = fileEntry.status === 'D';
+
+			contextMenu.show([
+				[
+					{
+						title: 'Open Changes',
+						visible: !isUntracked,
+						onClick: () => sendMessage({
+							command: 'viewDiff',
+							repo,
+							fromHash: UNCOMMITTED,
+							toHash: UNCOMMITTED,
+							oldFilePath: fileEntry.oldPath || filePath,
+							newFilePath: filePath,
+							type: fileEntry.status as GG.GitFileStatus
+						})
+					},
+					{
+						title: 'Open File',
+						visible: !isDeleted,
+						onClick: () => sendMessage({ command: 'openFile', repo, hash: UNCOMMITTED, filePath })
+					}
+				],
+				[
+					{
+						title: 'Stage Changes',
+						visible: !isStaged,
+						onClick: () => sendMessage({ command: 'stageFiles', repo, files: [filePath] })
+					},
+					{
+						title: 'Unstage Changes',
+						visible: isStaged,
+						onClick: () => sendMessage({ command: 'unstageFiles', repo, files: [filePath] })
+					},
+					{
+						title: 'Discard Changes',
+						visible: !isStaged && !isUntracked,
+						onClick: () => dialog.showConfirmation(
+							'Are you sure you want to discard changes to <b><i>' + escapeHtml(filePath) + '</i></b>?',
+							'Discard Changes',
+							() => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: false }),
+							null
+						)
+					},
+					{
+						title: 'Delete Untracked File',
+						visible: !isStaged && isUntracked,
+						onClick: () => dialog.showConfirmation(
+							'Are you sure you want to delete the untracked file <b><i>' + escapeHtml(filePath) + '</i></b>?',
+							'Delete File',
+							() => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: true }),
+							null
+						)
+					}
+				],
+				[
+					{
+						title: 'Copy Relative Path to Clipboard',
+						visible: true,
+						onClick: () => sendMessage({ command: 'copyFilePath', repo, filePath, absolute: false })
+					},
+					{
+						title: 'Copy Absolute Path to Clipboard',
+						visible: true,
+						onClick: () => sendMessage({ command: 'copyFilePath', repo, filePath, absolute: true })
+					}
+				]
+			], false, null, e as MouseEvent, document.body);
+		});
+	});
+
 	// File action buttons
 	contentElem.querySelectorAll<HTMLButtonElement>('.cpFileBtn').forEach((btn) => {
 		btn.addEventListener('click', (e) => {

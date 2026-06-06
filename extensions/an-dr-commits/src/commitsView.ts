@@ -906,8 +906,13 @@ export class CommitsView extends Disposable {
 				break;
 			}
 			case 'discardFileChanges': {
-				const discardError = await this.dataSource.discardFileChanges(msg.repo, msg.files, msg.isUntracked);
+				const discardError = await this.dataSource.discardFileChanges(msg.repo, msg.files, msg.isUntracked, msg.restoreToIndex ?? false);
 				this.sendMessage({ command: 'discardFileChanges', error: discardError });
+				break;
+			}
+			case 'addToGitignore': {
+				const ignoreError = await this.dataSource.addToGitignore(msg.repo, msg.filePath, msg.type);
+				this.sendMessage({ command: 'addToGitignore', error: ignoreError });
 				break;
 			}
 		}

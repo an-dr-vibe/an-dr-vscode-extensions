@@ -280,6 +280,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'discardFileChanges':
 				filesPanelHandleStageUnstageResponse(msg.error);
 				break;
+			case 'addToGitignore':
+				filesPanelHandleAddToGitignoreResponse(msg.error);
+				break;
 			case 'commitChanges':
 				filesPanelHandleCommitResponse(msg.error);
 				break;

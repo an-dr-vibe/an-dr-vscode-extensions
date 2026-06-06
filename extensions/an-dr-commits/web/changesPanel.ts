@@ -295,12 +295,7 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 					{
 						title: 'Discard Changes',
 						visible: !isStaged && !isUntracked,
-						onClick: () => dialog.showConfirmation(
-							'Are you sure you want to discard changes to <b><i>' + escapeHtml(filePath) + '</i></b>?',
-							'Discard Changes',
-							() => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: false }),
-							null
-						)
+						onClick: () => _cpShowDiscardDialog(repo, filePath)
 					},
 					{
 						title: 'Delete Untracked File',
@@ -311,6 +306,11 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 							() => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: true }),
 							null
 						)
+					},
+					{
+						title: 'Ignore File',
+						visible: !isStaged,
+						onClick: () => _cpShowIgnoreDialog(repo, filePath)
 					}
 				],
 				[
@@ -353,12 +353,16 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 			} else if (action === 'discard' && filePath) {
 				const fileEntry = _cpChanges.find((c) => c.path === filePath);
 				const isUntracked = fileEntry ? fileEntry.status === 'U' : false;
-				dialog.showConfirmation(
-					'Are you sure you want to discard changes to <b><i>' + escapeHtml(filePath) + '</i></b>?',
-					'Discard Changes',
-					() => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked }),
-					null
-				);
+				if (isUntracked) {
+					dialog.showConfirmation(
+						'Are you sure you want to delete the untracked file <b><i>' + escapeHtml(filePath) + '</i></b>?',
+						'Delete File',
+						() => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: true }),
+						null
+					);
+				} else {
+					_cpShowDiscardDialog(repo, filePath);
+				}
 			}
 			void isStaged;
 		});
@@ -439,6 +443,50 @@ function filesPanelHandleStageUnstageResponse(error: GG.ErrorInfo) {
 		dialog.showError('Unable to Stage/Unstage File', error, null, null);
 	}
 	if (_cpActive) changesPanelRequestRefresh();
+}
+
+function filesPanelHandleAddToGitignoreResponse(error: GG.ErrorInfo) {
+	if (error !== null) {
+		dialog.showError('Unable to Add to .gitignore', error, null, null);
+	}
+	if (_cpActive) changesPanelRequestRefresh();
+}
+
+function _cpShowDiscardDialog(repo: string, filePath: string) {
+	const isAlsoStaged = _cpChanges.some((c) => c.path === filePath && c.staged);
+	const options: DialogRadioInputOption[] = [
+		{ name: 'Restore to HEAD', value: 'head', description: 'Revert all changes, matching the last committed version' }
+	];
+	if (isAlsoStaged) {
+		options.push({ name: 'Restore to index', value: 'index', description: 'Revert unstaged edits only; keep staged snapshot' });
+	}
+	dialog.showForm(
+		'Reset <b><i>' + escapeHtml(filePath) + '</i></b>:',
+		[{ type: DialogInputType.Radio, name: '', options, default: 'head' }],
+		'Reset',
+		(values) => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: false, restoreToIndex: values[0] === 'index' }),
+		null
+	);
+}
+
+function _cpShowIgnoreDialog(repo: string, filePath: string) {
+	const normalized = filePath.replace(/\\/g, '/');
+	const basename = normalized.split('/').pop() || filePath;
+	const ext = basename.includes('.') ? basename.split('.').pop() : null;
+	const options: DialogRadioInputOption[] = [
+		{ name: 'Add to root .gitignore', value: 'root', description: 'Append "/' + normalized + '" to the project root .gitignore' },
+		{ name: 'Add to local .gitignore', value: 'local', description: 'Append "/' + basename + '" to the .gitignore next to this file' }
+	];
+	if (ext) {
+		options.push({ name: 'Ignore by extension', value: 'extension', description: 'Append "*.' + ext + '" to the project root .gitignore' });
+	}
+	dialog.showForm(
+		'Ignore <b><i>' + escapeHtml(filePath) + '</i></b>:',
+		[{ type: DialogInputType.Radio, name: '', options, default: 'root' }],
+		'Add to .gitignore',
+		(values) => sendMessage({ command: 'addToGitignore', repo, filePath, type: values[0] as 'root' | 'local' | 'extension' }),
+		null
+	);
 }
 
 function filesPanelHandleCommitResponse(error: GG.ErrorInfo) {

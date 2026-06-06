@@ -83,6 +83,7 @@ interface DialogSelectInputOption {
 interface DialogRadioInputOption {
 	readonly name: string;
 	readonly value: string;
+	readonly description?: string;
 }
 
 type DialogInput = DialogTextInput | DialogTextRefInput | DialogTextAreaInput | DialogSelectInput | DialogRadioInput | DialogCheckboxInput;
@@ -218,7 +219,7 @@ class Dialog {
 			let inputHtml;
 			if (input.type === DialogInputType.Radio) {
 				inputHtml = '<td class="inputCol"' + (infoColRequired ? ' colspan="2"' : '') + '><span class="dialogFormRadio">' +
-					input.options.map((option, optionId) => '<label><input type="radio" name="dialogInput' + id + '" value="' + optionId + '"' + (option.value === input.default ? ' checked' : '') + ' tabindex="' + (id + 1) + '"/><span class="customRadio"></span>' + escapeHtml(option.name) + '</label>').join('<br>') +
+					input.options.map((option, optionId) => '<label><input type="radio" name="dialogInput' + id + '" value="' + optionId + '"' + (option.value === input.default ? ' checked' : '') + ' tabindex="' + (id + 1) + '"/><span class="customRadio"></span>' + escapeHtml(option.name) + (option.description ? '<span class="dialogRadioDesc">' + escapeHtml(option.description) + '</span>' : '') + '</label>').join('<br>') +
 					'</span></td>';
 			} else {
 				const infoHtml = input.info ? '<span class="dialogInfo" title="' + escapeHtml(input.info) + '">' + ICONS.info + '</span>' : '';

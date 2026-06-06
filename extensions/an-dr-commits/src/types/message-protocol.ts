@@ -889,9 +889,20 @@ export interface RequestDiscardFileChanges extends RepoRequest {
 	readonly command: 'discardFileChanges';
 	readonly files: string[];
 	readonly isUntracked: boolean;
+	readonly restoreToIndex?: boolean;
 }
 export interface ResponseDiscardFileChanges {
 	readonly command: 'discardFileChanges';
+	readonly error: ErrorInfo;
+}
+
+export interface RequestAddToGitignore extends RepoRequest {
+	readonly command: 'addToGitignore';
+	readonly filePath: string;
+	readonly type: 'root' | 'local' | 'extension';
+}
+export interface ResponseAddToGitignore {
+	readonly command: 'addToGitignore';
 	readonly error: ErrorInfo;
 }
 
@@ -972,7 +983,8 @@ export type RequestMessage =
 	| RequestStageFiles
 	| RequestUnstageFiles
 	| RequestCommitChanges
-	| RequestDiscardFileChanges;
+	| RequestDiscardFileChanges
+	| RequestAddToGitignore;
 
 export type ResponseMessage =
 	ResponseAddRemote
@@ -1049,6 +1061,7 @@ export type ResponseMessage =
 	| ResponseStageFiles
 	| ResponseUnstageFiles
 	| ResponseCommitChanges
-	| ResponseDiscardFileChanges;
+	| ResponseDiscardFileChanges
+	| ResponseAddToGitignore;
 
 export { DeepReadonly, DeepWriteable, Writeable };

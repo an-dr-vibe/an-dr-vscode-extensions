@@ -68,6 +68,16 @@ body.vscode-high-contrast .dialog{
 	user-select:none;
 }
 
+.dialogContent .dialogFormRadio .dialogRadioDesc{
+	display:block;
+	font-size:11px;
+	opacity:0.65;
+	padding-left:20px;
+	line-height:14px;
+	margin-top:1px;
+	margin-bottom:3px;
+}
+
 .dialogContent > table.dialogForm.single .customCheckbox, .dialogContent > table.dialogForm.multiCheckbox .customCheckbox{
 	margin-right:6px;
 }

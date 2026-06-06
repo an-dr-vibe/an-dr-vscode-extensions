@@ -1197,11 +1197,48 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(args, repo);
 	}
 
-	public discardFileChanges(repo: string, filePaths: string[], isUntracked: boolean): Promise<ErrorInfo> {
+	public discardFileChanges(repo: string, filePaths: string[], isUntracked: boolean, restoreToIndex: boolean = false): Promise<ErrorInfo> {
 		if (isUntracked) {
 			return this.runGitCommand(['clean', '-f', '--', ...filePaths], repo);
 		}
+		if (restoreToIndex) {
+			return this.runGitCommand(['checkout', '--', ...filePaths], repo);
+		}
 		return this.runGitCommand(['checkout', 'HEAD', '--', ...filePaths], repo);
+	}
+
+	public async addToGitignore(repo: string, filePath: string, type: 'root' | 'local' | 'extension'): Promise<ErrorInfo> {
+		const normalized = filePath.replace(/\\/g, '/');
+		const basename = normalized.split('/').pop()!;
+		const dir = normalized.includes('/') ? normalized.substring(0, normalized.lastIndexOf('/')) : '';
+		const ext = basename.includes('.') ? basename.split('.').pop() : null;
+
+		let pattern: string;
+		let gitignorePath: string;
+
+		if (type === 'root') {
+			pattern = '/' + normalized;
+			gitignorePath = path.join(repo, '.gitignore');
+		} else if (type === 'local') {
+			pattern = '/' + basename;
+			gitignorePath = dir ? path.join(repo, dir, '.gitignore') : path.join(repo, '.gitignore');
+		} else {
+			if (!ext) return 'File has no extension to ignore by.';
+			pattern = '*.' + ext;
+			gitignorePath = path.join(repo, '.gitignore');
+		}
+
+		try {
+			let content = '';
+			try { content = fs.readFileSync(gitignorePath, 'utf8'); } catch { }
+			const lines = content.split('\n').map((l) => l.trim());
+			if (lines.includes(pattern)) return null;
+			if (content.length > 0 && !content.endsWith('\n')) content += '\n';
+			fs.writeFileSync(gitignorePath, content + pattern + '\n', 'utf8');
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : String(e);
+		}
 	}
 
 	/**

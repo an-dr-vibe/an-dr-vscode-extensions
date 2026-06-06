@@ -109,11 +109,8 @@ function commitsGetVisibleCommitTableWidth(view: any) {
 }
 
 function commitsGetDescriptionTargetWidth(view: any, availableWidth: number, avatarWidth: number) {
-	const descElem = <HTMLElement | null>view.tableElem.querySelector('td:nth-child(2), th[data-col="1"]');
-	const textWidth = descElem !== null ? descElem.scrollWidth : 0;
 	const maxPossible = Math.max(0, availableWidth - avatarWidth);
-	const preferred = Math.max(240, Math.min(textWidth, 380));
-	return Math.max(120, Math.min(preferred, maxPossible));
+	return Math.max(120, Math.min(600, maxPossible));
 }
 
 function commitsUpdateCommittedColumnDisplayMode(view: any) {

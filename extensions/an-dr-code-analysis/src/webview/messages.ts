@@ -95,10 +95,26 @@ export interface DepthChangeMessage {
     depth: number;
 }
 
+export interface NodeClickMessage {
+    type: 'nodeClick';
+    nodeId: string;
+    filePath?: string;
+    line?: number;
+}
+
+export interface NodeDoubleClickMessage {
+    type: 'nodeDoubleClick';
+    nodeId: string;
+    filePath?: string;
+    line?: number;
+}
+
 export type WebviewToExtensionMessage =
     | ReadyMessage
     | RefreshToolsMessage
     | ShowToolHelpMessage
     | TogglePinMessage
     | RequestAnalysisMessage
-    | DepthChangeMessage;
+    | DepthChangeMessage
+    | NodeClickMessage
+    | NodeDoubleClickMessage;

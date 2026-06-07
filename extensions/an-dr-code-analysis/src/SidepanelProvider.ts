@@ -68,6 +68,17 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                 case 'depthChange':
                     void this._runAnalysis(msg.graphType, msg.depth);
                     break;
+                case 'nodeDoubleClick':
+                    if (msg.filePath) {
+                        void vscode.workspace.openTextDocument(msg.filePath).then(doc =>
+                            vscode.window.showTextDocument(doc, {
+                                selection: msg.line !== undefined
+                                    ? new vscode.Range(msg.line, 0, msg.line, 0)
+                                    : undefined,
+                            })
+                        );
+                    }
+                    break;
             }
         });
     }

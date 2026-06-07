@@ -1,3 +1,5 @@
+import { CytoscapeRenderer } from './graph/CytoscapeRenderer';
+
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -54,6 +56,29 @@ interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; 
 interface AnalysisBusyMessage   { type: 'analysisBusy';   graphType: GraphType; }
 type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage;
 
+// ── Stub graph (verification / Iteration 5) ──────────────────────────────────
+
+const STUB_GRAPH: GraphModel = {
+    graphType: 'callGraph',
+    targetId: 'main',
+    depth: 2,
+    tool: 'stub',
+    confidence: 'low',
+    nodes: [
+        { id: 'main',        label: 'main',        fullName: 'int main()',            filePath: 'main.c',    line: 10,  role: 'target'   },
+        { id: 'foo',         label: 'foo',          fullName: 'void foo(int x)',       filePath: 'foo.c',     line: 5,   role: 'callee'   },
+        { id: 'bar',         label: 'bar',          fullName: 'int bar()',             filePath: 'bar.c',     line: 1,   role: 'callee'   },
+        { id: 'caller_a',    label: 'caller_a',     fullName: 'void caller_a()',       filePath: 'app.c',     line: 20,  role: 'caller'   },
+        { id: 'ext_printf',  label: 'printf',       fullName: 'int printf(const char*,...)', filePath: undefined, line: undefined, role: 'external' },
+    ],
+    edges: [
+        { sourceId: 'caller_a',   targetId: 'main'       },
+        { sourceId: 'main',       targetId: 'foo'        },
+        { sourceId: 'main',       targetId: 'bar'        },
+        { sourceId: 'foo',        targetId: 'ext_printf', isExternal: true },
+    ],
+};
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 interface AnalysisState {
@@ -61,7 +86,6 @@ interface AnalysisState {
     graph?: GraphModel;
     errorMessage?: string;
     activeGraphType?: GraphType;
-    requestId?: number;
 }
 
 interface AppState {
@@ -73,7 +97,7 @@ interface AppState {
 const state: AppState = {
     tools: null,
     context: null,
-    analysis: { status: 'idle' },
+    analysis: { status: 'result', graph: STUB_GRAPH, activeGraphType: 'callGraph' },
     depth: 2,
 };
 
@@ -81,6 +105,26 @@ const state: AppState = {
 
 function esc(str: string): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Renderer instance ────────────────────────────────────────────────────────
+
+const vscode = acquireVsCodeApi();
+
+let renderer: CytoscapeRenderer | null = null;
+
+function getOrCreateRenderer(): CytoscapeRenderer {
+    const container = document.getElementById('cy-container') as HTMLElement;
+    const tooltip   = document.getElementById('cy-tooltip')   as HTMLElement;
+    if (!renderer) {
+        renderer = new CytoscapeRenderer(
+            container,
+            tooltip,
+            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeClick',      nodeId, filePath, line }),
+            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeDoubleClick', nodeId, filePath, line }),
+        );
+    }
+    return renderer;
 }
 
 // ── CONTEXT section ──────────────────────────────────────────────────────────
@@ -189,24 +233,25 @@ const CONFIDENCE_BADGE: Record<string, string> = {
 
 function renderGraph(s: AnalysisState, depth: number): string {
     const graphTitle = s.activeGraphType ? ` — ${GRAPH_TYPE_LABELS[s.activeGraphType]}` : '';
-    let bodyHtml: string;
 
+    let bodyHtml: string;
     if (s.status === 'idle') {
         bodyHtml = `<div class="graph-placeholder">Select an analysis above.</div>`;
     } else if (s.status === 'busy') {
-        bodyHtml = `<div class="graph-placeholder">Analyzing…</div>`;
+        bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">Analyzing…</div>`;
     } else if (s.status === 'error') {
         const label = s.activeGraphType ? GRAPH_TYPE_LABELS[s.activeGraphType] : '';
-        bodyHtml = `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
+        bodyHtml = `<div class="graph-area" id="cy-container"></div>`
+            + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
     } else if (s.status === 'result' && s.graph) {
         const badge = `${CONFIDENCE_BADGE[s.graph.confidence] ?? ''} ${esc(s.graph.tool)}`;
-        bodyHtml = `<div id="graph-area" class="graph-area">[graph area — renderer coming in Iteration 5]</div>
+        bodyHtml = `<div class="graph-area" id="cy-container"></div>
           <div class="graph-meta">
             <span class="confidence-badge">${badge}</span>
-            <span class="graph-node-count">${s.graph.nodes.length} nodes</span>
+            <span class="graph-node-count">${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</span>
           </div>`;
     } else {
-        bodyHtml = `<div class="graph-placeholder">No results found.</div>`;
+        bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">No results found.</div>`;
     }
 
     const depthControls = `<div class="depth-controls">
@@ -227,10 +272,15 @@ function renderGraph(s: AnalysisState, depth: number): string {
 
 // ── Render ───────────────────────────────────────────────────────────────────
 
-const vscode = acquireVsCodeApi();
 const root = document.getElementById('root')!;
 
+let _depthDebounce: ReturnType<typeof setTimeout> | undefined;
+
 function render(): void {
+    // always destroy before wiping the DOM — cy holds references to old nodes
+    renderer?.destroy();
+    renderer = null;
+
     let html = renderContext(state.context);
     html += renderAnalysis(state.analysis);
     html += renderGraph(state.analysis, state.depth);
@@ -238,11 +288,24 @@ function render(): void {
         html += renderToolsStatus(state.tools);
     }
     root.innerHTML = html;
+
+    // mount cytoscape into the freshly created #cy-container
+    if (state.analysis.status === 'result' && state.analysis.graph) {
+        getOrCreateRenderer().render(state.analysis.graph);
+    }
 }
 
 render();
 
 // ── Events ───────────────────────────────────────────────────────────────────
+
+function triggerDepthChange(): void {
+    if (!state.analysis.activeGraphType) { return; }
+    clearTimeout(_depthDebounce);
+    _depthDebounce = setTimeout(() => {
+        vscode.postMessage({ type: 'depthChange', graphType: state.analysis.activeGraphType!, depth: state.depth });
+    }, 500);
+}
 
 root.addEventListener('click', (e: MouseEvent) => {
     const target = e.target as Element;
@@ -268,33 +331,17 @@ root.addEventListener('click', (e: MouseEvent) => {
     }
 
     if (target.id === 'depth-minus') {
-        if (state.depth > 1) {
-            state.depth--;
-            if (state.analysis.activeGraphType) {
-                vscode.postMessage({ type: 'depthChange', graphType: state.analysis.activeGraphType, depth: state.depth });
-            }
-            render();
-        }
+        if (state.depth > 1) { state.depth--; render(); triggerDepthChange(); }
         return;
     }
-
     if (target.id === 'depth-plus') {
-        if (state.depth < 8) {
-            state.depth++;
-            if (state.analysis.activeGraphType) {
-                vscode.postMessage({ type: 'depthChange', graphType: state.analysis.activeGraphType, depth: state.depth });
-            }
-            render();
-        }
+        if (state.depth < 8) { state.depth++; render(); triggerDepthChange(); }
         return;
     }
-
     if (target.id === 'depth-reset') {
         state.depth = 2;
-        if (state.analysis.activeGraphType) {
-            vscode.postMessage({ type: 'depthChange', graphType: state.analysis.activeGraphType, depth: state.depth });
-        }
         render();
+        triggerDepthChange();
         return;
     }
 });
@@ -316,11 +363,7 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             state.depth = msg.graph.depth;
             break;
         case 'analysisError':
-            state.analysis = {
-                status: 'error',
-                errorMessage: msg.message,
-                activeGraphType: msg.graphType,
-            };
+            state.analysis = { status: 'error', errorMessage: msg.message, activeGraphType: msg.graphType };
             break;
     }
     render();

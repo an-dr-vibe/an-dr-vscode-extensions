@@ -163,12 +163,97 @@ export function generateWebviewHtml(
             border-color: var(--vscode-button-border, rgba(128,128,128,0.4));
             background: var(--vscode-badge-background, rgba(128,128,128,0.2));
         }
+        /* ANALYSIS section */
+        .analysis-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 2px 0;
+        }
+        .analysis-btn {
+            background: var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
+            color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+            border: 1px solid var(--vscode-button-border, rgba(128,128,128,0.3));
+            border-radius: 3px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 0.88em;
+        }
+        .analysis-btn:hover:not(:disabled) {
+            background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
+        }
+        .analysis-btn:disabled { opacity: 0.5; cursor: default; }
+        /* GRAPH section */
+        .graph-area {
+            position: relative;
+            width: 100%;
+            height: 260px;
+            background: var(--vscode-editor-background, #1e1e1e);
+            border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .graph-placeholder, .graph-error {
+            padding: 12px 4px;
+            font-size: 0.88em;
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+        }
+        .graph-error { color: var(--vscode-errorForeground, #f48771); font-style: normal; }
+        .graph-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0 2px;
+            font-size: 0.82em;
+            color: var(--vscode-descriptionForeground);
+        }
+        .depth-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 0;
+        }
+        .depth-btn {
+            background: var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
+            color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+            border: 1px solid var(--vscode-button-border, rgba(128,128,128,0.3));
+            border-radius: 3px;
+            padding: 1px 7px;
+            cursor: pointer;
+            font-size: 0.9em;
+            min-width: 24px;
+        }
+        .depth-btn:hover:not(:disabled) {
+            background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
+        }
+        .depth-btn:disabled { opacity: 0.4; cursor: default; }
+        .depth-label { font-size: 0.88em; color: var(--vscode-foreground); min-width: 54px; }
+        /* Tooltip */
+        #cy-tooltip {
+            position: fixed;
+            display: none;
+            background: var(--vscode-editorHoverWidget-background, #252526);
+            border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
+            color: var(--vscode-editorHoverWidget-foreground, #ccc);
+            font-size: 0.82em;
+            font-family: var(--vscode-editor-font-family, monospace);
+            padding: 4px 8px;
+            border-radius: 3px;
+            pointer-events: none;
+            white-space: pre;
+            z-index: 1000;
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
 <body>
     <div id="root">
         <div class="placeholder">Code Analysis — loading…</div>
     </div>
+    <div id="cy-tooltip"></div>
     <script nonce="${nonce}" src="${webviewScriptUri}"></script>
 </body>
 </html>`;

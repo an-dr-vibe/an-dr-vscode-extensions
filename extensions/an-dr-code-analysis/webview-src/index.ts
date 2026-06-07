@@ -51,17 +51,14 @@ function renderContext(ctx: EditorContext | null): string {
 
     let symbolHtml = '—';
     if (ctx?.symbol) {
-        const SOURCE_TITLES: Record<SymbolSource, string> = {
-            'call-hierarchy':  '',
-            'document-symbol': 'title="From file structure (no LSP call hierarchy)"',
-            'word':            'title="Word under cursor (no symbol provider)"',
-        };
-        const cls = ctx.symbolSource === 'call-hierarchy'
-            ? 'ctx-symbol'
-            : ctx.symbolSource === 'document-symbol'
-                ? 'ctx-symbol ctx-symbol-doc'
-                : 'ctx-symbol ctx-symbol-fallback';
-        symbolHtml = `<span class="${cls}" ${SOURCE_TITLES[ctx.symbolSource]}>${esc(ctx.symbol)}</span>`;
+        if (ctx.symbolSource === 'call-hierarchy') {
+            symbolHtml = `<span class="ctx-symbol">${esc(ctx.symbol)}</span>`;
+        } else if (ctx.symbolSource === 'document-symbol') {
+            symbolHtml = `<span class="ctx-symbol ctx-symbol-doc" title="From file structure — no LSP call hierarchy available">${esc(ctx.symbol)}</span>`;
+        } else {
+            symbolHtml = `<span class="ctx-symbol ctx-symbol-fallback">${esc(ctx.symbol)}</span>`
+                + `<span class="ctx-symbol-warn" title="No symbol provider responded — showing word under cursor only. Analysis may not work correctly.">⚠️</span>`;
+        }
     }
     const rows = ctx
         ? `<div class="ctx-row"><span class="ctx-key">Symbol</span><span class="ctx-val">${symbolHtml}</span></div>

@@ -131,6 +131,11 @@ export function generateWebviewHtml(
             font-weight: normal;
             opacity: 0.55;
         }
+        .ctx-symbol-warn {
+            font-size: 0.8em;
+            margin-left: 4px;
+            cursor: help;
+        }
         .ctx-empty {
             font-style: italic;
             color: var(--vscode-descriptionForeground);

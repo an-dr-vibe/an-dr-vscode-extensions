@@ -8,13 +8,13 @@ Each iteration ends with a reviewable checkpoint. Complete one before starting t
 
 Get a buildable, activatable extension with an empty sidepanel.
 
-- [ ] Create `package.json` (publisher `an-dr`, engine `^1.90.0`, `activationEvents: ["*"]`)
+- [x] Create `package.json` (publisher `an-dr`, engine `^1.90.0`, `activationEvents: ["*"]`)
   - Register `viewsContainers.activitybar` and `views.an-dr-code-analysis` (webview type)
-- [ ] Create `tsconfig.json` and `webpack.config.js` (two entry points: extension + webview)
-- [ ] Create `src/extension.ts` — activate(), register sidepanel provider, return empty exports
-- [ ] Create `src/SidepanelProvider.ts` — `WebviewViewProvider` with static HTML placeholder
-- [ ] Create `webview-src/index.ts` — empty entry point, renders "Code Analysis (loading...)"
-- [ ] Build succeeds (`npm run build`), extension loads in Extension Development Host
+- [x] Create `tsconfig.json` and `webpack.config.js` (two entry points: extension + webview)
+- [x] Create `src/extension.ts` — activate(), register sidepanel provider, return empty exports
+- [x] Create `src/SidepanelProvider.ts` — `WebviewViewProvider` with static HTML placeholder
+- [x] Create `webview-src/index.ts` — empty entry point, renders "Code Analysis (loading...)"
+- [x] Build succeeds (`npm run build`), extension loads in Extension Development Host
 - [ ] Sidepanel appears in Activity Bar with placeholder text
 
 **Checkpoint:** Panel opens, no errors in Extension Host log.

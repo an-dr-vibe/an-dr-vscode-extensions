@@ -1,0 +1,174 @@
+{
+	"name": "an-dr-code-analysis",
+	"displayName": "Code Analysis",
+	"version": "0.1.0",
+	"publisher": "an-dr",
+	"author": {
+		"name": "an-dr",
+		"email": "mail@agramakov.me"
+	},
+	"description": "Static code analysis: call graphs, file dependencies, and component dependencies.",
+	"categories": ["Other"],
+	"homepage": "https://github.com/an-dr/an-dr-vscode-extensions/tree/main/extensions/an-dr-code-analysis",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/an-dr/an-dr-vscode-extensions.git"
+	},
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.90.0"
+	},
+	"activationEvents": ["*"],
+	"main": "./out/extension.js",
+	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "an-dr-code-analysis",
+					"title": "Code Analysis",
+					"icon": "$(graph)"
+				}
+			]
+		},
+		"views": {
+			"an-dr-code-analysis": [
+				{
+					"type": "webview",
+					"id": "an-dr-code-analysis.panel",
+					"name": "Code Analysis"
+				}
+			]
+		},
+		"configuration": {
+			"title": "An-Dr Code Analysis",
+			"properties": {
+				"an-dr-code-analysis.analysis.callGraph.depth": {
+					"type": "number",
+					"default": 2,
+					"minimum": 1,
+					"maximum": 8,
+					"description": "Default call graph depth in both directions."
+				},
+				"an-dr-code-analysis.analysis.callGraph.hideExternal": {
+					"type": "boolean",
+					"default": true,
+					"description": "Hide stdlib/external symbols in call graph."
+				},
+				"an-dr-code-analysis.analysis.fileDeps.depth": {
+					"type": "number",
+					"default": 2,
+					"minimum": 1,
+					"maximum": 8,
+					"description": "Default file dependency depth."
+				},
+				"an-dr-code-analysis.analysis.fileDeps.hideExternal": {
+					"type": "boolean",
+					"default": true,
+					"description": "Hide stdlib/external file dependencies."
+				},
+				"an-dr-code-analysis.analysis.componentDeps.hideExternal": {
+					"type": "boolean",
+					"default": false,
+					"description": "Hide external packages in component graph."
+				},
+				"an-dr-code-analysis.analysis.maxDepth": {
+					"type": "number",
+					"default": 5,
+					"minimum": 1,
+					"maximum": 8,
+					"description": "Hard cap on depth in sidebar. Expanded view uses 8."
+				},
+				"an-dr-code-analysis.tools.clangdPath": {
+					"type": "string",
+					"default": "",
+					"description": "Override clangd binary path. Empty = auto-detect from PATH."
+				},
+				"an-dr-code-analysis.tools.rustAnalyzerPath": {
+					"type": "string",
+					"default": "",
+					"description": "Override rust-analyzer binary path. Empty = auto-detect."
+				},
+				"an-dr-code-analysis.tools.ctagsPath": {
+					"type": "string",
+					"default": "",
+					"description": "Override ctags binary path. Empty = auto-detect."
+				},
+				"an-dr-code-analysis.tools.cscopePath": {
+					"type": "string",
+					"default": "",
+					"description": "Override cscope binary path. Empty = auto-detect."
+				},
+				"an-dr-code-analysis.tools.compileCommandsPath": {
+					"type": "string",
+					"default": "",
+					"description": "Override compile_commands.json path. Empty = search standard locations."
+				},
+				"an-dr-code-analysis.tools.fallbackTool": {
+					"type": "string",
+					"enum": ["auto", "cscope", "ctags"],
+					"default": "auto",
+					"description": "Force a specific fallback tool instead of auto-selection."
+				},
+				"an-dr-code-analysis.clangd.fallbackFlags": {
+					"type": "array",
+					"items": { "type": "string" },
+					"default": [],
+					"description": "Extra compiler flags passed to clangd when compile_commands.json is missing."
+				},
+				"an-dr-code-analysis.clangd.warnOnMissingCompileCommands": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show warning when compile_commands.json is not found."
+				},
+				"an-dr-code-analysis.clangd.autoOfferRecovery": {
+					"type": "boolean",
+					"default": true,
+					"description": "Offer recovery actions when clangd fails."
+				},
+				"an-dr-code-analysis.ai.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable AI fallback when all local tools fail. Requires companion extension."
+				},
+				"an-dr-code-analysis.ai.requireConfirmation": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show confirmation dialog before sending code to AI for analysis."
+				},
+				"an-dr-code-analysis.ai.extensionId": {
+					"type": "string",
+					"default": "an-dr.an-dr-ai",
+					"description": "VS Code extension ID of the AI companion extension."
+				},
+				"an-dr-code-analysis.ui.showConfidenceBadge": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show tool confidence badge below graph."
+				},
+				"an-dr-code-analysis.ui.nodeLabel.maxLength.sidebar": {
+					"type": "number",
+					"default": 15,
+					"description": "Max node label characters in sidebar graph."
+				},
+				"an-dr-code-analysis.ui.nodeLabel.maxLength.expanded": {
+					"type": "number",
+					"default": 25,
+					"description": "Max node label characters in expanded graph."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"build": "webpack --mode production",
+		"build:dev": "webpack --mode development",
+		"watch": "webpack --mode development --watch"
+	},
+	"devDependencies": {
+		"@types/node": "^18.0.0",
+		"@types/vscode": "^1.90.0",
+		"ts-loader": "^9.5.1",
+		"typescript": "^5.4.5",
+		"webpack": "^5.91.0",
+		"webpack-cli": "^5.1.4"
+	}
+}

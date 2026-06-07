@@ -17,7 +17,15 @@ Get a buildable, activatable extension with an empty sidepanel.
 - [x] Build succeeds (`npm run build`), extension loads in Extension Development Host
 - [ ] Sidepanel appears in Activity Bar with placeholder text
 
-**Checkpoint:** Panel opens, no errors in Extension Host log.
+**Verification:**
+
+1. Open the `extensions/an-dr-code-analysis` folder in VS Code
+2. Press `F5` → Extension Development Host opens
+3. Click the graph icon in the Activity Bar → "Code Analysis" panel opens
+4. Panel shows "Code Analysis — ready" placeholder text
+5. No errors in the Extension Host output channel
+
+- [ ] **Approved**
 
 ---
 
@@ -32,7 +40,15 @@ Detect installed tools on activation and render status in the panel.
 - [ ] Webview renders TOOLS STATUS section with ✅ / ⚠️ / ❌ icons (collapsed by default)
 - [ ] `ToolRegistry.refresh()` callable on demand
 
-**Checkpoint:** Open panel → TOOLS STATUS shows real state for the machine's installed tools.
+**Verification:**
+
+1. Press `F5` → Extension Development Host opens
+2. Open the Code Analysis panel
+3. Expand the TOOLS STATUS section
+4. Each tool installed on this machine shows ✅; uninstalled tools show ❌
+5. Run `which clangd` (or equivalent) in terminal — result matches what the panel shows
+
+- [ ] **Approved**
 
 ---
 
@@ -50,7 +66,15 @@ Track active editor symbol and file; render in panel.
 - [ ] Webview renders CONTEXT section: Symbol, File, Lang, Pin button
 - [ ] Pin toggle works (pinned state visually distinct)
 
-**Checkpoint:** Switch editor tabs → CONTEXT updates. Pin → stays locked.
+**Verification:**
+
+1. Open a `.cpp` file — CONTEXT section shows the file name and `C++`
+2. Click on a function name — Symbol field updates to that function
+3. Switch to a different editor tab — CONTEXT updates to new file
+4. Click Pin (📌) — switch tabs — CONTEXT stays locked to the pinned symbol
+5. Click Pin again — CONTEXT unfreezes and updates normally
+
+- [ ] **Approved**
 
 ---
 
@@ -68,7 +92,15 @@ Define types and wire the analysis skeleton without any real analyzer yet.
 - [ ] Webview renders GRAPH section skeleton: graph area placeholder, depth controls (no renderer yet), confidence badge area
 - [ ] Define all message types in `messages.ts`
 
-**Checkpoint:** Click "Call Graph" → spinner appears → "No results found" (empty graph). No crashes.
+**Verification:**
+
+1. Open the panel — three analysis buttons are visible (Call Graph, File Deps, Component Deps)
+2. Click "Call Graph" — button shows spinner / "Analyzing..." state
+3. After a moment — "No results found" message appears (no crash)
+4. Depth `[−]` / `[+]` / `[reset]` controls are visible below the graph area
+5. No errors in Extension Host output
+
+- [ ] **Approved**
 
 ---
 
@@ -84,7 +116,16 @@ Render graphs in the webview. Use stub data first to verify rendering.
 - [ ] Node interactions: single click → `nodeClick` message, double-click → `nodeDoubleClick` message, hover tooltip (full name + file)
 - [ ] Depth `[−]` / `[+]` / `[reset]` controls wired to `depthChange` message (debounced 500ms)
 
-**Checkpoint:** Paste a hardcoded `GraphModel` fixture → graph renders with correct layout and interactions.
+**Verification:**
+
+1. Open the panel — a hardcoded stub graph (3–5 nodes, 2–3 edges) renders automatically
+2. Nodes are visually distinct: target node is larger/bolder, caller/callee use different colors
+3. Edges have directed arrows; at least one dashed edge (external)
+4. Hover a node — tooltip shows full name and file path
+5. Click `[+]` depth — graph re-renders with more nodes
+6. Click `[reset]` — returns to default depth
+
+- [ ] **Approved**
 
 ---
 
@@ -98,7 +139,15 @@ Implement LSP call hierarchy for C/C++ via clangd.
 - [ ] Wire `LspAnalyzer` into `AnalyzerFactory` for `c`/`cpp` + `callGraph`
 - [ ] Confidence: `high`, tool: `clangd`
 
-**Checkpoint:** Open a `.cpp` file, click "Call Graph" → real call graph appears with 🟢 clangd badge.
+**Verification:**
+
+1. Open a `.cpp` file that has a project with `compile_commands.json`
+2. Click on a function name — CONTEXT shows the symbol
+3. Click "Call Graph" — real graph renders with callers and callees
+4. Confidence badge shows 🟢 `clangd`
+5. Double-click a node — editor jumps to that function's definition
+
+- [ ] **Approved**
 
 ---
 
@@ -112,7 +161,15 @@ Add universal fallback for call graph when LSP unavailable or empty.
 - [ ] Confidence badge reflects actual tool used
 - [ ] Show warning in graph if fallback was used
 
-**Checkpoint:** Disable clangd (or open a file with no `compile_commands.json`) → ctags result appears with 🟡 badge.
+**Verification:**
+
+1. Open a `.cpp` file **without** `compile_commands.json` (or rename it away temporarily)
+2. Click "Call Graph" — graph renders using ctags
+3. Confidence badge shows 🟡 `ctags`
+4. A warning note is visible indicating fallback was used
+5. Restore `compile_commands.json` — re-run — badge returns to 🟢 `clangd`
+
+- [ ] **Approved**
 
 ---
 
@@ -125,7 +182,14 @@ Implement file dependency graph via clangd `documentLink` + `#include` regex fal
 - [ ] Wire both into factory for `c`/`cpp` + `fileDeps`
 - [ ] "File Deps" button now triggers real analysis
 
-**Checkpoint:** Click "File Deps" on a `.cpp` file → include graph renders.
+**Verification:**
+
+1. Open a `.cpp` file that includes several headers
+2. Click "File Deps" — graph renders with the active file at center and included files as nodes
+3. Confidence badge shows 🟢 `clangd` (or 🔴 regex if clangd unavailable)
+4. With clangd disabled: repeat — badge shows 🔴 `regex`, graph still renders from `#include` lines
+
+- [ ] **Approved**
 
 ---
 
@@ -139,7 +203,15 @@ Surface clangd misconfiguration and offer fixes.
 - [ ] Webview renders recovery action buttons below error message
 - [ ] Cross-compilation detection: scan `compile_commands.json` for `arm-none-eabi`, `riscv` — offer `.clangd` generation with user confirmation
 
-**Checkpoint:** Open project without `compile_commands.json` → error with "Generate via CMake" button.
+**Verification:**
+
+1. Open a CMake project folder that has **no** `compile_commands.json`
+2. Click "Call Graph" → error message appears with a "Generate via CMake" button
+3. Click the button → correct `cmake` command runs (or opens a terminal with it)
+4. Open a project with an ARM cross-compilation entry in `compile_commands.json`
+5. Panel offers "Generate .clangd config" with a confirmation dialog before writing
+
+- [ ] **Approved**
 
 ---
 
@@ -151,7 +223,14 @@ Add Rust language support.
 - [ ] Create `src/analyzers/cli/CargoAnalyzer.ts` — `cargo metadata --format-version 1` → component deps `GraphModel`
 - [ ] Wire into factory: `rust` + `callGraph` → `[LspAnalyzer, CtagsAnalyzer]`; `rust` + `fileDeps` → `[LspAnalyzer, RegexAnalyzer]`; `rust` + `componentDeps` → `[CargoAnalyzer]`
 
-**Checkpoint:** Open a `.rs` file → call graph, file deps, and component deps all work.
+**Verification:**
+
+1. Open a `.rs` file in a Cargo workspace
+2. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
+3. Click "File Deps" → module dependency graph renders
+4. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`
+
+- [ ] **Approved**
 
 ---
 
@@ -164,7 +243,15 @@ Add TS/JS support.
 - [ ] `tsconfig.json` `references` → component deps
 - [ ] Wire into factory for all three graph types
 
-**Checkpoint:** Open a `.ts` file → all three analyses work.
+**Verification:**
+
+1. Open a `.ts` file
+2. Click "Call Graph" → graph renders, badge shows 🟢 `tsserver`
+3. Click "File Deps" → import graph renders
+4. Open a project with `tsconfig.json` `references` → "Component Deps" shows project references graph
+5. Open a `.js` file → same three analyses work (lower accuracy expected)
+
+- [ ] **Approved**
 
 ---
 
@@ -176,7 +263,14 @@ Add Python support.
 - [ ] Create `src/analyzers/heuristic/AstWalkAnalyzer.ts` — `import` AST walk → file deps; confidence `low`
 - [ ] Wire into factory: `python` + `callGraph` → `[Pyan3Analyzer, CtagsAnalyzer]`; `python` + `fileDeps` → `[AstWalkAnalyzer]`
 
-**Checkpoint:** Open a `.py` file → call graph and file deps work.
+**Verification:**
+
+1. Open a `.py` file
+2. Click "Call Graph" → graph renders, badge shows 🟡 `pyan3`
+3. Click "File Deps" → import graph renders, badge shows 🔴 `ast-walk`
+4. With pyan3 uninstalled: Call Graph falls back to ctags, badge shows 🟡 `ctags`
+
+- [ ] **Approved**
 
 ---
 
@@ -188,7 +282,13 @@ Add component-level analysis for C/C++.
 - [ ] Directory heuristic fallback: group files by top-level directory, infer deps from `#include` across groups
 - [ ] Wire into factory: `c`/`cpp` + `componentDeps` → `[CmakeAnalyzer, RegexAnalyzer(heuristic)]`
 
-**Checkpoint:** Open a CMake project → "Component Deps" shows target graph.
+**Verification:**
+
+1. Open a CMake project with multiple targets
+2. Click "Component Deps" → CMake target dependency graph renders, badge shows 🟡 `cmake`
+3. Remove `CMakeLists.txt` access (or open a non-CMake project) → heuristic fallback renders directory-level graph
+
+- [ ] **Approved**
 
 ---
 
@@ -202,7 +302,15 @@ Wider graph in a `WebviewPanel` editor tab.
 - [ ] Independent from sidebar (both work simultaneously)
 - [ ] No PNG/SVG export yet (deferred)
 
-**Checkpoint:** Click ↗ → full-tab graph opens, sidebar still works.
+**Verification:**
+
+1. Run any analysis in the sidebar to get a graph result
+2. Click ↗ → new editor tab opens titled "Code Analysis — Call Graph — {symbol}"
+3. Graph renders at wider width with hierarchical layout
+4. Interact with sidebar (pin, depth change) → sidebar still works independently
+5. Depth control in expanded tab goes up to 8
+
+- [ ] **Approved**
 
 ---
 
@@ -217,7 +325,15 @@ Connect to companion extension (e.g. `an-dr-ai`) as last-resort analyzer.
 - [ ] `contractVersion: "1.0"` included in every request
 - [ ] AI is never triggered silently — always requires explicit user confirmation
 
-**Checkpoint:** Kill all local tools → AI fallback dialog appears → confirming produces AI graph with 🤖 badge.
+**Verification:**
+
+1. Disable all local tools (or open an unsupported file type)
+2. Click any analysis button → confirmation dialog appears listing files to be sent and their sizes
+3. Click Cancel → no analysis runs, no data is sent
+4. Click Confirm → AI graph renders with 🤖 badge
+5. Disable `an-dr-ai` extension → error message explains companion is not available (no silent fallback)
+
+- [ ] **Approved**
 
 ---
 
@@ -233,4 +349,13 @@ Final UX pass.
 - [ ] Output channel logging for all analysis steps (errors, fallbacks, tool output)
 - [ ] Section collapse/expand state persisted across panel closes
 
-**Checkpoint:** Manual smoke test of all graph types, all interactions, error states, and cancellation.
+**Verification:**
+
+1. Trigger a slow analysis, wait 10s → "Cancel" button appears; clicking it stops the analysis
+2. Start an analysis, then switch files → "Results are for {old file}" notice appears
+3. Right-click a graph node → context menu shows Jump to Definition / Copy Name / Pin
+4. Click a ⚠️ tool in TOOLS STATUS → popover explains what it's for and how to install it
+5. Run analysis on a file with no callable symbols → "No results found (clangd)" — not an error state
+6. Collapse a section, close the panel, reopen → section stays collapsed
+
+- [ ] **Approved**

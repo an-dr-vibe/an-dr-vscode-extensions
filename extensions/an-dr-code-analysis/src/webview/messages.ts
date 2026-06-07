@@ -10,6 +10,8 @@ export interface ToolStatus {
 
 export interface EditorContext {
     symbol?: string;
+    symbolKind?: number;
+    symbolFromLsp: boolean;
     file: string;
     filePath: string;
     lang: string;

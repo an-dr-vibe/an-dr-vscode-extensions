@@ -14,6 +14,8 @@ interface ToolStatus {
 
 interface EditorContext {
     symbol?: string;
+    symbolKind?: number;
+    symbolFromLsp: boolean;
     file: string;
     filePath: string;
     lang: string;
@@ -45,8 +47,14 @@ function renderContext(ctx: EditorContext | null): string {
     const pinLabel = ctx?.isPinned ? '📌 Pinned' : '📌 Pin';
     const pinClass = ctx?.isPinned ? 'pin-btn pinned' : 'pin-btn';
 
+    let symbolHtml = '—';
+    if (ctx?.symbol) {
+        const cls = ctx.symbolFromLsp ? 'ctx-symbol' : 'ctx-symbol ctx-symbol-fallback';
+        const title = ctx.symbolFromLsp ? '' : ' title="Word under cursor (no LSP result)"';
+        symbolHtml = `<span class="${cls}"${title}>${esc(ctx.symbol)}</span>`;
+    }
     const rows = ctx
-        ? `<div class="ctx-row"><span class="ctx-key">Symbol</span><span class="ctx-val ctx-symbol">${esc(ctx.symbol ?? '—')}</span></div>
+        ? `<div class="ctx-row"><span class="ctx-key">Symbol</span><span class="ctx-val">${symbolHtml}</span></div>
            <div class="ctx-row"><span class="ctx-key">File</span><span class="ctx-val">${esc(ctx.file)}</span></div>
            <div class="ctx-row"><span class="ctx-key">Lang</span><span class="ctx-val">${esc(ctx.lang)}</span></div>`
         : `<div class="ctx-empty">No file open</div>`;

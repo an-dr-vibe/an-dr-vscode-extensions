@@ -62,7 +62,8 @@
       "Bash(rm bundle.js)",
       "Bash(grep -v \"^--$\")",
       "Bash(git pull *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" add extensions/an-dr-code-analysis/docs/ extensions/an-dr-code-analysis/package-lock.json)"
     ]
   }
 }

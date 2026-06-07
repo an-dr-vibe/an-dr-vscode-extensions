@@ -124,6 +124,10 @@ export function generateWebviewHtml(
             font-family: var(--vscode-editor-font-family, monospace);
             font-weight: 600;
         }
+        .ctx-symbol-fallback {
+            font-weight: normal;
+            opacity: 0.65;
+        }
         .ctx-empty {
             font-style: italic;
             color: var(--vscode-descriptionForeground);

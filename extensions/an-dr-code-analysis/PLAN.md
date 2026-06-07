@@ -56,26 +56,47 @@ Detect installed tools on activation and render status in the panel.
 
 Track active editor symbol and file; render in panel.
 
-- [ ] Create `src/context/ContextTracker.ts`
+- [x] Create `src/context/ContextTracker.ts`
   - Subscribe to `onDidChangeActiveTextEditor` and `onDidChangeTextEditorSelection` (debounced 300ms)
-  - Symbol detection: LSP hover first, word-boundary regex fallback
-  - `pin()` / `unpin()` / `isPinned()`
+  - Symbol detection: **word-boundary regex only** (`getWordRangeAtPosition`) — picks up any word under the cursor, not a semantic symbol
+  - `pin()` / `unpin()` / `toggle()` / `isPinned()`
   - Emit `onContextChange: vscode.Event<EditorContext>`
-- [ ] Define `contextUpdate` message in `messages.ts`
-- [ ] `SidepanelProvider.updateContext()` posts `contextUpdate` to webview
-- [ ] Webview renders CONTEXT section: Symbol, File, Lang, Pin button
-- [ ] Pin toggle works (pinned state visually distinct)
+- [x] Define `contextUpdate` and `togglePin` messages in `messages.ts`
+- [x] `SidepanelProvider` posts `contextUpdate` on every context change
+- [x] Webview renders CONTEXT section: Symbol, File, Lang, Pin button
+- [x] Pin toggle works (pinned state visually distinct)
+
+> ⚠️ **Known limitation:** Symbol shown is the word under the cursor, not a semantic symbol. It can be a parameter name, a keyword, or a comment word — anything. This means the CONTEXT display is unreliable as a preview of what will actually be analyzed. See Iteration 3b below for the fix.
 
 **Verification:**
 
 1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
 2. Open a `.cpp` file — CONTEXT section shows the file name and `C++`
-3. Click on a function name — Symbol field updates to that function
+3. Click on a function name — Symbol field updates to that word
 4. Switch to a different editor tab — CONTEXT updates to new file
 5. Click Pin (📌) — switch tabs — CONTEXT stays locked to the pinned symbol
 6. Click Pin again — CONTEXT unfreezes and updates normally
 
-- [ ] **Approved**
+- [x] **Approved**
+
+---
+
+## Iteration 3b — Semantic Symbol Detection
+
+Replace word-boundary symbol detection with `vscode.prepareCallHierarchy`, which returns the exact `CallHierarchyItem` the analyzer will use in Iteration 6. This ensures the CONTEXT display is honest: it shows a symbol only when the LSP can actually analyze it.
+
+- [ ] In `ContextTracker._update()`: call `vscode.commands.executeCommand('vscode.prepareCallHierarchy', uri, position)` — use the returned item's `name` as the symbol
+- [ ] Fall back to `getWordRangeAtPosition` only when `prepareCallHierarchy` returns empty (e.g. cursor on a comment, string, or non-callable token)
+- [ ] Store the full `CallHierarchyItem` on `EditorContext` for use by the analyzer in Iteration 6 (avoids a second LSP round-trip)
+- [ ] CONTEXT Symbol field is blank (shows `—`) when cursor is not on a callable symbol
+
+**Verification:**
+
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Click inside a function body (not on its name) — Symbol shows the enclosing function name
+3. Click on a parameter name — Symbol shows `—` (not the parameter word)
+4. Click on a comment word — Symbol shows `—`
+5. Click on a function call site — Symbol shows the called function's name
 
 ---
 

@@ -48,7 +48,7 @@ Detect installed tools on activation and render status in the panel.
 4. Each tool installed on this machine shows ✅; uninstalled tools show ❌
 5. Run `where clangd` (Windows) or `which clangd` (Unix) in terminal — result matches the panel
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 

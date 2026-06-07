@@ -101,6 +101,56 @@ export function generateWebviewHtml(
             opacity: 0.9;
         }
         .tool-action:hover { opacity: 1; text-decoration: underline; }
+        /* CONTEXT section */
+        .ctx-body { padding: 4px 0 4px 4px; }
+        .ctx-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 2px 0;
+            font-size: 0.92em;
+        }
+        .ctx-key {
+            min-width: 46px;
+            color: var(--vscode-descriptionForeground);
+            font-size: 0.88em;
+        }
+        .ctx-val {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .ctx-symbol {
+            font-family: var(--vscode-editor-font-family, monospace);
+            font-weight: 600;
+        }
+        .ctx-empty {
+            font-style: italic;
+            color: var(--vscode-descriptionForeground);
+            padding: 4px 0;
+            font-size: 0.92em;
+        }
+        /* Pin button — inline in summary */
+        .section-header { display: flex; align-items: center; justify-content: space-between; }
+        .pin-btn {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 3px;
+            padding: 0 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            color: var(--vscode-descriptionForeground);
+            line-height: 1.4;
+        }
+        .pin-btn:hover {
+            border-color: var(--vscode-button-border, rgba(128,128,128,0.4));
+            color: var(--vscode-foreground);
+        }
+        .pin-btn.pinned {
+            color: var(--vscode-foreground);
+            border-color: var(--vscode-button-border, rgba(128,128,128,0.4));
+            background: var(--vscode-badge-background, rgba(128,128,128,0.2));
+        }
     </style>
 </head>
 <body>

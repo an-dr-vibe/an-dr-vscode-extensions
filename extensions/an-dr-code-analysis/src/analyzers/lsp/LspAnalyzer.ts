@@ -3,6 +3,7 @@ import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { getIncomingCalls, getOutgoingCalls, prepareCallHierarchy } from './LspClient';
 import { buildCallGraph } from '../../graph/GraphBuilder';
 import { ContextTracker } from '../../context/ContextTracker';
+import { log } from '../../logger';
 
 const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
 
@@ -16,42 +17,42 @@ export class LspAnalyzer implements IAnalyzer {
     }
 
     async analyze(request: AnalysisRequest): Promise<AnalysisResult | null> {
-        const { context, graphType, depth, signal } = request;
+        const { context, graphType, depth, signal, callHierarchyItem } = request;
 
-        // Reuse the CallHierarchyItem already fetched by ContextTracker (no second round-trip)
-        let target = this._contextTracker.currentCallHierarchyItem;
+        // Use the item snapshotted at request time (before focus changed away from the editor).
+        let target = callHierarchyItem;
+        log.appendLine(`[LspAnalyzer] snapshotted item: ${target?.name ?? 'none'}, context symbol: ${context.symbol}`);
 
-        // If stale (context changed) or missing, fetch fresh
-        if (!target || target.name !== context.symbol) {
-            const uri = vscode.Uri.file(context.filePath);
-            // We don't have the exact position, so use line 0 as fallback — the
-            // context tracker already resolved the symbol so it should be in scope.
-            // Better: resolve from the active editor position if available.
+        if (!target) {
+            // ContextTracker fell back to document-symbol or word — try to resolve from
+            // the active editor position if it's still on the right file.
             const editor = vscode.window.activeTextEditor;
-            const pos = editor?.document.uri.fsPath === context.filePath
+            const uri = vscode.Uri.file(context.filePath);
+            const pos = (editor?.document.uri.fsPath === context.filePath)
                 ? editor.selection.active
                 : new vscode.Position(0, 0);
+            log.appendLine(`[LspAnalyzer] resolving fresh at ${pos.line}:${pos.character} in ${context.filePath}`);
             const items = await prepareCallHierarchy(uri, pos, signal);
+            log.appendLine(`[LspAnalyzer] fresh resolve: ${items?.length ?? 0} items`);
             if (!items?.length) { return null; }
             target = items[0];
         }
 
         if (signal?.aborted) { return null; }
 
+        log.appendLine(`[LspAnalyzer] fetching calls for: ${target.name}`);
         const [incoming, outgoing] = await Promise.all([
             getIncomingCalls(target, signal),
             getOutgoingCalls(target, signal),
         ]);
+        log.appendLine(`[LspAnalyzer] incoming=${incoming.length} outgoing=${outgoing.length}`);
 
         if (signal?.aborted) { return null; }
 
+        // A lone target node with no edges means LSP returned nothing useful
+        if (incoming.length === 0 && outgoing.length === 0) { return null; }
+
         const graph = buildCallGraph(target, incoming, outgoing, graphType, depth, this.name);
-
-        // A graph with only the target node (no callers/callees) means LSP returned nothing useful
-        if (graph.nodes.length <= 1 && incoming.length === 0 && outgoing.length === 0) {
-            return null;
-        }
-
         return { graph };
     }
 }

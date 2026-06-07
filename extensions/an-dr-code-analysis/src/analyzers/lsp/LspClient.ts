@@ -1,10 +1,5 @@
 import * as vscode from 'vscode';
-
-export interface LspCallHierarchyResult {
-    item: vscode.CallHierarchyItem;
-    incoming: vscode.CallHierarchyIncomingCall[];
-    outgoing: vscode.CallHierarchyOutgoingCall[];
-}
+import { log } from '../../logger';
 
 export async function prepareCallHierarchy(
     uri: vscode.Uri,
@@ -16,8 +11,10 @@ export async function prepareCallHierarchy(
         const result = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
             'vscode.prepareCallHierarchy', uri, position
         );
+        log.appendLine(`[LspClient] prepareCallHierarchy: ${result?.length ?? 0} items`);
         return result?.length ? result : undefined;
-    } catch {
+    } catch (e) {
+        log.appendLine(`[LspClient] prepareCallHierarchy threw: ${e}`);
         return undefined;
     }
 }
@@ -28,10 +25,13 @@ export async function getIncomingCalls(
 ): Promise<vscode.CallHierarchyIncomingCall[]> {
     if (signal?.aborted) { return []; }
     try {
-        return await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
-            'vscode.provideIncomingCalls', item
-        ) ?? [];
-    } catch {
+        const result = await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
+            '_executeProvideIncomingCalls', item
+        );
+        log.appendLine(`[LspClient] getIncomingCalls raw result: ${JSON.stringify(result?.length)}`);
+        return result ?? [];
+    } catch (e) {
+        log.appendLine(`[LspClient] getIncomingCalls threw: ${e}`);
         return [];
     }
 }
@@ -42,10 +42,13 @@ export async function getOutgoingCalls(
 ): Promise<vscode.CallHierarchyOutgoingCall[]> {
     if (signal?.aborted) { return []; }
     try {
-        return await vscode.commands.executeCommand<vscode.CallHierarchyOutgoingCall[]>(
-            'vscode.provideOutgoingCalls', item
-        ) ?? [];
-    } catch {
+        const result = await vscode.commands.executeCommand<vscode.CallHierarchyOutgoingCall[]>(
+            '_executeProvideOutgoingCalls', item
+        );
+        log.appendLine(`[LspClient] getOutgoingCalls raw result: ${JSON.stringify(result?.length)}`);
+        return result ?? [];
+    } catch (e) {
+        log.appendLine(`[LspClient] getOutgoingCalls threw: ${e}`);
         return [];
     }
 }

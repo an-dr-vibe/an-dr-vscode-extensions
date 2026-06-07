@@ -129,7 +129,7 @@ Define types and wire the analysis skeleton without any real analyzer yet.
 5. Depth `[−]` / `[+]` / `[reset]` controls are visible below the graph area
 6. No errors in Extension Host output
 
-- [x] **Approved**
+- [ ] **Approved**
 
 ---
 
@@ -155,7 +155,7 @@ Render graphs in the webview. Use stub data first to verify rendering.
 6. Click `[+]` depth — graph re-renders with more nodes
 7. Click `[reset]` — returns to default depth
 
-- [x] **Approved**
+- [ ] **Approved**
 
 ---
 

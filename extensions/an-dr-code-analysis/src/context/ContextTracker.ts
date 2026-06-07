@@ -102,10 +102,9 @@ export class ContextTracker implements vscode.Disposable {
         const id = ++this._updateId;
         const editor = vscode.window.activeTextEditor;
 
-        if (!editor) {
-            this._current = null;
-            this._currentCallHierarchyItem = undefined;
-            this._onContextChange.fire(null);
+        if (!editor || editor.document.uri.scheme !== 'file') {
+            // Webview panels and output channels fire onDidChangeActiveTextEditor with
+            // undefined or non-file URIs — don't clear the last valid source-file context.
             return;
         }
 

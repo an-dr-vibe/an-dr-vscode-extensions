@@ -8,6 +8,7 @@ import { AnalysisCache } from './cache/AnalysisCache';
 import { Settings } from './config/Settings';
 import { WebviewToExtensionMessage } from './webview/messages';
 import { GraphType } from './graph/GraphModel';
+import { log } from './logger';
 
 export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Disposable {
     static readonly viewType = 'an-dr-code-analysis.panel';
@@ -113,7 +114,10 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         }
 
         const clampedDepth = Math.min(depth, Settings.maxDepth());
-        const request = { context: ctx, graphType, depth: clampedDepth };
+        // Snapshot the CallHierarchyItem NOW before the webview steals focus and
+        // onDidChangeActiveTextEditor fires and potentially clears it.
+        const callHierarchyItem = this._contextTracker.currentCallHierarchyItem;
+        const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem };
 
         const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
         if (cached) {
@@ -124,10 +128,13 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         this._view.webview.postMessage({ type: 'analysisBusy', graphType });
 
         const chain = this._analyzerFactory.getChain(request);
+        log.appendLine(`[analysis] graphType=${graphType} symbol=${ctx.symbol} lang=${ctx.langId} chain=[${chain.map(a => a.name).join(', ')}]`);
 
         for (const analyzer of chain) {
             try {
+                log.appendLine(`[analysis] running ${analyzer.name}...`);
                 const result = await analyzer.analyze(request);
+                log.appendLine(`[analysis] ${analyzer.name} result: ${result ? `${result.graph.nodes.length} nodes` : 'null'}`);
                 if (result && result.graph.nodes.length > 0) {
                     this._cache.set(
                         { filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol },
@@ -137,7 +144,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                     return;
                 }
             } catch (err) {
-                // try next analyzer in chain
+                log.appendLine(`[analysis] ${analyzer.name} threw: ${err}`);
             }
         }
 

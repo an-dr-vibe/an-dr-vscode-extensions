@@ -129,7 +129,7 @@ Define types and wire the analysis skeleton without any real analyzer yet.
 5. Depth `[−]` / `[+]` / `[reset]` controls are visible below the graph area
 6. No errors in Extension Host output
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 

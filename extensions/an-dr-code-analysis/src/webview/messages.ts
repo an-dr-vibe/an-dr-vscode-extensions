@@ -1,3 +1,6 @@
+import { GraphModel, GraphType } from '../graph/GraphModel';
+export type { GraphType };
+
 export type ToolState = 'ok' | 'warn' | 'missing';
 export type ToolGroup = 'universal' | 'c-cpp' | 'rust' | 'python' | 'typescript';
 
@@ -32,7 +35,35 @@ export interface ContextUpdateMessage {
     context: EditorContext | null;
 }
 
-export type ExtensionToWebviewMessage = ToolsStatusMessage | ContextUpdateMessage;
+export interface AnalysisResultMessage {
+    type: 'analysisResult';
+    graph: GraphModel;
+}
+
+export interface AnalysisErrorMessage {
+    type: 'analysisError';
+    graphType: GraphType;
+    message: string;
+    recoveryActions?: RecoveryAction[];
+}
+
+export interface AnalysisBusyMessage {
+    type: 'analysisBusy';
+    graphType: GraphType;
+}
+
+export interface RecoveryAction {
+    label: string;
+    command: string;
+    args?: unknown[];
+}
+
+export type ExtensionToWebviewMessage =
+    | ToolsStatusMessage
+    | ContextUpdateMessage
+    | AnalysisResultMessage
+    | AnalysisErrorMessage
+    | AnalysisBusyMessage;
 
 // Webview → extension
 export interface ReadyMessage {
@@ -52,8 +83,22 @@ export interface TogglePinMessage {
     type: 'togglePin';
 }
 
+export interface RequestAnalysisMessage {
+    type: 'requestAnalysis';
+    graphType: GraphType;
+    depth: number;
+}
+
+export interface DepthChangeMessage {
+    type: 'depthChange';
+    graphType: GraphType;
+    depth: number;
+}
+
 export type WebviewToExtensionMessage =
     | ReadyMessage
     | RefreshToolsMessage
     | ShowToolHelpMessage
-    | TogglePinMessage;
+    | TogglePinMessage
+    | RequestAnalysisMessage
+    | DepthChangeMessage;

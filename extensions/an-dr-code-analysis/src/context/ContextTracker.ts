@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
+export type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
+
 export interface EditorContext {
     symbol?: string;
     symbolKind?: number;
-    symbolFromLsp: boolean;
+    symbolSource: SymbolSource;
     file: string;
     filePath: string;
     lang: string;
@@ -33,6 +35,18 @@ const LANG_DISPLAY: Record<string, string> = {
     css:                'CSS',
     xml:                'XML',
 };
+
+function findDeepestContaining(
+    symbols: vscode.DocumentSymbol[],
+    pos: vscode.Position
+): vscode.DocumentSymbol | undefined {
+    for (const sym of symbols) {
+        if (sym.range.contains(pos)) {
+            return findDeepestContaining(sym.children, pos) ?? sym;
+        }
+    }
+    return undefined;
+}
 
 export class ContextTracker implements vscode.Disposable {
     private readonly _onContextChange = new vscode.EventEmitter<EditorContext | null>();
@@ -98,38 +112,65 @@ export class ContextTracker implements vscode.Disposable {
         const doc = editor.document;
         const pos = editor.selection.active;
 
-        // Try LSP call hierarchy first — this is the exact symbol the analyzer will use
-        let symbol: string | undefined;
-        let symbolKind: number | undefined;
-        let symbolFromLsp = false;
-        let callHierarchyItem: vscode.CallHierarchyItem | undefined;
-
+        // Tier 1: LSP call hierarchy — exact semantic symbol, reusable by analyzer
         try {
             const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
                 'vscode.prepareCallHierarchy', doc.uri, pos
             );
-            if (id !== this._updateId) { return; } // cursor moved while we were waiting
+            if (id !== this._updateId) { return; }
             if (items && items.length > 0) {
-                callHierarchyItem = items[0];
-                symbol = items[0].name;
-                symbolKind = items[0].kind;
-                symbolFromLsp = true;
+                this._currentCallHierarchyItem = items[0];
+                this._emit(id, doc, {
+                    symbol: items[0].name,
+                    symbolKind: items[0].kind,
+                    symbolSource: 'call-hierarchy',
+                });
+                return;
+            }
+        } catch {
+            if (id !== this._updateId) { return; }
+        }
+        this._currentCallHierarchyItem = undefined;
+
+        // Tier 2: Document symbol provider — finds enclosing function from file structure,
+        // works for header files and projects without compile_commands.json
+        try {
+            const allSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                'vscode.executeDocumentSymbolProvider', doc.uri
+            );
+            if (id !== this._updateId) { return; }
+            if (allSymbols && allSymbols.length > 0) {
+                const sym = findDeepestContaining(allSymbols, pos);
+                if (sym) {
+                    this._emit(id, doc, {
+                        symbol: sym.name,
+                        symbolKind: sym.kind,
+                        symbolSource: 'document-symbol',
+                    });
+                    return;
+                }
             }
         } catch {
             if (id !== this._updateId) { return; }
         }
 
-        // Fall back to word under cursor when LSP has no result (e.g. no server installed)
-        if (!symbol) {
-            const wordRange = doc.getWordRangeAtPosition(pos);
-            symbol = wordRange ? doc.getText(wordRange) : undefined;
-        }
+        // Tier 3: Word under cursor — always available, semantically unreliable
+        const wordRange = doc.getWordRangeAtPosition(pos);
+        this._emit(id, doc, {
+            symbol: wordRange ? doc.getText(wordRange) : undefined,
+            symbolSource: 'word',
+        });
+    }
 
-        this._currentCallHierarchyItem = callHierarchyItem;
+    private _emit(
+        id: number,
+        doc: vscode.TextDocument,
+        partial: Pick<EditorContext, 'symbol' | 'symbolSource'> & Partial<EditorContext>
+    ): void {
+        if (id !== this._updateId) { return; }
         this._current = {
-            symbol,
-            symbolKind,
-            symbolFromLsp,
+            ...partial,
+            symbolSource: partial.symbolSource,
             file: path.basename(doc.fileName),
             filePath: doc.fileName,
             lang: LANG_DISPLAY[doc.languageId] ?? doc.languageId,

@@ -8,10 +8,12 @@ export interface ToolStatus {
     detail?: string;
 }
 
+export type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
+
 export interface EditorContext {
     symbol?: string;
     symbolKind?: number;
-    symbolFromLsp: boolean;
+    symbolSource: SymbolSource;
     file: string;
     filePath: string;
     lang: string;

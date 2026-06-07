@@ -85,10 +85,14 @@ Track active editor symbol and file; render in panel.
 
 Replace word-boundary symbol detection with `vscode.prepareCallHierarchy`, which returns the exact `CallHierarchyItem` the analyzer will use in Iteration 6. This ensures the CONTEXT display is honest: it shows a symbol only when the LSP can actually analyze it.
 
-- [ ] In `ContextTracker._update()`: call `vscode.commands.executeCommand('vscode.prepareCallHierarchy', uri, position)` — use the returned item's `name` as the symbol
-- [ ] Fall back to `getWordRangeAtPosition` only when `prepareCallHierarchy` returns empty (e.g. cursor on a comment, string, or non-callable token)
-- [ ] Store the full `CallHierarchyItem` on `EditorContext` for use by the analyzer in Iteration 6 (avoids a second LSP round-trip)
-- [ ] CONTEXT Symbol field is blank (shows `—`) when cursor is not on a callable symbol
+- [x] Three-tier symbol detection in `ContextTracker._update()`:
+  1. `vscode.prepareCallHierarchy` — exact semantic symbol, reused by analyzer (needs clangd + compile_commands)
+  2. `vscode.executeDocumentSymbolProvider` → find deepest enclosing symbol — works for header files without compile_commands
+  3. `getWordRangeAtPosition` — last resort, always available
+- [x] Stale-update guard: async results from a previous cursor position are discarded
+- [x] `CallHierarchyItem` stored on `ContextTracker` for Iteration 6 (no second LSP round-trip)
+- [x] `symbolSource: 'call-hierarchy' | 'document-symbol' | 'word'` on `EditorContext`
+- [x] Webview renders symbol bold (call-hierarchy), normal (document-symbol), or dimmed with tooltip (word)
 
 **Verification:**
 

@@ -12,10 +12,12 @@ interface ToolStatus {
     detail?: string;
 }
 
+type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
+
 interface EditorContext {
     symbol?: string;
     symbolKind?: number;
-    symbolFromLsp: boolean;
+    symbolSource: SymbolSource;
     file: string;
     filePath: string;
     lang: string;
@@ -49,9 +51,17 @@ function renderContext(ctx: EditorContext | null): string {
 
     let symbolHtml = '—';
     if (ctx?.symbol) {
-        const cls = ctx.symbolFromLsp ? 'ctx-symbol' : 'ctx-symbol ctx-symbol-fallback';
-        const title = ctx.symbolFromLsp ? '' : ' title="Word under cursor (no LSP result)"';
-        symbolHtml = `<span class="${cls}"${title}>${esc(ctx.symbol)}</span>`;
+        const SOURCE_TITLES: Record<SymbolSource, string> = {
+            'call-hierarchy':  '',
+            'document-symbol': 'title="From file structure (no LSP call hierarchy)"',
+            'word':            'title="Word under cursor (no symbol provider)"',
+        };
+        const cls = ctx.symbolSource === 'call-hierarchy'
+            ? 'ctx-symbol'
+            : ctx.symbolSource === 'document-symbol'
+                ? 'ctx-symbol ctx-symbol-doc'
+                : 'ctx-symbol ctx-symbol-fallback';
+        symbolHtml = `<span class="${cls}" ${SOURCE_TITLES[ctx.symbolSource]}>${esc(ctx.symbol)}</span>`;
     }
     const rows = ctx
         ? `<div class="ctx-row"><span class="ctx-key">Symbol</span><span class="ctx-val">${symbolHtml}</span></div>

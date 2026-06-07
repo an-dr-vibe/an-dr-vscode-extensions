@@ -180,12 +180,17 @@
 		"build:dev": "webpack --mode development",
 		"watch": "webpack --mode development --watch",
 		"package": "vsce package --no-dependencies",
-		"install-ext": "npm run build && vsce package --no-dependencies && code --install-extension an-dr-code-analysis-0.1.0.vsix"
+		"install-ext": "npm run build && vsce package --no-dependencies && code --install-extension an-dr-code-analysis-0.1.0.vsix",
+		"test": "jest",
+		"test:coverage": "jest --coverage"
 	},
 	"devDependencies": {
+		"@types/jest": "^30.0.0",
 		"@types/node": "^18.0.0",
 		"@types/vscode": "^1.90.0",
 		"@vscode/vsce": "^3.9.2",
+		"jest": "^30.4.2",
+		"ts-jest": "^29.4.11",
 		"ts-loader": "^9.5.1",
 		"typescript": "^5.4.5",
 		"webpack": "^5.91.0",

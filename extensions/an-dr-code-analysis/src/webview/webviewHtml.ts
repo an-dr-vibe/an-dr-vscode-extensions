@@ -200,6 +200,40 @@ export function generateWebviewHtml(
             font-style: italic;
         }
         .graph-error { color: var(--vscode-errorForeground, #f48771); font-style: normal; }
+        .ft-section .section-body { padding: 4px 0; }
+        .ft-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 1px 4px;
+            font-size: 0.82em;
+            line-height: 1.5;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .ft-toggle {
+            cursor: pointer;
+            font-size: 0.7em;
+            width: 12px;
+            flex-shrink: 0;
+            user-select: none;
+            color: var(--vscode-descriptionForeground);
+        }
+        .ft-toggle-spacer { width: 12px; flex-shrink: 0; }
+        .ft-check { flex-shrink: 0; cursor: pointer; margin: 0; }
+        .ft-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: default;
+        }
+        .ft-dir { cursor: pointer; font-weight: 500; }
+        .graph-fallback-note {
+            font-size: 0.8em;
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            padding: 2px 4px;
+        }
+        .analysis-config { margin-top: 6px; }
         .graph-action-btn {
             display: inline-block;
             margin-top: 6px;

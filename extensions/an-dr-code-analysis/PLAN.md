@@ -110,15 +110,15 @@ Replace word-boundary symbol detection with `vscode.prepareCallHierarchy`, which
 
 Define types and wire the analysis skeleton without any real analyzer yet.
 
-- [ ] Create `src/graph/GraphModel.ts` — all types from spec §7.5
-- [ ] Create `src/analyzers/IAnalyzer.ts` — `IAnalyzer`, `AnalysisRequest`, `AnalysisResult` interfaces
-- [ ] Create `src/analyzers/AnalyzerFactory.ts` — stub returning empty chain
-- [ ] Create `src/cache/AnalysisCache.ts` — mtime-based cache with `FileSystemWatcher`
-- [ ] Create `src/config/Settings.ts` — typed accessors for all settings (§08)
-- [ ] Create analysis pipeline in `SidepanelProvider`: receives `requestAnalysis`, runs chain, sends `analysisResult` or `analysisError`
-- [ ] Webview renders ANALYSIS section: three buttons (Call Graph, File Deps, Component Deps)
-- [ ] Webview renders GRAPH section skeleton: graph area placeholder, depth controls (no renderer yet), confidence badge area
-- [ ] Define all message types in `messages.ts`
+- [x] Create `src/graph/GraphModel.ts` — all types from spec §7.5
+- [x] Create `src/analyzers/IAnalyzer.ts` — `IAnalyzer`, `AnalysisRequest`, `AnalysisResult` interfaces
+- [x] Create `src/analyzers/AnalyzerFactory.ts` — stub returning empty chain
+- [x] Create `src/cache/AnalysisCache.ts` — mtime-based cache with `FileSystemWatcher`
+- [x] Create `src/config/Settings.ts` — typed accessors for all settings (§08)
+- [x] Create analysis pipeline in `SidepanelProvider`: receives `requestAnalysis`, runs chain, sends `analysisResult` or `analysisError`
+- [x] Webview renders ANALYSIS section: three buttons (Call Graph, File Deps, Component Deps)
+- [x] Webview renders GRAPH section skeleton: graph area placeholder, depth controls (no renderer yet), confidence badge area
+- [x] Define all message types in `messages.ts`
 
 **Verification:**
 
@@ -129,7 +129,7 @@ Define types and wire the analysis skeleton without any real analyzer yet.
 5. Depth `[−]` / `[+]` / `[reset]` controls are visible below the graph area
 6. No errors in Extension Host output
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 
@@ -137,13 +137,13 @@ Define types and wire the analysis skeleton without any real analyzer yet.
 
 Render graphs in the webview. Use stub data first to verify rendering.
 
-- [ ] Add `cytoscape` as a bundled dependency (no CDN)
-- [ ] Create `webview-src/graph/CytoscapeRenderer.ts` — renders `GraphModel` into a `cy` instance
-- [ ] Create `webview-src/graph/layouts.ts` — radial (call graph sidebar), hierarchical (expanded), force-directed (file/component deps)
-- [ ] Node styling: target (large, bold), caller, callee, external (gray)
-- [ ] Edge styling: directed arrows, dashed for external
-- [ ] Node interactions: single click → `nodeClick` message, double-click → `nodeDoubleClick` message, hover tooltip (full name + file)
-- [ ] Depth `[−]` / `[+]` / `[reset]` controls wired to `depthChange` message (debounced 500ms)
+- [x] Add `cytoscape` as a bundled dependency (no CDN)
+- [x] Create `webview-src/graph/CytoscapeRenderer.ts` — renders `GraphModel` into a `cy` instance
+- [x] Create `webview-src/graph/layouts.ts` — radial (call graph sidebar), hierarchical (expanded), force-directed (file/component deps)
+- [x] Node styling: target (large, bold), caller, callee, external (gray)
+- [x] Edge styling: directed arrows, dashed for external
+- [x] Node interactions: single click → `nodeClick` message, double-click → `nodeDoubleClick` message, hover tooltip (full name + file)
+- [x] Depth `[−]` / `[+]` / `[reset]` controls wired to `depthChange` message (debounced 500ms)
 
 **Verification:**
 
@@ -155,7 +155,7 @@ Render graphs in the webview. Use stub data first to verify rendering.
 6. Click `[+]` depth — graph re-renders with more nodes
 7. Click `[reset]` — returns to default depth
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 
@@ -163,11 +163,11 @@ Render graphs in the webview. Use stub data first to verify rendering.
 
 Implement LSP call hierarchy for C/C++ via clangd.
 
-- [ ] Create `src/analyzers/lsp/LspClient.ts` — LSP protocol helpers (callHierarchy/prepareCallHierarchy, incomingCalls, outgoingCalls)
-- [ ] Create `src/analyzers/lsp/LspAnalyzer.ts` — implements `IAnalyzer` for C/C++, call graph only
-- [ ] Create `src/graph/GraphBuilder.ts` — normalizes LSP call hierarchy response → `GraphModel`
-- [ ] Wire `LspAnalyzer` into `AnalyzerFactory` for `c`/`cpp` + `callGraph`
-- [ ] Confidence: `high`, tool: `clangd`
+- [x] Create `src/analyzers/lsp/LspClient.ts` — LSP protocol helpers (callHierarchy/prepareCallHierarchy, incomingCalls, outgoingCalls)
+- [x] Create `src/analyzers/lsp/LspAnalyzer.ts` — implements `IAnalyzer` for C/C++, call graph only
+- [x] Create `src/graph/GraphBuilder.ts` — normalizes LSP call hierarchy response → `GraphModel`
+- [x] Wire `LspAnalyzer` into `AnalyzerFactory` for `c`/`cpp` + `callGraph`
+- [x] Confidence: `high`, tool: `clangd`
 
 **Verification:**
 
@@ -178,7 +178,7 @@ Implement LSP call hierarchy for C/C++ via clangd.
 5. Confidence badge shows 🟢 `clangd`
 6. Double-click a node — editor jumps to that function's definition
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 
@@ -186,11 +186,11 @@ Implement LSP call hierarchy for C/C++ via clangd.
 
 Add universal fallback for call graph when LSP unavailable or empty.
 
-- [ ] Create `src/analyzers/cli/CtagsAnalyzer.ts` — runs `ctags -x` or `ctags -R --fields=+n`, parses output → `GraphModel`; confidence `medium`
-- [ ] `AnalyzerFactory.getChain()` returns `[LspAnalyzer, CtagsAnalyzer]` for C/C++ call graph
-- [ ] Fallback chain logic in pipeline: try each analyzer in order, use first non-empty result
-- [ ] Confidence badge reflects actual tool used
-- [ ] Show warning in graph if fallback was used
+- [x] Create `src/analyzers/cli/CtagsAnalyzer.ts` — runs `ctags -R --fields=+n --output-format=json`, greps call sites → `GraphModel`; confidence `medium`
+- [x] `AnalyzerFactory.getChain()` returns `[LspAnalyzer, CtagsAnalyzer]` for C/C++ call graph
+- [x] Fallback chain logic in pipeline: try each analyzer in order, use first non-empty result
+- [x] Confidence badge reflects actual tool used
+- [x] Show warning in graph if fallback was used
 
 **Verification:**
 

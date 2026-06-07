@@ -88,17 +88,65 @@ interface AnalysisState {
     activeGraphType?: GraphType;
 }
 
+// ── File filter tree ─────────────────────────────────────────────────────────
+
+interface TreeNode {
+    name: string;
+    fullPath: string;       // for files: the filePath; for dirs: the dir prefix
+    isDir: boolean;
+    children: TreeNode[];
+}
+
+function buildFileTree(graph: GraphModel): TreeNode {
+    const root: TreeNode = { name: '', fullPath: '', isDir: true, children: [] };
+    const filePaths = [...new Set(graph.nodes.map(n => n.filePath).filter(Boolean) as string[])];
+
+    // Find common prefix to make paths relative in display
+    const sep = /[\\/]/;
+    const splitAll = filePaths.map(p => p.replace(/\\/g, '/').split('/'));
+    let prefixLen = splitAll[0]?.length ?? 0;
+    for (const parts of splitAll) {
+        while (prefixLen > 0 && parts.slice(0, prefixLen).join('/') !== splitAll[0].slice(0, prefixLen).join('/')) {
+            prefixLen--;
+        }
+    }
+    const prefixParts = splitAll[0]?.slice(0, prefixLen) ?? [];
+
+    for (const filePath of filePaths) {
+        const parts = filePath.replace(/\\/g, '/').split('/').slice(prefixLen);
+        let node = root;
+        let cumPath = prefixParts.join('/');
+        for (let i = 0; i < parts.length; i++) {
+            cumPath = cumPath ? `${cumPath}/${parts[i]}` : parts[i];
+            const isLast = i === parts.length - 1;
+            let child = node.children.find(c => c.name === parts[i]);
+            if (!child) {
+                child = { name: parts[i], fullPath: isLast ? filePath : cumPath, isDir: !isLast, children: [] };
+                node.children.push(child);
+            }
+            node = child;
+        }
+    }
+    return root;
+}
+
+// uncheckedPaths: set of fullPath strings that are hidden
+// collapsedDirs: set of dir fullPath strings that are collapsed
 interface AppState {
     tools: ToolStatus[] | null;
     context: EditorContext | null;
     analysis: AnalysisState;
     depth: number;
+    uncheckedPaths: Set<string>;
+    collapsedDirs: Set<string>;
 }
 const state: AppState = {
     tools: null,
     context: null,
     analysis: { status: 'idle' },
     depth: 2,
+    uncheckedPaths: new Set(),
+    collapsedDirs: new Set(),
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -215,12 +263,74 @@ function renderAnalysis(s: AnalysisState): string {
         return `<button class="analysis-btn" data-graph-type="${gt}" ${isBusy ? 'disabled' : ''}>${btnLabel}</button>`;
     }).join('');
 
+    const ccppBtn = isCCppContext()
+        ? `<div class="analysis-config"><button class="graph-action-btn" id="setup-compile-commands">Setup compile_commands.json</button></div>`
+        : '';
+
     return `<details class="section" open>
   <summary class="section-header">ANALYSIS</summary>
   <div class="section-body">
     <div class="analysis-buttons">${buttons}</div>
+    ${ccppBtn}
   </div>
 </details>`;
+}
+
+// ── File filter tree ─────────────────────────────────────────────────────────
+
+function allDescendantFilesUnchecked(node: TreeNode): boolean {
+    if (!node.isDir) { return isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode); }
+    return node.children.length > 0 && node.children.every(c => allDescendantFilesUnchecked(c));
+}
+
+function renderTreeNode(node: TreeNode, indent: number): string {
+    const pad = indent * 16;
+    if (node.isDir) {
+        const collapsed = state.collapsedDirs.has(node.fullPath);
+        const checked = !allDescendantFilesUnchecked(node);
+        const arrow = collapsed ? '▶' : '▼';
+        const childrenHtml = collapsed ? '' : node.children.map(c => renderTreeNode(c, indent + 1)).join('');
+        return `<div class="ft-row" style="padding-left:${pad}px">
+  <span class="ft-toggle" data-dir="${esc(node.fullPath)}">${arrow}</span>
+  <input type="checkbox" class="ft-check" data-path="${esc(node.fullPath)}" data-is-dir="1" ${checked ? 'checked' : ''}>
+  <span class="ft-label ft-dir" data-dir="${esc(node.fullPath)}">${esc(node.name)}/</span>
+</div>${childrenHtml}`;
+    } else {
+        const checked = !isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode);
+        return `<div class="ft-row" style="padding-left:${pad}px">
+  <span class="ft-toggle-spacer"></span>
+  <input type="checkbox" class="ft-check" data-path="${esc(node.fullPath)}" ${checked ? 'checked' : ''}>
+  <span class="ft-label">${esc(node.name)}</span>
+</div>`;
+    }
+}
+
+function renderFileFilter(graph: GraphModel): string {
+    const tree = buildFileTree(graph);
+    if (tree.children.length === 0) { return ''; }
+    const childrenHtml = tree.children.map(c => renderTreeNode(c, 0)).join('');
+    return `<details class="section ft-section" open>
+  <summary class="section-header">FILTER</summary>
+  <div class="section-body ft-body">${childrenHtml}</div>
+</details>`;
+}
+
+function isNodeFiltered(node: GraphNode): boolean {
+    if (!node.filePath || node.role === 'target') { return false; }
+    const norm = node.filePath.replace(/\\/g, '/');
+    for (const p of state.uncheckedPaths) {
+        const np = p.replace(/\\/g, '/');
+        if (norm === np || norm.startsWith(np + '/')) { return true; }
+    }
+    return false;
+}
+
+function applyFilter(graph: GraphModel): GraphModel {
+    if (state.uncheckedPaths.size === 0) { return graph; }
+    const visibleNodes = graph.nodes.filter(n => !isNodeFiltered(n));
+    const visibleIds = new Set(visibleNodes.map(n => n.id));
+    const visibleEdges = graph.edges.filter(e => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId));
+    return { ...graph, nodes: visibleNodes, edges: visibleEdges };
 }
 
 // ── GRAPH section ────────────────────────────────────────────────────────────
@@ -230,6 +340,11 @@ const CONFIDENCE_BADGE: Record<string, string> = {
     medium: '🟡',
     low:    '🔴',
 };
+
+function isCCppContext(): boolean {
+    const id = state.context?.langId;
+    return id === 'c' || id === 'cpp' || id === 'cuda-cpp' || id === 'objective-c' || id === 'objective-cpp';
+}
 
 function renderGraph(s: AnalysisState, depth: number): string {
     const graphTitle = s.activeGraphType ? ` — ${GRAPH_TYPE_LABELS[s.activeGraphType]}` : '';
@@ -241,22 +356,18 @@ function renderGraph(s: AnalysisState, depth: number): string {
         bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">Analyzing…</div>`;
     } else if (s.status === 'error') {
         const label = s.activeGraphType ? GRAPH_TYPE_LABELS[s.activeGraphType] : '';
-        const isCCpp = state.context?.langId === 'c' || state.context?.langId === 'cpp'
-            || state.context?.langId === 'cuda-cpp' || state.context?.langId === 'objective-c'
-            || state.context?.langId === 'objective-cpp';
-        const configBtn = isCCpp
-            ? `<br><button class="graph-action-btn" id="setup-compile-commands">Setup compile_commands.json</button>`
-            : '';
         bodyHtml = `<div class="graph-area" id="cy-container"></div>`
-            + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}`
-            + `${configBtn}</div>`;
+            + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
     } else if (s.status === 'result' && s.graph) {
         const badge = `${CONFIDENCE_BADGE[s.graph.confidence] ?? ''} ${esc(s.graph.tool)}`;
+        const fallbackNote = s.graph.confidence !== 'high'
+            ? `<div class="graph-fallback-note">Fallback tool — callers only, no callees</div>`
+            : '';
         bodyHtml = `<div class="graph-area" id="cy-container"></div>
           <div class="graph-meta">
             <span class="confidence-badge">${badge}</span>
             <span class="graph-node-count">${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</span>
-          </div>`;
+          </div>${fallbackNote}`;
     } else {
         bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">No results found.</div>`;
     }
@@ -291,6 +402,9 @@ function render(): void {
     let html = renderContext(state.context);
     html += renderAnalysis(state.analysis);
     html += renderGraph(state.analysis, state.depth);
+    if (state.analysis.status === 'result' && state.analysis.graph) {
+        html += renderFileFilter(state.analysis.graph);
+    }
     if (state.tools !== null) {
         html += renderToolsStatus(state.tools);
     }
@@ -298,8 +412,37 @@ function render(): void {
 
     // mount cytoscape into the freshly created #cy-container
     if (state.analysis.status === 'result' && state.analysis.graph) {
-        getOrCreateRenderer().render(state.analysis.graph);
+        const filtered = applyFilter(state.analysis.graph);
+        getOrCreateRenderer().render(filtered);
     }
+}
+
+// Rebuilds only the filter tree body (for collapse/expand) without touching the rest of the DOM.
+function rebuildFilterBody(): void {
+    if (!state.analysis.graph) { return; }
+    const body = document.querySelector<HTMLElement>('.ft-body');
+    if (!body) { render(); return; } // section not in DOM yet — fall back to full render
+    const tree = buildFileTree(state.analysis.graph);
+    body.innerHTML = tree.children.map(c => renderTreeNode(c, 0)).join('');
+}
+
+// Re-renders only the cytoscape graph without touching the DOM — used when
+// only the filter changes so <details> open/collapsed state is preserved.
+function renderGraphOnly(): void {
+    if (state.analysis.status !== 'result' || !state.analysis.graph) { return; }
+    const filtered = applyFilter(state.analysis.graph);
+    // Re-use existing renderer if container still exists, else recreate
+    const container = document.getElementById('cy-container');
+    if (!container) { render(); return; }
+    if (!renderer) {
+        renderer = new CytoscapeRenderer(
+            container,
+            document.getElementById('cy-tooltip') as HTMLElement,
+            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeClick',       nodeId, filePath, line }),
+            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeDoubleClick', nodeId, filePath, line }),
+        );
+    }
+    renderer.render(filtered);
 }
 
 render();
@@ -356,6 +499,60 @@ root.addEventListener('click', (e: MouseEvent) => {
         vscode.postMessage({ type: 'runCommand', command: 'an-dr-code-analysis.selectCompileCommands' });
         return;
     }
+
+    // File filter tree: collapse/expand toggle — rebuild only the filter body, not the whole page
+    const toggle = target.closest<HTMLElement>('.ft-toggle');
+    if (toggle) {
+        const dir = toggle.dataset['dir']!;
+        if (state.collapsedDirs.has(dir)) { state.collapsedDirs.delete(dir); }
+        else { state.collapsedDirs.add(dir); }
+        rebuildFilterBody();
+        return;
+    }
+    const dirLabel = target.closest<HTMLElement>('.ft-dir');
+    if (dirLabel) {
+        const dir = dirLabel.dataset['dir']!;
+        if (state.collapsedDirs.has(dir)) { state.collapsedDirs.delete(dir); }
+        else { state.collapsedDirs.add(dir); }
+        rebuildFilterBody();
+        return;
+    }
+});
+
+// File filter checkboxes — use 'change' so the checkbox value is correct
+root.addEventListener('change', (e: Event) => {
+    const target = e.target as HTMLElement;
+    const cb = target.closest<HTMLInputElement>('.ft-check');
+    if (!cb || !state.analysis.graph) { return; }
+
+    const p = cb.dataset['path']!;
+    const isDir = cb.dataset['isDir'] === '1';
+    const checked = cb.checked;
+    const norm = (s: string) => s.replace(/\\/g, '/');
+
+    if (isDir) {
+        const graph = state.analysis.graph;
+        const prefix = norm(p);
+        // Toggle all descendant file paths
+        const descendantFiles = graph.nodes
+            .map(n => n.filePath)
+            .filter((f): f is string => !!f && norm(f).startsWith(prefix + '/'));
+        for (const f of descendantFiles) {
+            if (checked) { state.uncheckedPaths.delete(f); }
+            else { state.uncheckedPaths.add(f); }
+        }
+        if (checked) { state.uncheckedPaths.delete(p); }
+        else { state.uncheckedPaths.add(p); }
+        // Update child checkbox visuals in-place (no DOM rebuild)
+        document.querySelectorAll<HTMLInputElement>('.ft-check').forEach(c => {
+            const cp = c.dataset['path']!;
+            if (norm(cp).startsWith(prefix + '/') || cp === p) { c.checked = checked; }
+        });
+    } else {
+        if (checked) { state.uncheckedPaths.delete(p); }
+        else { state.uncheckedPaths.add(p); }
+    }
+    renderGraphOnly();
 });
 
 window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
@@ -373,6 +570,8 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
         case 'analysisResult':
             state.analysis = { status: 'result', graph: msg.graph, activeGraphType: msg.graph.graphType };
             state.depth = msg.graph.depth;
+            state.uncheckedPaths = new Set();
+            state.collapsedDirs = new Set();
             break;
         case 'analysisError':
             state.analysis = { status: 'error', errorMessage: msg.message, activeGraphType: msg.graphType };

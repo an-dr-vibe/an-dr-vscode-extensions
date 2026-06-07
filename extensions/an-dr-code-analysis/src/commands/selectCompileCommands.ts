@@ -64,26 +64,39 @@ export async function selectCompileCommandsCommand(): Promise<void> {
             const found = await findCompileCommandsFiles(workspaceRoot);
             log.appendLine(`[selectCompileCommands] found ${found.length} compile_commands.json files`);
 
+            const NONE_LABEL  = '$(circle-slash) No compile_commands (use ctags fallback)';
+            const BROWSE_LABEL = '$(folder-opened) Browse…';
+
             const items: vscode.QuickPickItem[] = found.map(f => ({
                 label: path.relative(workspaceRoot, f).replace(/\\/g, '/'),
                 detail: f,
             }));
-
-            items.push({ label: '$(folder-opened) Browse…', detail: 'Pick a compile_commands.json manually' });
-
-            if (items.length === 0) {
-                vscode.window.showWarningMessage('No compile_commands.json found in workspace.');
-                return;
-            }
+            items.push({ label: BROWSE_LABEL, detail: 'Pick a compile_commands.json manually' });
+            items.push({ label: NONE_LABEL,   detail: 'Remove .clangd config — rely on ctags fallback' });
 
             const picked = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select compile_commands.json to use with clangd',
+                placeHolder: found.length === 0
+                    ? 'No compile_commands.json found — select an option'
+                    : 'Select compile_commands.json to use with clangd',
                 title: 'Compile Commands',
             });
             if (!picked) { return; }
 
+            // "No compile_commands" — remove .clangd and clear setting
+            if (picked.label === NONE_LABEL) {
+                const cfg = vscode.workspace.getConfiguration(NS);
+                await cfg.update('tools.compileCommandsPath', '', vscode.ConfigurationTarget.Workspace);
+                const clangdPath = path.join(workspaceRoot, '.clangd');
+                if (fs.existsSync(clangdPath)) {
+                    fs.unlinkSync(clangdPath);
+                    log.appendLine(`[selectCompileCommands] removed .clangd at ${clangdPath}`);
+                }
+                vscode.window.showInformationMessage('compile_commands.json cleared. clangd will use ctags as fallback.');
+                return;
+            }
+
             let filePath: string;
-            if (picked.label.startsWith('$(folder-opened)')) {
+            if (picked.label === BROWSE_LABEL) {
                 const uri = await vscode.window.showOpenDialog({
                     canSelectFiles: true,
                     canSelectFolders: false,

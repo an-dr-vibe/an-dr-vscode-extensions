@@ -53,8 +53,8 @@ export class LspAnalyzer implements IAnalyzer {
 
         if (signal?.aborted) { return null; }
 
-        // A lone target node with no edges means LSP returned nothing useful
-        if (incoming.length === 0 && outgoing.length === 0) { return null; }
+        // Even a lone target with no edges is a valid result — it means the function
+        // exists but has no callers/callees visible to clangd at this depth.
 
         const graph = buildCallGraph(target, incoming, outgoing, graphType, depth, this.name);
         return { graph };

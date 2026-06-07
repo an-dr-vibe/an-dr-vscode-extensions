@@ -19,7 +19,18 @@ async function findCompileCommandsFiles(workspaceRoot: string): Promise<string[]
         }
         for (const entry of entries) {
             if (entry.isFile() && entry.name === 'compile_commands.json') {
-                results.push(path.join(dir, entry.name));
+                const filePath = path.join(dir, entry.name);
+                try {
+                    const content = fs.readFileSync(filePath, 'utf8').trim();
+                    const parsed = JSON.parse(content);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        results.push(filePath);
+                    } else {
+                        log.appendLine(`[selectCompileCommands] skipping empty: ${filePath}`);
+                    }
+                } catch {
+                    results.push(filePath); // include unparseable files, let user decide
+                }
             } else if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
                 scan(path.join(dir, entry.name), depth + 1);
             }

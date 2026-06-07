@@ -241,10 +241,15 @@ function renderGraph(s: AnalysisState, depth: number): string {
         bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">Analyzing…</div>`;
     } else if (s.status === 'error') {
         const label = s.activeGraphType ? GRAPH_TYPE_LABELS[s.activeGraphType] : '';
-        const configBtn = `<button class="graph-action-btn" id="setup-compile-commands">Setup compile_commands.json</button>`;
+        const isCCpp = state.context?.langId === 'c' || state.context?.langId === 'cpp'
+            || state.context?.langId === 'cuda-cpp' || state.context?.langId === 'objective-c'
+            || state.context?.langId === 'objective-cpp';
+        const configBtn = isCCpp
+            ? `<br><button class="graph-action-btn" id="setup-compile-commands">Setup compile_commands.json</button>`
+            : '';
         bodyHtml = `<div class="graph-area" id="cy-container"></div>`
             + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}`
-            + `<br>${configBtn}</div>`;
+            + `${configBtn}</div>`;
     } else if (s.status === 'result' && s.graph) {
         const badge = `${CONFIDENCE_BADGE[s.graph.confidence] ?? ''} ${esc(s.graph.tool)}`;
         bodyHtml = `<div class="graph-area" id="cy-container"></div>

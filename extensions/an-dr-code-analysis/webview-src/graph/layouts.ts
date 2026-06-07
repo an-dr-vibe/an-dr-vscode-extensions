@@ -9,9 +9,9 @@ export function getLayout(name: LayoutName, nodeCount: number): cytoscape.Layout
                 name: 'concentric',
                 concentric: (node: cytoscape.NodeSingular) => node.data('role') === 'target' ? 10 : 1,
                 levelWidth: () => 1,
-                minNodeSpacing: 40,
+                minNodeSpacing: 10,
                 animate: false,
-                padding: 20,
+                padding: 10,
             } as cytoscape.LayoutOptions;
 
         case 'hierarchical':

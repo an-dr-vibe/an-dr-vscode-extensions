@@ -71,6 +71,7 @@ Components are larger than files — targets, packages, crates, top-level module
 | Language | Component = |
 |---|---|
 | C/C++ (CMake) | CMake target (`add_library`, `add_executable`) |
+| C/C++ (Meson) | Meson target (`executable`, `library`, `shared_library`, `static_library`) |
 | C/C++ (no build sys) | Top-level directory |
 | Rust | Workspace member crate |
 | Python | Top-level package (directory with `__init__.py`) |
@@ -86,4 +87,4 @@ Components are larger than files — targets, packages, crates, top-level module
 ### Notes
 - This is the slowest analysis — may require parsing build system files
 - Cache aggressively; invalidate only when build config files change
-- C/C++ without CMake falls back to directory heuristic — label results accordingly
+- C/C++ without CMake or Meson falls back to directory heuristic — label results accordingly

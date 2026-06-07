@@ -158,7 +158,7 @@ Grid of tool name + status icon:
 ✅ clangd 14.0.0          ✅ rust-analyzer 2024-01
 ✅ cargo 1.75.0           ✅ tsserver (bundled)
 ✅ ctags 6.1.0            ⚠️ pyan3 (not found)
-❌ cscope (not found)     ⚠️ cmake (not found)
+❌ cscope (not found)     ⚠️ cmake (not found)   ⚠️ meson (not found)
 🤖 AI: andrei.ai-ext ✅
 ```
 

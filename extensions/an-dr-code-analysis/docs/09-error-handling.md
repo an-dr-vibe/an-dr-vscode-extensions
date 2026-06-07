@@ -7,8 +7,8 @@
 | Failure | Detection | User Message | Recovery |
 |---|---|---|---|
 | Not installed | `which clangd` fails | "clangd not found. C/C++ analysis will use ctags fallback." | Link to LLVM install guide |
-| No compile_commands.json | File not found at search paths | "No compile_commands.json found. Analysis accuracy will be reduced." | Offer CMake/Bear generation |
-| Stale compile_commands.json | mtime < CMakeLists.txt mtime | "compile_commands.json may be outdated. Results may be inaccurate." | Offer regeneration |
+| No compile_commands.json | File not found at search paths | "No compile_commands.json found. Analysis accuracy will be reduced." | Offer CMake/Meson/Bear generation |
+| Stale compile_commands.json | mtime < CMakeLists.txt / meson.build mtime | "compile_commands.json may be outdated. Results may be inaccurate." | Offer regeneration |
 | LSP not responding | Timeout on `initialize` request | "clangd is not responding. Falling back to ctags." | Suggest restart, check PATH |
 | Symbols not resolving | Empty result on known-good file | "clangd returned no results. Falling back to ctags." | Check compile_commands, offer .clangd generation |
 | Cross-compiler flags | Detected arm-none-eabi / riscv in compile_commands | "Cross-compilation flags detected. clangd may struggle." | Offer .clangd generation |
@@ -51,6 +51,14 @@
 | Not installed | `cmake --version` fails | "cmake not found. C/C++ component dependency analysis will use directory heuristic." |
 | Graphviz generation fails | Non-zero exit | "cmake --graphviz failed. Using directory heuristic for component analysis." |
 
+### meson
+
+| Failure | Detection | User Message |
+|---|---|---|
+| Not installed | `meson --version` fails | "meson not found. C/C++ component dependency analysis will use directory heuristic." |
+| Introspect fails | Non-zero exit from `meson introspect --targets` | "meson introspect failed. Using directory heuristic for component analysis." |
+| Build dir not found | No `meson-info/` in known build dirs | "Meson build directory not configured. Run 'meson setup <build_dir>' first." |
+
 ### AI Companion Extension
 
 | Failure | Detection | User Message |
@@ -72,6 +80,18 @@ Action:
   2. Run: cmake -S {workspaceRoot} -B {buildDir} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
   3. On success: copy/symlink compile_commands.json to workspaceRoot
   4. On failure: show cmake output, suggest manual configuration
+```
+
+### Generate compile_commands.json via Meson
+
+```
+Condition: meson.build found, meson available, no compile_commands.json
+Action:
+  1. Find or prompt for build directory
+  2. Run: meson setup {buildDir} --wipe (or meson setup {buildDir} if no prior config)
+  3. Meson always writes compile_commands.json to {buildDir}
+  4. Copy/symlink {buildDir}/compile_commands.json to workspaceRoot
+  5. On failure: show meson output, suggest manual configuration
 ```
 
 ### Generate compile_commands.json via Bear

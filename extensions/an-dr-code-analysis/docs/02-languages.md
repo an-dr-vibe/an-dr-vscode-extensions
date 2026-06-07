@@ -15,8 +15,8 @@
 
 | Language | Call Graph | File Deps | Component Deps |
 |---|---|---|---|
-| C | ✅ | ✅ | ✅ (CMake / heuristic) |
-| C++ | ✅ | ✅ | ✅ (CMake / heuristic) |
+| C | ✅ | ✅ | ✅ (CMake / Meson / heuristic) |
+| C++ | ✅ | ✅ | ✅ (CMake / Meson / heuristic) |
 | Python | ✅ | ✅ | ⚠️ heuristic |
 | Rust | ✅ | ✅ | ✅ (cargo metadata) |
 | TypeScript | ✅ | ✅ | ✅ (tsconfig references) |

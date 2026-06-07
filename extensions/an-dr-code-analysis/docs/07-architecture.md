@@ -279,7 +279,7 @@ class AnalysisCache {
 ```
 
 Cache key: `{filePath}:{symbol}:{graphType}:{depth}:{tool}`
-Invalidation: watch `CMakeLists.txt`, `Cargo.toml`, `package.json`, `tsconfig.json`,
+Invalidation: watch `CMakeLists.txt`, `meson.build`, `Cargo.toml`, `package.json`, `tsconfig.json`,
 `compile_commands.json` for changes → clear affected entries.
 
 ## 7.9 SidepanelProvider

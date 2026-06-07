@@ -100,7 +100,7 @@ Implement in this order. Each item should be functional before starting the next
 11. tsserver integration — TypeScript call graph + file deps
 12. tsconfig component deps — TypeScript component graph
 13. Python (pyan3 + AST walk)
-14. Component deps (CMake + directory heuristic)
+14. Component deps (CMake + Meson + directory heuristic)
 15. clangd recovery actions — compile_commands generation, .clangd generation
 16. Analysis cache — mtime-based invalidation
 17. Expand to full tab — wider graph view

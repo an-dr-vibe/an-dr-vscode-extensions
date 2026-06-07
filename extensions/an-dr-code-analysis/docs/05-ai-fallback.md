@@ -102,7 +102,7 @@ function isAiAvailable(): boolean {
 
 ```
 - projectSnapshot: directory tree, 3 levels deep
-- fileContent: content of CMakeLists.txt / Cargo.toml / package.json if present
+- fileContent: content of CMakeLists.txt / meson.build / Cargo.toml / package.json if present
 - prompt: see Section 5.5
 ```
 
@@ -190,7 +190,7 @@ Return a JSON object with this exact structure:
 }
 
 Rules:
-- A component = a CMake target, Cargo crate, Python package, or tsconfig project
+- A component = a CMake target, Meson target, Cargo crate, Python package, or tsconfig project
 - "external" = third-party dependencies outside the project
 - Return only JSON. No markdown. No explanation.
 - If component boundaries are unclear, use top-level directories as components.

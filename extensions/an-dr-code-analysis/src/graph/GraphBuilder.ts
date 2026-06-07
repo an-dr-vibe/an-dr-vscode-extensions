@@ -3,7 +3,8 @@ import * as path from 'path';
 import { GraphModel, GraphNode, GraphEdge, GraphType, NodeRole } from './GraphModel';
 
 function itemId(item: vscode.CallHierarchyItem): string {
-    return `${item.uri.fsPath}:${item.selectionRange.start.line}:${item.name}`;
+    const line = item.selectionRange?.start?.line ?? item.range?.start?.line ?? 0;
+    return `${item.uri.fsPath}:${line}:${item.name}`;
 }
 
 function itemLabel(item: vscode.CallHierarchyItem): string {
@@ -32,10 +33,10 @@ export function buildCallGraph(
                 id,
                 label: itemLabel(item),
                 fullName: itemFullName(item),
-                filePath: item.uri.fsPath,
-                line: item.selectionRange.start.line,
+                filePath: item.uri?.fsPath,
+                line: item.selectionRange?.start?.line ?? item.range?.start?.line,
                 role,
-                langId: path.extname(item.uri.fsPath).slice(1),
+                langId: path.extname(item.uri?.fsPath ?? '').slice(1),
             });
         }
         return id;

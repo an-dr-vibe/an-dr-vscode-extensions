@@ -111,6 +111,12 @@ export class ContextTracker implements vscode.Disposable {
         const doc = editor.document;
         const pos = editor.selection.active;
 
+        // Clear the stored item only when switching to a different file — not when
+        // tier 1 simply fails at the current cursor position (e.g. cursor on whitespace).
+        if (this._currentCallHierarchyItem?.uri.fsPath !== doc.uri.fsPath) {
+            this._currentCallHierarchyItem = undefined;
+        }
+
         // Tier 1: LSP call hierarchy — exact semantic symbol, reusable by analyzer
         try {
             const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
@@ -129,7 +135,8 @@ export class ContextTracker implements vscode.Disposable {
         } catch {
             if (id !== this._updateId) { return; }
         }
-        this._currentCallHierarchyItem = undefined;
+        // Do NOT clear _currentCallHierarchyItem here — keep the last resolved item
+        // so it's available when the user clicks the analysis panel.
 
         // Tier 2: Document symbol provider — finds enclosing function from file structure,
         // works for header files and projects without compile_commands.json

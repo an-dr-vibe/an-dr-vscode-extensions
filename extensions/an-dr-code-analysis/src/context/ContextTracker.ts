@@ -148,6 +148,27 @@ export class ContextTracker implements vscode.Disposable {
             if (allSymbols && allSymbols.length > 0) {
                 const sym = findDeepestContaining(allSymbols, pos);
                 if (sym) {
+                    // Try to upgrade to call-hierarchy using the symbol's name token position.
+                    // This lets the analyzer reuse the item even when the cursor is inside
+                    // the function body rather than on its name.
+                    try {
+                        const chItems = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
+                            'vscode.prepareCallHierarchy', doc.uri, sym.selectionRange.start
+                        );
+                        if (id !== this._updateId) { return; }
+                        if (chItems && chItems.length > 0) {
+                            this._currentCallHierarchyItem = chItems[0];
+                            this._emit(id, doc, {
+                                symbol: chItems[0].name,
+                                symbolKind: chItems[0].kind,
+                                symbolSource: 'call-hierarchy',
+                            });
+                            return;
+                        }
+                    } catch {
+                        if (id !== this._updateId) { return; }
+                    }
+
                     this._emit(id, doc, {
                         symbol: sym.name,
                         symbolKind: sym.kind,

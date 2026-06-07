@@ -109,6 +109,12 @@ export interface NodeDoubleClickMessage {
     line?: number;
 }
 
+export interface RunCommandMessage {
+    type: 'runCommand';
+    command: string;
+    args?: unknown[];
+}
+
 export type WebviewToExtensionMessage =
     | ReadyMessage
     | RefreshToolsMessage
@@ -117,4 +123,5 @@ export type WebviewToExtensionMessage =
     | RequestAnalysisMessage
     | DepthChangeMessage
     | NodeClickMessage
-    | NodeDoubleClickMessage;
+    | NodeDoubleClickMessage
+    | RunCommandMessage;

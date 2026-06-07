@@ -200,6 +200,18 @@ export function generateWebviewHtml(
             font-style: italic;
         }
         .graph-error { color: var(--vscode-errorForeground, #f48771); font-style: normal; }
+        .graph-action-btn {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            font-size: 0.82em;
+            background: var(--vscode-button-secondaryBackground, #3a3d41);
+            color: var(--vscode-button-secondaryForeground, #ccc);
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .graph-action-btn:hover { background: var(--vscode-button-secondaryHoverBackground, #4a4d51); }
         .graph-meta {
             display: flex;
             align-items: center;

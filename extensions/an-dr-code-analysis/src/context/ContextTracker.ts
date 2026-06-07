@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { log } from '../logger';
 
 export type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
 
@@ -118,11 +119,13 @@ export class ContextTracker implements vscode.Disposable {
         }
 
         // Tier 1: LSP call hierarchy — exact semantic symbol, reusable by analyzer
+        log.appendLine(`[ContextTracker] tier1: cursor at ${pos.line}:${pos.character} in ${doc.uri.fsPath}`);
         try {
             const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
                 'vscode.prepareCallHierarchy', doc.uri, pos
             );
             if (id !== this._updateId) { return; }
+            log.appendLine(`[ContextTracker] tier1 prepareCallHierarchy: ${items?.length ?? 0} items`);
             if (items && items.length > 0) {
                 this._currentCallHierarchyItem = items[0];
                 this._emit(id, doc, {
@@ -151,11 +154,14 @@ export class ContextTracker implements vscode.Disposable {
                     // Try to upgrade to call-hierarchy using the symbol's name token position.
                     // This lets the analyzer reuse the item even when the cursor is inside
                     // the function body rather than on its name.
+                    const upgradePos = sym.selectionRange.start;
+                    log.appendLine(`[ContextTracker] tier2 upgrade: sym="${sym.name}" at ${upgradePos.line}:${upgradePos.character} in ${doc.uri.fsPath}`);
                     try {
                         const chItems = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
-                            'vscode.prepareCallHierarchy', doc.uri, sym.selectionRange.start
+                            'vscode.prepareCallHierarchy', doc.uri, upgradePos
                         );
                         if (id !== this._updateId) { return; }
+                        log.appendLine(`[ContextTracker] tier2 prepareCallHierarchy: ${chItems?.length ?? 0} items`);
                         if (chItems && chItems.length > 0) {
                             this._currentCallHierarchyItem = chItems[0];
                             this._emit(id, doc, {
@@ -165,7 +171,8 @@ export class ContextTracker implements vscode.Disposable {
                             });
                             return;
                         }
-                    } catch {
+                    } catch (e) {
+                        log.appendLine(`[ContextTracker] tier2 prepareCallHierarchy threw: ${e}`);
                         if (id !== this._updateId) { return; }
                     }
 

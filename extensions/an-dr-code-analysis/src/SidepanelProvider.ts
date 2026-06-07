@@ -81,6 +81,9 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                         );
                     }
                     break;
+                case 'runCommand':
+                    void vscode.commands.executeCommand(msg.command, ...(msg.args ?? []));
+                    break;
             }
         });
     }

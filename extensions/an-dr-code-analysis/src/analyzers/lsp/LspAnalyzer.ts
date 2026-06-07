@@ -34,7 +34,11 @@ export class LspAnalyzer implements IAnalyzer {
             log.appendLine(`[LspAnalyzer] resolving fresh at ${pos.line}:${pos.character} in ${context.filePath}`);
             const items = await prepareCallHierarchy(uri, pos, signal);
             log.appendLine(`[LspAnalyzer] fresh resolve: ${items?.length ?? 0} items`);
-            if (!items?.length) { return null; }
+            if (!items?.length) {
+                log.appendLine(`[LspAnalyzer] clangd returned no call hierarchy — ensure compile_commands.json is` +
+                    ` discoverable from the source file's directory (or add a .clangd config at the workspace root).`);
+                return null;
+            }
             target = items[0];
         }
 

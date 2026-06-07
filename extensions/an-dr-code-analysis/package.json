@@ -43,6 +43,13 @@
 				}
 			]
 		},
+		"commands": [
+			{
+				"command": "an-dr-code-analysis.selectCompileCommands",
+				"title": "Select compile_commands.json",
+				"category": "Code Analysis"
+			}
+		],
 		"configuration": {
 			"title": "An-Dr Code Analysis",
 			"properties": {

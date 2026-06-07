@@ -15,7 +15,7 @@ Get a buildable, activatable extension with an empty sidepanel.
 - [x] Create `src/SidepanelProvider.ts` — `WebviewViewProvider` with static HTML placeholder
 - [x] Create `webview-src/index.ts` — empty entry point, renders "Code Analysis (loading...)"
 - [x] Build succeeds (`npm run build`), extension loads in Extension Development Host
-- [ ] Sidepanel appears in Activity Bar with placeholder text
+- [x] Sidepanel appears in Activity Bar with placeholder text
 
 **Verification:**
 
@@ -25,7 +25,7 @@ Get a buildable, activatable extension with an empty sidepanel.
 4. Panel shows "Code Analysis — ready" placeholder text
 5. No errors in the Extension Host output channel
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 

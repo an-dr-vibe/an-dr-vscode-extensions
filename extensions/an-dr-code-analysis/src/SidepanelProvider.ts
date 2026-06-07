@@ -15,13 +15,14 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
     private _view?: vscode.WebviewView;
     private readonly _toolRegistry = new ToolRegistry();
     private readonly _contextTracker: ContextTracker;
-    private readonly _analyzerFactory = new AnalyzerFactory();
+    private readonly _analyzerFactory: AnalyzerFactory;
     private readonly _cache = new AnalysisCache();
     private readonly _disposables: vscode.Disposable[] = [];
 
     constructor(private readonly _extensionUri: vscode.Uri) {
         this._contextTracker = new ContextTracker();
         this._contextTracker.onContextChange(ctx => this._postContext(ctx));
+        this._analyzerFactory = new AnalyzerFactory(this._contextTracker);
         this._disposables.push(this._cache);
     }
 

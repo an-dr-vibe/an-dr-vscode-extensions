@@ -97,7 +97,7 @@ interface AppState {
 const state: AppState = {
     tools: null,
     context: null,
-    analysis: { status: 'result', graph: STUB_GRAPH, activeGraphType: 'callGraph' },
+    analysis: { status: 'idle' },
     depth: 2,
 };
 

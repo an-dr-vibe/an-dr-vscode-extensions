@@ -155,7 +155,7 @@ Render graphs in the webview. Use stub data first to verify rendering.
 6. Click `[+]` depth — graph re-renders with more nodes
 7. Click `[reset]` — returns to default depth
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 

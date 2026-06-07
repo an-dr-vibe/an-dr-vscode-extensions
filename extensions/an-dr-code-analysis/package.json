@@ -8,7 +8,9 @@
 		"email": "mail@agramakov.me"
 	},
 	"description": "Static code analysis: call graphs, file dependencies, and component dependencies.",
-	"categories": ["Other"],
+	"categories": [
+		"Other"
+	],
 	"homepage": "https://github.com/an-dr/an-dr-vscode-extensions/tree/main/extensions/an-dr-code-analysis",
 	"repository": {
 		"type": "git",
@@ -18,7 +20,9 @@
 	"engines": {
 		"vscode": "^1.90.0"
 	},
-	"activationEvents": ["*"],
+	"activationEvents": [
+		"*"
+	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"viewsContainers": {
@@ -105,13 +109,19 @@
 				},
 				"an-dr-code-analysis.tools.fallbackTool": {
 					"type": "string",
-					"enum": ["auto", "cscope", "ctags"],
+					"enum": [
+						"auto",
+						"cscope",
+						"ctags"
+					],
 					"default": "auto",
 					"description": "Force a specific fallback tool instead of auto-selection."
 				},
 				"an-dr-code-analysis.clangd.fallbackFlags": {
 					"type": "array",
-					"items": { "type": "string" },
+					"items": {
+						"type": "string"
+					},
 					"default": [],
 					"description": "Extra compiler flags passed to clangd when compile_commands.json is missing."
 				},
@@ -161,11 +171,14 @@
 	"scripts": {
 		"build": "webpack --mode production",
 		"build:dev": "webpack --mode development",
-		"watch": "webpack --mode development --watch"
+		"watch": "webpack --mode development --watch",
+		"package": "vsce package --no-dependencies",
+		"install-ext": "npm run build && vsce package --no-dependencies && code --install-extension an-dr-code-analysis-0.1.0.vsix"
 	},
 	"devDependencies": {
 		"@types/node": "^18.0.0",
 		"@types/vscode": "^1.90.0",
+		"@vscode/vsce": "^3.9.2",
 		"ts-loader": "^9.5.1",
 		"typescript": "^5.4.5",
 		"webpack": "^5.91.0",

@@ -19,8 +19,8 @@ Get a buildable, activatable extension with an empty sidepanel.
 
 **Verification:**
 
-1. Open the `extensions/an-dr-code-analysis` folder in VS Code
-2. Press `F5` → Extension Development Host opens
+1. Run `npm run install-ext` in `extensions/an-dr-code-analysis`
+2. Reload VS Code window (`Developer: Reload Window`)
 3. Click the graph icon in the Activity Bar → "Code Analysis" panel opens
 4. Panel shows "Code Analysis — ready" placeholder text
 5. No errors in the Extension Host output channel
@@ -33,20 +33,20 @@ Get a buildable, activatable extension with an empty sidepanel.
 
 Detect installed tools on activation and render status in the panel.
 
-- [ ] Create `src/tools/ToolRegistry.ts` — detects: clangd, rust-analyzer, cargo, ctags, cscope, pyan3, cmake, bear, importlab, iwyu; tsserver always "ok" (bundled)
-- [ ] Create `src/tools/ClangdHealth.ts` — checks `compile_commands.json` presence and staleness
-- [ ] Define `ToolStatus` type in `src/webview/messages.ts`
-- [ ] `SidepanelProvider` sends `toolsStatus` message after detection
-- [ ] Webview renders TOOLS STATUS section with ✅ / ⚠️ / ❌ icons (collapsed by default)
-- [ ] `ToolRegistry.refresh()` callable on demand
+- [x] Create `src/tools/ToolRegistry.ts` — detects: clangd, rust-analyzer, cargo, ctags, cscope, pyan3, cmake, bear, importlab, iwyu; tsserver always "ok" (bundled)
+- [x] Create `src/tools/ClangdHealth.ts` — checks `compile_commands.json` presence and staleness
+- [x] Define `ToolStatus` type in `src/webview/messages.ts`
+- [x] `SidepanelProvider` sends `toolsStatus` message after detection
+- [x] Webview renders TOOLS STATUS section with ✅ / ⚠️ / ❌ icons (collapsed by default)
+- [x] `ToolRegistry.refresh()` callable on demand
 
 **Verification:**
 
-1. Press `F5` → Extension Development Host opens
-2. Open the Code Analysis panel
-3. Expand the TOOLS STATUS section
+1. Run `npm run install-ext` in `extensions/an-dr-code-analysis`
+2. Reload VS Code window (`Developer: Reload Window`)
+3. Open the Code Analysis panel and expand TOOLS STATUS
 4. Each tool installed on this machine shows ✅; uninstalled tools show ❌
-5. Run `which clangd` (or equivalent) in terminal — result matches what the panel shows
+5. Run `where clangd` (Windows) or `which clangd` (Unix) in terminal — result matches the panel
 
 - [ ] **Approved**
 
@@ -68,11 +68,12 @@ Track active editor symbol and file; render in panel.
 
 **Verification:**
 
-1. Open a `.cpp` file — CONTEXT section shows the file name and `C++`
-2. Click on a function name — Symbol field updates to that function
-3. Switch to a different editor tab — CONTEXT updates to new file
-4. Click Pin (📌) — switch tabs — CONTEXT stays locked to the pinned symbol
-5. Click Pin again — CONTEXT unfreezes and updates normally
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.cpp` file — CONTEXT section shows the file name and `C++`
+3. Click on a function name — Symbol field updates to that function
+4. Switch to a different editor tab — CONTEXT updates to new file
+5. Click Pin (📌) — switch tabs — CONTEXT stays locked to the pinned symbol
+6. Click Pin again — CONTEXT unfreezes and updates normally
 
 - [ ] **Approved**
 
@@ -94,11 +95,12 @@ Define types and wire the analysis skeleton without any real analyzer yet.
 
 **Verification:**
 
-1. Open the panel — three analysis buttons are visible (Call Graph, File Deps, Component Deps)
-2. Click "Call Graph" — button shows spinner / "Analyzing..." state
-3. After a moment — "No results found" message appears (no crash)
-4. Depth `[−]` / `[+]` / `[reset]` controls are visible below the graph area
-5. No errors in Extension Host output
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open the panel — three analysis buttons are visible (Call Graph, File Deps, Component Deps)
+3. Click "Call Graph" — button shows spinner / "Analyzing..." state
+4. After a moment — "No results found" message appears (no crash)
+5. Depth `[−]` / `[+]` / `[reset]` controls are visible below the graph area
+6. No errors in Extension Host output
 
 - [ ] **Approved**
 
@@ -118,12 +120,13 @@ Render graphs in the webview. Use stub data first to verify rendering.
 
 **Verification:**
 
-1. Open the panel — a hardcoded stub graph (3–5 nodes, 2–3 edges) renders automatically
-2. Nodes are visually distinct: target node is larger/bolder, caller/callee use different colors
-3. Edges have directed arrows; at least one dashed edge (external)
-4. Hover a node — tooltip shows full name and file path
-5. Click `[+]` depth — graph re-renders with more nodes
-6. Click `[reset]` — returns to default depth
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open the panel — a hardcoded stub graph (3–5 nodes, 2–3 edges) renders automatically
+3. Nodes are visually distinct: target node is larger/bolder, caller/callee use different colors
+4. Edges have directed arrows; at least one dashed edge (external)
+5. Hover a node — tooltip shows full name and file path
+6. Click `[+]` depth — graph re-renders with more nodes
+7. Click `[reset]` — returns to default depth
 
 - [ ] **Approved**
 
@@ -141,11 +144,12 @@ Implement LSP call hierarchy for C/C++ via clangd.
 
 **Verification:**
 
-1. Open a `.cpp` file that has a project with `compile_commands.json`
-2. Click on a function name — CONTEXT shows the symbol
-3. Click "Call Graph" — real graph renders with callers and callees
-4. Confidence badge shows 🟢 `clangd`
-5. Double-click a node — editor jumps to that function's definition
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.cpp` file that has a project with `compile_commands.json`
+3. Click on a function name — CONTEXT shows the symbol
+4. Click "Call Graph" — real graph renders with callers and callees
+5. Confidence badge shows 🟢 `clangd`
+6. Double-click a node — editor jumps to that function's definition
 
 - [ ] **Approved**
 
@@ -163,11 +167,12 @@ Add universal fallback for call graph when LSP unavailable or empty.
 
 **Verification:**
 
-1. Open a `.cpp` file **without** `compile_commands.json` (or rename it away temporarily)
-2. Click "Call Graph" — graph renders using ctags
-3. Confidence badge shows 🟡 `ctags`
-4. A warning note is visible indicating fallback was used
-5. Restore `compile_commands.json` — re-run — badge returns to 🟢 `clangd`
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.cpp` file **without** `compile_commands.json` (or rename it away temporarily)
+3. Click "Call Graph" — graph renders using ctags
+4. Confidence badge shows 🟡 `ctags`
+5. A warning note is visible indicating fallback was used
+6. Restore `compile_commands.json` — re-run — badge returns to 🟢 `clangd`
 
 - [ ] **Approved**
 
@@ -184,10 +189,11 @@ Implement file dependency graph via clangd `documentLink` + `#include` regex fal
 
 **Verification:**
 
-1. Open a `.cpp` file that includes several headers
-2. Click "File Deps" — graph renders with the active file at center and included files as nodes
-3. Confidence badge shows 🟢 `clangd` (or 🔴 regex if clangd unavailable)
-4. With clangd disabled: repeat — badge shows 🔴 `regex`, graph still renders from `#include` lines
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.cpp` file that includes several headers
+3. Click "File Deps" — graph renders with the active file at center and included files as nodes
+4. Confidence badge shows 🟢 `clangd` (or 🔴 regex if clangd unavailable)
+5. With clangd disabled: repeat — badge shows 🔴 `regex`, graph still renders from `#include` lines
 
 - [ ] **Approved**
 
@@ -205,11 +211,12 @@ Surface clangd misconfiguration and offer fixes.
 
 **Verification:**
 
-1. Open a CMake project folder that has **no** `compile_commands.json`
-2. Click "Call Graph" → error message appears with a "Generate via CMake" button
-3. Click the button → correct `cmake` command runs (or opens a terminal with it)
-4. Open a project with an ARM cross-compilation entry in `compile_commands.json`
-5. Panel offers "Generate .clangd config" with a confirmation dialog before writing
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a CMake project folder that has **no** `compile_commands.json`
+3. Click "Call Graph" → error message appears with a "Generate via CMake" button
+4. Click the button → correct `cmake` command runs (or opens a terminal with it)
+5. Open a project with an ARM cross-compilation entry in `compile_commands.json`
+6. Panel offers "Generate .clangd config" with a confirmation dialog before writing
 
 - [ ] **Approved**
 
@@ -225,10 +232,11 @@ Add Rust language support.
 
 **Verification:**
 
-1. Open a `.rs` file in a Cargo workspace
-2. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
-3. Click "File Deps" → module dependency graph renders
-4. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.rs` file in a Cargo workspace
+3. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
+4. Click "File Deps" → module dependency graph renders
+5. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`
 
 - [ ] **Approved**
 
@@ -245,11 +253,12 @@ Add TS/JS support.
 
 **Verification:**
 
-1. Open a `.ts` file
-2. Click "Call Graph" → graph renders, badge shows 🟢 `tsserver`
-3. Click "File Deps" → import graph renders
-4. Open a project with `tsconfig.json` `references` → "Component Deps" shows project references graph
-5. Open a `.js` file → same three analyses work (lower accuracy expected)
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.ts` file
+3. Click "Call Graph" → graph renders, badge shows 🟢 `tsserver`
+4. Click "File Deps" → import graph renders
+5. Open a project with `tsconfig.json` `references` → "Component Deps" shows project references graph
+6. Open a `.js` file → same three analyses work (lower accuracy expected)
 
 - [ ] **Approved**
 
@@ -265,10 +274,11 @@ Add Python support.
 
 **Verification:**
 
-1. Open a `.py` file
-2. Click "Call Graph" → graph renders, badge shows 🟡 `pyan3`
-3. Click "File Deps" → import graph renders, badge shows 🔴 `ast-walk`
-4. With pyan3 uninstalled: Call Graph falls back to ctags, badge shows 🟡 `ctags`
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.py` file
+3. Click "Call Graph" → graph renders, badge shows 🟡 `pyan3`
+4. Click "File Deps" → import graph renders, badge shows 🔴 `ast-walk`
+5. With pyan3 uninstalled: Call Graph falls back to ctags, badge shows 🟡 `ctags`
 
 - [ ] **Approved**
 
@@ -284,9 +294,10 @@ Add component-level analysis for C/C++.
 
 **Verification:**
 
-1. Open a CMake project with multiple targets
-2. Click "Component Deps" → CMake target dependency graph renders, badge shows 🟡 `cmake`
-3. Remove `CMakeLists.txt` access (or open a non-CMake project) → heuristic fallback renders directory-level graph
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a CMake project with multiple targets
+3. Click "Component Deps" → CMake target dependency graph renders, badge shows 🟡 `cmake`
+4. Remove `CMakeLists.txt` access (or open a non-CMake project) → heuristic fallback renders directory-level graph
 
 - [ ] **Approved**
 
@@ -304,11 +315,12 @@ Wider graph in a `WebviewPanel` editor tab.
 
 **Verification:**
 
-1. Run any analysis in the sidebar to get a graph result
-2. Click ↗ → new editor tab opens titled "Code Analysis — Call Graph — {symbol}"
-3. Graph renders at wider width with hierarchical layout
-4. Interact with sidebar (pin, depth change) → sidebar still works independently
-5. Depth control in expanded tab goes up to 8
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Run any analysis in the sidebar to get a graph result
+3. Click ↗ → new editor tab opens titled "Code Analysis — Call Graph — {symbol}"
+4. Graph renders at wider width with hierarchical layout
+5. Interact with sidebar (pin, depth change) → sidebar still works independently
+6. Depth control in expanded tab goes up to 8
 
 - [ ] **Approved**
 
@@ -327,11 +339,12 @@ Connect to companion extension (e.g. `an-dr-ai`) as last-resort analyzer.
 
 **Verification:**
 
-1. Disable all local tools (or open an unsupported file type)
-2. Click any analysis button → confirmation dialog appears listing files to be sent and their sizes
-3. Click Cancel → no analysis runs, no data is sent
-4. Click Confirm → AI graph renders with 🤖 badge
-5. Disable `an-dr-ai` extension → error message explains companion is not available (no silent fallback)
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Disable all local tools (or open an unsupported file type)
+3. Click any analysis button → confirmation dialog appears listing files to be sent and their sizes
+4. Click Cancel → no analysis runs, no data is sent
+5. Click Confirm → AI graph renders with 🤖 badge
+6. Disable `an-dr-ai` extension → error message explains companion is not available (no silent fallback)
 
 - [ ] **Approved**
 
@@ -351,11 +364,12 @@ Final UX pass.
 
 **Verification:**
 
-1. Trigger a slow analysis, wait 10s → "Cancel" button appears; clicking it stops the analysis
-2. Start an analysis, then switch files → "Results are for {old file}" notice appears
-3. Right-click a graph node → context menu shows Jump to Definition / Copy Name / Pin
-4. Click a ⚠️ tool in TOOLS STATUS → popover explains what it's for and how to install it
-5. Run analysis on a file with no callable symbols → "No results found (clangd)" — not an error state
-6. Collapse a section, close the panel, reopen → section stays collapsed
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Trigger a slow analysis, wait 10s → "Cancel" button appears; clicking it stops the analysis
+3. Start an analysis, then switch files → "Results are for {old file}" notice appears
+4. Right-click a graph node → context menu shows Jump to Definition / Copy Name / Pin
+5. Click a ⚠️ tool in TOOLS STATUS → tab opens with install instructions
+6. Run analysis on a file with no callable symbols → "No results found (clangd)" — not an error state
+7. Collapse a section, close the panel, reopen → section stays collapsed
 
 - [ ] **Approved**

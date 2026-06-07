@@ -102,6 +102,8 @@ Replace word-boundary symbol detection with `vscode.prepareCallHierarchy`, which
 4. Click on a comment word — Symbol shows `—`
 5. Click on a function call site — Symbol shows the called function's name
 
+- [x] **Approved**
+
 ---
 
 ## Iteration 4 — Graph Infrastructure

@@ -36,14 +36,11 @@ import { selectCompileCommandsCommand } from '../commands/selectCompileCommands'
 
 // ── BUG: maxDepth = 5 but scan starts at depth=0 → actually scans 6 levels ──
 
-describe('BUG: scan depth off-by-one', () => {
-    it('compile_commands.json exactly 5 subdirectories deep IS found (depth=5 is still scanned)', () => {
-        // scan(root, 0) → recurse into children at depth=1
-        // scan(d0, 1) → recurse into children at depth=2 ...
-        // scan(d4, 5) → 5 > 5 = false → scanned → compile_commands.json found
-        // So a file 5 levels of subdirectories deep IS found.
+describe('S1 fixed: scan depth — MAX_SCAN_DEPTH=5 scans up to 4 subdirectory levels', () => {
+    it('S1 fixed: compile_commands.json exactly 4 subdirectories deep IS found', () => {
+        // scan(root,0)→scan(d0,1)→scan(d1,2)→scan(d2,3)→scan(d3,4) — depth<5 allowed
         let dir = tmpDir;
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 4; i++) {
             dir = path.join(dir, `d${i}`);
             fs.mkdirSync(dir);
         }
@@ -58,10 +55,10 @@ describe('BUG: scan depth off-by-one', () => {
         });
     });
 
-    it('BUG: compile_commands.json 6 subdirectories deep is NOT found — off-by-one means maxDepth=5 actually allows depth=5', () => {
-        // scan(d5, 6) → 6 > 5 = true → BLOCKED
+    it('S1 fixed: compile_commands.json exactly 5 subdirectories deep is NOT found', () => {
+        // scan(d4,5) → depth >= 5 → return immediately
         let dir = tmpDir;
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 5; i++) {
             dir = path.join(dir, `d${i}`);
             fs.mkdirSync(dir);
         }
@@ -72,8 +69,6 @@ describe('BUG: scan depth off-by-one', () => {
         return selectCompileCommandsCommand().then(() => {
             const items: any[] = (window.showQuickPick as jest.Mock).mock.calls[0]?.[0] ?? [];
             const found = items.filter((i: any) => !i.label.startsWith('$('));
-            // The variable is called maxDepth=5 but effective depth is 6 levels.
-            // A file at level 6 IS blocked, so this is 0. Documents the naming confusion.
             expect(found.length).toBe(0);
         });
     });
@@ -114,8 +109,8 @@ describe('BUG: directories starting with . are skipped by scanner', () => {
 
 // ── BUG: writeClangdConfig overwrites existing .clangd without warning ────────
 
-describe('BUG: writeClangdConfig overwrites existing user .clangd', () => {
-    it('BUG: existing hand-crafted .clangd is silently overwritten when user picks a file', () => {
+describe('S3 fixed: writeClangdConfig prompts before overwriting existing .clangd', () => {
+    it('S3 fixed: user cancels overwrite prompt — existing .clangd is preserved', () => {
         const clangdPath = path.join(tmpDir, '.clangd');
         const userContent = '# User config\nCompileFlags:\n  Add: [-std=c++17]\n';
         fs.writeFileSync(clangdPath, userContent);
@@ -129,14 +124,37 @@ describe('BUG: writeClangdConfig overwrites existing user .clangd', () => {
             label: 'build/compile_commands.json',
             detail: ccPath,
         });
+        // showWarningMessage: user clicks Cancel
+        (window.showWarningMessage as jest.Mock).mockResolvedValue('Cancel');
+
+        return selectCompileCommandsCommand().then(() => {
+            const newContent = fs.readFileSync(clangdPath, 'utf8');
+            // S3 fixed: user's config is preserved
+            expect(newContent).toContain('-std=c++17');
+            expect(newContent).toContain('# User config');
+        });
+    });
+
+    it('S3 fixed: user confirms overwrite — .clangd is updated', () => {
+        const clangdPath = path.join(tmpDir, '.clangd');
+        const userContent = '# User config\nCompileFlags:\n  Add: [-std=c++17]\n';
+        fs.writeFileSync(clangdPath, userContent);
+
+        const buildDir = path.join(tmpDir, 'build');
+        fs.mkdirSync(buildDir);
+        const ccPath = path.join(buildDir, 'compile_commands.json');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: buildDir, command: 'gcc', file: 'f.c' }]));
+
+        (window.showQuickPick as jest.Mock).mockResolvedValue({
+            label: 'build/compile_commands.json',
+            detail: ccPath,
+        });
+        // showWarningMessage: user clicks Overwrite
+        (window.showWarningMessage as jest.Mock).mockResolvedValue('Overwrite');
         (window.showInformationMessage as jest.Mock).mockResolvedValue(undefined);
 
         return selectCompileCommandsCommand().then(() => {
             const newContent = fs.readFileSync(clangdPath, 'utf8');
-            // BUG CONFIRMED: user's -std=c++17 and custom comment are gone
-            expect(newContent).not.toContain('-std=c++17');
-            expect(newContent).not.toContain('# User config');
-            // And it was replaced with the generated content:
             expect(newContent).toMatch(/CompilationDatabase/);
         });
     });
@@ -144,19 +162,15 @@ describe('BUG: writeClangdConfig overwrites existing user .clangd', () => {
 
 // ── BUG: showInformationMessage call when None is selected ────────────────────
 
-describe('"None" selection shows informationMessage', () => {
-    it('BUG: showInformationMessage is called with message containing "cleared"', () => {
+describe('S4 fixed: "None" selection does NOT show informationMessage', () => {
+    it('S4 fixed: showInformationMessage is NOT called when "None" is selected', () => {
         const NONE_LABEL = '$(circle-slash) No compile_commands (use ctags fallback)';
         (window.showQuickPick as jest.Mock).mockResolvedValue({ label: NONE_LABEL });
 
         return selectCompileCommandsCommand().then(() => {
-            // The call happens but showInformationMessage mock may not capture it
-            // depending on the withProgress mock chain. Verify the function was called at all:
             const calls = (window.showInformationMessage as jest.Mock).mock.calls;
-            const hasCleared = calls.some(args =>
-                typeof args[0] === 'string' && args[0].toLowerCase().includes('cleared')
-            );
-            expect(hasCleared).toBe(true);
+            // S4 fixed: no info message for a remove/clear action
+            expect(calls).toHaveLength(0);
         });
     });
 });
@@ -184,23 +198,16 @@ describe('BUG: subprojects directory is scanned by findCompileCommandsFiles', ()
 
 // ── BUG: picked.detail used with non-null assertion ──────────────────────────
 
-describe('BUG: non-null assertion on picked.detail', () => {
-    it('BUG: if picked.detail is undefined, path.dirname throws TypeError', () => {
+describe('S5 fixed: undefined picked.detail is handled gracefully', () => {
+    it('S5 fixed: if picked.detail is undefined, command returns without throwing', () => {
         // A found item that for some reason has no detail field
         (window.showQuickPick as jest.Mock).mockResolvedValue({
             label: 'some/path/compile_commands.json',
             detail: undefined,
         });
-        (window.showInformationMessage as jest.Mock).mockResolvedValue(undefined);
 
-        // BUG: code does `filePath = picked.detail!` → undefined → path.dirname(undefined) throws
-        return selectCompileCommandsCommand().then(
-            () => { /* resolved: either bug didn't trigger or was caught */ },
-            (err) => {
-                // If it rejected, the TypeError was not caught inside the command
-                expect(err).toBeDefined();
-            }
-        );
+        // S5 fixed: guard returns early instead of using non-null assertion
+        return expect(selectCompileCommandsCommand()).resolves.toBeUndefined();
     });
 });
 

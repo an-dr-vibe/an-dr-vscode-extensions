@@ -66,54 +66,56 @@ describe('race condition: existsSync then statSync', () => {
 // ── BUG: both CMakeLists.txt AND meson.build exist — meson is never checked ──
 
 describe('BUG: only CMakeLists.txt and Makefile are checked for staleness', () => {
-    it('BUG: meson.build newer than compile_commands.json is NOT detected as stale', () => {
+    it('H2 fixed: meson.build newer than compile_commands.json is detected as stale', () => {
         const ccPath     = path.join(tmpDir, 'compile_commands.json');
         const mesonPath  = path.join(tmpDir, 'meson.build');
-        fs.writeFileSync(ccPath, '[]');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         const now = Date.now();
         fs.utimesSync(ccPath, new Date(now - 5000), new Date(now - 5000));
         fs.writeFileSync(mesonPath, 'project("test")'); // newer
 
         const status = ClangdHealth.check();
-        // BUG: meson.build is not in the checked list → status is ok even though stale
-        expect(status.state).toBe('ok'); // documents the bug
+        // H2 fixed: meson.build is now in the checked list
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
     });
 
-    it('BUG: build.ninja newer than compile_commands.json is NOT detected as stale', () => {
+    it('H2 fixed: build.ninja newer than compile_commands.json is detected as stale', () => {
         const ccPath    = path.join(tmpDir, 'compile_commands.json');
         const ninjaPath = path.join(tmpDir, 'build.ninja');
-        fs.writeFileSync(ccPath, '[]');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         const now = Date.now();
         fs.utimesSync(ccPath, new Date(now - 5000), new Date(now - 5000));
         fs.writeFileSync(ninjaPath, '# ninja build');
 
         const status = ClangdHealth.check();
-        expect(status.state).toBe('ok'); // documents the missing coverage
+        // H2 fixed: build.ninja is now in the checked list
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
     });
 });
 
 // ── BUG: empty compile_commands.json treated as present and fresh ────────────
 
-describe('BUG: empty compile_commands.json is treated as valid', () => {
-    it('BUG: empty array compile_commands.json returns ok — clangd gets no compile commands', () => {
+describe('H3 fixed: empty or malformed compile_commands.json is treated as invalid', () => {
+    it('H3 fixed: empty array compile_commands.json returns warn', () => {
         fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '[]');
         const status = ClangdHealth.check();
-        // BUG: ClangdHealth returns 'ok' for an empty array — but clangd would have no commands
-        expect(status.state).toBe('ok');
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/empty/i);
     });
 
-    it('BUG: completely empty file (zero bytes) returns ok — would likely crash clangd', () => {
+    it('H3 fixed: completely empty file returns warn (malformed JSON)', () => {
         fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '');
         const status = ClangdHealth.check();
-        // ClangdHealth only checks existence and mtime, not content validity
-        expect(status.state).toBe('ok'); // documents the gap
+        expect(status.state).toBe('warn');
     });
 
-    it('BUG: malformed JSON in compile_commands.json returns ok', () => {
+    it('H3 fixed: malformed JSON in compile_commands.json returns warn', () => {
         fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '{not valid json}');
         const status = ClangdHealth.check();
-        // No parsing — always ok if file exists and is not stale
-        expect(status.state).toBe('ok');
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/malformed/i);
     });
 });
 
@@ -144,24 +146,22 @@ describe('BUG: only the first workspace folder is checked', () => {
 // ── BUG: Makefile check does not differentiate Makefile from makefile (case) ──
 
 describe('BUG: case sensitivity of build file names (Linux only)', () => {
-    it('BUG: lowercase "makefile" is not checked for staleness on case-sensitive filesystems', async () => {
+    it('H5 fixed: lowercase "makefile" is checked for staleness on case-sensitive filesystems', async () => {
         if (process.platform === 'win32') {
-            // Windows FS is case-insensitive: 'Makefile' stat will match 'makefile'
-            // so this bug doesn't manifest on Windows. Skip.
+            // Windows FS is case-insensitive: test doesn't apply.
             return;
         }
         const ccPath      = path.join(tmpDir, 'compile_commands.json');
         const makefileLow = path.join(tmpDir, 'makefile'); // lowercase
-        fs.writeFileSync(ccPath, '[]');
-        await new Promise(r => setTimeout(r, 10));
-        fs.writeFileSync(makefileLow, 'all:'); // newer, but lowercase
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         const now = Date.now();
         fs.utimesSync(ccPath, new Date(now - 5000), new Date(now - 5000));
+        fs.writeFileSync(makefileLow, 'all:'); // newer
 
         const status = ClangdHealth.check();
-        // BUG: only 'Makefile' (capital M) is in the checked list.
-        // On Linux, 'makefile' is a different file → staleness not detected → ok
-        expect(status.state).toBe('ok'); // confirms the gap on case-sensitive Linux
+        // H5 fixed: 'makefile' (lowercase) is now in the checked list
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
     });
 });
 
@@ -176,7 +176,7 @@ describe('staleness check: first stale match wins', () => {
         // cmake is older than cc
         fs.writeFileSync(cmakePath, 'cmake_minimum_required(VERSION 3.0)');
         await new Promise(r => setTimeout(r, 20));
-        fs.writeFileSync(ccPath, '[]');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         await new Promise(r => setTimeout(r, 20));
         // Makefile is newer than cc
         fs.writeFileSync(makePath, 'all:');

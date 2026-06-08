@@ -31,7 +31,8 @@ describe('ClangdHealth.check', () => {
     });
 
     it('returns ok when compile_commands.json is present and up-to-date', () => {
-        fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '[]');
+        fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'),
+            JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         const status = ClangdHealth.check();
         expect(status.state).toBe('ok');
         expect(status.name).toBe('clangd');
@@ -40,7 +41,8 @@ describe('ClangdHealth.check', () => {
     it('warns when CMakeLists.txt is newer than compile_commands.json', async () => {
         const ccPath = path.join(tmpDir, 'compile_commands.json');
         const cmakePath = path.join(tmpDir, 'CMakeLists.txt');
-        fs.writeFileSync(ccPath, '[]');
+        fs.writeFileSync(ccPath,
+            JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         // Wait a tick so timestamps differ reliably
         await new Promise(r => setTimeout(r, 10));
         fs.writeFileSync(cmakePath, 'cmake_minimum_required(VERSION 3.0)');
@@ -56,7 +58,8 @@ describe('ClangdHealth.check', () => {
     it('warns when Makefile is newer than compile_commands.json', async () => {
         const ccPath = path.join(tmpDir, 'compile_commands.json');
         const makePath = path.join(tmpDir, 'Makefile');
-        fs.writeFileSync(ccPath, '[]');
+        fs.writeFileSync(ccPath,
+            JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
         await new Promise(r => setTimeout(r, 10));
         fs.writeFileSync(makePath, 'all:');
         const now = Date.now();
@@ -72,7 +75,8 @@ describe('ClangdHealth.check', () => {
         const ccPath = path.join(tmpDir, 'compile_commands.json');
         fs.writeFileSync(cmakePath, 'cmake_minimum_required(VERSION 3.0)');
         await new Promise(r => setTimeout(r, 10));
-        fs.writeFileSync(ccPath, '[]');
+        fs.writeFileSync(ccPath,
+            JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
 
         const status = ClangdHealth.check();
         expect(status.state).toBe('ok');

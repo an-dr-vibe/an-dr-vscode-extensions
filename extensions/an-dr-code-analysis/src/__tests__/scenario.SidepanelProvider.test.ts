@@ -131,7 +131,7 @@ describe('Scenario: depth clamping via Settings.maxDepth', () => {
         provider.dispose();
     });
 
-    it('BUG: depth=0 is not validated — it is passed straight through', async () => {
+    it('P1 fixed: depth=0 is clamped to 1 (minimum)', async () => {
         const posted: any[] = [];
         const view = makeWebviewView(msg => posted.push(msg));
         const provider = new SidepanelProvider(makeExtensionUri(tmpDir));
@@ -151,13 +151,12 @@ describe('Scenario: depth clamping via Settings.maxDepth', () => {
         const handler = (view.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
         await handler({ type: 'requestAnalysis', graphType: 'callGraph', depth: 0 });
 
-        // BUG: depth=0 passes Math.min(0, 5)=0 — no minimum validation.
-        // The pipeline will run with depth=0 which should be invalid per Settings schema (min:1).
-        expect(capturedDepth).toBe(0);
+        // P1 fixed: depth=0 → Math.max(0, 1)=1 → clamped to 1
+        expect(capturedDepth).toBe(1);
         provider.dispose();
     });
 
-    it('BUG: depth=-1 is not validated — negative depths are not clamped', async () => {
+    it('P2 fixed: depth=-1 is clamped to 1 (minimum)', async () => {
         const view = makeWebviewView();
         const provider = new SidepanelProvider(makeExtensionUri(tmpDir));
         provider.resolveWebviewView(view, {} as any, {} as any);
@@ -176,8 +175,8 @@ describe('Scenario: depth clamping via Settings.maxDepth', () => {
         const handler = (view.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
         await handler({ type: 'requestAnalysis', graphType: 'callGraph', depth: -1 });
 
-        // Math.min(-1, 5) = -1 → passed through
-        expect(capturedDepth).toBe(-1);
+        // P2 fixed: depth=-1 → Math.max(-1, 1)=1 → clamped to 1
+        expect(capturedDepth).toBe(1);
         provider.dispose();
     });
 });
@@ -268,13 +267,7 @@ describe('Scenario: cache hit on re-analysis', () => {
 // ── Scenario: result with 0 nodes is treated as no result ─────────────────────
 
 describe('Scenario: analyzer returns graph with 0 nodes', () => {
-    it('BUG: graph with nodes.length=0 is NOT cached and falls through to analysisError', async () => {
-        // A target-only graph has 1 node. But what if an analyzer returns a graph with 0 nodes?
-        // The pipeline checks `result.graph.nodes.length > 0` — so 0 nodes = not accepted.
-        // The result is not cached, the next analyzer in chain is tried.
-        // This is intentional, but it means a lone-target result from CtagsAnalyzer
-        // (which returns 1 node) IS accepted, while a hypothetical analyzer returning
-        // 0 nodes (perhaps a stub) causes the pipeline to fall through to error.
+    it('P3 fixed: graph with nodes.length=0 is returned as a valid result', async () => {
         const view = makeWebviewView();
         const provider = new SidepanelProvider(makeExtensionUri(tmpDir));
         provider.resolveWebviewView(view, {} as any, {} as any);
@@ -288,7 +281,7 @@ describe('Scenario: analyzer returns graph with 0 nodes', () => {
 
         const emptyGraph = {
             graphType: 'callGraph', targetId: 'id',
-            nodes: [], // 0 nodes!
+            nodes: [], // 0 nodes
             edges: [], depth: 2, tool: 'mock', confidence: 'high' as const,
         };
         const factory = (provider as any)._analyzerFactory;
@@ -304,9 +297,9 @@ describe('Scenario: analyzer returns graph with 0 nodes', () => {
         handler({ type: 'requestAnalysis', graphType: 'callGraph', depth: 2 });
         await flushAsync();
 
-        // BUG: 0 nodes → not accepted → analysisError sent instead of analysisResult
-        expect(posted.some(m => m.type === 'analysisError')).toBe(true);
-        expect(posted.some(m => m.type === 'analysisResult')).toBe(false);
+        // P3 fixed: 0-node graph is a valid result — analysisResult is sent, not analysisError
+        expect(posted.some(m => m.type === 'analysisResult')).toBe(true);
+        expect(posted.some(m => m.type === 'analysisError')).toBe(false);
         provider.dispose();
     });
 });

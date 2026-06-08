@@ -116,7 +116,8 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
             return;
         }
 
-        const clampedDepth = Math.min(depth, Settings.maxDepth());
+        // P1/P2: clamp depth to [1, maxDepth] — reject depth ≤ 0
+        const clampedDepth = Math.min(Math.max(depth, 1), Settings.maxDepth());
         // Snapshot the CallHierarchyItem NOW before the webview steals focus and
         // onDidChangeActiveTextEditor fires and potentially clears it.
         const callHierarchyItem = this._contextTracker.currentCallHierarchyItem;
@@ -138,7 +139,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                 log.appendLine(`[analysis] running ${analyzer.name}...`);
                 const result = await analyzer.analyze(request);
                 log.appendLine(`[analysis] ${analyzer.name} result: ${result ? `${result.graph.nodes.length} nodes` : 'null'}`);
-                if (result && result.graph.nodes.length > 0) {
+                if (result) {
                     this._cache.set(
                         { filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol },
                         result

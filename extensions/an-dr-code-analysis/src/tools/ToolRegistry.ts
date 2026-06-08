@@ -13,7 +13,7 @@ interface ToolDef {
 }
 
 const TOOLS: ReadonlyArray<ToolDef> = [
-    { name: 'clangd',        cmd: 'clangd',                 group: 'c-cpp' },
+    // T2: 'clangd' removed — it is handled separately via ClangdHealth and must not appear here
     { name: 'cmake',         cmd: 'cmake',                  group: 'c-cpp' },
     { name: 'bear',          cmd: 'bear',                   group: 'c-cpp' },
     { name: 'importlab',     cmd: 'importlab',              group: 'c-cpp' },
@@ -39,6 +39,7 @@ export class ToolRegistry {
     private _statuses: ToolStatus[] = [];
 
     async refresh(): Promise<ToolStatus[]> {
+        // T2: TOOLS no longer contains 'clangd', so filter is a no-op but kept for safety
         const nonClangd = TOOLS.filter(t => t.name !== 'clangd');
 
         const [clangdBinary, ...otherStates] = await Promise.all([
@@ -65,6 +66,7 @@ export class ToolRegistry {
     }
 
     get statuses(): ToolStatus[] {
-        return this._statuses;
+        // T1: return a copy to prevent callers from mutating internal registry state
+        return [...this._statuses];
     }
 }

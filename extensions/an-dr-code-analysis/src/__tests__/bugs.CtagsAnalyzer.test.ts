@@ -146,10 +146,8 @@ describe('BUG: path normalisation mismatch between targetId and callerId', () =>
         });
     });
 
-    it('targetId includes raw 1-based line but callerId includes 0-based line', () => {
-        // targetId = `${path}:${targetEntry.line}:${name}` where line is 1-based (from ctags)
-        // callerId = `${filePath}:${caller.line}:${name}`  where caller.line = enclosing.line - 1 (0-based)
-        // So if target and caller are the same function, their ids DIFFER by the line offset.
+    it('C3 fixed: targetId and callerId both use 0-based lines', () => {
+        // Both targetId and callerId now use 0-based line numbers consistently.
         const fooPath  = tmpFile('lib.c',  'int foo() {}\nint bar() { foo(); }');
         stubCtags([
             jsonLine('foo', fooPath, 1),
@@ -158,16 +156,14 @@ describe('BUG: path normalisation mismatch between targetId and callerId', () =>
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo')).then(result => {
             if (!result) { return; }
-            // targetId: "...lib.c:1:foo" (1-based)
-            // callerId: "...lib.c:1:bar" (0-based: enclosing.line - 1 = 2 - 1 = 1)
-            // Both happen to be 1 here — but this is a coincidence (line 1 → 0-indexed = 0, but -1+1 = 1).
-            // Actually: targetEntry.line=1 (raw), targetId includes 1.
-            // enclosing.line=2 (raw), caller.line = 2-1 = 1, callerId includes 1. Coincidence.
-            // For targetEntry.line=5, targetId includes 5 (1-based).
-            // For a caller at line=5, caller.line = 5-1=4, callerId includes 4.
-            // So the id format is INCONSISTENT between target and callers.
+            // C3 fixed: targetEntry.line=1 → 0-based = 0, so targetId ends with :0:foo
             const targetId = result.graph.targetId;
-            expect(targetId).toMatch(/:1:foo$/); // raw ctags line (1-based)
+            expect(targetId).toMatch(/:0:foo$/);
+            // callerId for bar: enclosing.line=2 → 0-based = 1, so callerId ends with :1:bar
+            const callerNode = result.graph.nodes.find(n => n.role === 'caller');
+            if (callerNode) {
+                expect(callerNode.id).toMatch(/:1:bar$/);
+            }
         });
     });
 });
@@ -175,16 +171,16 @@ describe('BUG: path normalisation mismatch between targetId and callerId', () =>
 // ── BUG: multiple ctags entries for same symbol name (C++ overloads) ─────────
 
 describe('BUG: multiple ctags entries for the same target name', () => {
-    it('only the FIRST matching ctags entry is used as the target definition', () => {
+    it('C5: first matching ctags entry is used as the target definition (overloads recognised)', () => {
         const fooPath = tmpFile('foo.cpp', 'void foo(int x) {}\nvoid foo(double y) {}');
         stubCtags([
             jsonLine('foo', fooPath, 1),  // void foo(int)
-            jsonLine('foo', fooPath, 2),  // void foo(double) — overload, ignored
+            jsonLine('foo', fooPath, 2),  // void foo(double) — overload
         ]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo', 'cpp')).then(result => {
             expect(result).not.toBeNull();
-            // Only the first overload is the target — second is ignored
+            // First overload anchors the target node
             const targetNode = result!.graph.nodes.find(n => n.role === 'target')!;
             expect(targetNode.line).toBe(0); // ctags line 1 → 0-based = 0
         });
@@ -281,15 +277,14 @@ describe('symbol stripping edge cases', () => {
 // ── BUG: ctags line number 0 in JSON ─────────────────────────────────────────
 
 describe('BUG: malformed ctags output — line 0', () => {
-    it('ctags entry with line=0 produces a target node with line=-1 (0-indexed)', () => {
-        // targetEntry.line = 0 → target node line = 0 - 1 = -1
+    it('C4 fixed: ctags entry with line=0 produces a target node with line=0 (clamped)', () => {
+        // C4 fixed: Math.max(0, 0-1) = 0, not -1
         const fooPath = tmpFile('foo.c', 'int foo() {}');
         stubCtags([jsonLine('foo', fooPath, 0)]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo')).then(result => {
-            // BUG: line 0 from ctags → graph node line = -1 (invalid)
             if (result) {
-                expect(result.graph.nodes[0].line).toBe(-1);
+                expect(result.graph.nodes[0].line).toBe(0);
             }
         });
     });

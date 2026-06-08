@@ -70,7 +70,8 @@ function findCallers(
     }
     for (const fns of fileToFns.values()) { fns.sort((a, b) => a.line - b.line); }
 
-    const callPattern = new RegExp(`\\b${targetName}\\s*\\(`);
+    const escaped = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const callPattern = new RegExp(`\\b${escaped}\\s*\\(`);
     const callers: { name: string; filePath: string; line: number }[] = [];
     const seen = new Set<string>();
 
@@ -125,25 +126,28 @@ export class CtagsAnalyzer implements IAnalyzer {
         log.appendLine(`[CtagsAnalyzer] ctags returned ${entries.length} entries`);
         if (signal?.aborted || entries.length === 0) { return null; }
 
-        // Find the target's own definition
-        const targetEntry = entries.find(e => e.name === targetName);
-        if (!targetEntry) {
+        // Find the target's own definition (use all overloads; report the first)
+        const targetEntries = entries.filter(e => e.name === targetName);
+        if (targetEntries.length === 0) {
             log.appendLine(`[CtagsAnalyzer] "${targetName}" not found in ctags output`);
             return null;
         }
+        const targetEntry = targetEntries[0];
 
         const callers = findCallers(targetName, entries, signal);
         log.appendLine(`[CtagsAnalyzer] found ${callers.length} callers`);
         if (signal?.aborted) { return null; }
 
-        // Build GraphModel
-        const targetId = `${targetEntry.path}:${targetEntry.line}:${targetName}`;
+        // C3/C4: normalize to 0-based; guard against line=0 from ctags (clamp to 0)
+        const targetLine0 = Math.max(0, targetEntry.line - 1);
+        // Build GraphModel using consistent 0-based lines in both id and node.line
+        const targetId = `${targetEntry.path}:${targetLine0}:${targetName}`;
         const nodes: GraphNode[] = [{
             id: targetId,
             label: targetName,
             fullName: targetName,
             filePath: targetEntry.path,
-            line: targetEntry.line - 1,
+            line: targetLine0,
             role: 'target',
             langId: path.extname(targetEntry.path).slice(1),
         }];

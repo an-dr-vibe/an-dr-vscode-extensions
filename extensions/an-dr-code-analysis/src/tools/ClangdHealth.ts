@@ -19,8 +19,20 @@ export class ClangdHealth {
             return { name: 'clangd', state: 'warn', group: GROUP, detail: 'compile_commands.json missing' };
         }
 
+        // H3: validate content — empty or malformed JSON is not useful for clangd
+        try {
+            const raw = fs.readFileSync(compileCommandsPath, 'utf8').trim();
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed) || parsed.length === 0) {
+                return { name: 'clangd', state: 'warn', group: GROUP, detail: 'compile_commands.json is empty' };
+            }
+        } catch {
+            return { name: 'clangd', state: 'warn', group: GROUP, detail: 'compile_commands.json is malformed' };
+        }
+
         const ccStat = fs.statSync(compileCommandsPath);
-        for (const buildFile of ['CMakeLists.txt', 'Makefile']) {
+        // H2: also check meson.build and build.ninja; H5: include lowercase 'makefile'
+        for (const buildFile of ['CMakeLists.txt', 'Makefile', 'makefile', 'meson.build', 'build.ninja']) {
             const buildFilePath = path.join(root, buildFile);
             if (fs.existsSync(buildFilePath)) {
                 const bfStat = fs.statSync(buildFilePath);

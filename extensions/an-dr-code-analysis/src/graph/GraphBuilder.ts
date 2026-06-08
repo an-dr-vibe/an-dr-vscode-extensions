@@ -15,6 +15,20 @@ function itemFullName(item: vscode.CallHierarchyItem): string {
     return item.detail ? `${item.detail}::${item.name}` : item.name;
 }
 
+function itemLangId(fsPath: string | undefined): string {
+    if (!fsPath) { return ''; }
+    const ext = path.extname(fsPath).slice(1);
+    if (ext) { return ext; }
+    // Extension-less files: use the bare filename as the language identifier.
+    return path.basename(fsPath).toLowerCase();
+}
+
+function toolConfidence(tool: string): 'high' | 'medium' | 'low' {
+    if (tool === 'clangd' || tool === 'tsserver') { return 'high'; }
+    if (tool === 'ctags' || tool === 'cscope')    { return 'medium'; }
+    return 'low';
+}
+
 export function buildCallGraph(
     target: vscode.CallHierarchyItem,
     incoming: vscode.CallHierarchyIncomingCall[],
@@ -24,6 +38,7 @@ export function buildCallGraph(
     tool: string,
 ): GraphModel {
     const nodesMap = new Map<string, GraphNode>();
+    const edgeSet  = new Set<string>();
     const edges: GraphEdge[] = [];
 
     function addNode(item: vscode.CallHierarchyItem, role: NodeRole): string {
@@ -36,22 +51,34 @@ export function buildCallGraph(
                 filePath: item.uri?.fsPath,
                 line: item.selectionRange?.start?.line ?? item.range?.start?.line,
                 role,
-                langId: path.extname(item.uri?.fsPath ?? '').slice(1),
+                langId: itemLangId(item.uri?.fsPath),
             });
+        } else {
+            // G1: a node that appears as both caller and callee keeps its first role
+            // but we must still emit the edge — the role field stays as-is because
+            // there is only one role slot; callers of this function handle the edge.
         }
         return id;
+    }
+
+    function addEdge(sourceId: string, targetId: string): void {
+        const key = `${sourceId}->${targetId}`;
+        if (!edgeSet.has(key)) {
+            edgeSet.add(key);
+            edges.push({ sourceId, targetId });
+        }
     }
 
     const targetId = addNode(target, 'target');
 
     for (const call of incoming) {
         const callerId = addNode(call.from, 'caller');
-        edges.push({ sourceId: callerId, targetId });
+        addEdge(callerId, targetId);
     }
 
     for (const call of outgoing) {
         const calleeId = addNode(call.to, 'callee');
-        edges.push({ sourceId: targetId, targetId: calleeId });
+        addEdge(targetId, calleeId);
     }
 
     return {
@@ -61,6 +88,6 @@ export function buildCallGraph(
         edges,
         depth,
         tool,
-        confidence: 'high',
+        confidence: toolConfidence(tool),
     };
 }

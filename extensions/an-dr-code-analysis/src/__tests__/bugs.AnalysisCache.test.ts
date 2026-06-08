@@ -33,8 +33,8 @@ afterEach(() => {
 
 // ── BUG: symbol=undefined and symbol="" produce the same key ─────────────────
 
-describe('BUG: key collision between symbol=undefined and symbol=""', () => {
-    it('BUG: undefined symbol and empty-string symbol map to the same cache entry', () => {
+describe('A1 fixed: symbol=undefined and symbol="" produce distinct cache entries', () => {
+    it('undefined symbol and empty-string symbol map to different cache entries', () => {
         const cache = new AnalysisCache();
         const r1 = makeResult('clangd');
         const r2 = makeResult('ctags');
@@ -42,34 +42,29 @@ describe('BUG: key collision between symbol=undefined and symbol=""', () => {
         cache.set({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: undefined }, r1);
         cache.set({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: '' },        r2);
 
-        // BUG: keyString uses `symbol ?? ''` so both produce the same key.
-        // r2 should overwrite r1. get() with undefined should return r2.
-        const result = cache.get({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: undefined });
-        // This passes only because both map to the same entry — a collision:
-        expect(result).toBe(r2);
-
-        // And getting with '' also returns r2:
-        const result2 = cache.get({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: '' });
-        expect(result2).toBe(r2);
+        // A1 fixed: different keys — each lookup returns its own result
+        const resultUndef = cache.get({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: undefined });
+        const resultEmpty = cache.get({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: '' });
+        expect(resultUndef).toBe(r1);
+        expect(resultEmpty).toBe(r2);
 
         cache.dispose();
     });
 
-    it('BUG: separate results for no-symbol vs empty-string cannot both be stored', () => {
+    it('A1 fixed: separate results for no-symbol vs empty-string are stored independently', () => {
         const cache = new AnalysisCache();
         const r1 = makeResult('clangd');
         const r2 = makeResult('ctags');
 
-        // Store with no symbol, then with empty string
         cache.set({ filePath: tmpFile, graphType: 'callGraph', depth: 2 }, r1);
         cache.set({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: '' }, r2);
 
-        // They should be separate entries but are not:
         const withUndefined = cache.get({ filePath: tmpFile, graphType: 'callGraph', depth: 2 });
         const withEmpty     = cache.get({ filePath: tmpFile, graphType: 'callGraph', depth: 2, symbol: '' });
 
-        // BUG: both return the SAME result (r2 overwrote r1)
-        expect(withUndefined).toBe(withEmpty); // confirms collision
+        // A1 fixed: independent entries
+        expect(withUndefined).toBe(r1);
+        expect(withEmpty).toBe(r2);
         cache.dispose();
     });
 });
@@ -100,12 +95,11 @@ describe('BUG: _invalidateFile prefix collision', () => {
             mtime: fs.statSync(realFile).mtimeMs,
         });
 
-        // Trigger invalidation for a path that is a prefix of the pathWithPipe key
+        // Trigger invalidation for a path that was previously a false-prefix with '|' separator
         workspace.__triggerFileChange(Uri.file(pathWithPipe));
-        // _invalidateFile checks k.startsWith('/tmp/.../a|') → YES matches '/tmp/.../a|b/...'
-        // BUG: the entry for a completely different conceptual path is invalidated
+        // A2 fixed: separator is \0, so pathWithPipe + '\0' does NOT match keyStr which uses '|'
         const entryStillExists = (cache as any)._map.has(keyStr);
-        expect(entryStillExists).toBe(false); // confirms the false-invalidation bug
+        expect(entryStillExists).toBe(true); // A2 fixed: no false invalidation
         cache.dispose();
     });
 

@@ -5,12 +5,15 @@ import { log } from '../logger';
 
 const NS = 'an-dr-code-analysis';
 
+// S1: MAX_SCAN_DEPTH is the exclusive limit; scan(dir, depth) with depth >= MAX_SCAN_DEPTH
+// returns immediately, so files up to MAX_SCAN_DEPTH-1 subdirectory levels deep are found.
+const MAX_SCAN_DEPTH = 5;
+
 async function findCompileCommandsFiles(workspaceRoot: string): Promise<string[]> {
     const results: string[] = [];
-    const maxDepth = 5;
 
     function scan(dir: string, depth: number): void {
-        if (depth > maxDepth) { return; }
+        if (depth >= MAX_SCAN_DEPTH) { return; }
         let entries: fs.Dirent[];
         try {
             entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -41,12 +44,23 @@ async function findCompileCommandsFiles(workspaceRoot: string): Promise<string[]
     return results;
 }
 
-function writeClangdConfig(workspaceRoot: string, compilationDatabaseDir: string): void {
+async function writeClangdConfig(workspaceRoot: string, compilationDatabaseDir: string): Promise<boolean> {
     const rel = path.relative(workspaceRoot, compilationDatabaseDir).replace(/\\/g, '/');
     const clangdPath = path.join(workspaceRoot, '.clangd');
     const content = `CompileFlags:\n  CompilationDatabase: ${rel}\n`;
+
+    // S3: prompt before overwriting an existing hand-crafted .clangd
+    if (fs.existsSync(clangdPath)) {
+        const choice = await vscode.window.showWarningMessage(
+            '.clangd already exists. Overwrite it with the new CompilationDatabase path?',
+            'Overwrite', 'Cancel'
+        );
+        if (choice !== 'Overwrite') { return false; }
+    }
+
     fs.writeFileSync(clangdPath, content, 'utf8');
     log.appendLine(`[selectCompileCommands] wrote .clangd at ${clangdPath} → CompilationDatabase: ${rel}`);
+    return true;
 }
 
 export async function selectCompileCommandsCommand(): Promise<void> {
@@ -91,7 +105,7 @@ export async function selectCompileCommandsCommand(): Promise<void> {
                     fs.unlinkSync(clangdPath);
                     log.appendLine(`[selectCompileCommands] removed .clangd at ${clangdPath}`);
                 }
-                vscode.window.showInformationMessage('compile_commands.json cleared. clangd will use ctags as fallback.');
+                // S4: no showInformationMessage for a remove action — it's just noise
                 return;
             }
 
@@ -106,7 +120,9 @@ export async function selectCompileCommandsCommand(): Promise<void> {
                 if (!uri || uri.length === 0) { return; }
                 filePath = uri[0].fsPath;
             } else {
-                filePath = picked.detail!;
+                // S5: guard against undefined detail instead of non-null assertion
+                if (!picked.detail) { return; }
+                filePath = picked.detail;
             }
 
             const dir = path.dirname(filePath);
@@ -115,8 +131,9 @@ export async function selectCompileCommandsCommand(): Promise<void> {
             const cfg = vscode.workspace.getConfiguration(NS);
             await cfg.update('tools.compileCommandsPath', filePath, vscode.ConfigurationTarget.Workspace);
 
-            // Write .clangd at workspace root
-            writeClangdConfig(workspaceRoot, dir);
+            // Write .clangd at workspace root (S3: may prompt if .clangd already exists)
+            const written = await writeClangdConfig(workspaceRoot, dir);
+            if (!written) { return; }
 
             const relPath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
             const choice = await vscode.window.showInformationMessage(

@@ -60,8 +60,8 @@ describe('BUG: role when same item is both caller and callee', () => {
         const calleeEdges = graph.edges.filter(e => e.sourceId  === graph.targetId);
         expect(callerEdges).toHaveLength(1);
         expect(calleeEdges).toHaveLength(1);
-        // The single node must serve both roles but only has one role field:
-        expect(sharedNode.role).not.toBe('callee'); // it's stuck as 'caller'
+        // G1 fixed: node role is 'caller' (first-seen wins); both edges are present.
+        expect(sharedNode.role).toBe('caller');
     });
 });
 
@@ -108,19 +108,19 @@ describe('BUG: item with missing selectionRange and range', () => {
         // but TWO edges are still pushed. So edge count > unique caller node count.
         const callerNodes = graph.nodes.filter(n => n.role === 'caller');
         expect(callerNodes).toHaveLength(1); // dedup correct
-        // BUG: edges are NOT deduplicated — there will be 2 edges for 1 caller node
-        expect(graph.edges).toHaveLength(2);
+        // G2 fixed: duplicate edges are deduplicated — only 1 edge for 1 caller node
+        expect(graph.edges).toHaveLength(1);
     });
 });
 
 // ── langId derivation ─────────────────────────────────────────────────────────
 
 describe('BUG: langId from file extension', () => {
-    it('file with no extension gets empty string langId', () => {
+    it('file with no extension uses basename as langId', () => {
         const noExt = item('main', '/src/Makefile', 0);
         const graph = buildCallGraph(noExt, [], [], 'callGraph', 2, 'clangd');
-        // path.extname('Makefile') = '' → slice(1) = '' → langId = ''
-        expect(graph.nodes[0].langId).toBe('');
+        // G4 fixed: no extension → basename.toLowerCase() = 'makefile'
+        expect(graph.nodes[0].langId).toBe('makefile');
     });
 
     it('file with double extension uses only last segment', () => {
@@ -151,13 +151,12 @@ describe('fullName construction', () => {
 // ── confidence is always 'high' regardless of tool ───────────────────────────
 
 describe('BUG: confidence hardcoded to high', () => {
-    it('buildCallGraph always returns confidence=high, even for non-clangd tools', () => {
+    it('buildCallGraph derives confidence from the tool parameter', () => {
         const target = item('foo', '/src/foo.c', 0);
-        const graph = buildCallGraph(target, [], [], 'callGraph', 2, 'some-other-tool');
-        // BUG: confidence is hardcoded to 'high' in buildCallGraph regardless of tool param
-        expect(graph.confidence).toBe('high');
-        // If called with tool='ctags', the graph will still say confidence='high'
-        // which contradicts CtagsAnalyzer which sets confidence='medium' manually.
+        // G3 fixed: confidence is derived from tool
+        expect(buildCallGraph(target, [], [], 'callGraph', 2, 'clangd').confidence).toBe('high');
+        expect(buildCallGraph(target, [], [], 'callGraph', 2, 'ctags').confidence).toBe('medium');
+        expect(buildCallGraph(target, [], [], 'callGraph', 2, 'some-other-tool').confidence).toBe('low');
     });
 });
 

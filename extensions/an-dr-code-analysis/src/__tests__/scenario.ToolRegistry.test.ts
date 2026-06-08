@@ -197,14 +197,14 @@ describe('Scenario: .statuses property', () => {
         stubAllMissing();
         const registry = new ToolRegistry();
         const result = await registry.refresh();
-        expect(registry.statuses).toBe(result); // same reference
+        expect(registry.statuses).toEqual(result); // same content (copies, not same reference)
     });
 
-    it('BUG: statuses getter returns the internal array by reference — caller mutation affects registry', () => {
+    it('T1 fixed: statuses getter returns a copy — caller mutation does not affect registry', () => {
         const registry = new ToolRegistry();
         const statuses = registry.statuses;
         statuses.push({ name: 'hacked', state: 'ok', group: 'universal' });
-        // Registry's internal state is now polluted
-        expect(registry.statuses).toHaveLength(1); // 1 = the injected entry
+        // T1 fixed: internal state is not polluted — a fresh copy is returned each time
+        expect(registry.statuses).toHaveLength(0); // still empty (no refresh yet)
     });
 });

@@ -15,8 +15,12 @@ interface CacheEntry {
     mtime: number;
 }
 
+// A1: use \0 (null byte) as separator — cannot appear in file paths or symbol names.
+// A1: represent undefined symbol distinctly from empty string.
+const SEP = '\0';
 function keyString(k: CacheKey): string {
-    return `${k.filePath}|${k.graphType}|${k.depth}|${k.symbol ?? ''}`;
+    const sym = k.symbol === undefined ? SEP + 'undef' : SEP + k.symbol;
+    return `${k.filePath}${SEP}${k.graphType}${SEP}${k.depth}${sym}`;
 }
 
 export class AnalysisCache implements vscode.Disposable {
@@ -60,8 +64,11 @@ export class AnalysisCache implements vscode.Disposable {
     }
 
     private _invalidateFile(fsPath: string): void {
+        // A2: use SEP (\0) so a path that happens to share a prefix with another
+        // path cannot cause false invalidation.
+        const prefix = fsPath + SEP;
         for (const k of this._map.keys()) {
-            if (k.startsWith(fsPath + '|')) {
+            if (k.startsWith(prefix)) {
                 this._map.delete(k);
             }
         }

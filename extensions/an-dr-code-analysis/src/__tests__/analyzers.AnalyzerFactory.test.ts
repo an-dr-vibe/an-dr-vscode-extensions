@@ -45,9 +45,10 @@ describe('AnalyzerFactory.getChain', () => {
         expect(chain).toHaveLength(0);
     });
 
-    it('returns empty chain for C fileDeps (not yet implemented)', () => {
+    it('returns one analyzer (FileDepsAnalyzer) for C fileDeps', () => {
         const chain = factory.getChain(makeRequest('c', 'fileDeps'));
-        expect(chain).toHaveLength(0);
+        expect(chain).toHaveLength(1);
+        expect(chain[0].name).toBe('filedeps');
     });
 
     it('returns empty chain for C componentDeps (not yet implemented)', () => {
@@ -105,5 +106,28 @@ describe('CtagsAnalyzer.canHandle', () => {
     it('does not handle c + fileDeps', () => {
         const chain = factory.getChain(makeRequest('c', 'fileDeps'));
         expect(chain.some(a => a.name === 'ctags')).toBe(false);
+    });
+});
+
+describe('FileDepsAnalyzer.canHandle', () => {
+    let factory: AnalyzerFactory;
+    beforeEach(() => { factory = new AnalyzerFactory(fakeTracker); });
+
+    const supported = ['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp'];
+    supported.forEach(lang => {
+        it(`handles ${lang} + fileDeps`, () => {
+            const chain = factory.getChain(makeRequest(lang, 'fileDeps'));
+            expect(chain.some(a => a.name === 'filedeps')).toBe(true);
+        });
+    });
+
+    it('does not handle rust + fileDeps', () => {
+        const chain = factory.getChain(makeRequest('rust', 'fileDeps'));
+        expect(chain.some(a => a.name === 'filedeps')).toBe(false);
+    });
+
+    it('does not handle c + callGraph', () => {
+        const chain = factory.getChain(makeRequest('c', 'callGraph'));
+        expect(chain.some(a => a.name === 'filedeps')).toBe(false);
     });
 });

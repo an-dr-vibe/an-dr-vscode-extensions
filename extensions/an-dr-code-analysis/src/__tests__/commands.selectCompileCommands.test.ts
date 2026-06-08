@@ -144,3 +144,133 @@ describe('selectCompileCommandsCommand — file selected', () => {
         expect(mockUpdate).toHaveBeenCalledWith('tools.compileCommandsPath', ccPath, expect.anything());
     });
 });
+
+// ── Edge cases and fixed bugs ─────────────────────────────────────────────────
+
+// The bugs tests use inline imports — pull in the command here for the fixture-based tests below.
+import { selectCompileCommandsCommand } from '../commands/selectCompileCommands';
+
+function setupMocksLocal() {
+    jest.clearAllMocks();
+    (window.withProgress as jest.Mock).mockImplementation(async (_o: unknown, task: () => Promise<void>) => task());
+    (workspace.getConfiguration as jest.Mock).mockReturnValue({
+        get: jest.fn((_k: string, d: unknown) => d),
+        update: jest.fn(),
+    });
+}
+
+describe('S1 fix: scan depth — MAX_SCAN_DEPTH=5', () => {
+    it('compile_commands.json exactly 4 subdirectories deep IS found', () => {
+        setupMocksLocal();
+        let dir = tmpDir;
+        for (let i = 0; i < 4; i++) { dir = path.join(dir, `d${i}`); fs.mkdirSync(dir); }
+        fs.writeFileSync(path.join(dir, 'compile_commands.json'),
+            JSON.stringify([{ directory: dir, command: 'gcc', file: 'f.c' }]));
+        (window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+        return selectCompileCommandsCommand().then(() => {
+            const items: any[] = (window.showQuickPick as jest.Mock).mock.calls[0]?.[0] ?? [];
+            expect(items.filter((i: any) => !i.label.startsWith('$('))).toHaveLength(1);
+        });
+    });
+
+    it('compile_commands.json exactly 5 subdirectories deep is NOT found', () => {
+        setupMocksLocal();
+        let dir = tmpDir;
+        for (let i = 0; i < 5; i++) { dir = path.join(dir, `d${i}`); fs.mkdirSync(dir); }
+        fs.writeFileSync(path.join(dir, 'compile_commands.json'),
+            JSON.stringify([{ directory: dir, command: 'gcc', file: 'f.c' }]));
+        (window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+        return selectCompileCommandsCommand().then(() => {
+            const items: any[] = (window.showQuickPick as jest.Mock).mock.calls[0]?.[0] ?? [];
+            expect(items.filter((i: any) => !i.label.startsWith('$('))).toHaveLength(0);
+        });
+    });
+});
+
+describe('hidden directories (.) are skipped', () => {
+    it('compile_commands.json inside .build is not discovered', () => {
+        setupMocksLocal();
+        const hiddenBuild = path.join(tmpDir, '.build');
+        fs.mkdirSync(hiddenBuild);
+        fs.writeFileSync(path.join(hiddenBuild, 'compile_commands.json'),
+            JSON.stringify([{ directory: hiddenBuild, command: 'gcc', file: 'f.c' }]));
+        (window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+        return selectCompileCommandsCommand().then(() => {
+            const items: any[] = (window.showQuickPick as jest.Mock).mock.calls[0]?.[0] ?? [];
+            expect(items.filter((i: any) => !i.label.startsWith('$('))).toHaveLength(0);
+        });
+    });
+});
+
+describe('S3 fix: writeClangdConfig prompts before overwriting', () => {
+    it('user cancels overwrite — existing .clangd is preserved', () => {
+        setupMocksLocal();
+        const clangdPath = path.join(tmpDir, '.clangd');
+        fs.writeFileSync(clangdPath, '# User config\nCompileFlags:\n  Add: [-std=c++17]\n');
+        const buildDir = path.join(tmpDir, 'build');
+        fs.mkdirSync(buildDir);
+        const ccPath = path.join(buildDir, 'compile_commands.json');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: buildDir, command: 'gcc', file: 'f.c' }]));
+        (window.showQuickPick as jest.Mock).mockResolvedValue({ label: 'build/compile_commands.json', detail: ccPath });
+        (window.showWarningMessage as jest.Mock).mockResolvedValue('Cancel');
+        return selectCompileCommandsCommand().then(() => {
+            expect(fs.readFileSync(clangdPath, 'utf8')).toContain('-std=c++17');
+        });
+    });
+
+    it('user confirms overwrite — .clangd is updated', () => {
+        setupMocksLocal();
+        const clangdPath = path.join(tmpDir, '.clangd');
+        fs.writeFileSync(clangdPath, '# User config\nCompileFlags:\n  Add: [-std=c++17]\n');
+        const buildDir = path.join(tmpDir, 'build');
+        fs.mkdirSync(buildDir);
+        const ccPath = path.join(buildDir, 'compile_commands.json');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: buildDir, command: 'gcc', file: 'f.c' }]));
+        (window.showQuickPick as jest.Mock).mockResolvedValue({ label: 'build/compile_commands.json', detail: ccPath });
+        (window.showWarningMessage as jest.Mock).mockResolvedValue('Overwrite');
+        (window.showInformationMessage as jest.Mock).mockResolvedValue(undefined);
+        return selectCompileCommandsCommand().then(() => {
+            expect(fs.readFileSync(clangdPath, 'utf8')).toMatch(/CompilationDatabase/);
+        });
+    });
+});
+
+describe('S4 fix: "None" selection does NOT call showInformationMessage', () => {
+    it('showInformationMessage is not called when None is selected', () => {
+        setupMocksLocal();
+        (window.showQuickPick as jest.Mock).mockResolvedValue({
+            label: '$(circle-slash) No compile_commands (use ctags fallback)',
+        });
+        return selectCompileCommandsCommand().then(() => {
+            expect((window.showInformationMessage as jest.Mock).mock.calls).toHaveLength(0);
+        });
+    });
+});
+
+describe('S5 fix: undefined picked.detail is handled gracefully', () => {
+    it('returns without throwing when picked.detail is undefined', () => {
+        setupMocksLocal();
+        (window.showQuickPick as jest.Mock).mockResolvedValue({
+            label: 'some/path/compile_commands.json',
+            detail: undefined,
+        });
+        return expect(selectCompileCommandsCommand()).resolves.toBeUndefined();
+    });
+});
+
+describe('subprojects directory is scanned (known limitation)', () => {
+    it('compile_commands.json inside subprojects/ IS found and offered', () => {
+        setupMocksLocal();
+        const subDir = path.join(tmpDir, 'subprojects', 'libfoo');
+        fs.mkdirSync(subDir, { recursive: true });
+        fs.writeFileSync(path.join(subDir, 'compile_commands.json'),
+            JSON.stringify([{ directory: subDir, command: 'gcc', file: 'f.c' }]));
+        (window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+        return selectCompileCommandsCommand().then(() => {
+            const items: any[] = (window.showQuickPick as jest.Mock).mock.calls[0]?.[0] ?? [];
+            const found = items.filter((i: any) => !i.label.startsWith('$('));
+            expect(found.length).toBeGreaterThan(0);
+            expect(found.some((i: any) => i.label.includes('subprojects'))).toBe(true);
+        });
+    });
+});

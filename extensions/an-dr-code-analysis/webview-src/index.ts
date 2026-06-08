@@ -218,11 +218,14 @@ const ICONS: Record<ToolState, string> = { ok: '✅', warn: '⚠️', missing: '
 
 function renderToolRow(t: ToolStatus): string {
     const detail = t.detail ? ` <span class="tool-detail">${esc(t.detail)}</span>` : '';
+    const hoverDetail = (t.state === 'ok' && t.detail)
+        ? ` <span class="tool-detail tool-detail-hover">${esc(t.detail)}</span>`
+        : detail;
     const clickable = t.state === 'warn' || t.state === 'missing';
     const icon = clickable
         ? `<button class="tool-action" data-tool="${esc(t.name)}" title="Show install instructions">${ICONS[t.state]}</button>`
         : `<span class="tool-icon">${ICONS[t.state]}</span>`;
-    return `<div class="tool-row">${icon}<span class="tool-name">${esc(t.name)}</span>${detail}</div>`;
+    return `<div class="tool-row">${icon}<span class="tool-name">${esc(t.name)}</span>${hoverDetail}</div>`;
 }
 
 function renderToolsStatus(tools: ToolStatus[]): string {
@@ -267,10 +270,10 @@ function renderAnalysis(s: AnalysisState): string {
     let ccppBtn = '';
     if (isCCppContext()) {
         const clangdTool = state.tools?.find(t => t.name === 'clangd');
-        const ccPath = clangdTool?.state === 'ok' && clangdTool.detail
-            ? `<div class="cc-path">${esc(clangdTool.detail)}</div>`
-            : '';
-        ccppBtn = `<div class="analysis-config"><button class="analysis-btn" id="setup-compile-commands">Setup compile_commands.json</button>${ccPath}</div>`;
+        const isSet = clangdTool?.state === 'ok' && !!clangdTool.detail;
+        const indicator = isSet ? `<span class="cc-indicator" title="${esc(clangdTool!.detail!)}">●</span>` : '';
+        const ccPath = isSet ? `<div class="cc-path">${esc(clangdTool!.detail!)}</div>` : '';
+        ccppBtn = `<div class="analysis-config"><button class="analysis-btn" id="setup-compile-commands">${indicator}Setup compile_commands.json</button>${ccPath}</div>`;
     }
 
     return `<details class="section" open>

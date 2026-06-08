@@ -234,12 +234,23 @@ export function generateWebviewHtml(
             padding: 2px 4px;
         }
         .analysis-config { margin-top: 6px; }
+        .cc-indicator {
+            color: #4caf50;
+            font-size: 0.8em;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
         .cc-path {
             margin-top: 4px;
             font-size: 0.78em;
-            font-family: var(--vscode-editor-font-family, monospace);
             color: var(--vscode-descriptionForeground);
             word-break: break-all;
+        }
+        .tool-detail-hover {
+            display: none;
+        }
+        .tool-row:hover .tool-detail-hover {
+            display: inline;
         }
         .graph-meta {
             display: flex;

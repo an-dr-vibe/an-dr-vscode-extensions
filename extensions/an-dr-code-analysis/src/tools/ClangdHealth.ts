@@ -5,6 +5,17 @@ import { ToolStatus, ToolGroup } from '../webview/messages';
 
 const GROUP: ToolGroup = 'c-cpp';
 
+function resolveCompileCommandsPath(root: string): string | null {
+    // Prefer the path explicitly configured by selectCompileCommands
+    const configured = vscode.workspace.getConfiguration('an-dr-code-analysis').get<string>('tools.compileCommandsPath');
+    if (configured && configured.trim()) {
+        return configured.trim();
+    }
+    // Fall back to compile_commands.json at the workspace root
+    const rootPath = path.join(root, 'compile_commands.json');
+    return fs.existsSync(rootPath) ? rootPath : null;
+}
+
 export class ClangdHealth {
     static check(): ToolStatus {
         const folders = vscode.workspace.workspaceFolders;
@@ -13,10 +24,14 @@ export class ClangdHealth {
         }
 
         const root = folders[0].uri.fsPath;
-        const compileCommandsPath = path.join(root, 'compile_commands.json');
+        const compileCommandsPath = resolveCompileCommandsPath(root);
+
+        if (!compileCommandsPath) {
+            return { name: 'clangd', state: 'warn', group: GROUP, detail: 'compile_commands.json missing' };
+        }
 
         if (!fs.existsSync(compileCommandsPath)) {
-            return { name: 'clangd', state: 'warn', group: GROUP, detail: 'compile_commands.json missing' };
+            return { name: 'clangd', state: 'warn', group: GROUP, detail: `compile_commands.json not found: ${compileCommandsPath}` };
         }
 
         // H3: validate content — empty or malformed JSON is not useful for clangd
@@ -42,6 +57,6 @@ export class ClangdHealth {
             }
         }
 
-        return { name: 'clangd', state: 'ok', group: GROUP };
+        return { name: 'clangd', state: 'ok', group: GROUP, detail: compileCommandsPath };
     }
 }

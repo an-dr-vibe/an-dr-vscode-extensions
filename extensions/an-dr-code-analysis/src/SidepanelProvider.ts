@@ -33,6 +33,14 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         clangdWatcher.onDidDelete(() => void this._sendToolsStatus());
         clangdWatcher.onDidChange(() => void this._sendToolsStatus());
         this._disposables.push(clangdWatcher);
+
+        // Refresh when tools.compileCommandsPath setting changes.
+        const cfgWatcher = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('an-dr-code-analysis.tools.compileCommandsPath')) {
+                void this._sendToolsStatus();
+            }
+        });
+        this._disposables.push(cfgWatcher);
     }
 
     resolveWebviewView(

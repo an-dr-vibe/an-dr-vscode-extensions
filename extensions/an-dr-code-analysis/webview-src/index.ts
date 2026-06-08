@@ -240,7 +240,8 @@ function renderToolsStatus(tools: ToolStatus[]): string {
 </div>`;
         }).join('');
 
-    return `<details class="section">
+    const hasIssues = tools.some(t => t.state !== 'ok');
+    return `<details class="section"${hasIssues ? ' open' : ''}>
   <summary class="section-header">TOOLS STATUS</summary>
   <div class="section-body">${sections}</div>
 </details>`;
@@ -263,9 +264,14 @@ function renderAnalysis(s: AnalysisState): string {
         return `<button class="analysis-btn" data-graph-type="${gt}" ${isBusy ? 'disabled' : ''}>${btnLabel}</button>`;
     }).join('');
 
-    const ccppBtn = isCCppContext()
-        ? `<div class="analysis-config"><button class="graph-action-btn" id="setup-compile-commands">Setup compile_commands.json</button></div>`
-        : '';
+    let ccppBtn = '';
+    if (isCCppContext()) {
+        const clangdTool = state.tools?.find(t => t.name === 'clangd');
+        const ccPath = clangdTool?.state === 'ok' && clangdTool.detail
+            ? `<div class="cc-path">${esc(clangdTool.detail)}</div>`
+            : '';
+        ccppBtn = `<div class="analysis-config"><button class="analysis-btn" id="setup-compile-commands">Setup compile_commands.json</button>${ccPath}</div>`;
+    }
 
     return `<details class="section" open>
   <summary class="section-header">ANALYSIS</summary>
@@ -473,7 +479,12 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
-    const analysisBtn = target.closest<HTMLButtonElement>('.analysis-btn');
+    if (target.id === 'setup-compile-commands') {
+        vscode.postMessage({ type: 'runCommand', command: 'an-dr-code-analysis.selectCompileCommands' });
+        return;
+    }
+
+    const analysisBtn = target.closest<HTMLButtonElement>('.analysis-btn[data-graph-type]');
     if (analysisBtn && !analysisBtn.disabled) {
         const gt = analysisBtn.dataset['graphType'] as GraphType;
         state.analysis = { status: 'busy', activeGraphType: gt };
@@ -494,11 +505,6 @@ root.addEventListener('click', (e: MouseEvent) => {
         state.depth = 2;
         render();
         triggerDepthChange();
-        return;
-    }
-
-    if (target.id === 'setup-compile-commands') {
-        vscode.postMessage({ type: 'runCommand', command: 'an-dr-code-analysis.selectCompileCommands' });
         return;
     }
 

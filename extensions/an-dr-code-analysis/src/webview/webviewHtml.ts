@@ -234,18 +234,13 @@ export function generateWebviewHtml(
             padding: 2px 4px;
         }
         .analysis-config { margin-top: 6px; }
-        .graph-action-btn {
-            display: inline-block;
-            margin-top: 6px;
-            padding: 3px 8px;
-            font-size: 0.82em;
-            background: var(--vscode-button-secondaryBackground, #3a3d41);
-            color: var(--vscode-button-secondaryForeground, #ccc);
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
+        .cc-path {
+            margin-top: 4px;
+            font-size: 0.78em;
+            font-family: var(--vscode-editor-font-family, monospace);
+            color: var(--vscode-descriptionForeground);
+            word-break: break-all;
         }
-        .graph-action-btn:hover { background: var(--vscode-button-secondaryHoverBackground, #4a4d51); }
         .graph-meta {
             display: flex;
             align-items: center;

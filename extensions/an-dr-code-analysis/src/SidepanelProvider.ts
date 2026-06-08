@@ -25,6 +25,14 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         this._contextTracker.onContextChange(ctx => this._postContext(ctx));
         this._analyzerFactory = new AnalyzerFactory(this._contextTracker);
         this._disposables.push(this._cache);
+
+        // Refresh tool status whenever .clangd is created/deleted/changed so the
+        // panel updates immediately after "Setup compile_commands.json" completes.
+        const clangdWatcher = vscode.workspace.createFileSystemWatcher('**/.clangd');
+        clangdWatcher.onDidCreate(() => void this._sendToolsStatus());
+        clangdWatcher.onDidDelete(() => void this._sendToolsStatus());
+        clangdWatcher.onDidChange(() => void this._sendToolsStatus());
+        this._disposables.push(clangdWatcher);
     }
 
     resolveWebviewView(

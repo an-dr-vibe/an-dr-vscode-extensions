@@ -201,3 +201,138 @@ describe('CtagsAnalyzer.analyze', () => {
         expect(result).toBeNull();
     });
 });
+
+// ── Edge cases and fixed bugs ─────────────────────────────────────────────────
+
+function jsonLine(name: string, filePath: string, line: number, kind = 'function'): string {
+    return JSON.stringify({ name, path: filePath, line, kind });
+}
+
+function stubCtags(lines: string[]) {
+    mockExecFile.mockImplementation((_c: unknown, _a: unknown, _o: unknown, cb: Function) => {
+        cb(null, { stdout: lines.join('\n'), stderr: '' });
+    });
+}
+
+function makeTmpFileLocal(name: string, content: string): string {
+    const p = path.join(tmpDir, name).replace(/\\/g, '/');
+    fs.writeFileSync(p, content);
+    return p;
+}
+
+describe('C1 fix: targetName with regex special characters', () => {
+    it('symbol with C++ operator+ does not throw', () => {
+        const fooPath = makeTmpFileLocal('foo.cpp', 'void operator+() {}');
+        stubCtags([jsonLine('operator+', fooPath, 1)]);
+        const analyzer = new CtagsAnalyzer();
+        return expect(analyzer.analyze(makeRequest('operator+', 'cpp'))).resolves.toBeDefined();
+    });
+
+    it('symbol with square bracket does not throw', () => {
+        const fooPath = makeTmpFileLocal('foo.c', 'int arr[0] = {};');
+        stubCtags([jsonLine('arr[0]', fooPath, 1)]);
+        const analyzer = new CtagsAnalyzer();
+        return expect(analyzer.analyze(makeRequest('arr[0]'))).resolves.toBeDefined();
+    });
+});
+
+describe('C3/C4 fix: 0-based line numbers', () => {
+    it('targetId and callerId both use 0-based lines', () => {
+        const fooPath = makeTmpFileLocal('lib.c', 'int foo() {}\nint bar() { foo(); }');
+        stubCtags([jsonLine('foo', fooPath, 1), jsonLine('bar', fooPath, 2)]);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('foo')).then(result => {
+            if (!result) { return; }
+            expect(result.graph.targetId).toMatch(/:0:foo$/);
+            const callerNode = result.graph.nodes.find(n => n.role === 'caller');
+            if (callerNode) { expect(callerNode.id).toMatch(/:1:bar$/); }
+        });
+    });
+
+    it('C4 fix: ctags entry with line=0 produces target node with line=0', () => {
+        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        stubCtags([jsonLine('foo', fooPath, 0)]);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('foo')).then(result => {
+            if (result) { expect(result.graph.nodes[0].line).toBe(0); }
+        });
+    });
+});
+
+describe('C5 fix: multiple ctags entries for same symbol (overloads)', () => {
+    it('first matching ctags entry is used as target definition', () => {
+        const fooPath = makeTmpFileLocal('foo.cpp', 'void foo(int x) {}\nvoid foo(double y) {}');
+        stubCtags([jsonLine('foo', fooPath, 1), jsonLine('foo', fooPath, 2)]);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('foo', 'cpp')).then(result => {
+            expect(result).not.toBeNull();
+            expect(result!.graph.nodes.find(n => n.role === 'target')!.line).toBe(0);
+        });
+    });
+});
+
+describe('symbol stripping edge cases', () => {
+    it('symbol with only parentheses strips to empty string → returns null', () => {
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('()')).then(result => expect(result).toBeNull());
+    });
+
+    it('symbol with surrounding spaces strips correctly', () => {
+        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        stubCtags([jsonLine('foo', fooPath, 1)]);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('  foo  ')).then(result => {
+            expect(result).not.toBeNull();
+            expect(result!.graph.nodes[0].label).toBe('foo');
+        });
+    });
+
+    it('symbol that is only whitespace returns null', () => {
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('   ')).then(result => expect(result).toBeNull());
+    });
+});
+
+describe('robustness: malformed ctags JSON', () => {
+    it('single invalid JSON line among valid lines does not crash', () => {
+        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        stubCtags(['not-json-at-all', jsonLine('foo', fooPath, 1), '{"incomplete":']);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('foo')).then(result => {
+            expect(result).not.toBeNull();
+            expect(result!.graph.nodes[0].label).toBe('foo');
+        });
+    });
+
+    it('ctags entry missing "name" field is filtered out', () => {
+        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        stubCtags([
+            JSON.stringify({ path: fooPath, line: 1, kind: 'function' }),
+            jsonLine('foo', fooPath, 1),
+        ]);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('foo')).then(result => expect(result).not.toBeNull());
+    });
+});
+
+describe('edge: call before any function definition', () => {
+    it('file-scope call has no enclosing function — not attributed as caller', () => {
+        const fooPath = makeTmpFileLocal('foo.c', 'foo();\nint bar() {}\nint foo() {}');
+        stubCtags([jsonLine('bar', fooPath, 2), jsonLine('foo', fooPath, 3)]);
+        const analyzer = new CtagsAnalyzer();
+        return analyzer.analyze(makeRequest('foo')).then(result => {
+            expect(result!.graph.nodes.filter(n => n.role === 'caller')).toHaveLength(0);
+        });
+    });
+});
+
+describe('canHandle uses langId not file extension', () => {
+    it('.h file opened as langId=c is handled', () => {
+        const analyzer = new CtagsAnalyzer();
+        const req: AnalysisRequest = {
+            context: { symbol: 'foo', symbolSource: 'word', file: 'foo.h', filePath: '/src/foo.h', lang: 'C', langId: 'c', isPinned: false },
+            graphType: 'callGraph', depth: 2,
+        };
+        expect(analyzer.canHandle(req)).toBe(true);
+    });
+});

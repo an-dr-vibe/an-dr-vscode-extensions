@@ -348,6 +348,10 @@ function isCCppContext(): boolean {
 
 function renderGraph(s: AnalysisState, depth: number): string {
     const graphTitle = s.activeGraphType ? ` — ${GRAPH_TYPE_LABELS[s.activeGraphType]}` : '';
+    // Show which tool produced the result directly in the header
+    const toolBadge = (s.status === 'result' && s.graph)
+        ? ` <span class="header-tool-badge">${CONFIDENCE_BADGE[s.graph.confidence] ?? ''} ${esc(s.graph.tool)}</span>`
+        : '';
 
     let bodyHtml: string;
     if (s.status === 'idle') {
@@ -359,13 +363,11 @@ function renderGraph(s: AnalysisState, depth: number): string {
         bodyHtml = `<div class="graph-area" id="cy-container"></div>`
             + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
     } else if (s.status === 'result' && s.graph) {
-        const badge = `${CONFIDENCE_BADGE[s.graph.confidence] ?? ''} ${esc(s.graph.tool)}`;
         const fallbackNote = s.graph.confidence !== 'high'
             ? `<div class="graph-fallback-note">Fallback tool — callers only, no callees</div>`
             : '';
         bodyHtml = `<div class="graph-area" id="cy-container"></div>
           <div class="graph-meta">
-            <span class="confidence-badge">${badge}</span>
             <span class="graph-node-count">${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</span>
           </div>${fallbackNote}`;
     } else {
@@ -380,7 +382,7 @@ function renderGraph(s: AnalysisState, depth: number): string {
     </div>`;
 
     return `<details class="section" open>
-  <summary class="section-header">GRAPH${esc(graphTitle)}</summary>
+  <summary class="section-header">GRAPH${esc(graphTitle)}${toolBadge}</summary>
   <div class="section-body">
     ${bodyHtml}
     ${depthControls}

@@ -92,3 +92,95 @@ describe('ClangdHealth.check', () => {
         expect(status.name).toBe('clangd');
     });
 });
+
+// ── Edge cases and fixed bugs ─────────────────────────────────────────────────
+
+describe('compile_commands.json only checked at workspace root (known limitation)', () => {
+    it('compile_commands.json in a subdirectory is not found — warns', () => {
+        const buildDir = path.join(tmpDir, 'build');
+        fs.mkdirSync(buildDir);
+        fs.writeFileSync(path.join(buildDir, 'compile_commands.json'), '[]');
+        fs.writeFileSync(path.join(tmpDir, '.clangd'), 'CompileFlags:\n  CompilationDatabase: build\n');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/missing/i);
+    });
+});
+
+describe('H2 fix: meson.build and build.ninja staleness detection', () => {
+    it('meson.build newer than compile_commands.json is detected as stale', () => {
+        const ccPath    = path.join(tmpDir, 'compile_commands.json');
+        const mesonPath = path.join(tmpDir, 'meson.build');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
+        const now = Date.now();
+        fs.utimesSync(ccPath, new Date(now - 5000), new Date(now - 5000));
+        fs.writeFileSync(mesonPath, 'project("test")');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
+    });
+
+    it('build.ninja newer than compile_commands.json is detected as stale', () => {
+        const ccPath    = path.join(tmpDir, 'compile_commands.json');
+        const ninjaPath = path.join(tmpDir, 'build.ninja');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
+        const now = Date.now();
+        fs.utimesSync(ccPath, new Date(now - 5000), new Date(now - 5000));
+        fs.writeFileSync(ninjaPath, '# ninja');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
+    });
+});
+
+describe('H3 fix: empty or malformed compile_commands.json is invalid', () => {
+    it('empty array returns warn', () => {
+        fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '[]');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/empty/i);
+    });
+
+    it('completely empty file returns warn', () => {
+        fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '');
+        expect(ClangdHealth.check().state).toBe('warn');
+    });
+
+    it('malformed JSON returns warn', () => {
+        fs.writeFileSync(path.join(tmpDir, 'compile_commands.json'), '{not valid json}');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/malformed/i);
+    });
+});
+
+describe('H5 fix: lowercase makefile staleness (case-sensitive FS only)', () => {
+    it('lowercase makefile newer than compile_commands.json is detected as stale', () => {
+        if (process.platform === 'win32') { return; }
+        const ccPath      = path.join(tmpDir, 'compile_commands.json');
+        const makefileLow = path.join(tmpDir, 'makefile');
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
+        const now = Date.now();
+        fs.utimesSync(ccPath, new Date(now - 5000), new Date(now - 5000));
+        fs.writeFileSync(makefileLow, 'all:');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
+    });
+});
+
+describe('staleness: first stale build file match wins', () => {
+    it('CMakeLists.txt older but Makefile newer → stale', async () => {
+        const ccPath    = path.join(tmpDir, 'compile_commands.json');
+        const cmakePath = path.join(tmpDir, 'CMakeLists.txt');
+        const makePath  = path.join(tmpDir, 'Makefile');
+        fs.writeFileSync(cmakePath, 'cmake_minimum_required(VERSION 3.0)');
+        await new Promise(r => setTimeout(r, 20));
+        fs.writeFileSync(ccPath, JSON.stringify([{ directory: tmpDir, command: 'gcc foo.c', file: 'foo.c' }]));
+        await new Promise(r => setTimeout(r, 20));
+        fs.writeFileSync(makePath, 'all:');
+        const status = ClangdHealth.check();
+        expect(status.state).toBe('warn');
+        expect(status.detail).toMatch(/stale/i);
+    });
+});

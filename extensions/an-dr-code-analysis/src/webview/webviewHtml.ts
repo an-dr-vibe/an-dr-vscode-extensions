@@ -275,6 +275,14 @@ export function generateWebviewHtml(
         }
         .depth-btn:disabled { opacity: 0.4; cursor: default; }
         .depth-label { font-size: 0.88em; color: var(--vscode-foreground); min-width: 54px; }
+        .header-tool-badge {
+            font-size: 0.82em;
+            font-weight: normal;
+            font-family: var(--vscode-editor-font-family, monospace);
+            color: var(--vscode-descriptionForeground);
+            margin-left: 6px;
+            letter-spacing: 0;
+        }
         /* Tooltip */
         #cy-tooltip {
             position: fixed;

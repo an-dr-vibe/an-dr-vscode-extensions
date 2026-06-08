@@ -113,3 +113,137 @@ describe('buildCallGraph', () => {
         expect(graph.nodes.find(n => n.id === graph.targetId)).toBeDefined();
     });
 });
+
+// ── Edge cases and fixed bugs ─────────────────────────────────────────────────
+
+function pos(line: number, ch = 0) { return new Position(line, ch); }
+function rng(l: number, c = 0) { return new Range(pos(l, c), pos(l, c + 1)); }
+
+function itemEx(
+    name: string,
+    filePath: string,
+    line = 0,
+    detail = '',
+    selRange?: ReturnType<typeof rng>,
+    range?: ReturnType<typeof rng>,
+): vscode.CallHierarchyItem {
+    return {
+        kind: CallHierarchyItemKind.Function as unknown as vscode.SymbolKind,
+        name,
+        detail,
+        uri: Uri.file(filePath) as unknown as vscode.Uri,
+        range: (range ?? rng(line)) as unknown as vscode.Range,
+        selectionRange: (selRange ?? rng(line)) as unknown as vscode.Range,
+        tags: undefined,
+    } as vscode.CallHierarchyItem;
+}
+
+function incomingCall(from: vscode.CallHierarchyItem): vscode.CallHierarchyIncomingCall {
+    return { from, fromRanges: [] } as vscode.CallHierarchyIncomingCall;
+}
+function outgoingCall(to: vscode.CallHierarchyItem): vscode.CallHierarchyOutgoingCall {
+    return { to, fromRanges: [] } as vscode.CallHierarchyOutgoingCall;
+}
+
+describe('role when same item is both caller and callee', () => {
+    it('node first seen as caller keeps role=caller even if also in outgoing; both edges present', () => {
+        const t = itemEx('foo', '/src/foo.c', 10);
+        const shared = itemEx('bar', '/src/bar.c', 5);
+        const graph = buildCallGraph(t, [incomingCall(shared)], [outgoingCall(shared)], 'callGraph', 2, 'clangd');
+        const sharedNode = graph.nodes.find(n => n.label === 'bar')!;
+        const callerEdges = graph.edges.filter(e => e.targetId === graph.targetId);
+        const calleeEdges = graph.edges.filter(e => e.sourceId === graph.targetId);
+        expect(callerEdges).toHaveLength(1);
+        expect(calleeEdges).toHaveLength(1);
+        expect(sharedNode.role).toBe('caller');
+    });
+});
+
+describe('item with missing selectionRange and range', () => {
+    it('produces a stable id when both ranges are undefined', () => {
+        const noRangeItem: vscode.CallHierarchyItem = {
+            kind: CallHierarchyItemKind.Function as unknown as vscode.SymbolKind,
+            name: 'foo',
+            detail: '',
+            uri: Uri.file('/src/foo.c') as unknown as vscode.Uri,
+            range: undefined as unknown as vscode.Range,
+            selectionRange: undefined as unknown as vscode.Range,
+            tags: undefined,
+        } as unknown as vscode.CallHierarchyItem;
+        expect(() => buildCallGraph(noRangeItem, [], [], 'callGraph', 2, 'clangd')).not.toThrow();
+        const graph = buildCallGraph(noRangeItem, [], [], 'callGraph', 2, 'clangd');
+        expect(graph.nodes[0].id).toContain('foo');
+    });
+
+    it('two different functions at line 0 in different files produce unique ids', () => {
+        const a = itemEx('init', '/src/a.c', 0);
+        const b = itemEx('init', '/src/b.c', 0);
+        const graph = buildCallGraph(a, [incomingCall(b)], [], 'callGraph', 2, 'clangd');
+        const ids = graph.nodes.map(n => n.id);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('two callers with identical name+file+line produce one node and one edge (G2 fix)', () => {
+        const t = itemEx('foo', '/src/foo.c', 5);
+        const c1 = itemEx('bar', '/src/foo.c', 1);
+        const c2 = itemEx('bar', '/src/foo.c', 1);
+        const graph = buildCallGraph(t, [incomingCall(c1), incomingCall(c2)], [], 'callGraph', 2, 'clangd');
+        expect(graph.nodes.filter(n => n.role === 'caller')).toHaveLength(1);
+        expect(graph.edges).toHaveLength(1);
+    });
+});
+
+describe('langId edge cases', () => {
+    it('file with no extension uses basename as langId (G4 fix)', () => {
+        const noExt = itemEx('main', '/src/Makefile', 0);
+        const graph = buildCallGraph(noExt, [], [], 'callGraph', 2, 'clangd');
+        expect(graph.nodes[0].langId).toBe('makefile');
+    });
+
+    it('file with double extension uses only last segment', () => {
+        const dotMin = itemEx('fn', '/src/foo.test.ts', 0);
+        const graph = buildCallGraph(dotMin, [], [], 'callGraph', 2, 'clangd');
+        expect(graph.nodes[0].langId).toBe('ts');
+    });
+});
+
+describe('fullName construction edge cases', () => {
+    it('detail with :: already in it produces ns::Class::method', () => {
+        const i = itemEx('method', '/src/foo.cpp', 0, 'ns::Class');
+        const graph = buildCallGraph(i, [], [], 'callGraph', 2, 'clangd');
+        expect(graph.nodes[0].fullName).toBe('ns::Class::method');
+    });
+
+    it('empty detail is treated as falsy — no separator added', () => {
+        const i = itemEx('fn', '/src/foo.c', 0, '');
+        const graph = buildCallGraph(i, [], [], 'callGraph', 2, 'clangd');
+        expect(graph.nodes[0].fullName).toBe('fn');
+    });
+});
+
+describe('confidence derived from tool (G3 fix)', () => {
+    it('clangd → high, ctags → medium, unknown → low', () => {
+        const t = itemEx('foo', '/src/foo.c', 0);
+        expect(buildCallGraph(t, [], [], 'callGraph', 2, 'clangd').confidence).toBe('high');
+        expect(buildCallGraph(t, [], [], 'callGraph', 2, 'ctags').confidence).toBe('medium');
+        expect(buildCallGraph(t, [], [], 'callGraph', 2, 'some-other-tool').confidence).toBe('low');
+    });
+});
+
+describe('edge direction', () => {
+    it('incoming call edge goes from caller to target', () => {
+        const t = itemEx('foo', '/src/foo.c', 10);
+        const caller = itemEx('bar', '/src/bar.c', 1);
+        const graph = buildCallGraph(t, [incomingCall(caller)], [], 'callGraph', 2, 'clangd');
+        expect(graph.edges[0].targetId).toBe(graph.targetId);
+        expect(graph.edges[0].sourceId).not.toBe(graph.targetId);
+    });
+
+    it('outgoing call edge goes from target to callee', () => {
+        const t = itemEx('foo', '/src/foo.c', 10);
+        const callee = itemEx('baz', '/src/baz.c', 20);
+        const graph = buildCallGraph(t, [], [outgoingCall(callee)], 'callGraph', 2, 'clangd');
+        expect(graph.edges[0].sourceId).toBe(graph.targetId);
+        expect(graph.edges[0].targetId).not.toBe(graph.targetId);
+    });
+});

@@ -1,10 +1,14 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
 import * as os from 'os';
+import * as path from 'path';
 import { ToolStatus, ToolState, ToolGroup } from '../webview/messages';
 import { ClangdHealth } from './ClangdHealth';
 
 const execFileAsync = promisify(execFile);
+
+const PYTHON_VENV = path.join(os.homedir(), '.an-dr-code-analysis', 'venv');
 
 interface ToolDef {
     name: string;
@@ -16,7 +20,7 @@ const TOOLS: ReadonlyArray<ToolDef> = [
     // T2: 'clangd' removed — it is handled separately via ClangdHealth and must not appear here
     { name: 'cmake',         cmd: 'cmake',                  group: 'c-cpp' },
     { name: 'bear',          cmd: 'bear',                   group: 'c-cpp' },
-    { name: 'importlab',     cmd: 'importlab',              group: 'c-cpp' },
+    { name: 'importlab',     cmd: 'importlab',              group: 'python' },
     { name: 'iwyu',          cmd: 'iwyu',                   group: 'c-cpp' },
     { name: 'rust-analyzer', cmd: 'rust-analyzer',          group: 'rust' },
     { name: 'cargo',         cmd: 'cargo',                  group: 'rust' },
@@ -35,6 +39,18 @@ async function isAvailable(cmd: string): Promise<ToolState> {
     }
 }
 
+async function isPythonToolInVenv(cmd: string): Promise<ToolState> {
+    const binDir  = os.platform() === 'win32' ? 'Scripts' : 'bin';
+    const ext     = os.platform() === 'win32' ? '.exe'    : '';
+    const exePath = path.join(PYTHON_VENV, binDir, cmd + ext);
+    try {
+        await fs.promises.access(exePath);
+        return 'ok';
+    } catch {
+        return 'missing';
+    }
+}
+
 export class ToolRegistry {
     private _statuses: ToolStatus[] = [];
 
@@ -44,7 +60,7 @@ export class ToolRegistry {
 
         const [clangdBinary, ...otherStates] = await Promise.all([
             isAvailable('clangd'),
-            ...nonClangd.map(t => isAvailable(t.cmd)),
+            ...nonClangd.map(t => t.group === 'python' ? isPythonToolInVenv(t.cmd) : isAvailable(t.cmd)),
         ]);
 
         const clangdStatus: ToolStatus = clangdBinary === 'ok'

@@ -17,7 +17,10 @@ function renderInstallCommands(commands: InstallCommand[]): string {
     return commands.map(c => `
         <div class="install-block">
             <div class="platform-label">${escapeHtml(c.platform)}</div>
-            <pre class="install-cmd"><code>${escapeHtml(c.command)}</code></pre>
+            <div class="install-cmd-row">
+                <pre class="install-cmd"><code>${escapeHtml(c.command)}</code></pre>
+                <button class="run-btn" data-command="${escapeHtml(c.command)}" title="Run in terminal">&#9654; Run</button>
+            </div>
         </div>`).join('');
 }
 
@@ -38,6 +41,7 @@ function generateHelpHtml(webview: vscode.Webview, help: ToolHelp): string {
     const csp = [
         `default-src 'none'`,
         `style-src 'unsafe-inline'`,
+        `script-src 'nonce-${nonce}'`,
         `img-src data:`,
     ].join('; ');
 
@@ -129,6 +133,30 @@ function generateHelpHtml(webview: vscode.Webview, help: ToolHelp): string {
             color: var(--vscode-descriptionForeground, #9d9d9d);
             font-style: italic;
         }
+        .install-cmd-row {
+            display: flex;
+            align-items: stretch;
+        }
+        .install-cmd-row .install-cmd {
+            flex: 1;
+            border-radius: 4px 0 0 4px;
+            border-right: none;
+        }
+        .run-btn {
+            background: var(--vscode-button-background, #0e639c);
+            color: var(--vscode-button-foreground, #ffffff);
+            border: 1px solid var(--vscode-panel-border, #444);
+            border-left: none;
+            border-radius: 0 4px 4px 0;
+            padding: 0 14px;
+            cursor: pointer;
+            font-size: 0.85em;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+        .run-btn:hover {
+            background: var(--vscode-button-hoverBackground, #1177bb);
+        }
     </style>
 </head>
 <body>
@@ -143,6 +171,14 @@ function generateHelpHtml(webview: vscode.Webview, help: ToolHelp): string {
 
     ${renderLinks(help)}
     ${notesHtml}
+<script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    document.querySelectorAll('.run-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            vscode.postMessage({ type: 'runInTerminal', command: btn.dataset.command });
+        });
+    });
+</script>
 </body>
 </html>`;
 }
@@ -153,9 +189,17 @@ export class ToolHelpPanel {
             'an-dr-code-analysis.toolHelp',
             `Install: ${help.name}`,
             vscode.ViewColumn.One,
-            { enableScripts: false }
+            { enableScripts: true }
         );
         panel.webview.html = generateHelpHtml(panel.webview, help);
+        panel.webview.onDidReceiveMessage(msg => {
+            if (msg.type === 'runInTerminal') {
+                const term = vscode.window.terminals.find(t => t.name === 'Tool Installation')
+                    ?? vscode.window.createTerminal('Tool Installation');
+                term.show();
+                term.sendText(msg.command);
+            }
+        });
     }
 
     static showByName(toolName: string): void {

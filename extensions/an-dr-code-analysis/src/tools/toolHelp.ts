@@ -27,7 +27,7 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         affectsCapabilities: ['Call Graph (C/C++)', 'File Dependencies (C/C++)'],
         installCommands: [
             { platform: 'Windows (winget)', command: 'winget install LLVM.LLVM' },
-            { platform: 'Windows (choco)', command: 'choco install llvm' },
+            { platform: 'Windows (choco)', command: 'sudo choco install llvm' },
             { platform: 'macOS (brew)', command: 'brew install llvm' },
             { platform: 'Ubuntu/Debian', command: 'sudo apt install clangd' },
             { platform: 'Fedora/RHEL', command: 'sudo dnf install clang-tools-extra' },
@@ -64,7 +64,7 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         affectsCapabilities: ['Call Graph (fallback for all languages)'],
         installCommands: [
             { platform: 'Windows (winget)', command: 'winget install UniversalCtags.Ctags' },
-            { platform: 'Windows (choco)', command: 'choco install universal-ctags' },
+            { platform: 'Windows (choco)', command: 'sudo choco install universal-ctags' },
             { platform: 'macOS (brew)', command: 'brew install universal-ctags' },
             { platform: 'Ubuntu/Debian', command: 'sudo apt install universal-ctags' },
             { platform: 'Fedora/RHEL', command: 'sudo dnf install ctags' },
@@ -90,11 +90,12 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         description: 'Python call graph generator using static analysis. Provides medium-confidence call graphs for Python code.',
         affectsCapabilities: ['Call Graph (Python)'],
         installCommands: [
-            { platform: 'All platforms (pip)', command: 'pip install pyan3' },
-            { platform: 'All platforms (pipx)', command: 'pipx install pyan3' },
+            { platform: 'Windows (PowerShell, extension venv)', command: 'python -m venv "$env:USERPROFILE\\.an-dr-code-analysis\\venv" && "$env:USERPROFILE\\.an-dr-code-analysis\\venv\\Scripts\\pip" install pyan3' },
+            { platform: 'Linux / macOS (extension venv)', command: 'python3 -m venv ~/.an-dr-code-analysis/venv && ~/.an-dr-code-analysis/venv/bin/pip install pyan3' },
         ],
         downloadUrl: 'https://github.com/davidfraser/pyan',
         docsUrl: 'https://github.com/davidfraser/pyan#readme',
+        notes: 'Installed into an extension-specific virtualenv at ~/.an-dr-code-analysis/venv (or %USERPROFILE%\\.an-dr-code-analysis\\venv on Windows). Creating the venv is idempotent — safe to run if already set up.',
     },
     cmake: {
         name: 'cmake',
@@ -102,7 +103,7 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         affectsCapabilities: ['Component Dependencies (C/C++)'],
         installCommands: [
             { platform: 'Windows (winget)', command: 'winget install Kitware.CMake' },
-            { platform: 'Windows (choco)', command: 'choco install cmake' },
+            { platform: 'Windows (choco)', command: 'sudo choco install cmake' },
             { platform: 'macOS (brew)', command: 'brew install cmake' },
             { platform: 'Ubuntu/Debian', command: 'sudo apt install cmake' },
             { platform: 'Fedora/RHEL', command: 'sudo dnf install cmake' },
@@ -129,10 +130,12 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         description: 'Python import dependency analyzer from Google. Used for file dependency analysis in Python projects.',
         affectsCapabilities: ['File Dependencies (Python)'],
         installCommands: [
-            { platform: 'All platforms (pip)', command: 'pip install importlab' },
+            { platform: 'Windows (PowerShell, extension venv)', command: 'python -m venv "$env:USERPROFILE\\.an-dr-code-analysis\\venv" && "$env:USERPROFILE\\.an-dr-code-analysis\\venv\\Scripts\\pip" install importlab' },
+            { platform: 'Linux / macOS (extension venv)', command: 'python3 -m venv ~/.an-dr-code-analysis/venv && ~/.an-dr-code-analysis/venv/bin/pip install importlab' },
         ],
         downloadUrl: 'https://github.com/google/importlab',
         docsUrl: 'https://github.com/google/importlab#readme',
+        notes: 'Installed into an extension-specific virtualenv at ~/.an-dr-code-analysis/venv (or %USERPROFILE%\\.an-dr-code-analysis\\venv on Windows). Creating the venv is idempotent — safe to run if already set up.',
     },
     iwyu: {
         name: 'iwyu',
@@ -142,7 +145,7 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
             { platform: 'macOS (brew)', command: 'brew install include-what-you-use' },
             { platform: 'Ubuntu/Debian', command: 'sudo apt install iwyu' },
             { platform: 'Fedora/RHEL', command: 'sudo dnf install include-what-you-use' },
-            { platform: 'Windows (choco)', command: 'choco install include-what-you-use' },
+            { platform: 'Windows (choco)', command: 'sudo choco install include-what-you-use' },
         ],
         downloadUrl: 'https://include-what-you-use.org/',
         docsUrl: 'https://github.com/include-what-you-use/include-what-you-use/blob/master/README.md',

@@ -27,6 +27,11 @@
         "category": "an-dr"
       },
       {
+        "command": "an-dr-extension-control.forceRebuild",
+        "title": "Extension Control: Force Rebuild All Extensions",
+        "category": "an-dr"
+      },
+      {
         "command": "an-dr-extension-control.checkUpdates",
         "title": "Extension Control: Check for Updates",
         "category": "an-dr"

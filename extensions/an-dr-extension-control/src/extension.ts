@@ -179,6 +179,15 @@ async function rebuild(config: vscode.WorkspaceConfiguration): Promise<void> {
     term.sendText(`pwsh -File "${installScript}"`);
 }
 
+async function forceRebuild(config: vscode.WorkspaceConfiguration): Promise<void> {
+    const root = requireRepo(config);
+    if (!root) { return; }
+    const term = vscode.window.createTerminal({ name: 'an-dr: Force Rebuild Extensions' });
+    term.show();
+    const installScript = path.join(root, 'install.ps1');
+    term.sendText(`pwsh -File "${installScript}" -Force`);
+}
+
 async function checkUpdates(config: vscode.WorkspaceConfiguration): Promise<void> {
     const root = requireRepo(config);
     if (!root) { return; }
@@ -318,6 +327,7 @@ export function activate(context: vscode.ExtensionContext): void {
         ['an-dr-extension-control.pullAndReload', () => pullAndReload(cfg())],
         ['an-dr-extension-control.openRepo',      () => openRepo(cfg())],
         ['an-dr-extension-control.rebuild',       () => rebuild(cfg())],
+        ['an-dr-extension-control.forceRebuild',  () => forceRebuild(cfg())],
         ['an-dr-extension-control.checkUpdates',  () => checkUpdates(cfg())],
         ['an-dr-extension-control.showRepoPath',  () => showRepoPath(cfg())],
     ];

@@ -3,7 +3,8 @@
 # Requires PowerShell >= 5 on Windows or pwsh (PowerShell Core) on Linux/macOS.
 
 param(
-    [switch] $SkipBuild   # Pass -SkipBuild to skip npm install / compile
+    [switch] $SkipBuild,  # Skip npm install / compile entirely
+    [switch] $Force       # Rebuild even if commit hash matches
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,9 +15,10 @@ $VscodeExtensions = Join-Path $HOME '.vscode' 'extensions'
 
 Write-Host ''
 Write-Host '  an-dr VSCode Extension Installer' -ForegroundColor Cyan
-Write-Host "  Platform : $($IsWindows ? 'Windows (junction)' : ($IsMacOS ? 'macOS (symlink)' : 'Linux (symlink)'))"
+# Write-Host "  Platform : $($IsWindows ? 'Windows (junction)' : ($IsMacOS ? 'macOS (symlink)' : 'Linux (symlink)'))"
 Write-Host '  Source   : ' -NoNewline; Write-Host $ExtensionsSource
 Write-Host '  Target   : ' -NoNewline; Write-Host $VscodeExtensions
+if ($Force) { Write-Host '  Mode     : FORCE (rebuilding all)' -ForegroundColor Magenta }
 Write-Host ''
 
 if (-not (Test-Path $VscodeExtensions)) {
@@ -52,22 +54,68 @@ function New-ManagedLink ([string]$Dst, [string]$Src) {
     }
 }
 
-function Build-Extension ([string]$ExtDir) {
-    $pkgJson     = Join-Path $ExtDir 'package.json'
-    $nodeModules = Join-Path $ExtDir 'node_modules'
-    if (-not (Test-Path $pkgJson)) { return }
+# Last commit touching all files under extensions/<ExtName>/ (build stamp).
+function Get-ExtCommitHash ([string]$ExtName) {
+    try {
+        $hash = & git -C $RepoDir log -1 --format='%H' -- "extensions/$ExtName" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $hash) { return $hash.Trim() }
+    } catch {}
+    return $null
+}
 
-    if (-not (Test-Path $nodeModules)) {
+# Last commit touching only package.json / package-lock.json (install stamp).
+function Get-ExtInstallHash ([string]$ExtName) {
+    try {
+        $hash = & git -C $RepoDir log -1 --format='%H' -- `
+            "extensions/$ExtName/package.json" `
+            "extensions/$ExtName/package-lock.json" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $hash) { return $hash.Trim() }
+    } catch {}
+    return $null
+}
+
+function Get-Stamp ([string]$ExtDir, [string]$File) {
+    $stamp = Join-Path $ExtDir 'out' $File
+    if (Test-Path $stamp) { return (Get-Content $stamp -Raw).Trim() }
+    return $null
+}
+
+function Set-Stamp ([string]$ExtDir, [string]$File, [string]$Hash) {
+    $outDir = Join-Path $ExtDir 'out'
+    if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
+    Set-Content -Path (Join-Path $outDir $File) -Value $Hash -NoNewline
+}
+
+function Build-Extension ([string]$ExtDir, [string]$ExtName) {
+    if (-not (Test-Path (Join-Path $ExtDir 'package.json'))) { return }
+
+    if (-not $Force) {
+        $currentHash = Get-ExtCommitHash $ExtName
+        $builtHash   = Get-Stamp $ExtDir '.build-commit'
+        if ($currentHash -and $builtHash -and $currentHash -eq $builtHash) {
+            Write-Host ' (up to date)' -ForegroundColor DarkGray -NoNewline
+            return
+        }
+    }
+
+    Write-Host ''
+
+    $installHash  = Get-ExtInstallHash $ExtName
+    $installedAt  = Get-Stamp $ExtDir '.install-commit'
+    if ($Force -or -not ($installHash -and $installedAt -and $installHash -eq $installedAt)) {
         Write-Host '    npm install...' -ForegroundColor DarkGray
         Push-Location $ExtDir
         try   { & npm install --silent }
         finally { Pop-Location }
+        Set-Stamp $ExtDir '.install-commit' ($installHash ?? 'no-git')
     }
 
-    Write-Host '    tsc compile...' -ForegroundColor DarkGray
+    Write-Host '    compile...' -ForegroundColor DarkGray
     Push-Location $ExtDir
     try   { & npm run compile --silent }
     finally { Pop-Location }
+
+    Set-Stamp $ExtDir '.build-commit' ((Get-ExtCommitHash $ExtName) ?? 'no-git')
 }
 
 # ── main loop — one link per nested extension dir ─────────────────────────────
@@ -93,7 +141,7 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
         }
     }
 
-    if (-not $SkipBuild) { Build-Extension $src }
+    if (-not $SkipBuild) { Build-Extension $src $ext.Name }
 
     New-ManagedLink $dst $src
     Write-Host ' linked' -ForegroundColor Green

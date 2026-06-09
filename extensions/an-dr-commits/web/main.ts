@@ -477,7 +477,10 @@ class CommitsView {
 
 	public loadCommitDetails(commitElem: HTMLElement) { commitsLoadCommitDetails(this, commitElem); }
 	public previewCommitFiles(commitHash: string) {
-		if (this.filesPanelCommitHash === commitHash) return;
+		if (this.filesPanelCommitHash === commitHash) {
+			if (this.filesPanel.isHidden()) this.filesPanel.show();
+			return;
+		}
 		if (this.expandedCommit !== null && this.expandedCommit.commitHash === commitHash) return;
 		this.previewCommitHash = commitHash;
 		this.filesPanelCommitHash = null;

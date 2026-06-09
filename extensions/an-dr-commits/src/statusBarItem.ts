@@ -4,6 +4,7 @@ import { Logger } from './logger';
 import { RepoChangeEvent } from './repoManager';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
+import { countChanges, GitChangeCounts } from './activityBarView';
 
 /**
  * Manages the Commits Status Bar Item — a single button that opens the Commits View.
@@ -18,6 +19,7 @@ export class StatusBarItem extends Disposable {
 	private numRepos: number = 0;
 	private branchName: string | null = null;
 	private isVisible: boolean = false;
+	private changes: GitChangeCounts = { modified: 0, deleted: 0 };
 
 	constructor(initialNumRepos: number, onDidChangeRepos: Event<RepoChangeEvent>, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
 		super();
@@ -32,7 +34,8 @@ export class StatusBarItem extends Disposable {
 				this.refresh();
 			}),
 			onDidChangeConfiguration((event) => {
-				if (event.affectsConfiguration('an-dr-commits.showStatusBarItem')) {
+				if (event.affectsConfiguration('an-dr-commits.showStatusBarItem') ||
+					event.affectsConfiguration('an-dr-commits.statusBarItem.dirtyIndicator')) {
 					this.refresh();
 				}
 			}),
@@ -50,33 +53,28 @@ export class StatusBarItem extends Disposable {
 
 	private subscribeToGitApi() {
 		const gitExt = vscode.extensions.getExtension('vscode.git');
-		if (!gitExt) return;
+		if (!gitExt) { return; }
 
 		const attach = (api: any) => {
-			const updateBranch = () => {
+			const update = () => {
 				const activeUri = vscode.window.activeTextEditor?.document.uri;
-				let repo: any = null;
-				if (activeUri) {
-					repo = api.getRepository(activeUri);
-				}
-				if (!repo && api.repositories.length > 0) {
-					repo = api.repositories[0];
-				}
-				const head = repo?.state?.HEAD;
-				this.branchName = (head?.name as string | undefined) ?? null;
+				let repo: any = activeUri ? api.getRepository(activeUri) : null;
+				if (!repo && api.repositories.length > 0) { repo = api.repositories[0]; }
+				this.branchName = (repo?.state?.HEAD?.name as string | undefined) ?? null;
+				this.changes = repo ? countChanges(repo) : { modified: 0, deleted: 0 };
 				this.refresh();
 			};
 
 			const watchRepo = (r: any) => {
-				this.registerDisposables(r.state.onDidChange(updateBranch));
+				this.registerDisposables(r.state.onDidChange(update));
 			};
 
 			api.repositories.forEach(watchRepo);
 			this.registerDisposables(
-				api.onDidOpenRepository((r: any) => { watchRepo(r); updateBranch(); }),
-				vscode.window.onDidChangeActiveTextEditor(updateBranch)
+				api.onDidOpenRepository((r: any) => { watchRepo(r); update(); }),
+				vscode.window.onDidChangeActiveTextEditor(update)
 			);
-			updateBranch();
+			update();
 		};
 
 		if (gitExt.isActive) {
@@ -88,10 +86,10 @@ export class StatusBarItem extends Disposable {
 
 	private refresh() {
 		const config = getConfig();
-		const label = this.branchName
+		const base = this.branchName
 			? StatusBarItem.ICON + ' ' + this.branchName
 			: StatusBarItem.ICON + ' ' + StatusBarItem.FALLBACK_LABEL;
-		this.item.text = label;
+		this.item.text = base + this.formatDirty(config.statusBarItemDirtyIndicator);
 		this.item.tooltip = StatusBarItem.FALLBACK_LABEL;
 
 		const shouldShow = config.showStatusBarItem && this.numRepos > 0;
@@ -105,5 +103,17 @@ export class StatusBarItem extends Disposable {
 			}
 			this.isVisible = shouldShow;
 		}
+	}
+
+	private formatDirty(format: '+N -M' | '*' | 'none'): string {
+		const { modified, deleted } = this.changes;
+		const total = modified + deleted;
+		if (total === 0 || format === 'none') { return ''; }
+		if (format === '*') { return ' *'; }
+		// '+N -M'
+		const parts: string[] = [];
+		if (modified > 0) { parts.push('+' + modified); }
+		if (deleted > 0) { parts.push('-' + deleted); }
+		return parts.length > 0 ? ' ' + parts.join(' ') : '';
 	}
 }

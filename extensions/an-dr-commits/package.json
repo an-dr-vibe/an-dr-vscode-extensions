@@ -1317,6 +1317,17 @@
 					"default": true,
 					"description": "Show a status bar item that opens Commits when clicked."
 				},
+				"an-dr-commits.statusBarItem.dirtyIndicator": {
+					"type": "string",
+					"enum": ["+N -M", "*", "none"],
+					"enumDescriptions": [
+						"Show the count of modified/added files (+N) and deleted files (-M) when the working tree is dirty.",
+						"Show an asterisk (*) when the working tree is dirty.",
+						"Do not show a dirty indicator."
+					],
+					"default": "+N -M",
+					"description": "Format of the dirty working-tree indicator shown in the status bar next to the branch name."
+				},
 				"an-dr-commits.sourceCodeProviderIntegrationLocation": {
 					"type": "string",
 					"enum": [
@@ -1648,6 +1659,24 @@
 					"markdownDeprecationMessage": "Depreciated: This setting has been renamed to `#an-dr-commits.repository.useMailmap#`"
 				}
 			}
+		},
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "an-dr-commits-container",
+					"title": "Commits",
+					"icon": "resources/commits-icon.svg"
+				}
+			]
+		},
+		"views": {
+			"an-dr-commits-container": [
+				{
+					"id": "an-dr-commits.activityView",
+					"name": "Commits",
+					"type": "tree"
+				}
+			]
 		},
 		"menus": {
 			"commandPalette": [

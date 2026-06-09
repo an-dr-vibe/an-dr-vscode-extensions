@@ -668,6 +668,16 @@ class Config {
 	}
 
 	/**
+	 * Get the value of the `an-dr-commits.statusBarItem.dirtyIndicator` Extension Setting.
+	 * Returns '+N -M', '*', or 'none'.
+	 */
+	get statusBarItemDirtyIndicator(): '+N -M' | '*' | 'none' {
+		const v = this.config.get<string>('statusBarItem.dirtyIndicator', '+N -M');
+		if (v === '*' || v === 'none') { return v; }
+		return '+N -M';
+	}
+
+	/**
 	 * Get the value of the `an-dr-commits.tabIconColourTheme` Extension Setting.
 	 */
 	get tabIconColourTheme() {

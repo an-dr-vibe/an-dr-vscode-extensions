@@ -78,7 +78,7 @@ Track active editor symbol and file; render in panel.
 6. Click Pin again — CONTEXT unfreezes and updates normally
 
 - [x] **Approved**
-
+![1781044289884](image/PLAN/1781044289884.png)
 ---
 
 ## Iteration 3b — Semantic Symbol Detection

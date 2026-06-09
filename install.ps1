@@ -129,6 +129,20 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
 
     Write-Host "  $($ext.Name)" -ForegroundColor Yellow -NoNewline
 
+    # Remove any publisher.name-version copies that VS Code may have installed
+    # from a .vsix — they shadow our junction and load stale code.
+    $pkgJson = Join-Path $src 'package.json'
+    if (Test-Path $pkgJson) {
+        $pkg = Get-Content $pkgJson -Raw | ConvertFrom-Json
+        $publisherPrefix = "$($pkg.publisher).$($pkg.name)-"
+        Get-ChildItem -Path $VscodeExtensions -Directory |
+            Where-Object { $_.Name.StartsWith($publisherPrefix) } |
+            ForEach-Object {
+                Write-Host " (removing $($_.Name))" -ForegroundColor DarkYellow -NoNewline
+                Remove-Item -Recurse -Force $_.FullName
+            }
+    }
+
     if (Test-Path $dst) {
         if (Test-ManagedLink $dst) {
             Remove-ManagedLink $dst

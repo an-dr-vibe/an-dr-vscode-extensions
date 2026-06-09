@@ -7,7 +7,6 @@ class FilesPanel {
 	private readonly headerElem: HTMLElement;
 	private readonly footerElem: HTMLElement;
 	private readonly contentElem: HTMLElement;
-	private readonly toggleBtn: HTMLElement;
 	private panelHidden: boolean;
 	private panelWidth: number;
 	private scrollTop: number = 0;
@@ -17,7 +16,7 @@ class FilesPanel {
 
 	constructor(layoutChangeCallback: () => void = () => {}) {
 		this.layoutChangeCallback = layoutChangeCallback;
-		this.panelHidden = globalState.filesPanelHidden;
+		this.panelHidden = true;
 		this.panelWidth = globalState.filesPanelWidth;
 
 		this.panel = document.getElementById('filesPanel')!;
@@ -47,25 +46,10 @@ class FilesPanel {
 			this.onScroll();
 		});
 
-		// Toggle button in the toolbar
-		this.toggleBtn = document.createElement('div');
-		this.toggleBtn.id = 'filesPanelToggle';
-		this.toggleBtn.title = 'Toggle Files Panel';
-		this.toggleBtn.innerHTML = ICONS.filesPanel;
-		const toggleBtnContainer = document.getElementById('filesPanelToggleBtn');
-		if (toggleBtnContainer) {
-			toggleBtnContainer.appendChild(this.toggleBtn);
-		}
-		this.toggleBtn.addEventListener('click', () => this.toggle());
-
-		// Apply initial state
+		// Apply initial state (always start hidden — visibility is driven by commit selection)
 		this.applyInlineWidth(this.panelWidth);
-		this.applyWidth(this.panelHidden ? 0 : this.panelWidth);
-		if (this.panelHidden) {
-			document.body.classList.add('filesPanelHidden');
-		} else {
-			this.toggleBtn.classList.add('active');
-		}
+		this.applyWidth(0);
+		document.body.classList.add('filesPanelHidden');
 
 		this.showPlaceholder();
 	}
@@ -111,17 +95,14 @@ class FilesPanel {
 		if (this.panelHidden) {
 			document.body.classList.add('filesPanelHidden');
 			this.applyWidth(0);
-			this.toggleBtn.classList.remove('active');
 		} else {
 			document.body.classList.remove('filesPanelHidden');
 			this.applyWidth(this.panelWidth);
-			this.toggleBtn.classList.add('active');
 		}
 		const inlineContent = document.getElementById('commitDetailsViewInlineFilesContent');
 		if (inlineContent !== null) {
 			inlineContent.innerHTML = this.contentElem.innerHTML;
 		}
-		updateGlobalViewState('filesPanelHidden', this.panelHidden);
 	}
 
 	public show() {
@@ -129,8 +110,6 @@ class FilesPanel {
 		this.panelHidden = false;
 		document.body.classList.remove('filesPanelHidden');
 		this.applyWidth(this.panelWidth);
-		this.toggleBtn.classList.add('active');
-		updateGlobalViewState('filesPanelHidden', false);
 	}
 
 	/** Recalculate content top offset to match the actual header height. */

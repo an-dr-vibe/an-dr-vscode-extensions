@@ -407,37 +407,3 @@ body.branchPanelHidden #sidebar{
 	border-right:none;
 }
 
-/* Files panel toggle button in toolbar */
-#filesPanelToggleBtn{
-	display:flex;
-	align-items:center;
-	flex-shrink:0;
-}
-#filesPanelToggle{
-	display:flex;
-	align-items:center;
-	justify-content:center;
-	width:26px;
-	height:26px;
-	min-width:26px;
-	border-radius:4px;
-	-webkit-user-select:none;
-	user-select:none;
-}
-#filesPanelToggle .codicon{
-	width:20px;
-	height:20px;
-	font-size:20px;
-	line-height:20px;
-	color:var(--vscode-editor-foreground);
-	opacity:0.4;
-}
-#filesPanelToggle:hover .codicon{
-	opacity:0.8;
-}
-#filesPanelToggle.active .codicon{
-	opacity:1;
-}
-#filesPanelToggle.active:hover .codicon{
-	opacity:1;
-}

@@ -24,8 +24,7 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push · Double-click to Force Push (Right-Click for More Actions)',
 			onClick: () => view.pushCurrentBranchAction()
 		},
-		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings · Double-click to Refresh', onClick: () => view.settingsBtnElem.click() },
-		{ id: 'filesPanelToggleBtn', elem: document.getElementById('filesPanelToggleBtn')!, visible: true, title: 'Toggle Files Panel', onClick: () => (document.getElementById('filesPanelToggle') as HTMLElement)?.click() }
+		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings · Double-click to Refresh', onClick: () => view.settingsBtnElem.click() }
 	];
 }
 
@@ -53,8 +52,6 @@ function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButto
 			{ title: 'Repository Settings', visible: true, onClick: () => view.settingsWidget.show(view.currentRepo) },
 			{ title: 'Refresh', visible: true, onClick: () => view.refresh(true, true) }
 		];
-	} else if (button.id === 'filesPanelToggleBtn') {
-		return [{ title: 'Toggle Files Panel', visible: true, onClick: button.onClick }];
 	} else {
 		return [{ title: button.title, visible: true, onClick: button.onClick }];
 	}

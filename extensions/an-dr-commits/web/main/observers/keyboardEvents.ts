@@ -44,22 +44,29 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 		view.compactFindWidgetPinnedOpen = false;
 		view.updateCompactFindWidgetState();
 		handledEvent(e);
-	} else if (view.filesPanelCommitHash !== null && view.expandedCommit === null) {
+	} else if (!view.filesPanel.isHidden() && view.expandedCommit === null) {
 		if (view.currentDiffRequest !== null) {
 			view.resetDiffState();
 		} else {
 			view.filesPanel.clear();
+			view.filesPanel.hide();
 			view.filesPanelCommitHash = null;
 			view.filesPanelFileChanges = null;
 			view.filesPanelFileTree = null;
 			view.filesPanelCompareWithHash = null;
+			view.previewCompareHashes = null;
+			view.previewCommitHash = null;
+			view.selectedCommits = new Set();
+			view.updateSelectionClasses();
 		}
 		handledEvent(e);
 	} else if (view.expandedCommit !== null) {
 		if (view.currentDiffRequest !== null) {
 			view.resetDiffState();
 		} else {
+			view.selectedCommits = new Set();
 			view.closeCommitDetails(true);
+			view.filesPanel.hide();
 		}
 		handledEvent(e);
 	}

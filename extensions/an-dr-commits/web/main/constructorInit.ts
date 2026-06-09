@@ -117,29 +117,6 @@ function commitsInitDropdowns(view: any) {
 		view.requestLoadRepoInfoAndCommits(true, true);
 	}, () => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); });
 
-	commitsSetupNarrowModePanelExclusion(view);
-}
-
-const NARROW_MIDDLE_WIDTH = 220;
-
-function commitsSetupNarrowModePanelExclusion(view: any) {
-	const getMiddleWidth = () => (document.getElementById('content')?.clientWidth ?? Infinity);
-
-	document.getElementById('sidebarToggle')?.addEventListener('click', () => {
-		requestAnimationFrame(() => {
-			if (!view.branchDropdown.isHidden() && getMiddleWidth() < NARROW_MIDDLE_WIDTH) {
-				view.filesPanel.hide();
-			}
-		});
-	});
-
-	document.getElementById('filesPanelToggle')?.addEventListener('click', () => {
-		requestAnimationFrame(() => {
-			if (!view.filesPanel.isHidden() && getMiddleWidth() < NARROW_MIDDLE_WIDTH) {
-				view.branchDropdown.hide();
-			}
-		});
-	});
 }
 
 function commitsRestoreFromPrevState(view: any, prevState: any) {

@@ -103,6 +103,7 @@ function commitsPreviewCommitComparison(view: any, hash1: string, hash2: string)
 	view.filesPanelFileTree = null;
 	view.filesPanelCompareWithHash = null;
 	view.resetDiffState();
+	view.filesPanel.show();
 	view.filesPanel.setContentLoading();
 	view.requestCommitComparison(order.from, order.to, false);
 }
@@ -139,6 +140,7 @@ function commitsUpdateSelectionPreview(view: any) {
 		view.filesPanelFileTree = null;
 		view.filesPanelCompareWithHash = null;
 		view.previewCompareHashes = null;
+		if (hashes.length === 0) view.filesPanel.hide();
 	}
 }
 

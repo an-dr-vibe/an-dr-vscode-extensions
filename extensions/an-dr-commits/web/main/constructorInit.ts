@@ -20,7 +20,7 @@ function commitsInitDropdowns(view: any) {
 	view.repoDropdown = new Dropdown('repoDropdown', true, false, 'Repos', (values: string[]) => {
 		view.loadRepo(values[0]);
 	});
-	view.filesPanel = new FilesPanel(() => view.updateCommittedColumnDisplayMode());
+	view.filesPanel = new FilesPanel(() => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); });
 	view.filesPanel.getContentElem().addEventListener('click', (e: MouseEvent) => commitsHandleFilesPanelClick(view, e));
 	view.filesPanel.getContentElem().addEventListener('dblclick', (e: MouseEvent) => commitsHandleFilesPanelDblClick(view, e));
 	view.branchDropdown = new BranchPanel('branchPanel', (values: string[]) => {
@@ -115,7 +115,31 @@ function commitsInitDropdowns(view: any) {
 		view.saveState();
 		view.clearCommits();
 		view.requestLoadRepoInfoAndCommits(true, true);
-	}, () => view.updateCommittedColumnDisplayMode());
+	}, () => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); });
+
+	commitsSetupNarrowModePanelExclusion(view);
+}
+
+const NARROW_MIDDLE_WIDTH = 220;
+
+function commitsSetupNarrowModePanelExclusion(view: any) {
+	const getMiddleWidth = () => (document.getElementById('content')?.clientWidth ?? Infinity);
+
+	document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+		requestAnimationFrame(() => {
+			if (!view.branchDropdown.isHidden() && getMiddleWidth() < NARROW_MIDDLE_WIDTH) {
+				view.filesPanel.hide();
+			}
+		});
+	});
+
+	document.getElementById('filesPanelToggle')?.addEventListener('click', () => {
+		requestAnimationFrame(() => {
+			if (!view.filesPanel.isHidden() && getMiddleWidth() < NARROW_MIDDLE_WIDTH) {
+				view.branchDropdown.hide();
+			}
+		});
+	});
 }
 
 function commitsRestoreFromPrevState(view: any, prevState: any) {

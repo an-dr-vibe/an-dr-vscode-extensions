@@ -102,7 +102,11 @@ class FilesPanel {
 		document.body.style.setProperty('--files-panel-inline-width', width + 'px');
 	}
 
-	private toggle() {
+	public hide() {
+		if (!this.panelHidden) this.toggle();
+	}
+
+	public toggle() {
 		this.panelHidden = !this.panelHidden;
 		if (this.panelHidden) {
 			document.body.classList.add('filesPanelHidden');

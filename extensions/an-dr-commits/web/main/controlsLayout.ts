@@ -94,7 +94,7 @@ function commitsUpdateControlsLayout(view: any) {
 			overflow = isOverflowing();
 		}
 
-		const hideOrder = ['filesPanelToggleBtn', 'settingsBtn', 'pushBtn', 'pullBtn'];
+		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn'];
 		for (let i = 0; i < hideOrder.length && overflow; i++) {
 			const button = buttons.find((item) => item.id === hideOrder[i]);
 			if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;

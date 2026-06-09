@@ -247,6 +247,14 @@ class BranchPanel {
 		this.scheduleLayoutChange();
 	}
 
+	public isHidden(): boolean {
+		return this.sidebarHidden;
+	}
+
+	public hide() {
+		if (!this.sidebarHidden) this.toggleSidebar();
+	}
+
 	public setRemoteUrls(urls: { [remoteName: string]: string | null }) {
 		this.remoteUrls = urls;
 		this.render();

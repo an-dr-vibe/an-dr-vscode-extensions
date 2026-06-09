@@ -245,7 +245,7 @@ function renderToolsStatus(tools: ToolStatus[]): string {
 
     const hasIssues = tools.some(t => t.state !== 'ok');
     return `<details class="section"${hasIssues ? ' open' : ''}>
-  <summary class="section-header">TOOLS STATUS</summary>
+  <summary class="section-header">TOOLS STATUS <button class="pin-btn" id="refresh-tools-btn" title="Re-check installed tools">↻</button></summary>
   <div class="section-body">${sections}</div>
 </details>`;
 }
@@ -473,6 +473,11 @@ root.addEventListener('click', (e: MouseEvent) => {
 
     if (target.id === 'pin-btn' || target.closest('#pin-btn')) {
         vscode.postMessage({ type: 'togglePin' });
+        return;
+    }
+
+    if (target.id === 'refresh-tools-btn') {
+        vscode.postMessage({ type: 'refreshTools' });
         return;
     }
 

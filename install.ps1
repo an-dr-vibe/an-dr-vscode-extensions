@@ -86,15 +86,27 @@ function Set-Stamp ([string]$ExtDir, [string]$File, [string]$Hash) {
     Set-Content -Path (Join-Path $outDir $File) -Value $Hash -NoNewline
 }
 
+function Test-ExtDirty ([string]$ExtName) {
+    # Returns $true if the working tree or index has any changes under extensions/<ExtName>/
+    & git -C $RepoDir diff --quiet -- "extensions/$ExtName" 2>$null
+    if ($LASTEXITCODE -ne 0) { return $true }
+    & git -C $RepoDir diff --cached --quiet -- "extensions/$ExtName" 2>$null
+    return $LASTEXITCODE -ne 0
+}
+
 function Build-Extension ([string]$ExtDir, [string]$ExtName) {
     if (-not (Test-Path (Join-Path $ExtDir 'package.json'))) { return }
 
     if (-not $Force) {
         $currentHash = Get-ExtCommitHash $ExtName
         $builtHash   = Get-Stamp $ExtDir '.build-commit'
-        if ($currentHash -and $builtHash -and $currentHash -eq $builtHash) {
+        $dirty       = Test-ExtDirty $ExtName
+        if ($currentHash -and $builtHash -and $currentHash -eq $builtHash -and -not $dirty) {
             Write-Host ' (up to date)' -ForegroundColor DarkGray -NoNewline
             return
+        }
+        if ($dirty) {
+            Write-Host ' (dirty)' -ForegroundColor Yellow -NoNewline
         }
     }
 

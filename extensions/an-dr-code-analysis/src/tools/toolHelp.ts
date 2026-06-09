@@ -90,7 +90,7 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         description: 'Python call graph generator using static analysis. Provides medium-confidence call graphs for Python code.',
         affectsCapabilities: ['Call Graph (Python)'],
         installCommands: [
-            { platform: 'Windows (PowerShell, extension venv)', command: 'python -m venv "$env:USERPROFILE\\.an-dr-code-analysis\\venv" && "$env:USERPROFILE\\.an-dr-code-analysis\\venv\\Scripts\\pip" install pyan3' },
+            { platform: 'Windows (PowerShell, extension venv)', command: 'python -m venv "$env:USERPROFILE\\.an-dr-code-analysis\\venv" && & "$env:USERPROFILE\\.an-dr-code-analysis\\venv\\Scripts\\pip" install pyan3' },
             { platform: 'Linux / macOS (extension venv)', command: 'python3 -m venv ~/.an-dr-code-analysis/venv && ~/.an-dr-code-analysis/venv/bin/pip install pyan3' },
         ],
         downloadUrl: 'https://github.com/davidfraser/pyan',
@@ -130,7 +130,7 @@ export const TOOL_HELP: Readonly<Record<string, ToolHelp>> = {
         description: 'Python import dependency analyzer from Google. Used for file dependency analysis in Python projects.',
         affectsCapabilities: ['File Dependencies (Python)'],
         installCommands: [
-            { platform: 'Windows (PowerShell, extension venv)', command: 'python -m venv "$env:USERPROFILE\\.an-dr-code-analysis\\venv" && "$env:USERPROFILE\\.an-dr-code-analysis\\venv\\Scripts\\pip" install importlab' },
+            { platform: 'Windows (PowerShell, extension venv)', command: 'python -m venv "$env:USERPROFILE\\.an-dr-code-analysis\\venv" && & "$env:USERPROFILE\\.an-dr-code-analysis\\venv\\Scripts\\pip" install importlab' },
             { platform: 'Linux / macOS (extension venv)', command: 'python3 -m venv ~/.an-dr-code-analysis/venv && ~/.an-dr-code-analysis/venv/bin/pip install importlab' },
         ],
         downloadUrl: 'https://github.com/google/importlab',

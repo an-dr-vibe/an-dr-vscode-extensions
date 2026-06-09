@@ -39,16 +39,30 @@ async function isAvailable(cmd: string): Promise<ToolState> {
     }
 }
 
+async function pathExists(p: string): Promise<boolean> {
+    try { await fs.promises.access(p); return true; } catch { return false; }
+}
+
 async function isPythonToolInVenv(cmd: string): Promise<ToolState> {
+    // 1. Try CLI entry point (e.g. pyan3.exe / pyan3)
     const binDir  = os.platform() === 'win32' ? 'Scripts' : 'bin';
     const ext     = os.platform() === 'win32' ? '.exe'    : '';
-    const exePath = path.join(PYTHON_VENV, binDir, cmd + ext);
-    try {
-        await fs.promises.access(exePath);
-        return 'ok';
-    } catch {
-        return 'missing';
+    if (await pathExists(path.join(PYTHON_VENV, binDir, cmd + ext))) { return 'ok'; }
+
+    // 2. Fallback: check site-packages for packages that have no CLI entry point
+    if (os.platform() === 'win32') {
+        if (await pathExists(path.join(PYTHON_VENV, 'Lib', 'site-packages', cmd))) { return 'ok'; }
+    } else {
+        const libDir = path.join(PYTHON_VENV, 'lib');
+        try {
+            for (const entry of await fs.promises.readdir(libDir)) {
+                if (entry.startsWith('python')) {
+                    if (await pathExists(path.join(libDir, entry, 'site-packages', cmd))) { return 'ok'; }
+                }
+            }
+        } catch { /* venv not created yet */ }
     }
+    return 'missing';
 }
 
 export class ToolRegistry {

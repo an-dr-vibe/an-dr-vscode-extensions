@@ -125,22 +125,25 @@ $skipped = 0
 
 foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     $src = $ext.FullName
-    $dst = Join-Path $VscodeExtensions $ext.Name
 
-    Write-Host "  $($ext.Name)" -ForegroundColor Yellow -NoNewline
-
-    # Remove any publisher.name-version copies that VS Code may have installed
-    # from a .vsix — they shadow our junction and load stale code.
+    # Derive junction name from package.json (publisher.name-version) so VS Code
+    # recognises it; fall back to folder name if fields are missing.
     $pkgJson = Join-Path $src 'package.json'
+    $dstName = $ext.Name
     if (Test-Path $pkgJson) {
         $pkg = Get-Content $pkgJson -Raw | ConvertFrom-Json
-        $publisherPrefix = "$($pkg.publisher).$($pkg.name)-"
-        Get-ChildItem -Path $VscodeExtensions -Directory |
-            Where-Object { $_.Name.StartsWith($publisherPrefix) } |
-            ForEach-Object {
-                Write-Host " (removing $($_.Name))" -ForegroundColor DarkYellow -NoNewline
-                Remove-Item -Recurse -Force $_.FullName
-            }
+        if ($pkg.publisher -and $pkg.name -and $pkg.version) {
+            $dstName = "$($pkg.publisher).$($pkg.name)-$($pkg.version)"
+        }
+    }
+    $dst = Join-Path $VscodeExtensions $dstName
+
+    Write-Host "  $dstName" -ForegroundColor Yellow -NoNewline
+
+    # Remove stale bare-name junction (legacy naming from earlier installs).
+    $legacyDst = Join-Path $VscodeExtensions $ext.Name
+    if ($legacyDst -ne $dst -and (Test-ManagedLink $legacyDst)) {
+        Remove-ManagedLink $legacyDst
     }
 
     if (Test-Path $dst) {

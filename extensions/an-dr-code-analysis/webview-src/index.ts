@@ -1,4 +1,5 @@
 import { CytoscapeRenderer } from './graph/CytoscapeRenderer';
+import { resolveNodeDblClick } from '../src/webview/nodeActions';
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
@@ -151,6 +152,7 @@ interface AppState {
     collapsedDirs: Set<string>;
     clangdHealth: ClangdHealth | null;
     mergeCircular: boolean;
+    selectedFilePath: string | null;
 }
 const state: AppState = {
     tools: null,
@@ -161,6 +163,7 @@ const state: AppState = {
     collapsedDirs: new Set(),
     clangdHealth: null,
     mergeCircular: true,
+    selectedFilePath: null,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -182,8 +185,23 @@ function getOrCreateRenderer(): CytoscapeRenderer {
         renderer = new CytoscapeRenderer(
             container,
             tooltip,
-            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeClick',      nodeId, filePath, line }),
-            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeDoubleClick', nodeId, filePath, line }),
+            (nodeId, filePath, line) => {
+                vscode.postMessage({ type: 'nodeClick', nodeId, filePath, line });
+                // Track selected file for tree highlighting
+                if (filePath !== state.selectedFilePath) {
+                    state.selectedFilePath = filePath ?? null;
+                    rebuildFilterBody();
+                }
+            },
+            (nodeId, filePath, line) => {
+                const g = state.analysis.graph;
+                const action = resolveNodeDblClick(nodeId, filePath, line, g?.targetId, g?.graphType, state.depth);
+                if (action.kind === 'reanalyzeTo') {
+                    vscode.postMessage({ type: 'reanalyzeTo', filePath: action.filePath, line: action.line, graphType: action.graphType, depth: action.depth });
+                } else {
+                    vscode.postMessage({ type: 'nodeDoubleClick', nodeId: action.nodeId, filePath: action.filePath, line: action.line });
+                }
+            },
         );
     }
     return renderer;
@@ -339,10 +357,15 @@ function renderTreeNode(node: TreeNode, indent: number): string {
 </div>${childrenHtml}`;
     } else {
         const checked = !isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode);
+        const graph = state.analysis.graph;
+        const norm = (s: string) => s.replace(/\\/g, '/');
+        const isTarget = graph ? norm(graph.nodes.find(n => n.id === graph.targetId)?.filePath ?? '') === norm(node.fullPath) : false;
+        const isSelected = state.selectedFilePath ? norm(state.selectedFilePath) === norm(node.fullPath) : false;
+        const cls = ['ft-label', isTarget ? 'ft-hl-target' : '', isSelected ? 'ft-hl-selected' : ''].filter(Boolean).join(' ');
         return `<div class="ft-row" style="padding-left:${pad}px">
   <span class="ft-toggle-spacer"></span>
   <input type="checkbox" class="ft-check" data-path="${esc(node.fullPath)}" ${checked ? 'checked' : ''}>
-  <span class="ft-label">${esc(node.name)}</span>
+  <span class="${cls}" data-filepath="${esc(node.fullPath)}">${esc(node.name)}</span>
 </div>`;
     }
 }
@@ -352,7 +375,7 @@ function renderFileFilter(graph: GraphModel): string {
     if (tree.children.length === 0) { return ''; }
     const childrenHtml = tree.children.map(c => renderTreeNode(c, 0)).join('');
     return `<details class="section ft-section" open>
-  <summary class="section-header">FILTER</summary>
+  <summary class="section-header" style="justify-content:center">TREE</summary>
   <div class="section-body ft-body">${childrenHtml}</div>
 </details>`;
 }
@@ -687,6 +710,15 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
+    // Tree file label: single click selects (highlights in tree), double-click opens file
+    const fileLabel = target.closest<HTMLElement>('[data-filepath]');
+    if (fileLabel && !fileLabel.classList.contains('ft-dir')) {
+        const fp = fileLabel.dataset['filepath']!;
+        state.selectedFilePath = fp;
+        rebuildFilterBody();
+        return;
+    }
+
     // File filter tree: collapse/expand toggle — rebuild filter UI and re-render graph
     const toggle = target.closest<HTMLElement>('.ft-toggle');
     if (toggle) {
@@ -705,6 +737,15 @@ root.addEventListener('click', (e: MouseEvent) => {
         rebuildFilterBody();
         renderGraphOnly();
         return;
+    }
+});
+
+// Tree file label double-click: open the file in the editor
+root.addEventListener('dblclick', (e: MouseEvent) => {
+    const fileLabel = (e.target as Element).closest<HTMLElement>('[data-filepath]');
+    if (fileLabel && !fileLabel.classList.contains('ft-dir')) {
+        const fp = fileLabel.dataset['filepath']!;
+        vscode.postMessage({ type: 'nodeDoubleClick', nodeId: fp, filePath: fp });
     }
 });
 
@@ -775,6 +816,7 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             state.depth = msg.graph.depth;
             state.uncheckedPaths = new Set();
             state.collapsedDirs = new Set();
+            state.selectedFilePath = null;
             render();
             break;
         case 'analysisCancelled':

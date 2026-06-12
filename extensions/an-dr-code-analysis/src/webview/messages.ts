@@ -132,6 +132,14 @@ export interface CancelAnalysisMessage {
     type: 'cancelAnalysis';
 }
 
+export interface ReanalyzeToMessage {
+    type: 'reanalyzeTo';
+    filePath: string;
+    line: number;
+    graphType: GraphType;
+    depth: number;
+}
+
 export type WebviewToExtensionMessage =
     | ReadyMessage
     | RefreshToolsMessage
@@ -142,4 +150,5 @@ export type WebviewToExtensionMessage =
     | NodeClickMessage
     | NodeDoubleClickMessage
     | RunCommandMessage
-    | CancelAnalysisMessage;
+    | CancelAnalysisMessage
+    | ReanalyzeToMessage;

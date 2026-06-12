@@ -48,6 +48,10 @@ export class Range {
     }
 }
 
+export class Selection extends Range {
+    constructor(anchor: Position, active: Position) { super(anchor, active); }
+}
+
 export class Uri {
     private constructor(
         public readonly scheme: string,
@@ -138,6 +142,7 @@ export const workspace = {
     })),
     onDidChangeConfiguration: jest.fn(() => ({ dispose: () => {} })),
     onDidChangeWorkspaceFolders: jest.fn(() => ({ dispose: () => {} })),
+    openTextDocument: jest.fn((_path: string) => Promise.resolve({ uri: Uri.file(_path) })),
 
     // test helpers — not part of real vscode API
     __setWorkspaceFolders(folders: { uri: Uri; name: string; index: number }[] | undefined) {
@@ -150,6 +155,11 @@ export const workspace = {
 
 // ── window mock ─────────────────────────────────────────────────────────────
 
+export const _mockEditor = {
+    selection: new Selection(new Position(0, 0), new Position(0, 0)),
+    revealRange: jest.fn(),
+};
+
 export const window = {
     activeTextEditor: undefined as unknown,
     onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: () => {} })),
@@ -159,6 +169,12 @@ export const window = {
     showErrorMessage: jest.fn(),
     showQuickPick: jest.fn(),
     showOpenDialog: jest.fn(),
+    showTextDocument: jest.fn((_doc: unknown, _opts?: unknown) => {
+        // Reset the mock editor each call so tests get a fresh writable object
+        _mockEditor.selection = new Selection(new Position(0, 0), new Position(0, 0));
+        _mockEditor.revealRange = jest.fn();
+        return Promise.resolve(_mockEditor);
+    }),
     createOutputChannel: jest.fn(() => ({
         appendLine: jest.fn(),
         append: jest.fn(),

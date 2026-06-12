@@ -272,6 +272,16 @@ export function generateWebviewHtml(
             cursor: default;
         }
         .ft-dir { cursor: pointer; font-weight: 500; }
+        .ft-label[data-filepath] { cursor: pointer; }
+        .ft-label[data-filepath]:hover { text-decoration: underline; }
+        .ft-hl-target {
+            color: var(--vscode-terminal-ansiGreen, #4caf50);
+            font-weight: 600;
+        }
+        .ft-hl-selected {
+            color: var(--vscode-terminal-ansiCyan, #26c6da);
+            font-weight: 600;
+        }
         .graph-fallback-note {
             font-size: 0.8em;
             color: var(--vscode-descriptionForeground);

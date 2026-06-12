@@ -9,7 +9,7 @@
 //   - analyzer chain: first analyzer returns null → second is tried
 //   - analyzer throws → falls through to next analyzer
 
-import { workspace } from '../__mocks__/vscode';
+import { workspace, window as mockWindow, _mockEditor } from '../__mocks__/vscode';
 import { SidepanelProvider } from '../SidepanelProvider';
 import { Uri } from '../__mocks__/vscode';
 import * as fs from 'fs';
@@ -451,6 +451,70 @@ describe('Scenario: double-click on a node that has no filePath', () => {
         const handler = (view.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
         // filePath is undefined — the guard `if (msg.filePath)` prevents navigation
         expect(() => handler({ type: 'nodeDoubleClick', nodeId: 'n1', filePath: undefined })).not.toThrow();
+        provider.dispose();
+    });
+});
+
+// ── Scenario: reanalyzeTo — opens file and moves cursor ──────────────────────
+
+describe('Scenario: reanalyzeTo message opens file and moves cursor', () => {
+    it('opens the file and positions cursor at the given line', async () => {
+        const view = makeWebviewView();
+        const provider = new SidepanelProvider(makeExtensionUri(tmpDir));
+        provider.resolveWebviewView(view, {} as any, {} as any);
+
+        const handler = (view.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+
+        // handler fires _reanalyzeTo with void — collect the inner promise via showTextDocument
+        handler({ type: 'reanalyzeTo', filePath: '/src/foo.cpp', line: 42, graphType: 'callGraph', depth: 2 });
+
+        // Wait for openTextDocument + showTextDocument to be called (they're awaited inside _reanalyzeTo)
+        await new Promise(r => setImmediate(r));
+        await new Promise(r => setImmediate(r));
+
+        expect(workspace.openTextDocument).toHaveBeenCalledWith('/src/foo.cpp');
+        expect(mockWindow.showTextDocument).toHaveBeenCalled();
+        // _reanalyzeTo assigns editor.selection = new Selection(line 42, 0)
+        expect(_mockEditor.selection.start.line).toBe(42);
+
+        provider.dispose();
+    });
+
+    it('kicks off analysis after the settle delay (sends analysisBusy or analysisError)', async () => {
+        const posted: any[] = [];
+        const view = makeWebviewView(msg => posted.push(msg));
+        const provider = new SidepanelProvider(makeExtensionUri(tmpDir));
+        provider.resolveWebviewView(view, {} as any, {} as any);
+
+        const handler = (view.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+
+        handler({ type: 'reanalyzeTo', filePath: '/src/foo.cpp', line: 5, graphType: 'fileDeps', depth: 1 });
+
+        // Wait for the 400ms settle timeout + analysis kick
+        await new Promise(r => setTimeout(r, 500));
+        await flushAsync();
+
+        // After delay — _runAnalysis was called; no context in test so analysisError is sent
+        const analysisMsg = posted.filter(m => m.type === 'analysisBusy' || m.type === 'analysisError');
+        expect(analysisMsg.length).toBeGreaterThan(0);
+        expect(analysisMsg[0].graphType).toBe('fileDeps');
+
+        provider.dispose();
+    }, 3000);
+
+    it('BUG GUARD: does not crash if openTextDocument rejects', async () => {
+        (workspace.openTextDocument as jest.Mock).mockRejectedValueOnce(new Error('file not found'));
+
+        const view = makeWebviewView();
+        const provider = new SidepanelProvider(makeExtensionUri(tmpDir));
+        provider.resolveWebviewView(view, {} as any, {} as any);
+
+        const handler = (view.webview.onDidReceiveMessage as jest.Mock).mock.calls[0][0];
+        // handler uses void — should not propagate the rejection
+        expect(() => handler({ type: 'reanalyzeTo', filePath: '/missing.cpp', line: 0, graphType: 'callGraph', depth: 1 })).not.toThrow();
+        // Drain so the unhandled rejection doesn't leak
+        await flushAsync(5);
+
         provider.dispose();
     });
 });

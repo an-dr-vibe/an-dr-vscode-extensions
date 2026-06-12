@@ -104,6 +104,10 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                         );
                     }
                     break;
+                case 'reanalyzeTo':
+                    this._cancelRunningAnalysis();
+                    void this._reanalyzeTo(msg.filePath, msg.line, msg.graphType, msg.depth);
+                    break;
                 case 'runCommand':
                     void vscode.commands.executeCommand(msg.command, ...(msg.args ?? []));
                     break;
@@ -155,6 +159,21 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
             issue: health.issue,
             message: health.message,
         });
+    }
+
+    private async _reanalyzeTo(filePath: string, line: number, graphType: import('./graph/GraphModel').GraphType, depth: number): Promise<void> {
+        try {
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            const editor = await vscode.window.showTextDocument(doc, { preserveFocus: false });
+            const pos = new vscode.Position(line, 0);
+            editor.selection = new vscode.Selection(pos, pos);
+            editor.revealRange(new vscode.Range(pos, pos));
+            // Give the context tracker time to resolve the symbol at the new cursor position.
+            await new Promise(r => setTimeout(r, 400));
+            void this._runAnalysis(graphType, depth);
+        } catch (err) {
+            log.appendLine(`[reanalyzeTo] failed: ${err}`);
+        }
     }
 
     private _cancelRunningAnalysis(): void {

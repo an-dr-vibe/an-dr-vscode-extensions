@@ -39,6 +39,26 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
   against branches, tags, and commits. Integrated functionality from
   `vscode-git-tree-compare` must keep visible attribution to the original author.
 
+## Shared agents
+
+Reusable agent prompts live in [`agents/`](agents/). Any extension can invoke them.
+
+| Agent          | File                                                  | Purpose                                                                 |
+|----------------|-------------------------------------------------------|-------------------------------------------------------------------------|
+| adversarial-ut | [agents/adversarial-ut.md](agents/adversarial-ut.md) | Bug-finding UT run — three-pass adversarial suite, outputs TECHDEBT.md |
+
+---
+
+## Extension-specific agent context
+
+Each extension with non-trivial architecture has its own `AGENTS.md`. Read it before
+touching that extension's files.
+
+- **an-dr-code-analysis** — see [extensions/an-dr-code-analysis/AGENTS.md](extensions/an-dr-code-analysis/AGENTS.md)
+- **an-dr-commits** — see [extensions/an-dr-commits/AGENTS.md](extensions/an-dr-commits/AGENTS.md)
+
+---
+
 ## Adding a new extension
 
 1. Create `extensions/<name>/` with `package.json`, `tsconfig.json`, `.vscodeignore`,

@@ -241,7 +241,28 @@ Surface clangd misconfiguration in Tools Status and gate the analyzer on it.
 
 ---
 
-## Iteration 10 — Rust (rust-analyzer + cargo)
+## Iteration 10 — Debug & Cleanup
+
+Stabilise the existing feature set before adding new languages. No new functionality.
+
+- [ ] Run the adversarial UT agent (see `AGENTS.md`) — capture all bugs as passing regression tests in `TECHDEBT.md`
+- [ ] Fix every bug surfaced by the UT run
+- [ ] Remove dead code (constants, settings, and functions whose output is never consumed)
+- [ ] Review all log lines — remove noise, keep signal
+- [ ] Verify the full flow on a real project: clangd path, ctags fallback, file deps, filter tree, pin, depth
+- [ ] All TypeScript strict-mode warnings resolved
+
+**Verification:**
+
+1. `npm run compile` — zero errors and zero warnings
+2. UT suite passes with no skipped tests
+3. TECHDEBT.md exists; every listed bug has a corresponding fix commit or a tracked issue
+
+- [ ] **Approved**
+
+---
+
+## Iteration 12 — Rust (rust-analyzer + cargo)
 
 Add Rust language support.
 
@@ -261,7 +282,7 @@ Add Rust language support.
 
 ---
 
-## Iteration 11 — TypeScript / JavaScript (tsserver)
+## Iteration 13 — TypeScript / JavaScript (tsserver)
 
 Add TS/JS support.
 
@@ -283,7 +304,7 @@ Add TS/JS support.
 
 ---
 
-## Iteration 12 — Python (pyan3 + AST)
+## Iteration 14 — Python (pyan3 + AST)
 
 Add Python support.
 
@@ -303,7 +324,7 @@ Add Python support.
 
 ---
 
-## Iteration 13 — Component Dependencies (CMake + directory heuristic)
+## Iteration 15 — Component Dependencies (CMake + directory heuristic)
 
 Add component-level analysis for C/C++.
 
@@ -322,7 +343,7 @@ Add component-level analysis for C/C++.
 
 ---
 
-## Iteration 14 — Expand to Full Tab
+## Iteration 16 — Expand to Full Tab
 
 Wider graph in a `WebviewPanel` editor tab.
 
@@ -345,31 +366,7 @@ Wider graph in a `WebviewPanel` editor tab.
 
 ---
 
-## Iteration 15 — AI Fallback Bridge
-
-Connect to companion extension (e.g. `an-dr-ai`) as last-resort analyzer.
-
-- [ ] Create `src/analyzers/ai/ExternalExtensionAnalyzer.ts` — calls companion via `vscode.commands.executeCommand('an-dr-ai.analyzeCode', request)`
-- [ ] `AiConfirmationPayload` built from failed request: files being sent, sizes, companion name
-- [ ] Webview renders AI confirmation dialog before sending; waits for `aiConfirmed` / `aiCancelled`
-- [ ] Wire into factory as final fallback (all languages, all graph types)
-- [ ] `contractVersion: "1.0"` included in every request
-- [ ] AI is never triggered silently — always requires explicit user confirmation
-
-**Verification:**
-
-1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
-2. Disable all local tools (or open an unsupported file type)
-3. Click any analysis button → confirmation dialog appears listing files to be sent and their sizes
-4. Click Cancel → no analysis runs, no data is sent
-5. Click Confirm → AI graph renders with 🤖 badge
-6. Disable `an-dr-ai` extension → error message explains companion is not available (no silent fallback)
-
-- [ ] **Approved**
-
----
-
-## Iteration 16 — Polish
+## Iteration 17 — Polish
 
 Final UX pass.
 

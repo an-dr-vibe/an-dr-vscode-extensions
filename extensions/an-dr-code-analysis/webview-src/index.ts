@@ -339,7 +339,12 @@ function applyFilter(graph: GraphModel): GraphModel {
     const visibleNodes = graph.nodes.filter(n => !isNodeFiltered(n));
     const visibleIds = new Set(visibleNodes.map(n => n.id));
     const visibleEdges = graph.edges.filter(e => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId));
-    return { ...graph, nodes: visibleNodes, edges: visibleEdges };
+    // Drop nodes that became orphans after edge filtering (keep target always).
+    const connectedIds = new Set<string>();
+    connectedIds.add(graph.targetId);
+    for (const e of visibleEdges) { connectedIds.add(e.sourceId); connectedIds.add(e.targetId); }
+    const finalNodes = visibleNodes.filter(n => connectedIds.has(n.id));
+    return { ...graph, nodes: finalNodes, edges: visibleEdges };
 }
 
 // ── GRAPH section ────────────────────────────────────────────────────────────

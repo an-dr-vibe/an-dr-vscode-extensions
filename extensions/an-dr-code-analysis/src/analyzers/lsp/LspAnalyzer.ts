@@ -7,22 +7,48 @@ import { ClangdHealth } from '../../tools/ClangdHealth';
 import { log } from '../../logger';
 
 const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
+const TS_JS_LANG_IDS = new Set(['typescript', 'javascript', 'typescriptreact', 'javascriptreact']);
 
 export class LspAnalyzer implements IAnalyzer {
-    readonly name = 'clangd';
+    readonly name: string;
+    private readonly _langIds: Set<string>;
+    private readonly _requireClangdHealth: boolean;
 
-    constructor(private readonly _contextTracker: ContextTracker) {}
+    constructor(
+        private readonly _contextTracker: ContextTracker,
+        config: { name: string; langIds: Set<string>; requireClangdHealth: boolean },
+    ) {
+        this.name = config.name;
+        this._langIds = config.langIds;
+        this._requireClangdHealth = config.requireClangdHealth;
+    }
+
+    static forCCpp(contextTracker: ContextTracker): LspAnalyzer {
+        return new LspAnalyzer(contextTracker, {
+            name: 'clangd',
+            langIds: C_CPP_LANG_IDS,
+            requireClangdHealth: true,
+        });
+    }
+
+    static forTsJs(contextTracker: ContextTracker): LspAnalyzer {
+        return new LspAnalyzer(contextTracker, {
+            name: 'tsserver',
+            langIds: TS_JS_LANG_IDS,
+            requireClangdHealth: false,
+        });
+    }
 
     canHandle(request: AnalysisRequest): boolean {
-        if (!C_CPP_LANG_IDS.has(request.context.langId) || request.graphType !== 'callGraph') {
+        if (!this._langIds.has(request.context.langId) || request.graphType !== 'callGraph') {
             return false;
         }
-        // Skip clangd entirely when compile_commands.json is absent — its index is
-        // unreliable without it and the result would look authoritative but isn't.
-        const health = ClangdHealth.checkDetail();
-        if (health.issue === 'NO_COMPILE_COMMANDS') {
-            log.appendLine('[LspAnalyzer] skipping — compile_commands.json not found');
-            return false;
+        if (this._requireClangdHealth) {
+            const health = ClangdHealth.checkDetail();
+            if (health.issue === 'NO_COMPILE_COMMANDS') {
+                log.appendLine('[LspAnalyzer] skipping — compile_commands.json not found');
+                return false;
+            }
         }
         return true;
     }
@@ -30,12 +56,9 @@ export class LspAnalyzer implements IAnalyzer {
     async analyze(request: AnalysisRequest): Promise<AnalysisResult | null> {
         const { context, graphType, depth, signal, callHierarchyItem } = request;
 
-        // Use the item snapshotted at request time (before focus changed away from the editor).
         let target = callHierarchyItem;
 
         if (!target) {
-            // ContextTracker fell back to document-symbol or word — try to resolve from
-            // the active editor position if it's still on the right file.
             const editor = vscode.window.activeTextEditor;
             const uri = vscode.Uri.file(context.filePath);
             const pos = (editor?.document.uri.fsPath === context.filePath)
@@ -43,8 +66,7 @@ export class LspAnalyzer implements IAnalyzer {
                 : new vscode.Position(0, 0);
             const items = await prepareCallHierarchy(uri, pos, signal);
             if (!items?.length) {
-                log.appendLine(`[LspAnalyzer] clangd returned no call hierarchy — ensure compile_commands.json is` +
-                    ` discoverable from the source file's directory (or add a .clangd config at the workspace root).`);
+                log.appendLine(`[LspAnalyzer:${this.name}] returned no call hierarchy for ${context.filePath}`);
                 return null;
             }
             target = items[0];
@@ -52,17 +74,49 @@ export class LspAnalyzer implements IAnalyzer {
 
         if (signal?.aborted) { return null; }
 
-        const [incoming, outgoing] = await Promise.all([
-            getIncomingCalls(target, signal),
-            getOutgoingCalls(target, signal),
-        ]);
+        // BFS up to `depth` levels. Each visited item expands one level of callers + callees.
+        // allIncoming/allOutgoing accumulate every call edge found across all levels.
+        const visited = new Set<string>();
+        const queue: { item: vscode.CallHierarchyItem; level: number }[] = [{ item: target, level: 0 }];
+        const allIncoming: vscode.CallHierarchyIncomingCall[] = [];
+        const allOutgoing: vscode.CallHierarchyOutgoingCall[] = [];
 
-        if (signal?.aborted) { return null; }
+        function itemKey(item: vscode.CallHierarchyItem): string {
+            const line = item.selectionRange?.start?.line ?? item.range?.start?.line ?? 0;
+            return `${item.uri.fsPath}:${line}:${item.name}`;
+        }
 
-        // Even a lone target with no edges is a valid result — it means the function
-        // exists but has no callers/callees visible to clangd at this depth.
+        while (queue.length > 0) {
+            if (signal?.aborted) { return null; }
+            const { item, level } = queue.shift()!;
+            const key = itemKey(item);
+            if (visited.has(key)) { continue; }
+            visited.add(key);
 
-        const graph = buildCallGraph(target, incoming, outgoing, graphType, depth, this.name);
+            if (level >= depth) { continue; }
+
+            const [inc, out] = await Promise.all([
+                getIncomingCalls(item, signal),
+                getOutgoingCalls(item, signal),
+            ]);
+            if (signal?.aborted) { return null; }
+
+            allIncoming.push(...inc);
+            allOutgoing.push(...out);
+
+            for (const c of inc) {
+                if (!visited.has(itemKey(c.from))) {
+                    queue.push({ item: c.from, level: level + 1 });
+                }
+            }
+            for (const c of out) {
+                if (!visited.has(itemKey(c.to))) {
+                    queue.push({ item: c.to, level: level + 1 });
+                }
+            }
+        }
+
+        const graph = buildCallGraph(target, allIncoming, allOutgoing, graphType, depth, this.name);
         return { graph };
     }
 }

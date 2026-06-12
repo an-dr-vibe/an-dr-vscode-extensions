@@ -36,10 +36,15 @@ const ROLE_COLORS = {
     external: { bg: 'var(--vscode-disabledForeground,  #888)',    border: 'var(--vscode-panel-border,        #555)',    label: 'var(--vscode-editor-foreground, #ccc)' },
 };
 
+function isLightTheme(): boolean {
+    return document.body.dataset['vscodeThemeKind'] === 'vscode-light' ||
+           document.body.dataset['vscodeThemeKind'] === 'vscode-high-contrast-light';
+}
+
 // Highlight colours for selected-node connections
 const HL = {
     incoming:        '#26a69a',  // teal green — edges flowing INTO the selected node
-    outgoing:        '#ef5350',  // coral red  — edges flowing OUT of the selected node
+    outgoing:        () => isLightTheme() ? '#e65100' : '#ffb300',  // amber (dark) / deep orange (light)
     selectedBg:      '#3949ab',  // indigo
     selectedBorder:  '#7986cb',  // indigo-300
     selectedLabel:   '#ffffff',
@@ -405,9 +410,9 @@ export class CytoscapeRenderer {
             {
                 selector: 'edge.hl-outgoing',
                 style: {
-                    'line-color': HL.outgoing,
-                    'target-arrow-color': HL.outgoing,
-                    'source-arrow-color': HL.outgoing,
+                    'line-color': HL.outgoing(),
+                    'target-arrow-color': HL.outgoing(),
+                    'source-arrow-color': HL.outgoing(),
                     'width': 2,
                     'opacity': 1,
                     'line-style': 'solid' as any,

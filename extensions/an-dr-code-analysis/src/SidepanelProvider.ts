@@ -253,7 +253,13 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         this._analysisAbortController = controller;
         const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem, signal: controller.signal };
 
-        this._view.webview.postMessage({ type: 'analysisBusy', graphType });
+        const LSP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp', 'typescript', 'javascript', 'typescriptreact', 'javascriptreact']);
+        const waitingForLsp = !callHierarchyItem && LSP_LANG_IDS.has(ctx.langId);
+        this._view.webview.postMessage({
+            type: 'analysisBusy',
+            graphType,
+            message: waitingForLsp ? 'Waiting for IntelliSense…' : undefined,
+        });
 
         const chain = this._analyzerFactory.getChain(request);
         log.appendLine(`[analysis] graphType=${graphType} symbol=${ctx.symbol} lang=${ctx.langId} chain=[${chain.map(a => a.name).join(', ')}]`);

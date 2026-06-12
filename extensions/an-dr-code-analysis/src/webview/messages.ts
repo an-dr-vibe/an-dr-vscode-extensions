@@ -50,6 +50,7 @@ export interface AnalysisErrorMessage {
 export interface AnalysisBusyMessage {
     type: 'analysisBusy';
     graphType: GraphType;
+    message?: string;
 }
 
 export interface AnalysisCancelledMessage {

@@ -49,9 +49,28 @@ describe('AnalyzerFactory.getChain', () => {
         expect(chain).toHaveLength(2);
     });
 
-    it('returns empty chain for TypeScript callGraph (not yet supported)', () => {
+    it('returns one analyzer (tsserver) for TypeScript callGraph', () => {
         const chain = factory.getChain(makeRequest('typescript', 'callGraph'));
-        expect(chain).toHaveLength(0);
+        expect(chain).toHaveLength(1);
+        expect(chain[0].name).toBe('tsserver');
+    });
+
+    it('returns one analyzer (tsserver) for TypeScript fileDeps', () => {
+        const chain = factory.getChain(makeRequest('typescript', 'fileDeps'));
+        expect(chain).toHaveLength(1);
+        expect(chain[0].name).toBe('tsserver');
+    });
+
+    it('returns one analyzer (tsconfig) for TypeScript componentDeps', () => {
+        const chain = factory.getChain(makeRequest('typescript', 'componentDeps'));
+        expect(chain).toHaveLength(1);
+        expect(chain[0].name).toBe('tsconfig');
+    });
+
+    it('returns one analyzer (tsserver) for JavaScript callGraph', () => {
+        const chain = factory.getChain(makeRequest('javascript', 'callGraph'));
+        expect(chain).toHaveLength(1);
+        expect(chain[0].name).toBe('tsserver');
     });
 
     it('returns one analyzer (FileDepsAnalyzer) for C fileDeps', () => {

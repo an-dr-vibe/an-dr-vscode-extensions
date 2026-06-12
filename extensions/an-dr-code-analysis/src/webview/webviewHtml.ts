@@ -249,6 +249,14 @@ export function generateWebviewHtml(
             align-items: flex-start;
             padding-top: 12px;
         }
+        .graph-overlay {
+            flex-direction: column;
+            gap: 4px;
+        }
+        .graph-overlay-detail {
+            font-size: 0.85em;
+            opacity: 0.7;
+        }
         .health-warning {
             font-size: 0.82em;
             color: var(--vscode-errorForeground, #f48771);

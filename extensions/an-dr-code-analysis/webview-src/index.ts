@@ -54,7 +54,7 @@ interface ToolsStatusMessage  { type: 'toolsStatus';   tools: ToolStatus[]; }
 interface ContextUpdateMessage { type: 'contextUpdate'; context: EditorContext | null; }
 interface AnalysisResultMessage { type: 'analysisResult'; graph: GraphModel; }
 interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; message: string; recoveryActions?: RecoveryAction[]; }
-interface AnalysisBusyMessage      { type: 'analysisBusy';      graphType: GraphType; }
+interface AnalysisBusyMessage      { type: 'analysisBusy';      graphType: GraphType; message?: string; }
 interface AnalysisCancelledMessage { type: 'analysisCancelled'; graphType: GraphType; }
 interface ClangdHealthMessage   { type: 'clangdHealth'; issue: ClangdHealth['issue']; message: string; recoveryActions?: RecoveryAction[]; }
 type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | AnalysisCancelledMessage | ClangdHealthMessage;
@@ -90,6 +90,7 @@ interface AnalysisState {
     status: 'idle' | 'busy' | 'result' | 'error';
     graph?: GraphModel;
     errorMessage?: string;
+    busyMessage?: string;
     recoveryActions?: RecoveryAction[];
     activeGraphType?: GraphType;
 }
@@ -552,7 +553,8 @@ function renderGraph(s: AnalysisState, depth: number): string {
     if (s.status === 'idle') {
         overlayHtml = `<div class="graph-overlay">Select an analysis above.</div>`;
     } else if (s.status === 'busy') {
-        overlayHtml = `<div class="graph-overlay">Analyzing…</div>`;
+        const detail = s.busyMessage ? `<div class="graph-overlay-detail">${esc(s.busyMessage)}</div>` : '';
+        overlayHtml = `<div class="graph-overlay">Analyzing…${detail}</div>`;
     } else if (s.status === 'error') {
         const label = s.activeGraphType ? GRAPH_TYPE_LABELS[s.activeGraphType] : '';
         overlayHtml = `<div class="graph-overlay graph-overlay-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
@@ -711,7 +713,7 @@ root.addEventListener('click', (e: MouseEvent) => {
             // Second click on the active busy button — cancel
             vscode.postMessage({ type: 'cancelAnalysis' });
         } else {
-            state.analysis = { status: 'busy', activeGraphType: gt };
+            state.analysis = { status: 'busy', activeGraphType: gt, busyMessage: undefined };
             render();
             vscode.postMessage({ type: 'requestAnalysis', graphType: gt, depth: state.depth });
         }
@@ -836,7 +838,7 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             renderAnalysisSection();
             break;
         case 'analysisBusy':
-            state.analysis = { status: 'busy', activeGraphType: msg.graphType };
+            state.analysis = { status: 'busy', activeGraphType: msg.graphType, busyMessage: msg.message };
             render();
             break;
         case 'analysisResult':

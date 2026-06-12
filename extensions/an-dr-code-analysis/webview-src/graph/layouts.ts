@@ -30,9 +30,17 @@ export function getLayout(name: LayoutName, nodeCount: number): cytoscape.Layout
                 name: 'cose',
                 animate: false,
                 padding: 30,
-                nodeRepulsion: () => 400000,
-                nodeOverlap: 40,
-                idealEdgeLength: () => 160,
+                nodeRepulsion: (node: cytoscape.NodeSingular) => {
+                    const bb = node.boundingBox({});
+                    const size = Math.max(bb.w, bb.h, 40);
+                    return size * size * 80;
+                },
+                nodeOverlap: 20,
+                idealEdgeLength: (edge: cytoscape.EdgeSingular) => {
+                    const srcBb = edge.source().boundingBox({});
+                    const tgtBb = edge.target().boundingBox({});
+                    return (Math.max(srcBb.w, tgtBb.w, 40) / 2) + 80;
+                },
                 edgeElasticity: () => 100,
                 gravity: 1,
                 numIter: 2000,

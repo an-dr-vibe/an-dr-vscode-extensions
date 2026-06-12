@@ -94,6 +94,7 @@ export class CytoscapeRenderer {
     }
 
     render(graph: GraphModel): void {
+        const prevSelectedId = this._selectedNodeId;
         this._cy?.destroy();
         this._selectedNodeId = null;
         this._jumpBtn.style.display = 'none';
@@ -127,7 +128,15 @@ export class CytoscapeRenderer {
             container: this._container,
             elements,
             style: this._buildStyle(),
-            layout: { ...this._pickLayout(graph), stop: () => { this._resolveOverlaps(); } } as any,
+            layout: {
+                ...this._pickLayout(graph), stop: () => {
+                    this._resolveOverlaps();
+                    // Re-apply highlight if the previously selected node still exists in the new graph.
+                    if (prevSelectedId && this._cy?.getElementById(prevSelectedId).length) {
+                        this.selectNode(prevSelectedId);
+                    }
+                },
+            } as any,
             userZoomingEnabled: true,
             userPanningEnabled: true,
             boxSelectionEnabled: false,
@@ -147,8 +156,9 @@ export class CytoscapeRenderer {
         const cy = this._cy;
         if (!cy) { return; }
 
-        const MARGIN = 8;   // minimum gap between node bounding boxes (px)
+        const MARGIN = 8;
         const MAX_PASSES = 50;
+        const BORDER = 16; // minimum distance from viewport edge
 
         for (let pass = 0; pass < MAX_PASSES; pass++) {
             const nodes = cy.nodes();
@@ -166,12 +176,10 @@ export class CytoscapeRenderer {
                     const overlapX2 = (bb2.x2 + MARGIN) - bb1.x1;
                     const overlapY2 = (bb2.y2 + MARGIN) - bb1.y1;
 
-                    // No overlap if any axis is already clear
                     if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) {
                         continue;
                     }
 
-                    // Push along the axis of least penetration
                     const pushX = Math.min(overlapX, overlapX2);
                     const pushY = Math.min(overlapY, overlapY2);
                     const half = 0.5;
@@ -190,6 +198,19 @@ export class CytoscapeRenderer {
             }
 
             if (!moved) { break; }
+        }
+
+        // Pull nodes away from the viewport boundary so none are clipped.
+        const ext = cy.extent();
+        for (const node of cy.nodes().toArray()) {
+            const bb = node.boundingBox({});
+            let dx = 0;
+            let dy = 0;
+            if (bb.x1 < ext.x1 + BORDER) { dx =  (ext.x1 + BORDER) - bb.x1; }
+            if (bb.x2 > ext.x2 - BORDER) { dx = -(bb.x2 - (ext.x2 - BORDER)); }
+            if (bb.y1 < ext.y1 + BORDER) { dy =  (ext.y1 + BORDER) - bb.y1; }
+            if (bb.y2 > ext.y2 - BORDER) { dy = -(bb.y2 - (ext.y2 - BORDER)); }
+            if (dx !== 0 || dy !== 0) { node.shift({ x: dx, y: dy }); }
         }
     }
 
@@ -273,7 +294,8 @@ export class CytoscapeRenderer {
                     'border-color': ROLE_COLORS.callee.border,
                     'border-width': 1.5,
                     'color': ROLE_COLORS.callee.label,
-                    'text-wrap': 'none',
+                    'text-wrap': 'wrap',
+                    'text-max-width': '160px',
                     'transition-property': 'opacity',
                     'transition-duration': '150ms' as any,
                 },
@@ -321,10 +343,17 @@ export class CytoscapeRenderer {
                     'opacity': 0.85,
                 },
             },
-            // Disable cytoscape's native selection ring — we manage selection visually ourselves
+            // Suppress Cytoscape's native selection overlay entirely — we manage it via hl- classes
             {
                 selector: 'node:selected',
-                style: { 'border-width': 1.5 },
+                style: {
+                    'border-width': 1.5,
+                    'overlay-opacity': 0,
+                },
+            },
+            {
+                selector: 'edge:selected',
+                style: { 'overlay-opacity': 0 },
             },
             // ── Highlight classes ─────────────────────────────────────────────
             {
@@ -345,8 +374,10 @@ export class CytoscapeRenderer {
                 style: {
                     'line-color': HL.incoming,
                     'target-arrow-color': HL.incoming,
+                    'source-arrow-color': HL.incoming,
                     'width': 2,
                     'opacity': 1,
+                    'line-style': 'solid' as any,
                 },
             },
             {
@@ -354,8 +385,10 @@ export class CytoscapeRenderer {
                 style: {
                     'line-color': HL.outgoing,
                     'target-arrow-color': HL.outgoing,
+                    'source-arrow-color': HL.outgoing,
                     'width': 2,
                     'opacity': 1,
+                    'line-style': 'solid' as any,
                 },
             },
             // ── Base edge ─────────────────────────────────────────────────────

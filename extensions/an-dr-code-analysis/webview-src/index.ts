@@ -144,7 +144,7 @@ const state: AppState = {
     tools: null,
     context: null,
     analysis: { status: 'idle' },
-    depth: 2,
+    depth: 1,
     uncheckedPaths: new Set(),
     collapsedDirs: new Set(),
 };
@@ -380,9 +380,14 @@ function renderGraph(s: AnalysisState, depth: number): string {
         const fallbackNote = s.graph.confidence !== 'high'
             ? `<div class="graph-fallback-note">Fallback tool — callers only, no callees</div>`
             : '';
+        const targetNode = s.graph.nodes.find(n => n.id === s.graph!.targetId);
+        const originBtn = (targetNode?.filePath)
+            ? `<button class="depth-btn" id="go-to-origin" title="${esc(targetNode.filePath)}">⌖ origin</button>`
+            : '';
         bodyHtml = `<div class="graph-area" id="cy-container"></div>
           <div class="graph-meta">
             <span class="graph-node-count">${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</span>
+            ${originBtn}
           </div>${fallbackNote}`;
     } else {
         bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">No results found.</div>`;
@@ -515,9 +520,15 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
     if (target.id === 'depth-reset') {
-        state.depth = 2;
+        state.depth = 1;
         render();
         triggerDepthChange();
+        return;
+    }
+
+    if (target.id === 'go-to-origin') {
+        const graph = state.analysis.graph;
+        if (graph && renderer) { renderer.selectNode(graph.targetId); }
         return;
     }
 

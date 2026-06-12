@@ -28,7 +28,6 @@ export interface GraphModel {
 
 export type NodeEventCallback = (nodeId: string, filePath?: string, line?: number) => void;
 
-// VS Code CSS variable → hex fallback pairs used for cy stylesheet
 const ROLE_COLORS = {
     target:   { bg: 'var(--vscode-terminal-ansiGreen,  #4caf50)', border: 'var(--vscode-terminal-ansiGreen,  #388e3c)', label: 'var(--vscode-editor-foreground, #fff)' },
     caller:   { bg: 'var(--vscode-terminal-ansiBlue,   #42a5f5)', border: 'var(--vscode-terminal-ansiBlue,   #1976d2)', label: 'var(--vscode-editor-foreground, #fff)' },
@@ -36,12 +35,24 @@ const ROLE_COLORS = {
     external: { bg: 'var(--vscode-disabledForeground,  #888)',    border: 'var(--vscode-panel-border,        #555)',    label: 'var(--vscode-editor-foreground, #ccc)' },
 };
 
+// Highlight colours for selected-node connections
+const HL = {
+    incoming:        '#ef5350',  // coral red  — edges flowing INTO the selected node
+    outgoing:        '#26a69a',  // teal green — edges flowing OUT of the selected node
+    selectedBg:      '#3949ab',  // indigo
+    selectedBorder:  '#7986cb',  // indigo-300
+    selectedLabel:   '#ffffff',
+    dimOpacity:      0.12,
+};
+
 export class CytoscapeRenderer {
     private _cy: cytoscape.Core | null = null;
     private _container: HTMLElement;
     private _tooltip: HTMLElement;
+    private _jumpBtn: HTMLElement;
     private _onNodeClick: NodeEventCallback;
     private _onNodeDblClick: NodeEventCallback;
+    private _selectedNodeId: string | null = null;
 
     constructor(
         container: HTMLElement,
@@ -53,10 +64,39 @@ export class CytoscapeRenderer {
         this._tooltip = tooltip;
         this._onNodeClick = onNodeClick;
         this._onNodeDblClick = onNodeDblClick;
+        this._jumpBtn = this._createJumpBtn();
+    }
+
+    private _createJumpBtn(): HTMLElement {
+        const btn = document.createElement('button');
+        btn.textContent = '↗ Go to file';
+        btn.style.cssText = [
+            'position:absolute',
+            'display:none',
+            'bottom:6px',
+            'right:6px',
+            'z-index:10',
+            'background:var(--vscode-button-background,#0e639c)',
+            'color:var(--vscode-button-foreground,#fff)',
+            'border:none',
+            'border-radius:3px',
+            'padding:3px 10px',
+            'font-size:0.82em',
+            'cursor:pointer',
+            'opacity:0.92',
+        ].join(';');
+        btn.addEventListener('mouseenter', () => { btn.style.opacity = '1'; });
+        btn.addEventListener('mouseleave', () => { btn.style.opacity = '0.92'; });
+        this._container.style.position = 'relative';
+        this._container.appendChild(btn);
+        return btn;
     }
 
     render(graph: GraphModel): void {
         this._cy?.destroy();
+        this._selectedNodeId = null;
+        this._jumpBtn.style.display = 'none';
+        this._jumpBtn.onclick = null;
 
         const elements: cytoscape.ElementDefinition[] = [
             ...graph.nodes.map(n => ({
@@ -85,7 +125,7 @@ export class CytoscapeRenderer {
             container: this._container,
             elements,
             style: this._buildStyle(),
-            layout: this._pickLayout(graph),
+            layout: { ...this._pickLayout(graph), stop: () => { this._resolveOverlaps(); } } as any,
             userZoomingEnabled: true,
             userPanningEnabled: true,
             boxSelectionEnabled: false,
@@ -98,12 +138,121 @@ export class CytoscapeRenderer {
         this._cy?.destroy();
         this._cy = null;
         this._hideTooltip();
+        this._jumpBtn.style.display = 'none';
+    }
+
+    private _resolveOverlaps(): void {
+        const cy = this._cy;
+        if (!cy) { return; }
+
+        const MARGIN = 8;   // minimum gap between node bounding boxes (px)
+        const MAX_PASSES = 50;
+
+        for (let pass = 0; pass < MAX_PASSES; pass++) {
+            const nodes = cy.nodes();
+            let moved = false;
+
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const a = nodes[i];
+                    const b = nodes[j];
+                    const bb1 = a.boundingBox({});
+                    const bb2 = b.boundingBox({});
+
+                    const overlapX = (bb1.x2 + MARGIN) - bb2.x1;
+                    const overlapY = (bb1.y2 + MARGIN) - bb2.y1;
+                    const overlapX2 = (bb2.x2 + MARGIN) - bb1.x1;
+                    const overlapY2 = (bb2.y2 + MARGIN) - bb1.y1;
+
+                    // No overlap if any axis is already clear
+                    if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) {
+                        continue;
+                    }
+
+                    // Push along the axis of least penetration
+                    const pushX = Math.min(overlapX, overlapX2);
+                    const pushY = Math.min(overlapY, overlapY2);
+                    const half = 0.5;
+
+                    if (pushX < pushY) {
+                        const dx = overlapX < overlapX2 ? pushX * half : -pushX * half;
+                        a.shift({ x: -dx, y: 0 });
+                        b.shift({ x:  dx, y: 0 });
+                    } else {
+                        const dy = overlapY < overlapY2 ? pushY * half : -pushY * half;
+                        a.shift({ x: 0, y: -dy });
+                        b.shift({ x: 0, y:  dy });
+                    }
+                    moved = true;
+                }
+            }
+
+            if (!moved) { break; }
+        }
     }
 
     private _pickLayout(graph: GraphModel): cytoscape.LayoutOptions {
         const name: LayoutName = layoutForGraphType(graph.graphType, false);
         return getLayout(name, graph.nodes.length);
     }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    selectNode(nodeId: string): void {
+        const cy = this._cy;
+        if (!cy) { return; }
+        const node = cy.getElementById(nodeId);
+        if (node.empty()) { return; }
+        this._selectedNodeId = nodeId;
+        this._applyHighlight(nodeId);
+        const filePath: string | undefined = node.data('filePath');
+        const line: number | undefined = node.data('line');
+        if (filePath) {
+            this._jumpBtn.style.display = 'block';
+            this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line);
+        }
+        cy.animate({ center: { eles: node } } as any, { duration: 200 });
+    }
+
+    // ── Selection highlight ───────────────────────────────────────────────────
+
+    private _applyHighlight(nodeId: string): void {
+        const cy = this._cy;
+        if (!cy) { return; }
+
+        const node = cy.getElementById(nodeId);
+        if (node.empty()) { return; }
+
+        // Clear cytoscape native selection state before applying our own classes
+        cy.elements().unselect();
+        this._clearHighlight();
+
+        const incomingEdges = node.incomers('edge');
+        const outgoingEdges = node.outgoers('edge');
+        const connectedEdges = incomingEdges.union(outgoingEdges);
+        const connectedNodes = connectedEdges.connectedNodes();
+
+        // Dim everything first
+        cy.elements().addClass('hl-dim');
+
+        // Un-dim the selected node and its neighbours
+        node.removeClass('hl-dim').addClass('hl-selected');
+        connectedNodes.removeClass('hl-dim');
+        incomingEdges.removeClass('hl-dim').addClass('hl-incoming');
+        outgoingEdges.removeClass('hl-dim').addClass('hl-outgoing');
+    }
+
+    private _clearHighlight(): void {
+        const cy = this._cy;
+        if (!cy) { return; }
+        cy.elements().unselect()
+            .removeClass('hl-dim')
+            .removeClass('hl-selected')
+            .removeClass('hl-incoming')
+            .removeClass('hl-outgoing');
+    }
+
+    // ── Style ─────────────────────────────────────────────────────────────────
 
     private _buildStyle(): cytoscape.StylesheetJsonBlock[] {
         return [
@@ -123,6 +272,8 @@ export class CytoscapeRenderer {
                     'border-width': 1.5,
                     'color': ROLE_COLORS.callee.label,
                     'text-wrap': 'none',
+                    'transition-property': 'opacity',
+                    'transition-duration': '150ms' as any,
                 },
             },
             {
@@ -156,13 +307,44 @@ export class CytoscapeRenderer {
                     'opacity': 0.65,
                 },
             },
+            // Disable cytoscape's native selection ring — we manage selection visually ourselves
             {
                 selector: 'node:selected',
+                style: { 'border-width': 1.5 },
+            },
+            // ── Highlight classes ─────────────────────────────────────────────
+            {
+                selector: '.hl-dim',
+                style: { 'opacity': HL.dimOpacity },
+            },
+            {
+                selector: 'node.hl-selected',
                 style: {
-                    'border-width': 3,
-                    'border-color': 'var(--vscode-focusBorder, #007fd4)',
+                    'border-width': 2,
+                    'border-color': HL.selectedBorder,
+                    'background-color': HL.selectedBg,
+                    'color': HL.selectedLabel,
                 },
             },
+            {
+                selector: 'edge.hl-incoming',
+                style: {
+                    'line-color': HL.incoming,
+                    'target-arrow-color': HL.incoming,
+                    'width': 2,
+                    'opacity': 1,
+                },
+            },
+            {
+                selector: 'edge.hl-outgoing',
+                style: {
+                    'line-color': HL.outgoing,
+                    'target-arrow-color': HL.outgoing,
+                    'width': 2,
+                    'opacity': 1,
+                },
+            },
+            // ── Base edge ─────────────────────────────────────────────────────
             {
                 selector: 'edge',
                 style: {
@@ -172,6 +354,8 @@ export class CytoscapeRenderer {
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier',
                     'arrow-scale': 1,
+                    'transition-property': 'opacity, line-color, target-arrow-color, width',
+                    'transition-duration': '150ms' as any,
                 },
             },
             {
@@ -185,12 +369,46 @@ export class CytoscapeRenderer {
         ];
     }
 
+    // ── Events ────────────────────────────────────────────────────────────────
+
     private _bindEvents(): void {
         if (!this._cy) { return; }
 
         this._cy.on('tap', 'node', (evt) => {
             const node = evt.target;
-            this._onNodeClick(node.id(), node.data('filePath'), node.data('line'));
+            const nodeId: string = node.id();
+            const filePath: string | undefined = node.data('filePath');
+            const line: number | undefined = node.data('line');
+
+            this._onNodeClick(nodeId, filePath, line);
+
+            if (this._selectedNodeId === nodeId) {
+                // Second tap on same node — deselect
+                this._selectedNodeId = null;
+                this._clearHighlight();
+                this._jumpBtn.style.display = 'none';
+                this._jumpBtn.onclick = null;
+            } else {
+                this._selectedNodeId = nodeId;
+                this._applyHighlight(nodeId);
+                if (filePath) {
+                    this._jumpBtn.style.display = 'block';
+                    this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line);
+                } else {
+                    this._jumpBtn.style.display = 'none';
+                    this._jumpBtn.onclick = null;
+                }
+            }
+        });
+
+        this._cy.on('tap', (evt) => {
+            // Tap on background — clear selection
+            if (evt.target === this._cy) {
+                this._selectedNodeId = null;
+                this._clearHighlight();
+                this._jumpBtn.style.display = 'none';
+                this._jumpBtn.onclick = null;
+            }
         });
 
         this._cy.on('dbltap', 'node', (evt) => {
@@ -214,7 +432,6 @@ export class CytoscapeRenderer {
         });
 
         this._cy.on('mouseout', 'node', () => this._hideTooltip());
-
         this._cy.on('pan zoom', () => this._hideTooltip());
     }
 

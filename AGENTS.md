@@ -4,8 +4,6 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 
 ## User preferences
 
-- **SmartGit** is the most important git tool — it should always be first in the `tool` enum
-  and the default value.
 - Minimalistic status bar: the user prefers icon-only options; `statusBarIconOnly` should exist
   on every extension that has a status bar item.
 - Keep extensions focused and small. No bundler, no test framework, plain `tsc`.
@@ -27,35 +25,13 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 - Extension TypeScript code must handle paths for all three platforms (e.g. tool
   install paths in `an-dr-git-tool` cover Win/Linux/Mac variants).
 
-## Extensions
-
-- **an-dr-ui-control** — Manages Activity Bar layout (visibility + order). Scans all installed
-  extensions for `viewsContainers.activitybar` contributions and maintains an ordered
-  `uiControl.activityBar` array in `settings.json`. New containers are appended as visible; hidden
-  entries are preserved across machines via Settings Sync. Has a webview UI (drag-to-reorder,
-  visibility toggles) and applies on startup (hide-only to avoid sidebar focus side-effects).
-- **an-dr-code-review** — Combines inline review comments with a review-oriented changed-files tree.
-  Comments are stored in `code-review/.code-review.json`. The tree view can compare the worktree
-  against branches, tags, and commits. Integrated functionality from
-  `vscode-git-tree-compare` must keep visible attribution to the original author.
-
 ## Shared agents
 
 Reusable agent prompts live in [`agents/`](agents/). Any extension can invoke them.
 
-| Agent          | File                                                  | Purpose                                                                 |
-|----------------|-------------------------------------------------------|-------------------------------------------------------------------------|
+| Agent          | File                                              | Purpose                                                                 |
+| -------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
 | adversarial-ut | [agents/adversarial-ut.md](agents/adversarial-ut.md) | Bug-finding UT run — three-pass adversarial suite, outputs TECHDEBT.md |
-
----
-
-## Extension-specific agent context
-
-Each extension with non-trivial architecture has its own `AGENTS.md`. Read it before
-touching that extension's files.
-
-- **an-dr-code-analysis** — see [extensions/an-dr-code-analysis/AGENTS.md](extensions/an-dr-code-analysis/AGENTS.md)
-- **an-dr-commits** — see [extensions/an-dr-commits/AGENTS.md](extensions/an-dr-commits/AGENTS.md)
 
 ---
 

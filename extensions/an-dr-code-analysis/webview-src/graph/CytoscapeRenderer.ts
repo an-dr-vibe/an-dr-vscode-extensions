@@ -38,8 +38,8 @@ const ROLE_COLORS = {
 
 // Highlight colours for selected-node connections
 const HL = {
-    incoming:        '#ef5350',  // coral red  — edges flowing INTO the selected node
-    outgoing:        '#26a69a',  // teal green — edges flowing OUT of the selected node
+    incoming:        '#26a69a',  // teal green — edges flowing INTO the selected node
+    outgoing:        '#ef5350',  // coral red  — edges flowing OUT of the selected node
     selectedBg:      '#3949ab',  // indigo
     selectedBorder:  '#7986cb',  // indigo-300
     selectedLabel:   '#ffffff',

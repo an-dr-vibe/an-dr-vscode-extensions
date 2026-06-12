@@ -258,31 +258,11 @@ Stabilise the existing feature set before adding new languages. No new functiona
 2. UT suite passes with no skipped tests
 3. TECHDEBT.md exists; every listed bug has a corresponding fix commit or a tracked issue
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 
-## Iteration 12 — Rust (rust-analyzer + cargo)
-
-Add Rust language support.
-
-- [ ] Extend `LspAnalyzer` to handle `rust` language via rust-analyzer
-- [ ] Create `src/analyzers/cli/CargoAnalyzer.ts` — `cargo metadata --format-version 1` → component deps `GraphModel`
-- [ ] Wire into factory: `rust` + `callGraph` → `[LspAnalyzer, CtagsAnalyzer]`; `rust` + `fileDeps` → `[LspAnalyzer, RegexAnalyzer]`; `rust` + `componentDeps` → `[CargoAnalyzer]`
-
-**Verification:**
-
-1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
-2. Open a `.rs` file in a Cargo workspace
-3. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
-4. Click "File Deps" → module dependency graph renders
-5. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`
-
-- [ ] **Approved**
-
----
-
-## Iteration 13 — TypeScript / JavaScript (tsserver)
+## Iteration 12 — TypeScript / JavaScript (tsserver)
 
 Add TS/JS support.
 
@@ -299,6 +279,26 @@ Add TS/JS support.
 4. Click "File Deps" → import graph renders
 5. Open a project with `tsconfig.json` `references` → "Component Deps" shows project references graph
 6. Open a `.js` file → same three analyses work (lower accuracy expected)
+
+- [ ] **Approved**
+
+---
+
+## Iteration 13 — Rust (rust-analyzer + cargo)
+
+Add Rust language support.
+
+- [ ] Extend `LspAnalyzer` to handle `rust` language via rust-analyzer
+- [ ] Create `src/analyzers/cli/CargoAnalyzer.ts` — `cargo metadata --format-version 1` → component deps `GraphModel`
+- [ ] Wire into factory: `rust` + `callGraph` → `[LspAnalyzer, CtagsAnalyzer]`; `rust` + `fileDeps` → `[LspAnalyzer, RegexAnalyzer]`; `rust` + `componentDeps` → `[CargoAnalyzer]`
+
+**Verification:**
+
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.rs` file in a Cargo workspace
+3. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
+4. Click "File Deps" → module dependency graph renders
+5. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`
 
 - [ ] **Approved**
 

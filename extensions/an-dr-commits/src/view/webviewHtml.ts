@@ -63,6 +63,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 						<div id="branchPanelControls">
 							<div id="branchPanelRepoHost">
 								<div id="repoDropdown" class="dropdown"></div>
+								<div id="repoRefreshBtn" title="Refresh"></div>
 							</div>
 						</div>
 					</div>

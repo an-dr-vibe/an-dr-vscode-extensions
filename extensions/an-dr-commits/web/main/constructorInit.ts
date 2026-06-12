@@ -14,6 +14,7 @@ function commitsInitDomElements(view: any) {
 	view.pullBtnElem = document.getElementById('pullBtn')!;
 	view.pushBtnElem = document.getElementById('pushBtn')!;
 	view.moreBtnElem = document.getElementById('moreBtn')!;
+	view.repoRefreshBtnElem = document.getElementById('repoRefreshBtn')!;
 }
 
 function commitsInitDropdowns(view: any) {
@@ -218,4 +219,6 @@ function commitsInitButtonHandlers(view: any) {
 	view.moreBtnElem.innerHTML = '&hellip;';
 	view.moreBtnElem.addEventListener('click', (e: MouseEvent) => view.showOverflowActions(e));
 	view.moreBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
+	view.repoRefreshBtnElem.innerHTML = ICONS.refresh;
+	view.repoRefreshBtnElem.addEventListener('click', () => view.refresh(true, true));
 }

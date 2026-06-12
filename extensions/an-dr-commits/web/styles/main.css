@@ -1405,7 +1405,26 @@ body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
 #branchPanelRepoHost .dropdown.loaded{
 	display:block;
 	width:100%;
+	min-width:0;
+	flex:1 1 0;
 	margin-top:0;
+}
+
+#repoRefreshBtn{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	flex:0 0 auto;
+	width:22px;
+	height:22px;
+	margin-left:4px;
+	border-radius:3px;
+	opacity:0.7;
+	cursor:pointer;
+}
+#repoRefreshBtn:hover{
+	opacity:1;
+	background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,0.18));
 }
 
 #branchPanelRepoHost .dropdownCurrentValue{

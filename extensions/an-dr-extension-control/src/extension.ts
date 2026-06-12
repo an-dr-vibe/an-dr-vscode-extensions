@@ -10,6 +10,15 @@ interface ExecResult { stdout: string; stderr: string; code: number; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+let outputChannel: vscode.OutputChannel | undefined;
+
+function getOutputChannel(): vscode.OutputChannel {
+    if (!outputChannel) {
+        outputChannel = vscode.window.createOutputChannel('Extension Control');
+    }
+    return outputChannel;
+}
+
 function exec(cmd: string, cwd: string, timeoutMs = 90_000): Promise<ExecResult> {
     return new Promise(resolve => {
         cp.exec(cmd, { cwd, timeout: timeoutMs }, (err, stdout, stderr) => {
@@ -18,6 +27,41 @@ function exec(cmd: string, cwd: string, timeoutMs = 90_000): Promise<ExecResult>
                 stderr: stderr.trim(),
                 code: err ? (err.code ?? 1) : 0,
             });
+        });
+    });
+}
+
+function execWithOutput(cmd: string, cwd: string, timeoutMs = 180_000): Promise<ExecResult> {
+    const channel = getOutputChannel();
+    channel.show(true);
+    channel.appendLine(`> ${cmd}`);
+
+    return new Promise(resolve => {
+        const proc = cp.spawn(cmd, [], { cwd, shell: true });
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+
+        proc.stdout.on('data', (data: Buffer) => {
+            const text = data.toString();
+            stdout.push(text);
+            channel.append(text);
+        });
+        proc.stderr.on('data', (data: Buffer) => {
+            const text = data.toString();
+            stderr.push(text);
+            channel.append(text);
+        });
+
+        const timer = setTimeout(() => {
+            proc.kill();
+            channel.appendLine('[timed out]');
+            resolve({ stdout: stdout.join('').trim(), stderr: stderr.join('').trim(), code: 1 });
+        }, timeoutMs);
+
+        proc.on('close', code => {
+            clearTimeout(timer);
+            channel.appendLine(`[exit ${code ?? 0}]`);
+            resolve({ stdout: stdout.join('').trim(), stderr: stderr.join('').trim(), code: code ?? 0 });
         });
     });
 }
@@ -137,9 +181,9 @@ async function pullAndReload(config: vscode.WorkspaceConfiguration): Promise<voi
                 }
             }
 
-            progress.report({ message: 'Rebuilding extensions…' });
+            progress.report({ message: 'Rebuilding extensions… (see Extension Control output)' });
             const installScript = path.join(root, 'install.ps1');
-            const build = await exec(`pwsh -File "${installScript}"`, root, 180_000);
+            const build = await execWithOutput(`pwsh -File "${installScript}"`, root, 180_000);
 
             if (build.code !== 0) {
                 vscode.window.showErrorMessage(

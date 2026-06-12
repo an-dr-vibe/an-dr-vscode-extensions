@@ -646,8 +646,7 @@ function renderContextOnly(): void {
 function rebuildFilterBody(): void {
     if (!state.analysis.graph) { return; }
     const body = document.querySelector<HTMLElement>('.ft-body');
-    console.log('[IDX] rebuildFilterBody: body found:', !!body);
-    if (!body) { console.log('[IDX] no .ft-body — falling back to full render()'); render(); return; } // section not in DOM yet — fall back to full render
+    if (!body) { render(); return; } // section not in DOM yet — fall back to full render
     const tree = buildFileTree(state.analysis.graph);
     body.innerHTML = tree.children.map(c => renderTreeNode(c, 0)).join('');
 }
@@ -659,8 +658,7 @@ function renderGraphOnly(): void {
     let filtered = foldCollapsedDirs(applyFilter(state.analysis.graph));
     if (state.mergeCircular) { filtered = mergeCircularEdges(filtered); }
     const container = document.getElementById('cy-container');
-    console.log('[IDX] renderGraphOnly: container found:', !!container, 'renderer exists:', !!renderer);
-    if (!container) { console.log('[IDX] no container — falling back to full render()'); render(); return; }
+    if (!container) { render(); return; }
     getOrCreateRenderer().render(filtered);
 }
 
@@ -755,9 +753,7 @@ root.addEventListener('click', (e: MouseEvent) => {
     const toggle = target.closest<HTMLElement>('.ft-toggle');
     if (toggle) {
         const dir = toggle.dataset['dir']!;
-        const wasCollapsed = state.collapsedDirs.has(dir);
-        if (wasCollapsed) { state.collapsedDirs.delete(dir); } else { state.collapsedDirs.add(dir); }
-        console.log('[IDX] tree toggle dir:', dir, 'collapsed:', !wasCollapsed, 'collapsedDirs size:', state.collapsedDirs.size);
+        if (state.collapsedDirs.has(dir)) { state.collapsedDirs.delete(dir); } else { state.collapsedDirs.add(dir); }
         rebuildFilterBody();
         renderGraphOnly();
         return;
@@ -765,9 +761,7 @@ root.addEventListener('click', (e: MouseEvent) => {
     const dirLabel = target.closest<HTMLElement>('.ft-dir');
     if (dirLabel) {
         const dir = dirLabel.dataset['dir']!;
-        const wasCollapsed = state.collapsedDirs.has(dir);
-        if (wasCollapsed) { state.collapsedDirs.delete(dir); } else { state.collapsedDirs.add(dir); }
-        console.log('[IDX] dir label click dir:', dir, 'collapsed:', !wasCollapsed, 'collapsedDirs size:', state.collapsedDirs.size);
+        if (state.collapsedDirs.has(dir)) { state.collapsedDirs.delete(dir); } else { state.collapsedDirs.add(dir); }
         rebuildFilterBody();
         renderGraphOnly();
         return;

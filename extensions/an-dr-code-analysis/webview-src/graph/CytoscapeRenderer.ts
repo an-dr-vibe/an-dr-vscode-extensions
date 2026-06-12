@@ -93,10 +93,12 @@ export class CytoscapeRenderer {
         return btn;
     }
 
+    private _renderSeq = 0; // increments on every render() call
+
     render(graph: GraphModel): void {
+        const seq = ++this._renderSeq;
         const prevSelectedId = this._selectedNodeId;
-        console.log('[CY] render() called, nodes:', graph.nodes.length, 'prevSelected:', prevSelectedId);
-        console.log('[CY] container in DOM:', document.contains(this._container), 'size:', this._container.offsetWidth, 'x', this._container.offsetHeight);
+        console.log(`[CY] render() seq=${seq} nodes=${graph.nodes.length} prevSelected=${prevSelectedId}`);
         this._cy?.destroy();
         // cytoscape's destroy() wipes all container children — re-attach our button
         this._container.appendChild(this._jumpBtn);
@@ -134,8 +136,16 @@ export class CytoscapeRenderer {
             style: this._buildStyle(),
             layout: {
                 ...this._pickLayout(graph), stop: () => {
+                    console.log(`[CY] layout stop seq=${seq} this._renderSeq=${this._renderSeq} cy===this._cy:${cy === this._cy} cy.destroyed:${cy.destroyed()}`);
                     // Guard: if a newer render() replaced _cy before this async callback fired, bail out.
-                    if (this._cy !== cy) { return; }
+                    if (this._cy !== cy) {
+                        console.log(`[CY] STALE stop callback — bailing (this._cy !== cy)`);
+                        return;
+                    }
+                    if (cy.destroyed()) {
+                        console.log(`[CY] STALE stop callback — bailing (cy.destroyed)`);
+                        return;
+                    }
                     this._resolveOverlaps();
                     if (prevSelectedId && this._cy?.getElementById(prevSelectedId).length) {
                         this.selectNode(prevSelectedId);
@@ -146,7 +156,9 @@ export class CytoscapeRenderer {
             userPanningEnabled: true,
             boxSelectionEnabled: false,
         });
+        console.log(`[CY] cytoscape() returned seq=${seq} cy.destroyed=${cy.destroyed()}`);
         this._cy = cy;
+        console.log(`[CY] this._cy assigned seq=${seq}`);
 
         this._bindEvents();
     }
@@ -160,12 +172,14 @@ export class CytoscapeRenderer {
 
     private _resolveOverlaps(): void {
         const cy = this._cy;
-        if (!cy) { return; }
+        console.log(`[CY] _resolveOverlaps cy=${!!cy} destroyed=${cy?.destroyed()}`);
+        if (!cy || cy.destroyed()) { return; }
 
         const MARGIN = 12;
         const MAX_PASSES = 80;
 
         for (let pass = 0; pass < MAX_PASSES; pass++) {
+            if (cy.destroyed()) { console.log(`[CY] cy destroyed mid-pass ${pass} — aborting`); break; }
             const nodes = cy.nodes();
             let moved = false;
 
@@ -451,14 +465,12 @@ export class CytoscapeRenderer {
 
     private _bindEvents(): void {
         if (!this._cy) { return; }
-        console.log('[CY] _bindEvents() registered on new cy instance');
 
         this._cy.on('tap', 'node', (evt) => {
             const node = evt.target;
             const nodeId: string = node.id();
             const filePath: string | undefined = node.data('filePath');
             const line: number | undefined = node.data('line');
-            console.log('[CY] tap node:', nodeId, 'filePath:', filePath);
 
             this._onNodeClick(nodeId, filePath, line);
 

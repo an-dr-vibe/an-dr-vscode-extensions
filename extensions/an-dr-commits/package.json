@@ -1674,7 +1674,7 @@
 				{
 					"id": "an-dr-commits.activityView",
 					"name": "Commits",
-					"type": "tree"
+					"type": "webview"
 				}
 			]
 		},

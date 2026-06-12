@@ -38,6 +38,32 @@ function createMockStatusBarItem() {
 	};
 }
 
+function createMockTreeView() {
+	return {
+		badge: undefined as any,
+		dispose: jest.fn()
+	};
+}
+
+function createMockWebviewView() {
+	let onDidReceiveMessage = (_msg: any) => { };
+	return {
+		badge: undefined as any,
+		webview: {
+			asWebviewUri: jest.fn((uri: Uri) => uri.with({ scheme: 'vscode-webview-resource', path: 'file//' + uri.path.replace(/\\/g, '/') })),
+			cspSource: 'vscode-webview-resource:',
+			html: '',
+			onDidReceiveMessage: jest.fn((listener: (msg: any) => void) => {
+				onDidReceiveMessage = listener;
+				return { dispose: jest.fn() };
+			}),
+			options: {},
+			postMessage: jest.fn()
+		},
+		postMessageToProvider: (msg: any) => onDidReceiveMessage(msg)
+	};
+}
+
 export const mocks = {
 	extensionContext: {
 		asAbsolutePath: jest.fn(),
@@ -61,6 +87,10 @@ export const mocks = {
 	},
 	statusBarItem: createMockStatusBarItem(),
 	statusBarItems: [] as ReturnType<typeof createMockStatusBarItem>[],
+	treeViews: [] as ReturnType<typeof createMockTreeView>[],
+	treeViewProviders: [] as any[],
+	webviewViewProviders: [] as any[],
+	webviewViews: [] as ReturnType<typeof createMockWebviewView>[],
 	terminal: {
 		sendText: jest.fn(),
 		show: jest.fn()
@@ -102,7 +132,8 @@ export const env = {
 
 export const EventEmitter = jest.fn(() => ({
 	dispose: jest.fn(),
-	event: jest.fn()
+	event: jest.fn(),
+	fire: jest.fn()
 }));
 
 export class Uri implements vscode.Uri {
@@ -150,6 +181,25 @@ export class ThemeColor {
 	constructor(public readonly id: string) { }
 }
 
+export enum TreeItemCollapsibleState {
+	None = 0,
+	Collapsed = 1,
+	Expanded = 2
+}
+
+export class TreeItem {
+	public command: any;
+	public description: string | undefined;
+	public iconPath: any;
+	public resourceUri: Uri | undefined;
+	public tooltip: string | undefined;
+
+	constructor(
+		public label: string,
+		public collapsibleState: TreeItemCollapsibleState = TreeItemCollapsibleState.None
+	) { }
+}
+
 export class Range {
 	constructor(
 		public readonly startLine: number,
@@ -191,6 +241,16 @@ export const window = {
 		mocks.statusBarItems.push(item);
 		mocks.statusBarItem = item;
 		return item;
+	}),
+	createTreeView: jest.fn((_id: string, options: any) => {
+		const treeView = createMockTreeView();
+		mocks.treeViews.push(treeView);
+		mocks.treeViewProviders.push(options.treeDataProvider);
+		return treeView;
+	}),
+	registerWebviewViewProvider: jest.fn((_id: string, provider: any) => {
+		mocks.webviewViewProviders.push(provider);
+		return { dispose: jest.fn() };
 	}),
 	createWebviewPanel: jest.fn(createWebviewPanel),
 	createTerminal: jest.fn(() => mocks.terminal),
@@ -297,6 +357,10 @@ beforeEach(() => {
 	jest.clearAllMocks();
 	mocks.statusBarItems.splice(0, mocks.statusBarItems.length);
 	mocks.statusBarItem = createMockStatusBarItem();
+	mocks.treeViews.splice(0, mocks.treeViews.length);
+	mocks.treeViewProviders.splice(0, mocks.treeViewProviders.length);
+	mocks.webviewViewProviders.splice(0, mocks.webviewViewProviders.length);
+	mocks.webviewViews.splice(0, mocks.webviewViews.length);
 
 	window.activeTextEditor = {
 		document: {
@@ -345,6 +409,12 @@ export function mockVscodeVersion(newVersion: string) {
 
 export function getMockedWebviewPanel(i: number) {
 	return mockedWebviews[i];
+}
+
+export function createWebviewView() {
+	const view = createMockWebviewView();
+	mocks.webviewViews.push(view);
+	return view;
 }
 
 export function getStatusBarItem(i: number) {

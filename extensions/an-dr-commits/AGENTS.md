@@ -72,6 +72,7 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `extensionState.ts` | Persists view state across sessions |
 | `types.ts` | Shared TypeScript interfaces for the backend |
 | `avatarManager.ts` | Fetches and caches author avatars |
+| `activityBarView.ts` | Activity-bar webview: Open Commits action, uncommitted changes panel, and dirty-count badge |
 | `statusBarItem.ts` | The status bar button that opens the graph |
 | `inlineBlame.ts` | Active editor inline blame + optional status bar current-commit display |
 | `diffDocProvider.ts` | Virtual document provider for diff views |

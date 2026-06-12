@@ -2,6 +2,15 @@ import { AnalyzerFactory } from '../analyzers/AnalyzerFactory';
 import { AnalysisRequest } from '../analyzers/IAnalyzer';
 import { EditorContext } from '../context/ContextTracker';
 
+// LspAnalyzer.canHandle gates on ClangdHealth.checkDetail() — mock it to return
+// a clean result so the factory tests aren't affected by the local filesystem.
+jest.mock('../tools/ClangdHealth', () => ({
+    ClangdHealth: {
+        check: jest.fn(() => ({ name: 'clangd', state: 'ok', group: 'c-cpp' })),
+        checkDetail: jest.fn(() => ({ issue: null, message: '', compileCommandsPath: '/fake/compile_commands.json' })),
+    },
+}));
+
 function makeRequest(langId: string, graphType: 'callGraph' | 'fileDeps' | 'componentDeps'): AnalysisRequest {
     const ctx: EditorContext = {
         symbol: 'foo',

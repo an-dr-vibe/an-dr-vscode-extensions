@@ -1,15 +1,16 @@
 // Tests for CtagsAnalyzer.
-// Strategy: mock child_process.execFile so runCtags() returns controlled JSON,
+// Strategy: mock child_process.spawn so runCtags() returns controlled JSON via a fake stream,
 // and use real temp files so findCallers() can actually read call sites.
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { EventEmitter } from 'events';
 import { workspace, Uri } from '../__mocks__/vscode';
 
-// Must mock before importing CtagsAnalyzer so the module-level promisify picks it up.
+// Mock spawn before importing CtagsAnalyzer.
 jest.mock('child_process', () => ({
-    execFile: jest.fn(),
+    spawn: jest.fn(),
 }));
 
 import * as cp from 'child_process';
@@ -17,7 +18,7 @@ import { CtagsAnalyzer } from '../analyzers/cli/CtagsAnalyzer';
 import { AnalysisRequest } from '../analyzers/IAnalyzer';
 import { EditorContext } from '../context/ContextTracker';
 
-const mockExecFile = cp.execFile as unknown as jest.Mock;
+const mockSpawn = cp.spawn as unknown as jest.Mock;
 
 let tmpDir: string;
 
@@ -31,10 +32,25 @@ function ctagsJsonLines(entries: { name: string; path: string; line: number; kin
     return entries.map(e => JSON.stringify({ name: e.name, path: e.path, line: e.line, kind: e.kind ?? 'function' })).join('\n');
 }
 
-function setupExecFile(stdout: string) {
-    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-        cb(null, { stdout, stderr: '' });
+// Create a fake ChildProcess that emits stdout data then fires 'close'.
+function makeFakeProc(stdoutData: string) {
+    const proc = new EventEmitter() as any;
+    proc.stdout = new EventEmitter();
+    proc.kill = jest.fn();
+    process.nextTick(() => {
+        if (stdoutData) { proc.stdout.emit('data', Buffer.from(stdoutData)); }
+        proc.emit('close', 0);
     });
+    return proc;
+}
+
+function setupSpawn(stdout: string) {
+    mockSpawn.mockImplementation(() => makeFakeProc(stdout));
+}
+
+// Alias helpers named after the old execFile helper for minimal test body changes.
+function stubCtags(lines: string[]) {
+    setupSpawn(lines.join('\n'));
 }
 
 function makeRequest(symbol: string, langId = 'c'): AnalysisRequest {
@@ -88,7 +104,7 @@ describe('CtagsAnalyzer.analyze', () => {
     beforeEach(() => { analyzer = new CtagsAnalyzer(); });
 
     it('returns null when ctags output is empty', async () => {
-        setupExecFile('');
+        setupSpawn('');
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result).toBeNull();
     });
@@ -96,7 +112,7 @@ describe('CtagsAnalyzer.analyze', () => {
     it('returns null when target symbol is not in ctags output', async () => {
         const filePath = makeTmpFile('foo.c', 'int bar() {}');
         const stdout = ctagsJsonLines([{ name: 'bar', path: filePath, line: 1 }]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result).toBeNull();
     });
@@ -104,7 +120,7 @@ describe('CtagsAnalyzer.analyze', () => {
     it('returns graph with target node when symbol found but no callers', async () => {
         const filePath = makeTmpFile('foo.c', 'int foo() {}');
         const stdout = ctagsJsonLines([{ name: 'foo', path: filePath, line: 1 }]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result).not.toBeNull();
         expect(result!.graph.nodes).toHaveLength(1);
@@ -118,7 +134,7 @@ describe('CtagsAnalyzer.analyze', () => {
             { name: 'foo', path: fooPath, line: 1 },
             { name: 'bar', path: fooPath, line: 2 },
         ]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result).not.toBeNull();
         const callerNode = result!.graph.nodes.find(n => n.label === 'bar');
@@ -132,7 +148,7 @@ describe('CtagsAnalyzer.analyze', () => {
         // foo() calls itself (recursion) — should not produce a self-edge
         const fooPath = makeTmpFile('foo.c', 'int foo() { foo(); }');
         const stdout = ctagsJsonLines([{ name: 'foo', path: fooPath, line: 1 }]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result!.graph.edges).toHaveLength(0);
     });
@@ -144,7 +160,7 @@ describe('CtagsAnalyzer.analyze', () => {
             { name: 'bar', path: fooPath, line: 1 },
             { name: 'foo', path: fooPath, line: 2 },
         ]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         const callerNodes = result!.graph.nodes.filter(n => n.role === 'caller');
         expect(callerNodes).toHaveLength(1);
@@ -155,7 +171,7 @@ describe('CtagsAnalyzer.analyze', () => {
         // symbol might come in as "foo(int, char)" from clangd context
         const fooPath = makeTmpFile('foo.c', 'int foo() {}');
         const stdout = ctagsJsonLines([{ name: 'foo', path: fooPath, line: 1 }]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo(int, char)'));
         expect(result).not.toBeNull();
         expect(result!.graph.nodes[0].label).toBe('foo');
@@ -164,7 +180,7 @@ describe('CtagsAnalyzer.analyze', () => {
     it('sets confidence=medium and tool=ctags on result', async () => {
         const fooPath = makeTmpFile('foo.c', 'int foo() {}');
         const stdout = ctagsJsonLines([{ name: 'foo', path: fooPath, line: 1 }]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result!.graph.confidence).toBe('medium');
         expect(result!.graph.tool).toBe('ctags');
@@ -177,7 +193,7 @@ describe('CtagsAnalyzer.analyze', () => {
             { name: 'foo',  path: fooPath,  line: 1 },
             { name: 'main', path: mainPath, line: 1 },
         ]);
-        setupExecFile(stdout);
+        setupSpawn(stdout);
         const result = await analyzer.analyze(makeRequest('foo'));
         expect(result!.graph.nodes.find(n => n.label === 'main')).toBeDefined();
     });
@@ -208,28 +224,16 @@ function jsonLine(name: string, filePath: string, line: number, kind = 'function
     return JSON.stringify({ name, path: filePath, line, kind });
 }
 
-function stubCtags(lines: string[]) {
-    mockExecFile.mockImplementation((_c: unknown, _a: unknown, _o: unknown, cb: Function) => {
-        cb(null, { stdout: lines.join('\n'), stderr: '' });
-    });
-}
-
-function makeTmpFileLocal(name: string, content: string): string {
-    const p = path.join(tmpDir, name).replace(/\\/g, '/');
-    fs.writeFileSync(p, content);
-    return p;
-}
-
 describe('C1 fix: targetName with regex special characters', () => {
     it('symbol with C++ operator+ does not throw', () => {
-        const fooPath = makeTmpFileLocal('foo.cpp', 'void operator+() {}');
+        const fooPath = makeTmpFile('foo.cpp', 'void operator+() {}');
         stubCtags([jsonLine('operator+', fooPath, 1)]);
         const analyzer = new CtagsAnalyzer();
         return expect(analyzer.analyze(makeRequest('operator+', 'cpp'))).resolves.toBeDefined();
     });
 
     it('symbol with square bracket does not throw', () => {
-        const fooPath = makeTmpFileLocal('foo.c', 'int arr[0] = {};');
+        const fooPath = makeTmpFile('foo.c', 'int arr[0] = {};');
         stubCtags([jsonLine('arr[0]', fooPath, 1)]);
         const analyzer = new CtagsAnalyzer();
         return expect(analyzer.analyze(makeRequest('arr[0]'))).resolves.toBeDefined();
@@ -238,7 +242,7 @@ describe('C1 fix: targetName with regex special characters', () => {
 
 describe('C3/C4 fix: 0-based line numbers', () => {
     it('targetId and callerId both use 0-based lines', () => {
-        const fooPath = makeTmpFileLocal('lib.c', 'int foo() {}\nint bar() { foo(); }');
+        const fooPath = makeTmpFile('lib.c', 'int foo() {}\nint bar() { foo(); }');
         stubCtags([jsonLine('foo', fooPath, 1), jsonLine('bar', fooPath, 2)]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo')).then(result => {
@@ -250,7 +254,7 @@ describe('C3/C4 fix: 0-based line numbers', () => {
     });
 
     it('C4 fix: ctags entry with line=0 produces target node with line=0', () => {
-        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        const fooPath = makeTmpFile('foo.c', 'int foo() {}');
         stubCtags([jsonLine('foo', fooPath, 0)]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo')).then(result => {
@@ -261,7 +265,7 @@ describe('C3/C4 fix: 0-based line numbers', () => {
 
 describe('C5 fix: multiple ctags entries for same symbol (overloads)', () => {
     it('first matching ctags entry is used as target definition', () => {
-        const fooPath = makeTmpFileLocal('foo.cpp', 'void foo(int x) {}\nvoid foo(double y) {}');
+        const fooPath = makeTmpFile('foo.cpp', 'void foo(int x) {}\nvoid foo(double y) {}');
         stubCtags([jsonLine('foo', fooPath, 1), jsonLine('foo', fooPath, 2)]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo', 'cpp')).then(result => {
@@ -278,7 +282,7 @@ describe('symbol stripping edge cases', () => {
     });
 
     it('symbol with surrounding spaces strips correctly', () => {
-        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        const fooPath = makeTmpFile('foo.c', 'int foo() {}');
         stubCtags([jsonLine('foo', fooPath, 1)]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('  foo  ')).then(result => {
@@ -295,7 +299,7 @@ describe('symbol stripping edge cases', () => {
 
 describe('robustness: malformed ctags JSON', () => {
     it('single invalid JSON line among valid lines does not crash', () => {
-        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        const fooPath = makeTmpFile('foo.c', 'int foo() {}');
         stubCtags(['not-json-at-all', jsonLine('foo', fooPath, 1), '{"incomplete":']);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo')).then(result => {
@@ -305,7 +309,7 @@ describe('robustness: malformed ctags JSON', () => {
     });
 
     it('ctags entry missing "name" field is filtered out', () => {
-        const fooPath = makeTmpFileLocal('foo.c', 'int foo() {}');
+        const fooPath = makeTmpFile('foo.c', 'int foo() {}');
         stubCtags([
             JSON.stringify({ path: fooPath, line: 1, kind: 'function' }),
             jsonLine('foo', fooPath, 1),
@@ -317,7 +321,7 @@ describe('robustness: malformed ctags JSON', () => {
 
 describe('edge: call before any function definition', () => {
     it('file-scope call has no enclosing function — not attributed as caller', () => {
-        const fooPath = makeTmpFileLocal('foo.c', 'foo();\nint bar() {}\nint foo() {}');
+        const fooPath = makeTmpFile('foo.c', 'foo();\nint bar() {}\nint foo() {}');
         stubCtags([jsonLine('bar', fooPath, 2), jsonLine('foo', fooPath, 3)]);
         const analyzer = new CtagsAnalyzer();
         return analyzer.analyze(makeRequest('foo')).then(result => {

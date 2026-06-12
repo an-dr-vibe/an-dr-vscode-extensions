@@ -20,7 +20,7 @@ const TOOLS: ReadonlyArray<ToolDef> = [
     // T2: 'clangd' removed — it is handled separately via ClangdHealth and must not appear here
     { name: 'cmake',         cmd: 'cmake',                  group: 'c-cpp' },
     { name: 'bear',          cmd: 'bear',                   group: 'c-cpp' },
-    { name: 'importlab',     cmd: 'importlab',              group: 'python' },
+    { name: 'importlab',     cmd: 'importlab',              group: 'c-cpp' },
     { name: 'iwyu',          cmd: 'iwyu',                   group: 'c-cpp' },
     { name: 'rust-analyzer', cmd: 'rust-analyzer',          group: 'rust' },
     { name: 'cargo',         cmd: 'cargo',                  group: 'rust' },

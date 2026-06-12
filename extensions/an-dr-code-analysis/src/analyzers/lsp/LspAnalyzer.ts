@@ -32,7 +32,6 @@ export class LspAnalyzer implements IAnalyzer {
 
         // Use the item snapshotted at request time (before focus changed away from the editor).
         let target = callHierarchyItem;
-        log.appendLine(`[LspAnalyzer] snapshotted item: ${target?.name ?? 'none'}, context symbol: ${context.symbol}`);
 
         if (!target) {
             // ContextTracker fell back to document-symbol or word — try to resolve from
@@ -42,9 +41,7 @@ export class LspAnalyzer implements IAnalyzer {
             const pos = (editor?.document.uri.fsPath === context.filePath)
                 ? editor.selection.active
                 : new vscode.Position(0, 0);
-            log.appendLine(`[LspAnalyzer] resolving fresh at ${pos.line}:${pos.character} in ${context.filePath}`);
             const items = await prepareCallHierarchy(uri, pos, signal);
-            log.appendLine(`[LspAnalyzer] fresh resolve: ${items?.length ?? 0} items`);
             if (!items?.length) {
                 log.appendLine(`[LspAnalyzer] clangd returned no call hierarchy — ensure compile_commands.json is` +
                     ` discoverable from the source file's directory (or add a .clangd config at the workspace root).`);
@@ -55,12 +52,10 @@ export class LspAnalyzer implements IAnalyzer {
 
         if (signal?.aborted) { return null; }
 
-        log.appendLine(`[LspAnalyzer] fetching calls for: ${target.name}`);
         const [incoming, outgoing] = await Promise.all([
             getIncomingCalls(target, signal),
             getOutgoingCalls(target, signal),
         ]);
-        log.appendLine(`[LspAnalyzer] incoming=${incoming.length} outgoing=${outgoing.length}`);
 
         if (signal?.aborted) { return null; }
 

@@ -347,14 +347,13 @@ describe('Scenario: switching files clears stale call hierarchy item', () => {
         await jest.runAllTimersAsync();
         expect(tracker.currentCallHierarchyItem?.name).toBe('fn1');
 
-        // Same file, cursor moves to whitespace — tier1 returns empty
-        mockExecute.mockResolvedValueOnce([]).mockResolvedValueOnce([]); // tier1 empty, tier2 empty
-
+        // Same file, same cursor position — dedup guard fires immediately, _update() early-returns.
+        // No executeCommand calls happen; the retained item is from the initial update.
         const editorCb = mockOnEditor.mock.calls[0][0];
-        editorCb(); // re-update same file
+        editorCb(); // re-update same file, same position
         await jest.runAllTimersAsync();
 
-        // Item is RETAINED (same file URI) — correct by design
+        // Item is RETAINED — both because dedup guard early-returned and because same URI
         expect(tracker.currentCallHierarchyItem?.name).toBe('fn1');
         tracker.dispose();
     });
@@ -382,13 +381,12 @@ describe('Scenario: selection change debouncing', () => {
         // Before debounce fires, no new updates
         expect(mockExecute.mock.calls.length).toBe(callsBefore);
 
-        mockExecute.mockResolvedValueOnce([]);
         jest.advanceTimersByTime(300);
         await jest.runAllTimersAsync();
 
-        // Only one debounced update ran — not three
+        // Debounced update is skipped entirely — same position as initial update, dedup guard fires.
         const callsAfter = mockExecute.mock.calls.length;
-        expect(callsAfter - callsBefore).toBeLessThanOrEqual(2); // tier1 + tier2 at most
+        expect(callsAfter - callsBefore).toBe(0);
         tracker.dispose();
     });
 });

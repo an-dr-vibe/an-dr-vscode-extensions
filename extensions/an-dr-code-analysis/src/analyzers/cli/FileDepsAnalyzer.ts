@@ -87,14 +87,12 @@ export class FileDepsAnalyzer implements IAnalyzer {
         if (!targetFilePath) { return null; }
 
         const workspaceRoot = workspaceFolders[0].uri.fsPath.replace(/\\/g, '/');
-        log.appendLine(`[FileDepsAnalyzer] scanning workspace for file deps of "${targetFilePath}"`);
 
         if (signal?.aborted) { return null; }
 
         // Collect all C/C++ files in the workspace
         const allFiles: string[] = [];
         collectSourceFiles(workspaceRoot, 0, allFiles);
-        log.appendLine(`[FileDepsAnalyzer] found ${allFiles.length} source files`);
 
         if (signal?.aborted) { return null; }
         if (allFiles.length === 0) { return null; }

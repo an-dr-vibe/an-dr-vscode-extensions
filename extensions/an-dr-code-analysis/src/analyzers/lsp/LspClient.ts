@@ -11,7 +11,6 @@ export async function prepareCallHierarchy(
         const result = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
             'vscode.prepareCallHierarchy', uri, position
         );
-        log.appendLine(`[LspClient] prepareCallHierarchy: ${result?.length ?? 0} items`);
         return result?.length ? result : undefined;
     } catch (e) {
         log.appendLine(`[LspClient] prepareCallHierarchy threw: ${e}`);
@@ -28,7 +27,6 @@ export async function getIncomingCalls(
         const result = await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
             '_executeProvideIncomingCalls', item
         );
-        log.appendLine(`[LspClient] getIncomingCalls raw result: ${JSON.stringify(result?.length)}`);
         return result ?? [];
     } catch (e) {
         log.appendLine(`[LspClient] getIncomingCalls threw: ${e}`);
@@ -45,7 +43,6 @@ export async function getOutgoingCalls(
         const result = await vscode.commands.executeCommand<vscode.CallHierarchyOutgoingCall[]>(
             '_executeProvideOutgoingCalls', item
         );
-        log.appendLine(`[LspClient] getOutgoingCalls raw result: ${JSON.stringify(result?.length)}`);
         return result ?? [];
     } catch (e) {
         log.appendLine(`[LspClient] getOutgoingCalls threw: ${e}`);

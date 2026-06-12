@@ -27,7 +27,7 @@ describe('ClangdHealth.check', () => {
     it('warns when compile_commands.json is missing', () => {
         const status = ClangdHealth.check();
         expect(status.state).toBe('warn');
-        expect(status.detail).toMatch(/compile_commands\.json missing/i);
+        expect(status.detail).toMatch(/compile_commands\.json not found/i);
     });
 
     it('returns ok when compile_commands.json is present and up-to-date', () => {
@@ -95,15 +95,15 @@ describe('ClangdHealth.check', () => {
 
 // ── Edge cases and fixed bugs ─────────────────────────────────────────────────
 
-describe('compile_commands.json only checked at workspace root (known limitation)', () => {
-    it('compile_commands.json in a subdirectory is not found — warns', () => {
+describe('compile_commands.json via .clangd CompilationDatabase directive', () => {
+    it('empty compile_commands.json found via .clangd directive — warns about empty', () => {
         const buildDir = path.join(tmpDir, 'build');
         fs.mkdirSync(buildDir);
         fs.writeFileSync(path.join(buildDir, 'compile_commands.json'), '[]');
         fs.writeFileSync(path.join(tmpDir, '.clangd'), 'CompileFlags:\n  CompilationDatabase: build\n');
         const status = ClangdHealth.check();
         expect(status.state).toBe('warn');
-        expect(status.detail).toMatch(/missing/i);
+        expect(status.detail).toMatch(/empty/i);
     });
 });
 

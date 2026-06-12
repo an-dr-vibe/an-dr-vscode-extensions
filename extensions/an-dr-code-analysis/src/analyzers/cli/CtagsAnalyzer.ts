@@ -6,8 +6,7 @@ import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
 
-const C_CPP_EXTENSIONS = new Set(['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx']);
-const C_CPP_LANG_IDS   = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
+const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
 
 interface CtagsEntry {
     name: string;
@@ -141,10 +140,7 @@ export class CtagsAnalyzer implements IAnalyzer {
         const targetName = context.symbol?.replace(/\(.*$/, '').trim(); // strip params if present
         if (!targetName) { return null; }
 
-        log.appendLine(`[CtagsAnalyzer] scanning workspace for "${targetName}" in ${workspaceRoot}`);
-
         const entries = await runCtags(workspaceRoot, signal);
-        log.appendLine(`[CtagsAnalyzer] ctags returned ${entries.length} entries`);
         if (signal?.aborted || entries.length === 0) { return null; }
 
         // Find the target's own definition (use all overloads; report the first)
@@ -156,7 +152,6 @@ export class CtagsAnalyzer implements IAnalyzer {
         const targetEntry = targetEntries[0];
 
         const callers = findCallers(targetName, entries, signal);
-        log.appendLine(`[CtagsAnalyzer] found ${callers.length} callers`);
         if (signal?.aborted) { return null; }
 
         // C3/C4: normalize to 0-based; guard against line=0 from ctags (clamp to 0)

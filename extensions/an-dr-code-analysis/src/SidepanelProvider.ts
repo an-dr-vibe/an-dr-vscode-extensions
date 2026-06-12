@@ -184,9 +184,8 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
 
         for (const analyzer of chain) {
             try {
-                log.appendLine(`[analysis] running ${analyzer.name}...`);
                 const result = await analyzer.analyze(request);
-                log.appendLine(`[analysis] ${analyzer.name} result: ${result ? `${result.graph.nodes.length} nodes` : 'null'}`);
+                log.appendLine(`[analysis] ${analyzer.name}: ${result ? `${result.graph.nodes.length} nodes` : 'null (trying next)'}`);
                 if (result) {
                     this._cache.set(
                         { filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol },

@@ -209,10 +209,10 @@ Add universal fallback for call graph when LSP unavailable or empty.
 
 Implement file dependency graph via clangd `documentLink` + `#include` regex fallback.
 
-- [ ] Extend `LspAnalyzer` to handle `fileDeps` graph type via `textDocument/documentLink`
-- [ ] Create `src/analyzers/heuristic/RegexAnalyzer.ts` — `#include` parse → `GraphModel`; confidence `low`
-- [ ] Wire both into factory for `c`/`cpp` + `fileDeps`
-- [ ] "File Deps" button now triggers real analysis
+- [x] Extend `LspAnalyzer` to handle `fileDeps` graph type via `textDocument/documentLink`
+- [x] Create `src/analyzers/heuristic/RegexAnalyzer.ts` — `#include` parse → `GraphModel`; confidence `low`
+- [x] Wire both into factory for `c`/`cpp` + `fileDeps`
+- [x] "File Deps" button now triggers real analysis
 
 **Verification:**
 
@@ -222,7 +222,7 @@ Implement file dependency graph via clangd `documentLink` + `#include` regex fal
 4. Confidence badge shows 🟢 `clangd` (or 🔴 regex if clangd unavailable)
 5. With clangd disabled: repeat — badge shows 🔴 `regex`, graph still renders from `#include` lines
 
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 
@@ -235,6 +235,8 @@ Surface clangd misconfiguration and offer fixes.
 - [ ] On clangd `NO_COMPILE_COMMANDS` or `STALE_COMPILE_COMMANDS`: send `analysisError` with `recoveryActions`
 - [ ] Webview renders recovery action buttons below error message
 - [ ] Cross-compilation detection: scan `compile_commands.json` for `arm-none-eabi`, `riscv` — offer `.clangd` generation with user confirmation
+
+> **Current iteration** ← start here
 
 **Verification:**
 

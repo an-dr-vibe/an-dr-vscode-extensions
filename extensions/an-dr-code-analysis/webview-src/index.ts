@@ -198,7 +198,7 @@ function renderContext(ctx: EditorContext | null): string {
            <div class="ctx-row"><span class="ctx-key">Lang</span><span class="ctx-val">${esc(ctx.lang)}</span></div>`
         : `<div class="ctx-empty">No file open</div>`;
 
-    return `<details class="section" open>
+    return `<details class="section ctx-section" open>
   <summary class="section-header">CONTEXT <button class="${pinClass}" id="pin-btn">${pinLabel}</button></summary>
   <div class="section-body ctx-body">${rows}</div>
 </details>`;
@@ -438,6 +438,15 @@ function render(): void {
     }
 }
 
+// Updates only the CONTEXT section in-place — cursor moves should not touch the graph.
+function renderContextOnly(): void {
+    const section = document.querySelector<HTMLElement>('.ctx-section');
+    if (!section) { render(); return; }
+    const next = document.createElement('template');
+    next.innerHTML = renderContext(state.context);
+    section.replaceWith(next.content.firstElementChild!);
+}
+
 // Rebuilds only the filter tree body (for collapse/expand) without touching the rest of the DOM.
 function rebuildFilterBody(): void {
     if (!state.analysis.graph) { return; }
@@ -592,24 +601,28 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
     switch (msg.type) {
         case 'toolsStatus':
             state.tools = msg.tools;
+            render();
             break;
         case 'contextUpdate':
             state.context = msg.context;
+            renderContextOnly();
             break;
         case 'analysisBusy':
             state.analysis = { status: 'busy', activeGraphType: msg.graphType };
+            render();
             break;
         case 'analysisResult':
             state.analysis = { status: 'result', graph: msg.graph, activeGraphType: msg.graph.graphType };
             state.depth = msg.graph.depth;
             state.uncheckedPaths = new Set();
             state.collapsedDirs = new Set();
+            render();
             break;
         case 'analysisError':
             state.analysis = { status: 'error', errorMessage: msg.message, activeGraphType: msg.graphType };
+            render();
             break;
     }
-    render();
 });
 
 vscode.postMessage({ type: 'ready' });

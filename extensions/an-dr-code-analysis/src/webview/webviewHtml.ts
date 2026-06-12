@@ -165,7 +165,8 @@ export function generateWebviewHtml(
             font-size: 0.92em;
         }
         /* Pin button — inline in summary */
-        .section-header { display: flex; align-items: center; justify-content: space-between; }
+        .section-header { display: flex; align-items: center; }
+        .section-header .pin-btn { margin-left: auto; }
         .pin-btn {
             background: none;
             border: 1px solid transparent;
@@ -229,6 +230,25 @@ export function generateWebviewHtml(
             font-style: italic;
         }
         .graph-error { color: var(--vscode-errorForeground, #f48771); font-style: normal; }
+        .graph-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.88em;
+            font-style: italic;
+            color: var(--vscode-descriptionForeground);
+            pointer-events: none;
+            text-align: center;
+            padding: 8px;
+        }
+        .graph-overlay-error {
+            font-style: normal;
+            color: var(--vscode-errorForeground, #f48771);
+            align-items: flex-start;
+            padding-top: 12px;
+        }
         .health-warning {
             font-size: 0.82em;
             color: var(--vscode-errorForeground, #f48771);

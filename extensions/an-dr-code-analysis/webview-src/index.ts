@@ -172,6 +172,29 @@ function esc(str: string): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ── Section fold persistence ─────────────────────────────────────────────────
+
+const FOLD_KEY = 'an-dr-code-analysis.sectionFold';
+
+function loadFoldState(): Record<string, boolean> {
+    try { return JSON.parse(localStorage.getItem(FOLD_KEY) ?? '{}'); } catch { return {}; }
+}
+
+function saveFoldState(id: string, open: boolean): void {
+    const s = loadFoldState();
+    s[id] = open;
+    localStorage.setItem(FOLD_KEY, JSON.stringify(s));
+}
+
+// Apply saved open/closed state to all <details data-section-id="..."> elements.
+function applyFoldState(): void {
+    const s = loadFoldState();
+    document.querySelectorAll<HTMLDetailsElement>('details[data-section-id]').forEach(el => {
+        const id = el.dataset['sectionId']!;
+        if (id in s) { el.open = s[id]; }
+    });
+}
+
 // ── Renderer instance ────────────────────────────────────────────────────────
 
 const vscode = acquireVsCodeApi();
@@ -210,8 +233,11 @@ function getOrCreateRenderer(): CytoscapeRenderer {
 // ── CONTEXT section ──────────────────────────────────────────────────────────
 
 function renderContext(ctx: EditorContext | null): string {
-    const pinLabel = ctx?.isPinned ? '📌 Pinned' : '📌 Pin';
+    const pinLabel = ctx?.isPinned ? '# Pinned' : '# Pin';
     const pinClass = ctx?.isPinned ? 'pin-btn pinned' : 'pin-btn';
+    const pinTitle = ctx?.isPinned
+        ? 'Click to unpin — resume auto-tracking as you navigate'
+        : 'Pin — freeze the current symbol/file so navigation does not change it';
 
     let symbolHtml = '—';
     if (ctx?.symbol) {
@@ -230,8 +256,8 @@ function renderContext(ctx: EditorContext | null): string {
            <div class="ctx-row"><span class="ctx-key">Lang</span><span class="ctx-val">${esc(ctx.lang)}</span></div>`
         : `<div class="ctx-empty">No file open</div>`;
 
-    return `<details class="section ctx-section" open>
-  <summary class="section-header">CONTEXT <button class="${pinClass}" id="pin-btn">${pinLabel}</button></summary>
+    return `<details class="section ctx-section" data-section-id="context" open>
+  <summary class="section-header">CONTEXT <button class="${pinClass}" id="pin-btn" title="${pinTitle}">${pinLabel}</button></summary>
   <div class="section-body ctx-body">${rows}</div>
 </details>`;
 }
@@ -276,7 +302,7 @@ function renderToolsStatus(tools: ToolStatus[]): string {
         }).join('');
 
     const hasIssues = tools.some(t => t.state !== 'ok');
-    return `<details class="section"${hasIssues ? ' open' : ''}>
+    return `<details class="section" data-section-id="tools"${hasIssues ? ' open' : ''}>
   <summary class="section-header">TOOLS STATUS <button class="pin-btn" id="refresh-tools-btn" title="Re-check installed tools">↻</button></summary>
   <div class="section-body">${sections}</div>
 </details>`;
@@ -319,7 +345,7 @@ function renderAnalysis(s: AnalysisState): string {
         }
     }
 
-    return `<details class="section analysis-section" open>
+    return `<details class="section analysis-section" data-section-id="analysis" open>
   <summary class="section-header">ANALYSIS</summary>
   <div class="section-body">
     <div class="analysis-buttons">${buttons}</div>
@@ -374,8 +400,8 @@ function renderFileFilter(graph: GraphModel): string {
     const tree = buildFileTree(graph);
     if (tree.children.length === 0) { return ''; }
     const childrenHtml = tree.children.map(c => renderTreeNode(c, 0)).join('');
-    return `<details class="section ft-section" open>
-  <summary class="section-header" style="justify-content:center">TREE</summary>
+    return `<details class="section ft-section" data-section-id="tree" open>
+  <summary class="section-header">TREE</summary>
   <div class="section-body ft-body">${childrenHtml}</div>
 </details>`;
 }
@@ -520,15 +546,16 @@ function renderGraph(s: AnalysisState, depth: number): string {
         ? ` <span class="header-tool-badge">${CONFIDENCE_BADGE[s.graph.confidence] ?? ''} ${esc(s.graph.tool)}</span>`
         : '';
 
-    let bodyHtml: string;
+    let overlayHtml = '';
+    let metaHtml = '';
+
     if (s.status === 'idle') {
-        bodyHtml = `<div class="graph-placeholder">Select an analysis above.</div>`;
+        overlayHtml = `<div class="graph-overlay">Select an analysis above.</div>`;
     } else if (s.status === 'busy') {
-        bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">Analyzing…</div>`;
+        overlayHtml = `<div class="graph-overlay">Analyzing…</div>`;
     } else if (s.status === 'error') {
         const label = s.activeGraphType ? GRAPH_TYPE_LABELS[s.activeGraphType] : '';
-        bodyHtml = `<div class="graph-area" id="cy-container"></div>`
-            + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
+        overlayHtml = `<div class="graph-overlay graph-overlay-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
     } else if (s.status === 'result' && s.graph) {
         const fallbackNote = s.graph.tool === 'ctags'
             ? `<div class="graph-fallback-note">Fallback tool — callers only, no callees</div>`
@@ -540,15 +567,16 @@ function renderGraph(s: AnalysisState, depth: number): string {
         const mergeChk = `<label class="graph-meta-check" title="Show circular dependencies as a single double-headed red arrow">
             <input type="checkbox" id="merge-circular-chk" ${state.mergeCircular ? 'checked' : ''}> circular
           </label>`;
-        bodyHtml = `<div class="graph-area" id="cy-container"></div>
-          <div class="graph-meta">
+        metaHtml = `<div class="graph-meta">
             <span class="graph-node-count">${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</span>
             ${originBtn}
             ${mergeChk}
           </div>${fallbackNote}`;
     } else {
-        bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">No results found.</div>`;
+        overlayHtml = `<div class="graph-overlay">No results found.</div>`;
     }
+
+    const bodyHtml = `<div class="graph-area" id="cy-container">${overlayHtml}</div>${metaHtml}`;
 
     const depthControls = `<div class="depth-controls">
       <button class="depth-btn" id="depth-minus" ${depth <= 1 ? 'disabled' : ''}>−</button>
@@ -557,7 +585,7 @@ function renderGraph(s: AnalysisState, depth: number): string {
       <button class="depth-btn" id="depth-reset">reset</button>
     </div>`;
 
-    return `<details class="section" open>
+    return `<details class="section" data-section-id="graph" open>
   <summary class="section-header">GRAPH${esc(graphTitle)}${toolBadge}</summary>
   <div class="section-body">
     ${bodyHtml}
@@ -592,6 +620,7 @@ function render(): void {
         html += renderToolsStatus(state.tools);
     }
     root.innerHTML = html;
+    applyFoldState();
 
     // mount cytoscape into the freshly created #cy-container
     if (state.analysis.status === 'result' && state.analysis.graph) {
@@ -603,11 +632,14 @@ function render(): void {
 
 // Updates only the CONTEXT section in-place — cursor moves should not touch the graph.
 function renderContextOnly(): void {
-    const section = document.querySelector<HTMLElement>('.ctx-section');
+    const section = document.querySelector<HTMLDetailsElement>('.ctx-section');
     if (!section) { render(); return; }
+    const wasOpen = section.open;
     const next = document.createElement('template');
     next.innerHTML = renderContext(state.context);
-    section.replaceWith(next.content.firstElementChild!);
+    const el = next.content.firstElementChild as HTMLDetailsElement;
+    el.open = wasOpen;
+    section.replaceWith(el);
 }
 
 // Rebuilds only the filter tree body (for collapse/expand) without touching the rest of the DOM.
@@ -640,6 +672,12 @@ function renderGraphOnly(): void {
 }
 
 render();
+
+// Persist section fold state via event delegation — fired whenever any <details> toggles.
+root.addEventListener('toggle', (e: Event) => {
+    const el = e.target as HTMLDetailsElement;
+    if (el.dataset['sectionId']) { saveFoldState(el.dataset['sectionId']!, el.open); }
+}, true);
 
 // ── Events ───────────────────────────────────────────────────────────────────
 

@@ -296,7 +296,6 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         } catch (e: any) {
             let msg = 'Changing the repository failed';
             this.log(msg, e);
-            window.showErrorMessage(`${msg}: ${e.message}`);
             return;
         }
         this.checkboxStates.clear();

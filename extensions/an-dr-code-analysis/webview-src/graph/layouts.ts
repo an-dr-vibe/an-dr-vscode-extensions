@@ -7,12 +7,19 @@ export function getLayout(name: LayoutName, nodeCount: number): cytoscape.Layout
         case 'radial':
             return {
                 name: 'concentric',
-                concentric: (node: cytoscape.NodeSingular) => node.data('role') === 'target' ? 10 : 1,
+                concentric: (node: cytoscape.NodeSingular) => {
+                    const role = node.data('role');
+                    if (role === 'target')   { return 30; }
+                    if (role === 'caller')   { return 20; }
+                    if (role === 'callee')   { return 10; }
+                    return 5; // external / folder
+                },
                 levelWidth: () => 1,
-                minNodeSpacing: 16,
+                minNodeSpacing: 8,
                 animate: false,
                 padding: 16,
-                spacingFactor: nodeCount > 8 ? 0.8 : 0.65,
+                // Stagger each ring's start angle so single-node rings don't stack vertically
+                startAngle: -Math.PI / 6,
             } as cytoscape.LayoutOptions;
 
         case 'hierarchical':

@@ -216,11 +216,11 @@ function getOrCreateRenderer(): CytoscapeRenderer {
                     rebuildFilterBody();
                 }
             },
-            (nodeId, filePath, line) => {
+            (nodeId, filePath, line, fullName) => {
                 const g = state.analysis.graph;
-                const action = resolveNodeDblClick(nodeId, filePath, line, g?.targetId, g?.graphType, state.depth);
+                const action = resolveNodeDblClick(nodeId, filePath, line, fullName, g?.targetId, g?.graphType, state.depth);
                 if (action.kind === 'reanalyzeTo') {
-                    vscode.postMessage({ type: 'reanalyzeTo', filePath: action.filePath, line: action.line, graphType: action.graphType, depth: action.depth });
+                    vscode.postMessage({ type: 'reanalyzeTo', filePath: action.filePath, line: action.line, fullName: action.fullName, graphType: action.graphType, depth: action.depth });
                 } else {
                     vscode.postMessage({ type: 'nodeDoubleClick', nodeId: action.nodeId, filePath: action.filePath, line: action.line });
                 }
@@ -657,18 +657,9 @@ function renderGraphOnly(): void {
     if (state.analysis.status !== 'result' || !state.analysis.graph) { return; }
     let filtered = foldCollapsedDirs(applyFilter(state.analysis.graph));
     if (state.mergeCircular) { filtered = mergeCircularEdges(filtered); }
-    // Re-use existing renderer if container still exists, else recreate
     const container = document.getElementById('cy-container');
     if (!container) { render(); return; }
-    if (!renderer) {
-        renderer = new CytoscapeRenderer(
-            container,
-            document.getElementById('cy-tooltip') as HTMLElement,
-            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeClick',       nodeId, filePath, line }),
-            (nodeId, filePath, line) => vscode.postMessage({ type: 'nodeDoubleClick', nodeId, filePath, line }),
-        );
-    }
-    renderer.render(filtered);
+    getOrCreateRenderer().render(filtered);
 }
 
 render();

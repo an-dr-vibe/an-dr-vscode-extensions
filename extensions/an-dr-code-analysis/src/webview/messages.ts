@@ -136,6 +136,7 @@ export interface ReanalyzeToMessage {
     type: 'reanalyzeTo';
     filePath: string;
     line: number;
+    fullName?: string;
     graphType: GraphType;
     depth: number;
 }

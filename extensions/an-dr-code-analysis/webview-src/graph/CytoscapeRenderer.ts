@@ -27,7 +27,7 @@ export interface GraphModel {
     confidence: 'high' | 'medium' | 'low';
 }
 
-export type NodeEventCallback = (nodeId: string, filePath?: string, line?: number) => void;
+export type NodeEventCallback = (nodeId: string, filePath?: string, line?: number, fullName?: string) => void;
 
 const ROLE_COLORS = {
     target:   { bg: 'var(--vscode-terminal-ansiGreen,  #4caf50)', border: 'var(--vscode-terminal-ansiGreen,  #388e3c)', label: 'var(--vscode-editor-foreground, #fff)' },
@@ -156,9 +156,8 @@ export class CytoscapeRenderer {
         const cy = this._cy;
         if (!cy) { return; }
 
-        const MARGIN = 8;
-        const MAX_PASSES = 50;
-        const BORDER = 16; // minimum distance from viewport edge
+        const MARGIN = 12;
+        const MAX_PASSES = 80;
 
         for (let pass = 0; pass < MAX_PASSES; pass++) {
             const nodes = cy.nodes();
@@ -171,27 +170,26 @@ export class CytoscapeRenderer {
                     const bb1 = a.boundingBox({});
                     const bb2 = b.boundingBox({});
 
-                    const overlapX = (bb1.x2 + MARGIN) - bb2.x1;
-                    const overlapY = (bb1.y2 + MARGIN) - bb2.y1;
-                    const overlapX2 = (bb2.x2 + MARGIN) - bb1.x1;
-                    const overlapY2 = (bb2.y2 + MARGIN) - bb1.y1;
+                    // Overlap on each axis: positive means overlapping
+                    const ox = Math.min(bb1.x2 + MARGIN, bb2.x2 + MARGIN) - Math.max(bb1.x1 - MARGIN, bb2.x1 - MARGIN);
+                    const oy = Math.min(bb1.y2 + MARGIN, bb2.y2 + MARGIN) - Math.max(bb1.y1 - MARGIN, bb2.y1 - MARGIN);
 
-                    if (overlapX <= 0 || overlapX2 <= 0 || overlapY <= 0 || overlapY2 <= 0) {
-                        continue;
-                    }
+                    if (ox <= 0 || oy <= 0) { continue; }
 
-                    const pushX = Math.min(overlapX, overlapX2);
-                    const pushY = Math.min(overlapY, overlapY2);
+                    // Separate along the axis of least overlap
                     const half = 0.5;
-
-                    if (pushX < pushY) {
-                        const dx = overlapX < overlapX2 ? pushX * half : -pushX * half;
-                        a.shift({ x: -dx, y: 0 });
-                        b.shift({ x:  dx, y: 0 });
+                    if (ox < oy) {
+                        const cx1 = (bb1.x1 + bb1.x2) / 2;
+                        const cx2 = (bb2.x1 + bb2.x2) / 2;
+                        const dir = cx1 <= cx2 ? -1 : 1;
+                        a.shift({ x: dir * ox * half, y: 0 });
+                        b.shift({ x: -dir * ox * half, y: 0 });
                     } else {
-                        const dy = overlapY < overlapY2 ? pushY * half : -pushY * half;
-                        a.shift({ x: 0, y: -dy });
-                        b.shift({ x: 0, y:  dy });
+                        const cy1 = (bb1.y1 + bb1.y2) / 2;
+                        const cy2 = (bb2.y1 + bb2.y2) / 2;
+                        const dir = cy1 <= cy2 ? -1 : 1;
+                        a.shift({ x: 0, y: dir * oy * half });
+                        b.shift({ x: 0, y: -dir * oy * half });
                     }
                     moved = true;
                 }
@@ -200,18 +198,7 @@ export class CytoscapeRenderer {
             if (!moved) { break; }
         }
 
-        // Pull nodes away from the viewport boundary so none are clipped.
-        const ext = cy.extent();
-        for (const node of cy.nodes().toArray()) {
-            const bb = node.boundingBox({});
-            let dx = 0;
-            let dy = 0;
-            if (bb.x1 < ext.x1 + BORDER) { dx =  (ext.x1 + BORDER) - bb.x1; }
-            if (bb.x2 > ext.x2 - BORDER) { dx = -(bb.x2 - (ext.x2 - BORDER)); }
-            if (bb.y1 < ext.y1 + BORDER) { dy =  (ext.y1 + BORDER) - bb.y1; }
-            if (bb.y2 > ext.y2 - BORDER) { dy = -(bb.y2 - (ext.y2 - BORDER)); }
-            if (dx !== 0 || dy !== 0) { node.shift({ x: dx, y: dy }); }
-        }
+        cy.fit(undefined, 24);
     }
 
     private _pickLayout(graph: GraphModel): cytoscape.LayoutOptions {
@@ -230,9 +217,10 @@ export class CytoscapeRenderer {
         this._applyHighlight(nodeId);
         const filePath: string | undefined = node.data('filePath');
         const line: number | undefined = node.data('line');
+        const fullName: string | undefined = node.data('fullName');
         if (filePath) {
             this._jumpBtn.style.display = 'block';
-            this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line);
+            this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line, fullName);
         }
         cy.animate({ center: { eles: node } } as any, { duration: 200 });
     }
@@ -399,7 +387,7 @@ export class CytoscapeRenderer {
                     'line-color': 'var(--vscode-panel-border, #666)',
                     'target-arrow-color': 'var(--vscode-panel-border, #666)',
                     'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
+                    'curve-style': 'straight',
                     'arrow-scale': 1,
                     'transition-property': 'opacity, line-color, target-arrow-color, width',
                     'transition-duration': '150ms' as any,
@@ -451,8 +439,9 @@ export class CytoscapeRenderer {
                 this._selectedNodeId = nodeId;
                 this._applyHighlight(nodeId);
                 if (filePath) {
+                    const fn: string | undefined = node.data('fullName');
                     this._jumpBtn.style.display = 'block';
-                    this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line);
+                    this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line, fn);
                 } else {
                     this._jumpBtn.style.display = 'none';
                     this._jumpBtn.onclick = null;
@@ -472,7 +461,7 @@ export class CytoscapeRenderer {
 
         this._cy.on('dbltap', 'node', (evt) => {
             const node = evt.target;
-            this._onNodeDblClick(node.id(), node.data('filePath'), node.data('line'));
+            this._onNodeDblClick(node.id(), node.data('filePath'), node.data('line'), node.data('fullName'));
         });
 
         this._cy.on('mouseover', 'node', (evt) => {
@@ -496,9 +485,17 @@ export class CytoscapeRenderer {
 
     private _showTooltip(text: string, pos: { x: number; y: number }): void {
         this._tooltip.textContent = text;
-        this._tooltip.style.left = `${pos.x + 12}px`;
-        this._tooltip.style.top  = `${pos.y + 12}px`;
         this._tooltip.style.display = 'block';
+        // Measure after making visible so offsetWidth is accurate
+        const tw = this._tooltip.offsetWidth;
+        const th = this._tooltip.offsetHeight;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const GAP = 12;
+        const x = (pos.x + GAP + tw > vw) ? Math.max(0, pos.x - tw - GAP) : pos.x + GAP;
+        const y = (pos.y + GAP + th > vh) ? Math.max(0, pos.y - th - GAP) : pos.y + GAP;
+        this._tooltip.style.left = `${x}px`;
+        this._tooltip.style.top  = `${y}px`;
     }
 
     private _hideTooltip(): void {

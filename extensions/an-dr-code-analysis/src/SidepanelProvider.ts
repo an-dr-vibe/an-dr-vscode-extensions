@@ -106,7 +106,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                     break;
                 case 'reanalyzeTo':
                     this._cancelRunningAnalysis();
-                    void this._reanalyzeTo(msg.filePath, msg.line, msg.graphType, msg.depth);
+                    void this._reanalyzeTo(msg.filePath, msg.line, msg.graphType, msg.depth, msg.fullName);
                     break;
                 case 'runCommand':
                     void vscode.commands.executeCommand(msg.command, ...(msg.args ?? []));
@@ -161,15 +161,56 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         });
     }
 
-    private async _reanalyzeTo(filePath: string, line: number, graphType: import('./graph/GraphModel').GraphType, depth: number): Promise<void> {
+    private async _reanalyzeTo(filePath: string, line: number, graphType: import('./graph/GraphModel').GraphType, depth: number, fullName?: string): Promise<void> {
         try {
             const doc = await vscode.workspace.openTextDocument(filePath);
             const editor = await vscode.window.showTextDocument(doc, { preserveFocus: false });
-            const pos = new vscode.Position(line, 0);
+
+            // Navigate to the stored line first, then try to find the exact symbol position.
+            let pos = new vscode.Position(line, 0);
+
+            // If the stored line is 0 or we have a fullName, scan document symbols to find
+            // the correct selectionRange position for the named symbol.
+            if (fullName) {
+                // Extract bare function name from clangd fullName format:
+                //   "NS::Class - file.hpp (path)::funcName(params...)"
+                // Strip everything up to and including the last "):: " (container suffix),
+                // then take the identifier before the opening "(" of the params.
+                const afterLastParen = fullName.replace(/^.*\)::/, '');
+                const bareName = afterLastParen.replace(/\s*\(.*$/, '').trim();
+                log.appendLine(`[reanalyzeTo] fullName="${fullName}" bareName="${bareName}"`);
+                try {
+                    const docSyms = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                        'vscode.executeDocumentSymbolProvider', doc.uri
+                    );
+                    const flat: vscode.DocumentSymbol[] = [];
+                    const flatten = (syms: vscode.DocumentSymbol[]) => { for (const s of syms) { flat.push(s); flatten(s.children); } };
+                    if (docSyms) { flatten(docSyms); }
+                    log.appendLine(`[reanalyzeTo] doc symbols: ${flat.map(s => s.name).join(', ')}`);
+                    const match = flat.find(s => s.name === bareName || s.name.startsWith(bareName + '('));
+                    log.appendLine(`[reanalyzeTo] match: ${match?.name ?? 'none'} → pos ${match?.selectionRange.start.line}:${match?.selectionRange.start.character}`);
+                    if (match) { pos = match.selectionRange.start; }
+                } catch (e) { log.appendLine(`[reanalyzeTo] doc symbol scan threw: ${e}`); }
+            }
+            log.appendLine(`[reanalyzeTo] navigating to ${filePath}:${pos.line}:${pos.character}`);
+
             editor.selection = new vscode.Selection(pos, pos);
             editor.revealRange(new vscode.Range(pos, pos));
-            // Give the context tracker time to resolve the symbol at the new cursor position.
-            await new Promise(r => setTimeout(r, 400));
+
+            // Force context tracker to resolve at the exact position — bypasses debounce
+            // and same-position guard, awaits the actual LSP response.
+            const ctx = await this._contextTracker.forceUpdateAt(doc, pos);
+            log.appendLine(`[reanalyzeTo] resolved ctx: symbol=${ctx?.symbol} source=${ctx?.symbolSource}`);
+
+            if (!ctx?.symbol || ctx.symbolSource === 'word') {
+                log.appendLine(`[reanalyzeTo] weak context — aborting (symbol=${ctx?.symbol} source=${ctx?.symbolSource})`);
+                this._view?.webview.postMessage({
+                    type: 'analysisError', graphType,
+                    message: `Could not resolve symbol at this position. Place cursor directly on the function name and try again.`,
+                });
+                return;
+            }
+
             void this._runAnalysis(graphType, depth);
         } catch (err) {
             log.appendLine(`[reanalyzeTo] failed: ${err}`);

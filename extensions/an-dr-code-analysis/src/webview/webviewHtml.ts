@@ -386,11 +386,10 @@ export function generateWebviewHtml(
             padding: 4px 8px;
             border-radius: 3px;
             pointer-events: none;
-            white-space: pre;
+            white-space: pre-wrap;
+            word-break: break-all;
             z-index: 1000;
-            max-width: 320px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            max-width: calc(100vw - 16px);
         }
     </style>
 </head>

@@ -9,6 +9,8 @@ import { Settings } from './config/Settings';
 import { WebviewToExtensionMessage } from './webview/messages';
 import { GraphType } from './graph/GraphModel';
 import { log } from './logger';
+import { ClangdHealth } from './tools/ClangdHealth';
+import { recoveryActionsFor, runCmakeGenerate, runBearWrap, generateClangdConfig } from './tools/RecoveryActions';
 
 export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Disposable {
     static readonly viewType = 'an-dr-code-analysis.panel';
@@ -102,6 +104,17 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                     break;
             }
         });
+
+        // Recovery commands — registered per-view so they're scoped to the panel lifetime
+        const ns = 'an-dr-code-analysis';
+        this._disposables.push(
+            vscode.commands.registerCommand(`${ns}.recovery.cmakeGenerate`,     () => void runCmakeGenerate()),
+            vscode.commands.registerCommand(`${ns}.recovery.bearWrap`,          () => void runBearWrap()),
+            vscode.commands.registerCommand(`${ns}.recovery.generateClangdConfig`, () => {
+                const health = ClangdHealth.checkDetail();
+                void generateClangdConfig(health.crossMarker);
+            }),
+        );
     }
 
     dispose(): void {
@@ -113,10 +126,41 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         if (!this._view) { return; }
         const tools = await this._toolRegistry.refresh();
         this._view.webview.postMessage({ type: 'toolsStatus', tools });
+        // Re-evaluate health now that tool statuses are fresh (ctags availability may have changed).
+        this._postClangdHealth(this._contextTracker.current);
     }
 
     private _postContext(ctx: import('./context/ContextTracker').EditorContext | null): void {
         this._view?.webview.postMessage({ type: 'contextUpdate', context: ctx });
+        this._postClangdHealth(ctx);
+    }
+
+    private _postClangdHealth(ctx: import('./context/ContextTracker').EditorContext | null): void {
+        if (!this._view) { return; }
+        const C_CPP = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
+        if (!ctx || !C_CPP.has(ctx.langId)) {
+            this._view.webview.postMessage({ type: 'clangdHealth', issue: null, message: '' });
+            return;
+        }
+        const health = ClangdHealth.checkDetail();
+        if (!health.issue) {
+            this._view.webview.postMessage({ type: 'clangdHealth', issue: null, message: '' });
+            return;
+        }
+        // Only surface the clangd warning if ctags is not available as a fallback.
+        // When ctags can handle the request, clangd's config issues are not actionable here
+        // (they are already shown in the Tools Status section).
+        const ctagsOk = this._toolRegistry.statuses.some(t => t.name === 'ctags' && t.state === 'ok');
+        if (ctagsOk) {
+            this._view.webview.postMessage({ type: 'clangdHealth', issue: null, message: '' });
+            return;
+        }
+        this._view.webview.postMessage({
+            type: 'clangdHealth',
+            issue: health.issue,
+            message: health.message,
+            recoveryActions: recoveryActionsFor(health.issue),
+        });
     }
 
     private async _runAnalysis(graphType: GraphType, depth: number): Promise<void> {
@@ -171,7 +215,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         this._view?.webview.postMessage({
             type: 'analysisError',
             graphType,
-            message: 'No results found',
+            message: 'No results found.',
         });
     }
 }

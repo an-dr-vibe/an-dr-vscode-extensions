@@ -3,6 +3,7 @@ import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { getIncomingCalls, getOutgoingCalls, prepareCallHierarchy } from './LspClient';
 import { buildCallGraph } from '../../graph/GraphBuilder';
 import { ContextTracker } from '../../context/ContextTracker';
+import { ClangdHealth } from '../../tools/ClangdHealth';
 import { log } from '../../logger';
 
 const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
@@ -13,7 +14,17 @@ export class LspAnalyzer implements IAnalyzer {
     constructor(private readonly _contextTracker: ContextTracker) {}
 
     canHandle(request: AnalysisRequest): boolean {
-        return C_CPP_LANG_IDS.has(request.context.langId) && request.graphType === 'callGraph';
+        if (!C_CPP_LANG_IDS.has(request.context.langId) || request.graphType !== 'callGraph') {
+            return false;
+        }
+        // Skip clangd entirely when compile_commands.json is absent — its index is
+        // unreliable without it and the result would look authoritative but isn't.
+        const health = ClangdHealth.checkDetail();
+        if (health.issue === 'NO_COMPILE_COMMANDS') {
+            log.appendLine('[LspAnalyzer] skipping — compile_commands.json not found');
+            return false;
+        }
+        return true;
     }
 
     async analyze(request: AnalysisRequest): Promise<AnalysisResult | null> {

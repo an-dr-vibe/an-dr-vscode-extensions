@@ -52,9 +52,10 @@ interface GraphModel {
 interface ToolsStatusMessage  { type: 'toolsStatus';   tools: ToolStatus[]; }
 interface ContextUpdateMessage { type: 'contextUpdate'; context: EditorContext | null; }
 interface AnalysisResultMessage { type: 'analysisResult'; graph: GraphModel; }
-interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; message: string; }
+interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; message: string; recoveryActions?: RecoveryAction[]; }
 interface AnalysisBusyMessage   { type: 'analysisBusy';   graphType: GraphType; }
-type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage;
+interface ClangdHealthMessage   { type: 'clangdHealth'; issue: ClangdHealth['issue']; message: string; recoveryActions?: RecoveryAction[]; }
+type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | ClangdHealthMessage;
 
 // ── Stub graph (verification / Iteration 5) ──────────────────────────────────
 
@@ -81,10 +82,13 @@ const STUB_GRAPH: GraphModel = {
 
 // ── State ────────────────────────────────────────────────────────────────────
 
+interface RecoveryAction { label: string; command: string; args?: unknown[]; }
+
 interface AnalysisState {
     status: 'idle' | 'busy' | 'result' | 'error';
     graph?: GraphModel;
     errorMessage?: string;
+    recoveryActions?: RecoveryAction[];
     activeGraphType?: GraphType;
 }
 
@@ -132,6 +136,12 @@ function buildFileTree(graph: GraphModel): TreeNode {
 
 // uncheckedPaths: set of fullPath strings that are hidden
 // collapsedDirs: set of dir fullPath strings that are collapsed
+interface ClangdHealth {
+    issue: 'NO_COMPILE_COMMANDS' | 'STALE_COMPILE_COMMANDS' | 'CROSS_COMPILE' | null;
+    message: string;
+    recoveryActions?: RecoveryAction[];
+}
+
 interface AppState {
     tools: ToolStatus[] | null;
     context: EditorContext | null;
@@ -139,6 +149,7 @@ interface AppState {
     depth: number;
     uncheckedPaths: Set<string>;
     collapsedDirs: Set<string>;
+    clangdHealth: ClangdHealth | null;
 }
 const state: AppState = {
     tools: null,
@@ -147,6 +158,7 @@ const state: AppState = {
     depth: 1,
     uncheckedPaths: new Set(),
     collapsedDirs: new Set(),
+    clangdHealth: null,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -267,22 +279,44 @@ function renderAnalysis(s: AnalysisState): string {
         return `<button class="analysis-btn" data-graph-type="${gt}" ${isBusy ? 'disabled' : ''}>${btnLabel}</button>`;
     }).join('');
 
-    let ccppBtn = '';
+    let configHtml = '';
     if (isCCppContext()) {
-        const clangdTool = state.tools?.find(t => t.name === 'clangd');
-        const isSet = clangdTool?.state === 'ok' && !!clangdTool.detail;
-        const indicator = isSet ? `<span class="cc-indicator" title="${esc(clangdTool!.detail!)}">●</span>` : '';
-        const ccPath = isSet ? `<div class="cc-path">${esc(clangdTool!.detail!)}</div>` : '';
-        ccppBtn = `<div class="analysis-config"><button class="analysis-btn" id="setup-compile-commands">${indicator}Setup compile_commands.json</button>${ccPath}</div>`;
+        const health = state.clangdHealth;
+        if (health?.issue) {
+            // Health issue: show warning + recovery buttons (replaces setup button)
+            const icon = health.issue === 'STALE_COMPILE_COMMANDS' ? '⚠' : '✗';
+            const recoveryBtns = (health.recoveryActions ?? []).map(a =>
+                `<button class="analysis-btn recovery-btn" data-command="${esc(a.command)}">${esc(a.label)}</button>`
+            ).join('');
+            configHtml = `<div class="analysis-config">
+  <div class="health-warning"><span class="health-icon">${icon}</span> ${esc(health.message)}</div>
+  <div class="recovery-actions">${recoveryBtns}</div>
+</div>`;
+        } else {
+            // Healthy: show compile_commands path + setup button
+            const clangdTool = state.tools?.find(t => t.name === 'clangd');
+            const isSet = clangdTool?.state === 'ok' && !!clangdTool.detail;
+            const indicator = isSet ? `<span class="cc-indicator" title="${esc(clangdTool!.detail!)}">●</span>` : '';
+            const ccPath = isSet ? `<div class="cc-path">${esc(clangdTool!.detail!)}</div>` : '';
+            configHtml = `<div class="analysis-config"><button class="analysis-btn" id="setup-compile-commands">${indicator}Setup compile_commands.json</button>${ccPath}</div>`;
+        }
     }
 
-    return `<details class="section" open>
+    return `<details class="section analysis-section" open>
   <summary class="section-header">ANALYSIS</summary>
   <div class="section-body">
     <div class="analysis-buttons">${buttons}</div>
-    ${ccppBtn}
+    ${configHtml}
   </div>
 </details>`;
+}
+
+function renderAnalysisSection(): void {
+    const section = document.querySelector<HTMLElement>('.analysis-section');
+    if (!section) { render(); return; }
+    const tmpl = document.createElement('template');
+    tmpl.innerHTML = renderAnalysis(state.analysis);
+    section.replaceWith(tmpl.content.firstElementChild!);
 }
 
 // ── File filter tree ─────────────────────────────────────────────────────────
@@ -420,6 +454,11 @@ function render(): void {
     renderer?.destroy();
     renderer = null;
 
+    if (state.tools === null) {
+        root.innerHTML = '<div class="loading">Loading…</div>';
+        return;
+    }
+
     let html = renderContext(state.context);
     html += renderAnalysis(state.analysis);
     html += renderGraph(state.analysis, state.depth);
@@ -541,6 +580,13 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
+    const recoveryBtn = target.closest<HTMLButtonElement>('.recovery-btn');
+    if (recoveryBtn) {
+        const cmd = recoveryBtn.dataset['command'];
+        if (cmd) { vscode.postMessage({ type: 'runCommand', command: cmd }); }
+        return;
+    }
+
     // File filter tree: collapse/expand toggle — rebuild only the filter body, not the whole page
     const toggle = target.closest<HTMLElement>('.ft-toggle');
     if (toggle) {
@@ -607,6 +653,10 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             state.context = msg.context;
             renderContextOnly();
             break;
+        case 'clangdHealth':
+            state.clangdHealth = { issue: msg.issue, message: msg.message, recoveryActions: msg.recoveryActions };
+            renderAnalysisSection();
+            break;
         case 'analysisBusy':
             state.analysis = { status: 'busy', activeGraphType: msg.graphType };
             render();
@@ -619,7 +669,7 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             render();
             break;
         case 'analysisError':
-            state.analysis = { status: 'error', errorMessage: msg.message, activeGraphType: msg.graphType };
+            state.analysis = { status: 'error', errorMessage: msg.message, recoveryActions: msg.recoveryActions, activeGraphType: msg.graphType };
             render();
             break;
     }

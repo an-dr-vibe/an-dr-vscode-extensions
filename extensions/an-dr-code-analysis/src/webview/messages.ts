@@ -58,12 +58,20 @@ export interface RecoveryAction {
     args?: unknown[];
 }
 
+export interface ClangdHealthMessage {
+    type: 'clangdHealth';
+    issue: 'NO_COMPILE_COMMANDS' | 'STALE_COMPILE_COMMANDS' | 'CROSS_COMPILE' | null;
+    message: string;
+    recoveryActions?: RecoveryAction[];
+}
+
 export type ExtensionToWebviewMessage =
     | ToolsStatusMessage
     | ContextUpdateMessage
     | AnalysisResultMessage
     | AnalysisErrorMessage
-    | AnalysisBusyMessage;
+    | AnalysisBusyMessage
+    | ClangdHealthMessage;
 
 // Webview → extension
 export interface ReadyMessage {

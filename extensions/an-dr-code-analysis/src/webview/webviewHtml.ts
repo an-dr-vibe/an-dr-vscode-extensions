@@ -39,6 +39,28 @@ export function generateWebviewHtml(
             font-style: italic;
             padding: 16px 8px;
         }
+        .loading {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            padding: 16px 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .loading::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--vscode-descriptionForeground);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
         .section {
             margin-bottom: 8px;
         }
@@ -187,7 +209,7 @@ export function generateWebviewHtml(
         .graph-area {
             position: relative;
             width: 100%;
-            height: 260px;
+            height: 320px;
             background: var(--vscode-editor-background, #1e1e1e);
             border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
             border-radius: 3px;
@@ -200,6 +222,22 @@ export function generateWebviewHtml(
             font-style: italic;
         }
         .graph-error { color: var(--vscode-errorForeground, #f48771); font-style: normal; }
+        .health-warning {
+            font-size: 0.82em;
+            color: var(--vscode-errorForeground, #f48771);
+            padding: 3px 0 4px;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+        .health-icon { flex-shrink: 0; }
+        .recovery-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 2px;
+        }
+        .recovery-btn { text-align: left; }
         .ft-section .section-body { padding: 4px 0; }
         .ft-row {
             display: flex;
@@ -311,7 +349,7 @@ export function generateWebviewHtml(
 </head>
 <body>
     <div id="root">
-        <div class="placeholder">Code Analysis — loading…</div>
+        <div class="loading">Loading…</div>
     </div>
     <div id="cy-tooltip"></div>
     <script nonce="${nonce}" src="${webviewScriptUri}"></script>

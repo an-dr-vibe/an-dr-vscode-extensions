@@ -2,12 +2,9 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as child_process from 'child_process';
-import * as util from 'util';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
-
-const execFile = util.promisify(child_process.execFile);
 
 const C_CPP_EXTENSIONS = new Set(['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx']);
 const C_CPP_LANG_IDS   = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
@@ -19,11 +16,12 @@ interface CtagsEntry {
     kind: string;
 }
 
-// Run ctags over the workspace and return all entries.
-async function runCtags(workspaceRoot: string, signal?: AbortSignal): Promise<CtagsEntry[]> {
-    if (signal?.aborted) { return []; }
-    try {
-        const { stdout } = await execFile('ctags', [
+// Run ctags over the workspace and return all entries, streaming line-by-line to avoid buffer limits.
+function runCtags(workspaceRoot: string, signal?: AbortSignal): Promise<CtagsEntry[]> {
+    if (signal?.aborted) { return Promise.resolve([]); }
+    return new Promise(resolve => {
+        const entries: CtagsEntry[] = [];
+        const proc = child_process.spawn('ctags', [
             '-R',
             '--output-format=json',
             '--fields=+n',
@@ -34,22 +32,45 @@ async function runCtags(workspaceRoot: string, signal?: AbortSignal): Promise<Ct
             '--exclude=build_*',
             '--exclude=out',
             '--exclude=node_modules',
-            '--exclude=subprojects',  // avoid meson symlink loops on Windows
+            '--exclude=subprojects',
             '--exclude=.meson*',
             workspaceRoot,
-        ], { maxBuffer: 8 * 1024 * 1024 });
+        ]);
 
-        return stdout.trim().split('\n')
-            .filter(Boolean)
-            .map(line => {
-                try { return JSON.parse(line) as { name: string; path: string; line: number; kind: string }; }
-                catch { return null; }
-            })
-            .filter((e): e is CtagsEntry => e !== null && typeof e.name === 'string');
-    } catch (e) {
-        log.appendLine(`[CtagsAnalyzer] ctags failed: ${e}`);
-        return [];
-    }
+        let tail = '';
+        proc.stdout.on('data', (chunk: Buffer) => {
+            if (signal?.aborted) { proc.kill(); return; }
+            const text = tail + chunk.toString('utf8');
+            const lines = text.split('\n');
+            tail = lines.pop() ?? '';
+            for (const line of lines) {
+                if (!line) { continue; }
+                try {
+                    const e = JSON.parse(line) as { name: string; path: string; line: number; kind: string };
+                    if (typeof e.name === 'string') { entries.push(e); }
+                } catch { /* skip malformed line */ }
+            }
+        });
+
+        proc.on('error', err => {
+            log.appendLine(`[CtagsAnalyzer] ctags failed: ${err}`);
+            resolve([]);
+        });
+
+        proc.on('close', () => {
+            // flush any trailing partial line
+            if (tail.trim()) {
+                try {
+                    const e = JSON.parse(tail) as CtagsEntry;
+                    if (typeof e.name === 'string') { entries.push(e); }
+                } catch { /* ignore */ }
+            }
+            log.appendLine(`[CtagsAnalyzer] ctags returned ${entries.length} entries`);
+            resolve(entries);
+        });
+
+        signal?.addEventListener('abort', () => { proc.kill(); resolve([]); }, { once: true });
+    });
 }
 
 // Search files ctags knows about for calls to targetName.

@@ -205,6 +205,13 @@ export function generateWebviewHtml(
             background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
         }
         .analysis-btn:disabled { opacity: 0.5; cursor: default; }
+        .analysis-btn-cancel {
+            background: var(--vscode-inputValidation-warningBackground, rgba(128,80,0,0.2));
+            border-color: var(--vscode-inputValidation-warningBorder, rgba(200,140,0,0.5));
+        }
+        .analysis-btn-cancel:hover {
+            background: var(--vscode-inputValidation-warningBackground, rgba(128,80,0,0.35));
+        }
         /* GRAPH section */
         .graph-area {
             position: relative;

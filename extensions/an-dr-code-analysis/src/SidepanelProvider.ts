@@ -20,6 +20,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
     private readonly _analyzerFactory: AnalyzerFactory;
     private readonly _cache = new AnalysisCache();
     private readonly _disposables: vscode.Disposable[] = [];
+    private _analysisAbortController: AbortController | null = null;
 
     constructor(private readonly _extensionUri: vscode.Uri) {
         this._contextTracker = new ContextTracker();
@@ -82,10 +83,15 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                     ToolHelpPanel.showByName(msg.toolName);
                     break;
                 case 'requestAnalysis':
+                    this._cancelRunningAnalysis();
                     void this._runAnalysis(msg.graphType, msg.depth);
                     break;
                 case 'depthChange':
+                    this._cancelRunningAnalysis();
                     void this._runAnalysis(msg.graphType, msg.depth);
+                    break;
+                case 'cancelAnalysis':
+                    this._cancelRunningAnalysis();
                     break;
                 case 'nodeDoubleClick':
                     if (msg.filePath) {
@@ -151,6 +157,13 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         });
     }
 
+    private _cancelRunningAnalysis(): void {
+        if (this._analysisAbortController) {
+            this._analysisAbortController.abort();
+            this._analysisAbortController = null;
+        }
+    }
+
     private async _runAnalysis(graphType: GraphType, depth: number): Promise<void> {
         if (!this._view) { return; }
 
@@ -169,7 +182,6 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         // Snapshot the CallHierarchyItem NOW before the webview steals focus and
         // onDidChangeActiveTextEditor fires and potentially clears it.
         const callHierarchyItem = this._contextTracker.currentCallHierarchyItem;
-        const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem };
 
         const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
         if (cached) {
@@ -177,26 +189,42 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
             return;
         }
 
+        const controller = new AbortController();
+        this._analysisAbortController = controller;
+        const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem, signal: controller.signal };
+
         this._view.webview.postMessage({ type: 'analysisBusy', graphType });
 
         const chain = this._analyzerFactory.getChain(request);
         log.appendLine(`[analysis] graphType=${graphType} symbol=${ctx.symbol} lang=${ctx.langId} chain=[${chain.map(a => a.name).join(', ')}]`);
 
         for (const analyzer of chain) {
+            if (controller.signal.aborted) { break; }
             try {
                 const result = await analyzer.analyze(request);
+                if (controller.signal.aborted) { break; }
                 log.appendLine(`[analysis] ${analyzer.name}: ${result ? `${result.graph.nodes.length} nodes` : 'null (trying next)'}`);
                 if (result) {
                     this._cache.set(
                         { filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol },
                         result
                     );
+                    this._analysisAbortController = null;
                     this._view?.webview.postMessage({ type: 'analysisResult', graph: result.graph });
                     return;
                 }
             } catch (err) {
+                if (controller.signal.aborted) { break; }
                 log.appendLine(`[analysis] ${analyzer.name} threw: ${err}`);
             }
+        }
+
+        this._analysisAbortController = null;
+
+        if (controller.signal.aborted) {
+            // User cancelled — return to idle without showing an error.
+            this._view?.webview.postMessage({ type: 'analysisCancelled', graphType });
+            return;
         }
 
         this._view?.webview.postMessage({

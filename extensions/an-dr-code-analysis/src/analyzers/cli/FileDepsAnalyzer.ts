@@ -138,9 +138,29 @@ export class FileDepsAnalyzer implements IAnalyzer {
 
         addNode(targetFilePath, 'target');
 
-        // BFS: find what the target includes (outgoing = callees)
+        // BFS: simultaneously expand outgoing includes (callees) and incoming
+        // includes (callers) for every node at each depth level.
         const visited = new Set<string>();
         const queue: { filePath: string; depth: number }[] = [{ filePath: targetFilePath, depth: 0 }];
+
+        // Pre-build reverse index: basename → files that include it, for caller lookup.
+        // We build it lazily as a full scan once.
+        type ReverseEntry = { includer: string; resolvedTarget: string }[];
+        const reverseIndex = new Map<string, ReverseEntry>();
+        for (const f of allFiles) {
+            if (signal?.aborted) { return null; }
+            const includes = parseIncludes(f);
+            for (const inc of includes) {
+                const base = path.basename(inc.replace(/\\/g, '/'));
+                if (!reverseIndex.has(base)) { reverseIndex.set(base, []); }
+                const resolved = resolveInclude(inc, f, fileSet, basenameIndex);
+                if (resolved) {
+                    reverseIndex.get(base)!.push({ includer: f, resolvedTarget: resolved });
+                }
+            }
+        }
+
+        if (signal?.aborted) { return null; }
 
         while (queue.length > 0) {
             if (signal?.aborted) { return null; }
@@ -150,37 +170,29 @@ export class FileDepsAnalyzer implements IAnalyzer {
 
             if (depth >= request.depth) { continue; }
 
+            // Outgoing: what current includes
             const includes = parseIncludes(current);
             for (const inc of includes) {
                 const resolved = resolveInclude(inc, current, fileSet, basenameIndex);
-                if (!resolved) { continue; }
-                if (resolved === targetFilePath) { continue; }
-
+                if (!resolved || resolved === targetFilePath) { continue; }
                 const role = current === targetFilePath ? 'callee' : 'external';
                 addNode(resolved, role);
                 addEdge(current, resolved);
-
-                if (!visited.has(resolved) && depth + 1 < request.depth) {
+                if (!visited.has(resolved)) {
                     queue.push({ filePath: resolved, depth: depth + 1 });
                 }
             }
-        }
 
-        // Also find who includes the target file (incoming = callers)
-        const targetBase = path.basename(targetFilePath);
-        for (const f of allFiles) {
-            if (signal?.aborted) { return null; }
-            if (f === targetFilePath) { continue; }
-            const includes = parseIncludes(f);
-            for (const inc of includes) {
-                const base = path.basename(inc.replace(/\\/g, '/'));
-                if (base === targetBase) {
-                    const resolved = resolveInclude(inc, f, fileSet, basenameIndex);
-                    if (resolved === targetFilePath) {
-                        addNode(f, 'caller');
-                        addEdge(f, targetFilePath);
-                        break;
-                    }
+            // Incoming: who includes current
+            const base = path.basename(current);
+            for (const { includer, resolvedTarget } of reverseIndex.get(base) ?? []) {
+                if (resolvedTarget !== current) { continue; }
+                if (includer === targetFilePath) { continue; }
+                const role = current === targetFilePath ? 'caller' : 'external';
+                addNode(includer, role);
+                addEdge(includer, current);
+                if (!visited.has(includer)) {
+                    queue.push({ filePath: includer, depth: depth + 1 });
                 }
             }
         }

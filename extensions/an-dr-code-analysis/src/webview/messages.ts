@@ -52,6 +52,11 @@ export interface AnalysisBusyMessage {
     graphType: GraphType;
 }
 
+export interface AnalysisCancelledMessage {
+    type: 'analysisCancelled';
+    graphType: GraphType;
+}
+
 export interface RecoveryAction {
     label: string;
     command: string;
@@ -70,6 +75,7 @@ export type ExtensionToWebviewMessage =
     | AnalysisResultMessage
     | AnalysisErrorMessage
     | AnalysisBusyMessage
+    | AnalysisCancelledMessage
     | ClangdHealthMessage;
 
 // Webview → extension
@@ -122,6 +128,10 @@ export interface RunCommandMessage {
     args?: unknown[];
 }
 
+export interface CancelAnalysisMessage {
+    type: 'cancelAnalysis';
+}
+
 export type WebviewToExtensionMessage =
     | ReadyMessage
     | RefreshToolsMessage
@@ -131,4 +141,5 @@ export type WebviewToExtensionMessage =
     | DepthChangeMessage
     | NodeClickMessage
     | NodeDoubleClickMessage
-    | RunCommandMessage;
+    | RunCommandMessage
+    | CancelAnalysisMessage;

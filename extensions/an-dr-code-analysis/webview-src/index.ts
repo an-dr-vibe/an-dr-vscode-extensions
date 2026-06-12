@@ -53,9 +53,10 @@ interface ToolsStatusMessage  { type: 'toolsStatus';   tools: ToolStatus[]; }
 interface ContextUpdateMessage { type: 'contextUpdate'; context: EditorContext | null; }
 interface AnalysisResultMessage { type: 'analysisResult'; graph: GraphModel; }
 interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; message: string; recoveryActions?: RecoveryAction[]; }
-interface AnalysisBusyMessage   { type: 'analysisBusy';   graphType: GraphType; }
+interface AnalysisBusyMessage      { type: 'analysisBusy';      graphType: GraphType; }
+interface AnalysisCancelledMessage { type: 'analysisCancelled'; graphType: GraphType; }
 interface ClangdHealthMessage   { type: 'clangdHealth'; issue: ClangdHealth['issue']; message: string; recoveryActions?: RecoveryAction[]; }
-type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | ClangdHealthMessage;
+type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | AnalysisCancelledMessage | ClangdHealthMessage;
 
 // ── Stub graph (verification / Iteration 5) ──────────────────────────────────
 
@@ -274,8 +275,10 @@ function renderAnalysis(s: AnalysisState): string {
     const buttons = GRAPH_TYPES.map(gt => {
         const label = GRAPH_TYPE_LABELS[gt];
         const isBusy = s.status === 'busy' && s.activeGraphType === gt;
-        const btnLabel = isBusy ? `⏳ ${label}…` : label;
-        return `<button class="analysis-btn" data-graph-type="${gt}" ${isBusy ? 'disabled' : ''}>${btnLabel}</button>`;
+        const isOtherBusy = s.status === 'busy' && s.activeGraphType !== gt;
+        const btnLabel = isBusy ? `⏹ ${label}…` : label;
+        const cls = isBusy ? 'analysis-btn analysis-btn-cancel' : 'analysis-btn';
+        return `<button class="${cls}" data-graph-type="${gt}" ${isOtherBusy ? 'disabled' : ''}>${btnLabel}</button>`;
     }).join('');
 
     let configHtml = '';
@@ -405,7 +408,7 @@ function renderGraph(s: AnalysisState, depth: number): string {
         bodyHtml = `<div class="graph-area" id="cy-container"></div>`
             + `<div class="graph-error">${label ? `<strong>${esc(label)}:</strong> ` : ''}${esc(s.errorMessage ?? 'Unknown error')}</div>`;
     } else if (s.status === 'result' && s.graph) {
-        const fallbackNote = s.graph.confidence !== 'high'
+        const fallbackNote = s.graph.tool === 'ctags'
             ? `<div class="graph-fallback-note">Fallback tool — callers only, no callees</div>`
             : '';
         const targetNode = s.graph.nodes.find(n => n.id === s.graph!.targetId);
@@ -547,9 +550,14 @@ root.addEventListener('click', (e: MouseEvent) => {
     const analysisBtn = target.closest<HTMLButtonElement>('.analysis-btn[data-graph-type]');
     if (analysisBtn && !analysisBtn.disabled) {
         const gt = analysisBtn.dataset['graphType'] as GraphType;
-        state.analysis = { status: 'busy', activeGraphType: gt };
-        render();
-        vscode.postMessage({ type: 'requestAnalysis', graphType: gt, depth: state.depth });
+        if (state.analysis.status === 'busy' && state.analysis.activeGraphType === gt) {
+            // Second click on the active busy button — cancel
+            vscode.postMessage({ type: 'cancelAnalysis' });
+        } else {
+            state.analysis = { status: 'busy', activeGraphType: gt };
+            render();
+            vscode.postMessage({ type: 'requestAnalysis', graphType: gt, depth: state.depth });
+        }
         return;
     }
 
@@ -653,6 +661,10 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             state.depth = msg.graph.depth;
             state.uncheckedPaths = new Set();
             state.collapsedDirs = new Set();
+            render();
+            break;
+        case 'analysisCancelled':
+            state.analysis = { status: 'idle' };
             render();
             break;
         case 'analysisError':

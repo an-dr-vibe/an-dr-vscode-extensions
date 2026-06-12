@@ -95,7 +95,11 @@ export class CytoscapeRenderer {
 
     render(graph: GraphModel): void {
         const prevSelectedId = this._selectedNodeId;
+        console.log('[CY] render() called, nodes:', graph.nodes.length, 'prevSelected:', prevSelectedId);
+        console.log('[CY] container in DOM:', document.contains(this._container), 'size:', this._container.offsetWidth, 'x', this._container.offsetHeight);
         this._cy?.destroy();
+        // cytoscape's destroy() wipes all container children — re-attach our button
+        this._container.appendChild(this._jumpBtn);
         this._selectedNodeId = null;
         this._jumpBtn.style.display = 'none';
         this._jumpBtn.onclick = null;
@@ -124,14 +128,15 @@ export class CytoscapeRenderer {
             })),
         ];
 
-        this._cy = cytoscape({
+        const cy = cytoscape({
             container: this._container,
             elements,
             style: this._buildStyle(),
             layout: {
                 ...this._pickLayout(graph), stop: () => {
+                    // Guard: if a newer render() replaced _cy before this async callback fired, bail out.
+                    if (this._cy !== cy) { return; }
                     this._resolveOverlaps();
-                    // Re-apply highlight if the previously selected node still exists in the new graph.
                     if (prevSelectedId && this._cy?.getElementById(prevSelectedId).length) {
                         this.selectNode(prevSelectedId);
                     }
@@ -141,6 +146,7 @@ export class CytoscapeRenderer {
             userPanningEnabled: true,
             boxSelectionEnabled: false,
         });
+        this._cy = cy;
 
         this._bindEvents();
     }
@@ -223,6 +229,31 @@ export class CytoscapeRenderer {
             this._jumpBtn.onclick = () => this._onNodeDblClick(nodeId, filePath, line, fullName);
         }
         cy.animate({ center: { eles: node } } as any, { duration: 200 });
+    }
+
+    selectNodesForFile(filePath: string): void {
+        const cy = this._cy;
+        if (!cy) { return; }
+        const norm = (s: string) => s.replace(/\\/g, '/');
+        const nfp = norm(filePath);
+        const matching = cy.nodes().filter(n => norm(n.data('filePath') ?? '') === nfp);
+        if (matching.empty()) { return; }
+        this._selectedNodeId = null;
+        this._jumpBtn.style.display = 'none';
+        this._jumpBtn.onclick = null;
+        this._clearHighlight();
+        cy.elements().addClass('hl-dim');
+        matching.removeClass('hl-dim').addClass('hl-selected');
+        const connectedEdges = matching.connectedEdges();
+        connectedEdges.removeClass('hl-dim');
+        connectedEdges.forEach(edge => {
+            const srcInFile = norm(edge.source().data('filePath') ?? '') === nfp;
+            const tgtInFile = norm(edge.target().data('filePath') ?? '') === nfp;
+            if (srcInFile) { edge.addClass('hl-outgoing'); }
+            if (tgtInFile) { edge.addClass('hl-incoming'); }
+        });
+        connectedEdges.connectedNodes().removeClass('hl-dim');
+        cy.animate({ fit: { eles: matching, padding: 40 } } as any, { duration: 200 });
     }
 
     // ── Selection highlight ───────────────────────────────────────────────────
@@ -420,12 +451,14 @@ export class CytoscapeRenderer {
 
     private _bindEvents(): void {
         if (!this._cy) { return; }
+        console.log('[CY] _bindEvents() registered on new cy instance');
 
         this._cy.on('tap', 'node', (evt) => {
             const node = evt.target;
             const nodeId: string = node.id();
             const filePath: string | undefined = node.data('filePath');
             const line: number | undefined = node.data('line');
+            console.log('[CY] tap node:', nodeId, 'filePath:', filePath);
 
             this._onNodeClick(nodeId, filePath, line);
 

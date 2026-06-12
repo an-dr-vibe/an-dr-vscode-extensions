@@ -628,7 +628,7 @@ function render(): void {
     if (state.analysis.status === 'result' && state.analysis.graph) {
         let g = foldCollapsedDirs(applyFilter(state.analysis.graph));
         if (state.mergeCircular) { g = mergeCircularEdges(g); }
-        getOrCreateRenderer().render(g);
+        getOrCreateRenderer().update(g);
     }
 }
 
@@ -661,7 +661,7 @@ function renderGraphOnly(): void {
     if (state.mergeCircular) { filtered = mergeCircularEdges(filtered); }
     const container = document.getElementById('cy-container');
     if (!container) { render(); return; }
-    getOrCreateRenderer().render(filtered);
+    getOrCreateRenderer().update(filtered);
 }
 
 render();
@@ -841,14 +841,60 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             state.analysis = { status: 'busy', activeGraphType: msg.graphType, busyMessage: msg.message };
             render();
             break;
-        case 'analysisResult':
+        case 'analysisResult': {
+            const prevGraphType = state.analysis.activeGraphType;
             state.analysis = { status: 'result', graph: msg.graph, activeGraphType: msg.graph.graphType };
             state.depth = msg.graph.depth;
             state.uncheckedPaths = new Set();
             state.collapsedDirs = new Set();
             state.selectedFilePath = null;
-            render();
+            // If the graph type is the same and the container is already in the DOM,
+            // patch the graph in-place (preserves viewport/positions) rather than full render.
+            const container = document.getElementById('cy-container');
+            if (container && prevGraphType === msg.graph.graphType && renderer) {
+                // Update meta row and analysis buttons in-place
+                renderAnalysisSection();
+                // Patch graph section header (tool badge, node count) without destroying cy
+                const graphSection = document.querySelector<HTMLElement>('[data-section-id="graph"]');
+                if (graphSection) {
+                    const tmpl = document.createElement('template');
+                    tmpl.innerHTML = renderGraph(state.analysis, state.depth);
+                    const newSection = tmpl.content.firstElementChild as HTMLElement;
+                    // Preserve open state
+                    if (graphSection instanceof HTMLDetailsElement) {
+                        (newSection as HTMLDetailsElement).open = graphSection.open;
+                    }
+                    // Swap only the meta row content — keep #cy-container intact
+                    const oldMeta = graphSection.querySelector('.graph-meta');
+                    const newMeta = newSection.querySelector('.graph-meta');
+                    if (oldMeta && newMeta) { oldMeta.replaceWith(newMeta); }
+                    const oldFallback = graphSection.querySelector('.graph-fallback-note');
+                    const newFallback = newSection.querySelector('.graph-fallback-note');
+                    if (newFallback) {
+                        if (oldFallback) { oldFallback.replaceWith(newFallback); }
+                        else { graphSection.querySelector('.graph-area')?.after(newFallback); }
+                    } else { oldFallback?.remove(); }
+                    // Update header badge
+                    const oldHeader = graphSection.querySelector('.section-header');
+                    const newHeader = newSection.querySelector('.section-header');
+                    if (oldHeader && newHeader) { oldHeader.innerHTML = newHeader.innerHTML; }
+                }
+                // Rebuild file tree
+                if (state.analysis.graph) {
+                    const ftSection = document.querySelector('[data-section-id="tree"]');
+                    const tmpl2 = document.createElement('template');
+                    tmpl2.innerHTML = renderFileFilter(state.analysis.graph);
+                    if (ftSection) { ftSection.replaceWith(tmpl2.content.firstElementChild!); }
+                    else { document.querySelector('[data-section-id="graph"]')?.after(tmpl2.content.firstElementChild!); }
+                }
+                let g = foldCollapsedDirs(applyFilter(msg.graph));
+                if (state.mergeCircular) { g = mergeCircularEdges(g); }
+                renderer.update(g);
+            } else {
+                render();
+            }
             break;
+        }
         case 'analysisCancelled':
             state.analysis = { status: 'idle' };
             render();

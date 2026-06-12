@@ -59,6 +59,9 @@ export class CytoscapeRenderer {
     private _onNodeClick: NodeEventCallback;
     private _onNodeDblClick: NodeEventCallback;
     private _selectedNodeId: string | null = null;
+    private _lastGraph: GraphModel | null = null;
+    // Remembers the last known position of every node by id — survives fold/unfold cycles.
+    private _posCache: Map<string, { x: number; y: number }> = new Map();
 
     constructor(
         container: HTMLElement,
@@ -98,129 +101,25 @@ export class CytoscapeRenderer {
         return btn;
     }
 
-    render(graph: GraphModel): void {
-        const prevSelectedId = this._selectedNodeId;
-        this._cy?.destroy();
-        // cytoscape's destroy() wipes all container children — re-attach our button
-        this._container.appendChild(this._jumpBtn);
-        this._selectedNodeId = null;
-        this._jumpBtn.style.display = 'none';
-        this._jumpBtn.onclick = null;
+    // ── Public API ────────────────────────────────────────────────────────────
 
-        const elements: cytoscape.ElementDefinition[] = [
-            ...graph.nodes.map(n => ({
-                group: 'nodes' as const,
-                data: {
-                    id: n.id,
-                    label: n.label,
-                    fullName: n.fullName,
-                    filePath: n.filePath,
-                    line: n.line,
-                    role: n.role,
-                },
-            })),
-            ...graph.edges.map((e, i) => ({
-                group: 'edges' as const,
-                data: {
-                    id: `e${i}`,
-                    source: e.sourceId,
-                    target: e.targetId,
-                    isExternal: e.isExternal ?? false,
-                    isBidirectional: e.isBidirectional ?? false,
-                },
-            })),
-        ];
-
-        // Use let (not const) so the stop callback — which fires synchronously inside
-        // the cytoscape() constructor for some layouts — can reference cy without TDZ crash.
-        let cy: cytoscape.Core;
-        cy = cytoscape({
-            container: this._container,
-            elements,
-            style: this._buildStyle(),
-            layout: {
-                ...this._pickLayout(graph), stop: () => {
-                    // If a newer render() has replaced _cy, this callback is stale — bail.
-                    if (!cy || (this._cy !== cy && this._cy !== null)) { return; }
-                    if (cy.destroyed()) { return; }
-                    this._resolveOverlaps();
-                    if (prevSelectedId && this._cy?.getElementById(prevSelectedId).length) {
-                        this.selectNode(prevSelectedId);
-                    }
-                },
-            } as any,
-            userZoomingEnabled: true,
-            userPanningEnabled: true,
-            boxSelectionEnabled: false,
-        });
-        this._cy = cy;
-
-        this._bindEvents();
+    /** Full or incremental render. First call builds from scratch; subsequent calls patch. */
+    update(graph: GraphModel): void {
+        if (!this._cy || this._cy.destroyed()) {
+            this._initFresh(graph);
+            return;
+        }
+        this._patch(graph);
     }
 
     destroy(): void {
         this._cy?.destroy();
         this._cy = null;
+        this._lastGraph = null;
+        this._posCache.clear();
         this._hideTooltip();
         this._jumpBtn.style.display = 'none';
     }
-
-    private _resolveOverlaps(): void {
-        const cy = this._cy;
-        if (!cy || cy.destroyed()) { return; }
-
-        const MARGIN = 12;
-        const MAX_PASSES = 80;
-
-        for (let pass = 0; pass < MAX_PASSES; pass++) {
-            if (cy.destroyed()) { break; }
-            const nodes = cy.nodes();
-            let moved = false;
-
-            for (let i = 0; i < nodes.length; i++) {
-                for (let j = i + 1; j < nodes.length; j++) {
-                    const a = nodes[i];
-                    const b = nodes[j];
-                    const bb1 = a.boundingBox({});
-                    const bb2 = b.boundingBox({});
-
-                    // Overlap on each axis: positive means overlapping
-                    const ox = Math.min(bb1.x2 + MARGIN, bb2.x2 + MARGIN) - Math.max(bb1.x1 - MARGIN, bb2.x1 - MARGIN);
-                    const oy = Math.min(bb1.y2 + MARGIN, bb2.y2 + MARGIN) - Math.max(bb1.y1 - MARGIN, bb2.y1 - MARGIN);
-
-                    if (ox <= 0 || oy <= 0) { continue; }
-
-                    // Separate along the axis of least overlap
-                    const half = 0.5;
-                    if (ox < oy) {
-                        const cx1 = (bb1.x1 + bb1.x2) / 2;
-                        const cx2 = (bb2.x1 + bb2.x2) / 2;
-                        const dir = cx1 <= cx2 ? -1 : 1;
-                        a.shift({ x: dir * ox * half, y: 0 });
-                        b.shift({ x: -dir * ox * half, y: 0 });
-                    } else {
-                        const cy1 = (bb1.y1 + bb1.y2) / 2;
-                        const cy2 = (bb2.y1 + bb2.y2) / 2;
-                        const dir = cy1 <= cy2 ? -1 : 1;
-                        a.shift({ x: 0, y: dir * oy * half });
-                        b.shift({ x: 0, y: -dir * oy * half });
-                    }
-                    moved = true;
-                }
-            }
-
-            if (!moved) { break; }
-        }
-
-        cy.fit(undefined, 24);
-    }
-
-    private _pickLayout(graph: GraphModel): cytoscape.LayoutOptions {
-        const name: LayoutName = layoutForGraphType(graph.graphType, false);
-        return getLayout(name, graph.nodes.length);
-    }
-
-    // ── Public API ────────────────────────────────────────────────────────────
 
     selectNode(nodeId: string): void {
         const cy = this._cy;
@@ -264,6 +163,257 @@ export class CytoscapeRenderer {
         cy.animate({ fit: { eles: matching, padding: 40 } } as any, { duration: 200 });
     }
 
+    // ── First render ──────────────────────────────────────────────────────────
+
+    private _initFresh(graph: GraphModel): void {
+        this._cy?.destroy();
+        this._container.appendChild(this._jumpBtn);
+        this._selectedNodeId = null;
+        this._jumpBtn.style.display = 'none';
+        this._jumpBtn.onclick = null;
+
+        const elements = this._toElements(graph);
+
+        let cy: cytoscape.Core;
+        cy = cytoscape({
+            container: this._container,
+            elements,
+            style: this._buildStyle(),
+            layout: {
+                ...this._pickLayout(graph), stop: () => {
+                    if (!cy || (this._cy !== cy && this._cy !== null)) { return; }
+                    if (cy.destroyed()) { return; }
+                    this._resolveOverlaps(cy.nodes());
+                    cy.fit(undefined, 24);
+                    // Seed position cache with post-layout positions
+                    cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
+                },
+            } as any,
+            userZoomingEnabled: true,
+            userPanningEnabled: true,
+            boxSelectionEnabled: false,
+        });
+        this._cy = cy;
+        this._lastGraph = graph;
+        this._bindEvents();
+    }
+
+    // ── Incremental patch ─────────────────────────────────────────────────────
+
+    private _patch(graph: GraphModel): void {
+        const cy = this._cy!;
+        const prev = this._lastGraph;
+
+        const prevNodeIds = new Set(prev?.nodes.map(n => n.id) ?? []);
+        const nextNodeIds = new Set(graph.nodes.map(n => n.id));
+        const prevEdgeKeys = new Set(prev?.edges.map(e => `${e.sourceId}->${e.targetId}`) ?? []);
+        const nextEdgeKeys = new Set(graph.edges.map(e => `${e.sourceId}->${e.targetId}`));
+
+        const addedNodeIds   = graph.nodes.filter(n => !prevNodeIds.has(n.id));
+        const removedNodeIds = (prev?.nodes ?? []).filter(n => !nextNodeIds.has(n.id));
+        const addedEdges     = graph.edges.filter(e => !prevEdgeKeys.has(`${e.sourceId}->${e.targetId}`));
+        const removedEdges   = (prev?.edges ?? []).filter(e => !nextEdgeKeys.has(`${e.sourceId}->${e.targetId}`));
+
+        // Update data on nodes whose role or label may have changed (e.g. old target becomes caller)
+        for (const node of graph.nodes) {
+            const el = cy.getElementById(node.id);
+            if (!el.empty()) {
+                el.data('label',    node.label);
+                el.data('fullName', node.fullName);
+                el.data('role',     node.role);
+                el.data('filePath', node.filePath);
+                el.data('line',     node.line);
+            }
+        }
+
+        // Snapshot positions of nodes about to be removed into the cache
+        for (const n of removedNodeIds) {
+            const el = cy.getElementById(n.id);
+            if (!el.empty()) { this._posCache.set(n.id, { ...el.position() }); }
+        }
+        // Also keep positions of all currently visible nodes up-to-date
+        cy.nodes().forEach(n => { this._posCache.set(n.id(), { ...n.position() }); });
+
+        // Remove stale edges first (before removing nodes they depend on)
+        for (const e of removedEdges) {
+            cy.getElementById(`e_${e.sourceId}_${e.targetId}`).remove();
+        }
+        // Remove stale nodes
+        for (const n of removedNodeIds) {
+            cy.getElementById(n.id).remove();
+        }
+
+        // Add new nodes — restore from cache if available, otherwise spawn near neighbours
+        const trulyNew: GraphNode[] = [];
+        if (addedNodeIds.length > 0) {
+            const newEles: cytoscape.ElementDefinition[] = addedNodeIds.map(n => {
+                const cached = this._posCache.get(n.id);
+                if (!cached) { trulyNew.push(n); }
+                return {
+                    group: 'nodes' as const,
+                    data: {
+                        id: n.id, label: n.label, fullName: n.fullName,
+                        filePath: n.filePath, line: n.line, role: n.role,
+                    },
+                    position: cached ?? this._spawnPosition(n.id, graph, cy),
+                };
+            });
+            cy.add(newEles);
+        }
+
+        // Add new edges
+        if (addedEdges.length > 0) {
+            const newEdgeEles: cytoscape.ElementDefinition[] = addedEdges.map(e => ({
+                group: 'edges' as const,
+                data: {
+                    id: `e_${e.sourceId}_${e.targetId}`,
+                    source: e.sourceId,
+                    target: e.targetId,
+                    isExternal: e.isExternal ?? false,
+                    isBidirectional: e.isBidirectional ?? false,
+                },
+            }));
+            cy.add(newEdgeEles);
+        }
+
+        this._lastGraph = graph;
+
+        // Resolve overlaps only for genuinely new nodes (no cached position)
+        if (trulyNew.length > 0) {
+            const selector = trulyNew.map(n => `#${CSS.escape(n.id)}`).join(',');
+            this._resolveOverlaps(cy.nodes(selector));
+        }
+
+        // Decide whether to fit:
+        // - target node changed → fit to new target
+        // - node count changed substantially (>30%) → fit all
+        // - only minor changes → keep viewport
+        const prevCount = prev?.nodes.length ?? 0;
+        const nextCount = graph.nodes.length;
+        const targetChanged = prev?.targetId !== graph.targetId;
+        const countShift = prevCount > 0 ? Math.abs(nextCount - prevCount) / prevCount : 1;
+
+        if (targetChanged || countShift > 0.3) {
+            cy.animate({ fit: { eles: cy.nodes(), padding: 24 } } as any, { duration: 250 });
+        }
+
+        // Re-apply selection if the selected node is still present
+        if (this._selectedNodeId && cy.getElementById(this._selectedNodeId).length) {
+            this._applyHighlight(this._selectedNodeId);
+        } else {
+            this._selectedNodeId = null;
+            this._jumpBtn.style.display = 'none';
+            this._jumpBtn.onclick = null;
+            this._clearHighlight();
+        }
+    }
+
+    /** Pick a spawn position for a new node: centroid of neighbours (live or cached) + jitter. */
+    private _spawnPosition(nodeId: string, graph: GraphModel, cy: cytoscape.Core): { x: number; y: number } {
+        const neighbourIds = graph.edges
+            .filter(e => e.sourceId === nodeId || e.targetId === nodeId)
+            .map(e => e.sourceId === nodeId ? e.targetId : e.sourceId);
+
+        const positions: { x: number; y: number }[] = [];
+        for (const id of neighbourIds) {
+            const live = cy.getElementById(id);
+            if (!live.empty()) { positions.push(live.position()); }
+            else {
+                const cached = this._posCache.get(id);
+                if (cached) { positions.push(cached); }
+            }
+        }
+
+        if (positions.length > 0) {
+            const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+            const cy2 = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+            const angle = Math.random() * 2 * Math.PI;
+            const r = 60 + Math.random() * 40;
+            return { x: cx + Math.cos(angle) * r, y: cy2 + Math.sin(angle) * r };
+        }
+
+        // No neighbours found anywhere — place near viewport center with jitter
+        const ext = cy.extent();
+        return {
+            x: (ext.x1 + ext.x2) / 2 + (Math.random() - 0.5) * 120,
+            y: (ext.y1 + ext.y2) / 2 + (Math.random() - 0.5) * 120,
+        };
+    }
+
+    // ── Overlap resolver ──────────────────────────────────────────────────────
+
+    private _resolveOverlaps(nodes: cytoscape.NodeCollection): void {
+        const cy = this._cy;
+        if (!cy || cy.destroyed()) { return; }
+
+        const MARGIN = 12;
+        const MAX_PASSES = 80;
+        const allNodes = cy.nodes();
+
+        for (let pass = 0; pass < MAX_PASSES; pass++) {
+            if (cy.destroyed()) { break; }
+            let moved = false;
+
+            nodes.forEach(a => {
+                allNodes.forEach(b => {
+                    if (a.id() === b.id()) { return; }
+                    const bb1 = a.boundingBox({});
+                    const bb2 = b.boundingBox({});
+
+                    const ox = Math.min(bb1.x2 + MARGIN, bb2.x2 + MARGIN) - Math.max(bb1.x1 - MARGIN, bb2.x1 - MARGIN);
+                    const oy = Math.min(bb1.y2 + MARGIN, bb2.y2 + MARGIN) - Math.max(bb1.y1 - MARGIN, bb2.y1 - MARGIN);
+
+                    if (ox <= 0 || oy <= 0) { return; }
+
+                    const half = 0.5;
+                    if (ox < oy) {
+                        const c1 = (bb1.x1 + bb1.x2) / 2;
+                        const c2 = (bb2.x1 + bb2.x2) / 2;
+                        const dir = c1 <= c2 ? -1 : 1;
+                        a.shift({ x: dir * ox * half, y: 0 });
+                        b.shift({ x: -dir * ox * half, y: 0 });
+                    } else {
+                        const c1 = (bb1.y1 + bb1.y2) / 2;
+                        const c2 = (bb2.y1 + bb2.y2) / 2;
+                        const dir = c1 <= c2 ? -1 : 1;
+                        a.shift({ x: 0, y: dir * oy * half });
+                        b.shift({ x: 0, y: -dir * oy * half });
+                    }
+                    moved = true;
+                });
+            });
+
+            if (!moved) { break; }
+        }
+    }
+
+    private _pickLayout(graph: GraphModel): cytoscape.LayoutOptions {
+        const name: LayoutName = layoutForGraphType(graph.graphType, false);
+        return getLayout(name, graph.nodes.length);
+    }
+
+    private _toElements(graph: GraphModel): cytoscape.ElementDefinition[] {
+        return [
+            ...graph.nodes.map(n => ({
+                group: 'nodes' as const,
+                data: {
+                    id: n.id, label: n.label, fullName: n.fullName,
+                    filePath: n.filePath, line: n.line, role: n.role,
+                },
+            })),
+            ...graph.edges.map(e => ({
+                group: 'edges' as const,
+                data: {
+                    id: `e_${e.sourceId}_${e.targetId}`,
+                    source: e.sourceId,
+                    target: e.targetId,
+                    isExternal: e.isExternal ?? false,
+                    isBidirectional: e.isBidirectional ?? false,
+                },
+            })),
+        ];
+    }
+
     // ── Selection highlight ───────────────────────────────────────────────────
 
     private _applyHighlight(nodeId: string): void {
@@ -273,7 +423,6 @@ export class CytoscapeRenderer {
         const node = cy.getElementById(nodeId);
         if (node.empty()) { return; }
 
-        // Clear cytoscape native selection state before applying our own classes
         cy.elements().unselect();
         this._clearHighlight();
 
@@ -282,10 +431,7 @@ export class CytoscapeRenderer {
         const connectedEdges = incomingEdges.union(outgoingEdges);
         const connectedNodes = connectedEdges.connectedNodes();
 
-        // Dim everything first
         cy.elements().addClass('hl-dim');
-
-        // Un-dim the selected node and its neighbours
         node.removeClass('hl-dim').addClass('hl-selected');
         connectedNodes.removeClass('hl-dim');
         incomingEdges.removeClass('hl-dim').addClass('hl-incoming');
@@ -323,8 +469,8 @@ export class CytoscapeRenderer {
                     'color': ROLE_COLORS.callee.label,
                     'text-wrap': 'wrap',
                     'text-max-width': '160px',
-                    'transition-property': 'opacity',
-                    'transition-duration': '150ms' as any,
+                    'transition-property': 'opacity, background-color, border-color',
+                    'transition-duration': '200ms' as any,
                 },
             },
             {
@@ -370,13 +516,9 @@ export class CytoscapeRenderer {
                     'opacity': 0.85,
                 },
             },
-            // Suppress Cytoscape's native selection overlay entirely — we manage it via hl- classes
             {
                 selector: 'node:selected',
-                style: {
-                    'border-width': 1.5,
-                    'overlay-opacity': 0,
-                },
+                style: { 'border-width': 1.5, 'overlay-opacity': 0 },
             },
             {
                 selector: 'edge:selected',
@@ -429,7 +571,7 @@ export class CytoscapeRenderer {
                     'curve-style': 'straight',
                     'arrow-scale': 1,
                     'transition-property': 'opacity, line-color, target-arrow-color, width',
-                    'transition-duration': '150ms' as any,
+                    'transition-duration': '200ms' as any,
                 },
             },
             {
@@ -469,7 +611,6 @@ export class CytoscapeRenderer {
             this._onNodeClick(nodeId, filePath, line);
 
             if (this._selectedNodeId === nodeId) {
-                // Second tap on same node — deselect
                 this._selectedNodeId = null;
                 this._clearHighlight();
                 this._jumpBtn.style.display = 'none';
@@ -489,7 +630,6 @@ export class CytoscapeRenderer {
         });
 
         this._cy.on('tap', (evt) => {
-            // Tap on background — clear selection
             if (evt.target === this._cy) {
                 this._selectedNodeId = null;
                 this._clearHighlight();
@@ -525,7 +665,6 @@ export class CytoscapeRenderer {
     private _showTooltip(text: string, pos: { x: number; y: number }): void {
         this._tooltip.textContent = text;
         this._tooltip.style.display = 'block';
-        // Measure after making visible so offsetWidth is accurate
         const tw = this._tooltip.offsetWidth;
         const th = this._tooltip.offsetHeight;
         const vw = window.innerWidth;

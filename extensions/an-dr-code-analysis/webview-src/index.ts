@@ -34,10 +34,10 @@ interface GraphNode {
     fullName: string;
     filePath?: string;
     line?: number;
-    role: 'target' | 'caller' | 'callee' | 'external';
+    role: 'target' | 'caller' | 'callee' | 'external' | 'folder';
 }
 
-interface GraphEdge { sourceId: string; targetId: string; isExternal?: boolean; }
+interface GraphEdge { sourceId: string; targetId: string; isExternal?: boolean; isBidirectional?: boolean; }
 
 interface GraphModel {
     graphType: GraphType;
@@ -150,6 +150,7 @@ interface AppState {
     uncheckedPaths: Set<string>;
     collapsedDirs: Set<string>;
     clangdHealth: ClangdHealth | null;
+    mergeCircular: boolean;
 }
 const state: AppState = {
     tools: null,
@@ -159,6 +160,7 @@ const state: AppState = {
     uncheckedPaths: new Set(),
     collapsedDirs: new Set(),
     clangdHealth: null,
+    mergeCircular: true,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -378,6 +380,103 @@ function applyFilter(graph: GraphModel): GraphModel {
     return { ...graph, nodes: finalNodes, edges: visibleEdges };
 }
 
+// Replace all nodes whose filePath falls under a collapsed dir with a single
+// folder node. Edges are redirected; intra-folder edges are dropped.
+function foldCollapsedDirs(graph: GraphModel): GraphModel {
+    if (state.collapsedDirs.size === 0) { return graph; }
+    const norm = (s: string) => s.replace(/\\/g, '/');
+
+    // Map each node id → the folder id it collapses into (if any).
+    const nodeToFolder = new Map<string, string>();
+    for (const node of graph.nodes) {
+        if (!node.filePath || node.role === 'target') { continue; }
+        const fp = norm(node.filePath);
+        for (const dir of state.collapsedDirs) {
+            const nd = norm(dir);
+            if (fp.startsWith(nd + '/') || fp === nd) {
+                nodeToFolder.set(node.id, nd);
+                break;
+            }
+        }
+    }
+
+    if (nodeToFolder.size === 0) { return graph; }
+
+    // Build folder nodes for every dir that actually absorbed something.
+    const folderIds = new Set(nodeToFolder.values());
+    const folderNodes = new Map<string, GraphNode>();
+    for (const dirPath of folderIds) {
+        const parts = dirPath.split('/');
+        const label = parts[parts.length - 1] + '/';
+        folderNodes.set(dirPath, {
+            id: dirPath,
+            label,
+            fullName: dirPath,
+            filePath: dirPath,
+            role: 'folder',
+        });
+    }
+
+    // Keep nodes that are not collapsed.
+    const keptNodes: GraphNode[] = [];
+    for (const node of graph.nodes) {
+        if (!nodeToFolder.has(node.id)) { keptNodes.push(node); }
+    }
+
+    // Redirect edges; drop intra-folder edges; dedup.
+    const edgeSet = new Set<string>();
+    const newEdges: GraphEdge[] = [];
+    const resolve = (id: string) => nodeToFolder.get(id) ?? id;
+
+    for (const edge of graph.edges) {
+        const src = resolve(edge.sourceId);
+        const tgt = resolve(edge.targetId);
+        if (src === tgt) { continue; } // intra-folder
+        const key = `${src}->${tgt}`;
+        if (!edgeSet.has(key)) {
+            edgeSet.add(key);
+            newEdges.push({ sourceId: src, targetId: tgt, isExternal: edge.isExternal });
+        }
+    }
+
+    return {
+        ...graph,
+        nodes: [...keptNodes, ...folderNodes.values()],
+        edges: newEdges,
+    };
+}
+
+// Merge A→B + B→A pairs into a single bidirectional edge.
+function mergeCircularEdges(graph: GraphModel): GraphModel {
+    const forward = new Set<string>();
+    for (const e of graph.edges) { forward.add(`${e.sourceId}->${e.targetId}`); }
+
+    const kept: GraphEdge[] = [];
+    const seen = new Set<string>();
+    for (const e of graph.edges) {
+        const key  = `${e.sourceId}->${e.targetId}`;
+        const back = `${e.targetId}->${e.sourceId}`;
+        if (seen.has(key)) { continue; }
+        if (forward.has(back)) {
+            // Circular pair — emit one merged edge (sourceId < targetId for stability)
+            const [a, b] = e.sourceId < e.targetId
+                ? [e.sourceId, e.targetId]
+                : [e.targetId, e.sourceId];
+            const mergedKey = `${a}->${b}`;
+            if (!seen.has(mergedKey)) {
+                seen.add(mergedKey);
+                kept.push({ sourceId: a, targetId: b, isBidirectional: true });
+            }
+            seen.add(key);
+            seen.add(back);
+        } else {
+            seen.add(key);
+            kept.push(e);
+        }
+    }
+    return { ...graph, edges: kept };
+}
+
 // ── GRAPH section ────────────────────────────────────────────────────────────
 
 const CONFIDENCE_BADGE: Record<string, string> = {
@@ -415,10 +514,14 @@ function renderGraph(s: AnalysisState, depth: number): string {
         const originBtn = (targetNode?.filePath)
             ? `<button class="depth-btn" id="go-to-origin" title="${esc(targetNode.filePath)}">⌖ origin</button>`
             : '';
+        const mergeChk = `<label class="graph-meta-check" title="Show circular dependencies as a single double-headed red arrow">
+            <input type="checkbox" id="merge-circular-chk" ${state.mergeCircular ? 'checked' : ''}> circular
+          </label>`;
         bodyHtml = `<div class="graph-area" id="cy-container"></div>
           <div class="graph-meta">
             <span class="graph-node-count">${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</span>
             ${originBtn}
+            ${mergeChk}
           </div>${fallbackNote}`;
     } else {
         bodyHtml = `<div class="graph-area" id="cy-container"></div><div class="graph-placeholder">No results found.</div>`;
@@ -469,8 +572,9 @@ function render(): void {
 
     // mount cytoscape into the freshly created #cy-container
     if (state.analysis.status === 'result' && state.analysis.graph) {
-        const filtered = applyFilter(state.analysis.graph);
-        getOrCreateRenderer().render(filtered);
+        let g = foldCollapsedDirs(applyFilter(state.analysis.graph));
+        if (state.mergeCircular) { g = mergeCircularEdges(g); }
+        getOrCreateRenderer().render(g);
     }
 }
 
@@ -496,7 +600,8 @@ function rebuildFilterBody(): void {
 // only the filter changes so <details> open/collapsed state is preserved.
 function renderGraphOnly(): void {
     if (state.analysis.status !== 'result' || !state.analysis.graph) { return; }
-    const filtered = applyFilter(state.analysis.graph);
+    let filtered = foldCollapsedDirs(applyFilter(state.analysis.graph));
+    if (state.mergeCircular) { filtered = mergeCircularEdges(filtered); }
     // Re-use existing renderer if container still exists, else recreate
     const container = document.getElementById('cy-container');
     if (!container) { render(); return; }
@@ -582,13 +687,14 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
-    // File filter tree: collapse/expand toggle — rebuild only the filter body, not the whole page
+    // File filter tree: collapse/expand toggle — rebuild filter UI and re-render graph
     const toggle = target.closest<HTMLElement>('.ft-toggle');
     if (toggle) {
         const dir = toggle.dataset['dir']!;
         if (state.collapsedDirs.has(dir)) { state.collapsedDirs.delete(dir); }
         else { state.collapsedDirs.add(dir); }
         rebuildFilterBody();
+        renderGraphOnly();
         return;
     }
     const dirLabel = target.closest<HTMLElement>('.ft-dir');
@@ -597,6 +703,7 @@ root.addEventListener('click', (e: MouseEvent) => {
         if (state.collapsedDirs.has(dir)) { state.collapsedDirs.delete(dir); }
         else { state.collapsedDirs.add(dir); }
         rebuildFilterBody();
+        renderGraphOnly();
         return;
     }
 });
@@ -604,6 +711,13 @@ root.addEventListener('click', (e: MouseEvent) => {
 // File filter checkboxes — use 'change' so the checkbox value is correct
 root.addEventListener('change', (e: Event) => {
     const target = e.target as HTMLElement;
+
+    if ((target as HTMLInputElement).id === 'merge-circular-chk') {
+        state.mergeCircular = (target as HTMLInputElement).checked;
+        renderGraphOnly();
+        return;
+    }
+
     const cb = target.closest<HTMLInputElement>('.ft-check');
     if (!cb || !state.analysis.graph) { return; }
 

@@ -305,6 +305,16 @@ export function generateWebviewHtml(
             font-size: 0.82em;
             color: var(--vscode-descriptionForeground);
         }
+        .graph-meta-check {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 0.82em;
+            color: var(--vscode-descriptionForeground);
+        }
+        .graph-meta-check input { cursor: pointer; margin: 0; }
         .depth-controls {
             display: flex;
             align-items: center;

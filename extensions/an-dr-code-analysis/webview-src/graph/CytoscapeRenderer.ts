@@ -7,13 +7,14 @@ export interface GraphNode {
     fullName: string;
     filePath?: string;
     line?: number;
-    role: 'target' | 'caller' | 'callee' | 'external';
+    role: 'target' | 'caller' | 'callee' | 'external' | 'folder';
 }
 
 export interface GraphEdge {
     sourceId: string;
     targetId: string;
     isExternal?: boolean;
+    isBidirectional?: boolean;
 }
 
 export interface GraphModel {
@@ -117,6 +118,7 @@ export class CytoscapeRenderer {
                     source: e.sourceId,
                     target: e.targetId,
                     isExternal: e.isExternal ?? false,
+                    isBidirectional: e.isBidirectional ?? false,
                 },
             })),
         ];
@@ -307,6 +309,18 @@ export class CytoscapeRenderer {
                     'opacity': 0.65,
                 },
             },
+            {
+                selector: 'node[role = "folder"]',
+                style: {
+                    'background-color': ROLE_COLORS.external.bg,
+                    'border-color': ROLE_COLORS.external.border,
+                    'border-width': 1.5,
+                    'border-style': 'dashed' as any,
+                    'color': ROLE_COLORS.external.label,
+                    'font-style': 'italic' as any,
+                    'opacity': 0.85,
+                },
+            },
             // Disable cytoscape's native selection ring — we manage selection visually ourselves
             {
                 selector: 'node:selected',
@@ -364,6 +378,18 @@ export class CytoscapeRenderer {
                     'line-style': 'dashed',
                     'line-dash-pattern': [6, 3],
                     'opacity': 0.6,
+                },
+            },
+            {
+                selector: 'edge[?isBidirectional]',
+                style: {
+                    'line-color': '#ef5350',
+                    'target-arrow-color': '#ef5350',
+                    'source-arrow-color': '#ef5350',
+                    'source-arrow-shape': 'triangle',
+                    'target-arrow-shape': 'triangle',
+                    'width': 3,
+                    'opacity': 1,
                 },
             },
         ];

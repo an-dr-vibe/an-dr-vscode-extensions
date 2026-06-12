@@ -139,7 +139,6 @@ function buildFileTree(graph: GraphModel): TreeNode {
 interface ClangdHealth {
     issue: 'NO_COMPILE_COMMANDS' | 'STALE_COMPILE_COMMANDS' | 'CROSS_COMPILE' | null;
     message: string;
-    recoveryActions?: RecoveryAction[];
 }
 
 interface AppState {
@@ -283,14 +282,9 @@ function renderAnalysis(s: AnalysisState): string {
     if (isCCppContext()) {
         const health = state.clangdHealth;
         if (health?.issue) {
-            // Health issue: show warning + recovery buttons (replaces setup button)
             const icon = health.issue === 'STALE_COMPILE_COMMANDS' ? '⚠' : '✗';
-            const recoveryBtns = (health.recoveryActions ?? []).map(a =>
-                `<button class="analysis-btn recovery-btn" data-command="${esc(a.command)}">${esc(a.label)}</button>`
-            ).join('');
             configHtml = `<div class="analysis-config">
   <div class="health-warning"><span class="health-icon">${icon}</span> ${esc(health.message)}</div>
-  <div class="recovery-actions">${recoveryBtns}</div>
 </div>`;
         } else {
             // Healthy: show compile_commands path + setup button
@@ -580,13 +574,6 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
-    const recoveryBtn = target.closest<HTMLButtonElement>('.recovery-btn');
-    if (recoveryBtn) {
-        const cmd = recoveryBtn.dataset['command'];
-        if (cmd) { vscode.postMessage({ type: 'runCommand', command: cmd }); }
-        return;
-    }
-
     // File filter tree: collapse/expand toggle — rebuild only the filter body, not the whole page
     const toggle = target.closest<HTMLElement>('.ft-toggle');
     if (toggle) {
@@ -654,7 +641,7 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             renderContextOnly();
             break;
         case 'clangdHealth':
-            state.clangdHealth = { issue: msg.issue, message: msg.message, recoveryActions: msg.recoveryActions };
+            state.clangdHealth = { issue: msg.issue, message: msg.message };
             renderAnalysisSection();
             break;
         case 'analysisBusy':

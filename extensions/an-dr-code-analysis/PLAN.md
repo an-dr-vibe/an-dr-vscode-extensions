@@ -226,28 +226,18 @@ Implement file dependency graph via clangd `documentLink` + `#include` regex fal
 
 ---
 
-## Iteration 9 — clangd Health & Recovery Actions
+## Iteration 9 — clangd Health ~~& Recovery Actions~~ ~~CANCELLED: recovery buttons~~
 
-Surface clangd misconfiguration and offer fixes.
+Surface clangd misconfiguration in Tools Status and gate the analyzer on it.
 
-- [ ] `ClangdHealth.ts` checks: `compile_commands.json` exists, is newer than `CMakeLists.txt`/`Makefile`, LSP returning results
-- [ ] Create `src/tools/RecoveryActions.ts` — generates `cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, `bear -- make`, `.clangd` for cross-compilation
-- [ ] On clangd `NO_COMPILE_COMMANDS` or `STALE_COMPILE_COMMANDS`: send `analysisError` with `recoveryActions`
-- [ ] Webview renders recovery action buttons below error message
-- [ ] Cross-compilation detection: scan `compile_commands.json` for `arm-none-eabi`, `riscv` — offer `.clangd` generation with user confirmation
+- [x] `ClangdHealth.ts`: `compile_commands.json` detection via extension setting, `.clangd` `CompilationDatabase:` directive, or workspace root fallback
+- [x] `ClangdHealth.check()` delegates to `checkDetail()` — single source of truth for both Tools Status and analyzer gating
+- [x] `LspAnalyzer.canHandle()` returns false when issue is `NO_COMPILE_COMMANDS` — no silent bad results
+- [x] Cross-compilation detection in `RecoveryActions.ts` (`detectCrossCompile`) — used by health check
+- [x] Health warning shown in analysis section only when ctags is also unavailable (otherwise Tools Status is sufficient)
+- [x] ~~Recovery action buttons (cmake generate, bear wrap, .clangd generate)~~ — cancelled, out of scope
 
-> **Current iteration** ← start here
-
-**Verification:**
-
-1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
-2. Open a CMake project folder that has **no** `compile_commands.json`
-3. Click "Call Graph" → error message appears with a "Generate via CMake" button
-4. Click the button → correct `cmake` command runs (or opens a terminal with it)
-5. Open a project with an ARM cross-compilation entry in `compile_commands.json`
-6. Panel offers "Generate .clangd config" with a confirmation dialog before writing
-
-- [ ] **Approved**
+- [x] **Approved**
 
 ---
 

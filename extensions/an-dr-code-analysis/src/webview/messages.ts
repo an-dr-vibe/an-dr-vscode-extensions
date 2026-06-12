@@ -62,7 +62,6 @@ export interface ClangdHealthMessage {
     type: 'clangdHealth';
     issue: 'NO_COMPILE_COMMANDS' | 'STALE_COMPILE_COMMANDS' | 'CROSS_COMPILE' | null;
     message: string;
-    recoveryActions?: RecoveryAction[];
 }
 
 export type ExtensionToWebviewMessage =

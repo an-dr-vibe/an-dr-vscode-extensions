@@ -58,6 +58,7 @@ export class ContextTracker implements vscode.Disposable {
     private _currentCallHierarchyItem: vscode.CallHierarchyItem | undefined;
     private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
     private _updateId = 0;
+    private _lastResolvedPos: { fsPath: string; line: number; character: number } | undefined;
     private readonly _disposables: vscode.Disposable[] = [];
 
     constructor() {
@@ -84,6 +85,7 @@ export class ContextTracker implements vscode.Disposable {
 
     unpin(): void {
         this._isPinned = false;
+        this._lastResolvedPos = undefined; // force re-resolve after unpin
         void this._update();
     }
 
@@ -112,6 +114,19 @@ export class ContextTracker implements vscode.Disposable {
         const doc = editor.document;
         const pos = editor.selection.active;
 
+        // Skip if position hasn't changed since last completed resolve — VS Code fires
+        // onDidChangeTextEditorSelection for reasons beyond cursor movement (LSP responses,
+        // highlight updates) which would otherwise cause continuous re-polling.
+        const fsPath = doc.uri.fsPath;
+        if (
+            this._lastResolvedPos &&
+            this._lastResolvedPos.fsPath === fsPath &&
+            this._lastResolvedPos.line === pos.line &&
+            this._lastResolvedPos.character === pos.character
+        ) {
+            return;
+        }
+
         // Clear the stored item only when switching to a different file — not when
         // tier 1 simply fails at the current cursor position (e.g. cursor on whitespace).
         if (this._currentCallHierarchyItem?.uri.fsPath !== doc.uri.fsPath) {
@@ -132,7 +147,7 @@ export class ContextTracker implements vscode.Disposable {
                     symbol: items[0].name,
                     symbolKind: items[0].kind,
                     symbolSource: 'call-hierarchy',
-                });
+                }, pos);
                 return;
             }
         } catch {
@@ -168,7 +183,7 @@ export class ContextTracker implements vscode.Disposable {
                                 symbol: chItems[0].name,
                                 symbolKind: chItems[0].kind,
                                 symbolSource: 'call-hierarchy',
-                            });
+                            }, pos);
                             return;
                         }
                     } catch (e) {
@@ -180,7 +195,7 @@ export class ContextTracker implements vscode.Disposable {
                         symbol: sym.name,
                         symbolKind: sym.kind,
                         symbolSource: 'document-symbol',
-                    });
+                    }, pos);
                     return;
                 }
             }
@@ -189,6 +204,7 @@ export class ContextTracker implements vscode.Disposable {
         }
 
         // Tier 3: Word under cursor — always available, semantically unreliable
+        this._lastResolvedPos = { fsPath, line: pos.line, character: pos.character };
         const wordRange = doc.getWordRangeAtPosition(pos);
         this._emit(id, doc, {
             symbol: wordRange ? doc.getText(wordRange) : undefined,
@@ -199,9 +215,13 @@ export class ContextTracker implements vscode.Disposable {
     private _emit(
         id: number,
         doc: vscode.TextDocument,
-        partial: Pick<EditorContext, 'symbol' | 'symbolSource'> & Partial<EditorContext>
+        partial: Pick<EditorContext, 'symbol' | 'symbolSource'> & Partial<EditorContext>,
+        pos?: vscode.Position
     ): void {
         if (id !== this._updateId) { return; }
+        if (pos) {
+            this._lastResolvedPos = { fsPath: doc.uri.fsPath, line: pos.line, character: pos.character };
+        }
         this._current = {
             ...partial,
             symbolSource: partial.symbolSource,

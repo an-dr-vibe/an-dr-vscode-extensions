@@ -10,7 +10,6 @@ import { WebviewToExtensionMessage } from './webview/messages';
 import { GraphType } from './graph/GraphModel';
 import { log } from './logger';
 import { ClangdHealth } from './tools/ClangdHealth';
-import { recoveryActionsFor, runCmakeGenerate, runBearWrap, generateClangdConfig } from './tools/RecoveryActions';
 
 export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Disposable {
     static readonly viewType = 'an-dr-code-analysis.panel';
@@ -105,16 +104,6 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
             }
         });
 
-        // Recovery commands — registered per-view so they're scoped to the panel lifetime
-        const ns = 'an-dr-code-analysis';
-        this._disposables.push(
-            vscode.commands.registerCommand(`${ns}.recovery.cmakeGenerate`,     () => void runCmakeGenerate()),
-            vscode.commands.registerCommand(`${ns}.recovery.bearWrap`,          () => void runBearWrap()),
-            vscode.commands.registerCommand(`${ns}.recovery.generateClangdConfig`, () => {
-                const health = ClangdHealth.checkDetail();
-                void generateClangdConfig(health.crossMarker);
-            }),
-        );
     }
 
     dispose(): void {
@@ -159,7 +148,6 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
             type: 'clangdHealth',
             issue: health.issue,
             message: health.message,
-            recoveryActions: recoveryActionsFor(health.issue),
         });
     }
 

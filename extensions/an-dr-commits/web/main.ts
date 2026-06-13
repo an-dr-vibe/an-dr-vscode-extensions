@@ -109,6 +109,8 @@ class CommitsView {
 	private readonly footerElem!: HTMLElement;
 	private readonly scrollShadowElem!: HTMLElement;
 	private readonly findWidgetToggleBtnElem!: HTMLElement;
+	private readonly commitFilterElem!: HTMLInputElement;
+	public commitFilterText: string = '';
 	private readonly settingsBtnElem!: HTMLElement;
 	private readonly resetBtnElem!: HTMLElement;
 	private readonly pullBtnElem!: HTMLElement;
@@ -464,6 +466,15 @@ class CommitsView {
 
 	public toggleSearchPanel() {
 		commitsShowFindWidgetFromToggle(this, true);
+	}
+
+	/** Apply or clear the commit filter. Updates the input element, hides non-matching rows, and saves state. */
+	public applyCommitFilter(text: string) {
+		this.commitFilterText = text;
+		this.commitFilterElem.value = text;
+		alterClass(this.commitFilterElem, CLASS_ACTIVE, text !== '');
+		commitsApplyFilter(this, text);
+		this.saveState();
 	}
 
 	private showFindWidgetFromToggle() {

@@ -1315,6 +1315,40 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 	min-width:0;
 }
 
+#commitFilter{
+	display:block;
+	box-sizing:border-box;
+	margin:0;
+	padding:3px 8px;
+	border:1px solid rgba(128,128,128,0.4);
+	border-radius:4px;
+	height:24px;
+	width:140px;
+	background:none;
+	color:var(--vscode-editor-foreground);
+	font-size:12px;
+	font-weight:400;
+	outline-offset:-1px !important;
+	flex-shrink:1;
+	min-width:60px;
+}
+#commitFilter:focus{
+	outline:1px solid var(--vscode-focusBorder);
+	border-color:transparent;
+}
+#commitFilter::placeholder{
+	color:var(--vscode-input-placeholderForeground);
+}
+#commitFilter.active{
+	border-color:var(--vscode-focusBorder);
+}
+tr.filterHidden{
+	display:none;
+}
+body.commitFilterActive #commitGraph{
+	display:none;
+}
+
 #searchPanel{
 	display:none;
 	height:37px;
@@ -1332,7 +1366,7 @@ body.searchPanelOpen #searchPanel{
 	align-items:center;
 	gap:12px;
 	min-width:0;
-	flex:1 1 auto;
+	flex:0 0 auto;
 }
 
 #sidebarToggleBtn{

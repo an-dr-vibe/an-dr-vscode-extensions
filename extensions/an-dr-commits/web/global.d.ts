@@ -69,6 +69,7 @@ declare global {
 		readonly branchPanel: GG.CommitsBranchPanelState;
 		readonly findWidget: FindWidgetState;
 		readonly settingsWidget: SettingsWidgetState;
+		readonly commitFilterText?: string;
 	}
 
 

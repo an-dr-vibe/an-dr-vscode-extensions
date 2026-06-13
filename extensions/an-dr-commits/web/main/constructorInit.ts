@@ -10,6 +10,7 @@ function commitsInitDomElements(view: any) {
 	view.footerElem = document.getElementById('footer')!;
 	view.scrollShadowElem = document.getElementById('scrollShadow')!;
 	view.findWidgetToggleBtnElem = document.getElementById('searchPanelToggleBtn')!;
+	view.commitFilterElem = <HTMLInputElement>document.getElementById('commitFilter')!;
 	view.settingsBtnElem = document.getElementById('settingsBtn')!;
 	view.resetBtnElem = document.getElementById('resetBtn')!;
 	view.pullBtnElem = document.getElementById('pullBtn')!;
@@ -135,6 +136,7 @@ function commitsRestoreFromPrevState(view: any, prevState: any) {
 	view.branchDropdown.restoreState(prevState.branchPanel);
 	view.findWidget.restoreState(prevState.findWidget);
 	view.settingsWidget.restoreState(prevState.settingsWidget);
+	if (prevState.commitFilterText) view.applyCommitFilter(prevState.commitFilterText);
 }
 
 function commitsResolveLoadViewTo(view: any, prevState: any, canRestoreFromPrevState: boolean): GG.LoadCommitsViewTo {
@@ -226,4 +228,20 @@ function commitsInitButtonHandlers(view: any) {
 	view.moreBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.repoRefreshBtnElem.innerHTML = ICONS.refresh;
 	view.repoRefreshBtnElem.addEventListener('click', () => view.refresh(true, true));
+
+	let commitFilterTimeout: ReturnType<typeof setTimeout> | null = null;
+	view.commitFilterElem.addEventListener('input', () => {
+		if (commitFilterTimeout !== null) clearTimeout(commitFilterTimeout);
+		commitFilterTimeout = setTimeout(() => {
+			commitFilterTimeout = null;
+			view.applyCommitFilter(view.commitFilterElem.value);
+		}, 150);
+	});
+	view.commitFilterElem.addEventListener('keydown', (e: KeyboardEvent) => {
+		if (e.key === 'Escape') {
+			view.applyCommitFilter('');
+			view.commitFilterElem.blur();
+			handledEvent(e);
+		}
+	});
 }

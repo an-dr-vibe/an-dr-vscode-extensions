@@ -298,7 +298,8 @@ function commitsSaveState(view: any) {
 		scrollTop: view.scrollTop,
 		branchPanel: view.branchDropdown.getState(),
 		findWidget: view.findWidget.getState(),
-		settingsWidget: view.settingsWidget.getState()
+		settingsWidget: view.settingsWidget.getState(),
+		commitFilterText: view.commitFilterText
 	});
 }
 

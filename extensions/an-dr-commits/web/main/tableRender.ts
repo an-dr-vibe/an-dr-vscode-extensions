@@ -160,6 +160,7 @@ function commitsRenderTable(view: any) {
 	view.updateCommittedColumnDisplayMode();
 	view.collapseReferenceBadgesToFit();
 	view.findWidget.refresh();
+	commitsApplyFilter(view, view.commitFilterText);
 	view.renderedGitBranchHead = view.gitBranchHead;
 
 	if (view.moreCommitsAvailable) {
@@ -202,6 +203,31 @@ function commitsRenderTableRestoreExpandedCommit(view: any) {
 		} else {
 			view.loadCommitComparison(commitElem, compareWithElem!);
 		}
+	}
+}
+
+function commitsApplyFilter(view: any, text: string) {
+	const rows = getCommitElems();
+	const active = text !== '';
+	alterClass(document.body, 'commitFilterActive', active);
+	if (!active) {
+		for (let i = 0; i < rows.length; i++) rows[i].classList.remove('filterHidden');
+		const scrollHash: string | null = view.expandedCommit !== null
+			? view.expandedCommit.commitHash
+			: (view.selectedCommits.size > 0 ? view.selectedCommits.values().next().value : view.commitHead);
+		if (scrollHash !== null) requestAnimationFrame(() => requestAnimationFrame(() => view.scrollToCommit(scrollHash, true)));
+		return;
+	}
+	const lower = text.toLowerCase();
+	const commits: ReadonlyArray<GG.GitCommit> = view.commits;
+	for (let i = 0; i < rows.length; i++) {
+		const commit = commits[parseInt(rows[i].dataset.id!)];
+		if (!commit) continue;
+		const match = commit.message.toLowerCase().includes(lower)
+			|| commit.hash.toLowerCase().startsWith(lower)
+			|| commit.author.toLowerCase().includes(lower)
+			|| commit.email.toLowerCase().includes(lower);
+		alterClass(rows[i], 'filterHidden', !match);
 	}
 }
 

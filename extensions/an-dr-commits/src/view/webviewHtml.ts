@@ -73,6 +73,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 								<div id="sidebarToggleBtn"></div>
 								<div id="searchPanelToggleBtn" title="Search Graph"></div>
 							</div>
+							<input id="commitFilter" type="text" placeholder="Filter..." autocomplete="off" spellcheck="false"/>
 							<div id="controlsBtns">
 								<div id="resetBtn"></div>
 								<div id="pullBtn"></div>

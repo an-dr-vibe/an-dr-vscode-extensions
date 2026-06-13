@@ -5,8 +5,9 @@ import * as child_process from 'child_process';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
+import { C_CPP_LANG_IDS, PYTHON_LANG_IDS } from '../../config/languageGroups';
 
-const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
+const CTAGS_LANG_IDS = new Set([...C_CPP_LANG_IDS, ...PYTHON_LANG_IDS]);
 
 interface CtagsEntry {
     name: string;
@@ -26,6 +27,7 @@ function runCtags(workspaceRoot: string, signal?: AbortSignal): Promise<CtagsEnt
             '--fields=+n',
             '--kinds-C=f',
             '--kinds-C++=f',
+            '--kinds-Python=f',
             '--exclude=.git',
             '--exclude=build',
             '--exclude=build_*',
@@ -128,7 +130,7 @@ export class CtagsAnalyzer implements IAnalyzer {
     readonly name = 'ctags';
 
     canHandle(request: AnalysisRequest): boolean {
-        return C_CPP_LANG_IDS.has(request.context.langId) && request.graphType === 'callGraph';
+        return CTAGS_LANG_IDS.has(request.context.langId) && request.graphType === 'callGraph';
     }
 
     async analyze(request: AnalysisRequest): Promise<AnalysisResult | null> {

@@ -288,10 +288,10 @@ Add TS/JS support.
 
 Add Python support.
 
-- [ ] Create `src/analyzers/cli/Pyan3Analyzer.ts` — runs `pyan3 --dot`, parses DOT → `GraphModel`; confidence `medium`
-- [ ] Create `src/analyzers/heuristic/AstWalkAnalyzer.ts` — `import` AST walk → file deps; confidence `low`
-- [ ] Extend `CtagsAnalyzer.canHandle()` to also accept `python` (universal fallback)
-- [ ] Wire into factory: `python` + `callGraph` → `[Pyan3Analyzer, CtagsAnalyzer]`; `python` + `fileDeps` → `[AstWalkAnalyzer]`
+- [x] Create `src/analyzers/cli/Pyan3Analyzer.ts` — runs `pyan3 --dot`, parses DOT → `GraphModel`; confidence `medium`
+- [x] Create `src/analyzers/heuristic/AstWalkAnalyzer.ts` — `import` AST walk → file deps; confidence `low`
+- [x] Extend `CtagsAnalyzer.canHandle()` to also accept `python` (universal fallback)
+- [x] Wire into factory: `python` + `callGraph` → `[Pyan3Analyzer, CtagsAnalyzer]`; `python` + `fileDeps` → `[AstWalkAnalyzer]`
 
 **Verification:**
 

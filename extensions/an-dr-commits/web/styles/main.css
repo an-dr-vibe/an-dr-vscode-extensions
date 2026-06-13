@@ -14,6 +14,7 @@ body{
 	--files-panel-width:220px;
 	--files-panel-inline-width:220px;
 }
+
 body.unableToLoad{
 	margin:0 20px;
 }
@@ -1277,8 +1278,10 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 #sidebarTop{
 	display:flex;
 	align-items:stretch;
+	align-self:flex-start;
 	width:var(--branch-panel-width);
 	flex:0 0 var(--branch-panel-width);
+	height:var(--top-bar-height);
 	min-width:0;
 	border-right:1px solid rgba(128,128,128,0.5);
 	border-bottom:1px solid rgba(128,128,128,0.5);
@@ -1291,19 +1294,37 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 
 #controls{
 	display:flex;
-	align-items:center;
-	gap:12px;
-	min-height:var(--top-bar-height);
-	padding:4px 10px;
-	border-bottom:1px solid rgba(128,128,128,0.5);
+	flex-direction:column;
 	background-color:var(--vscode-editor-background);
-	box-sizing:border-box;
 	font-weight:700;
 	font-size:13px;
 	-webkit-user-select:none;
 	user-select:none;
 	flex:1 1 auto;
 	min-width:0;
+}
+
+#controlsRow{
+	display:flex;
+	align-items:center;
+	gap:12px;
+	min-height:var(--top-bar-height);
+	padding:4px 10px;
+	border-bottom:1px solid rgba(128,128,128,0.5);
+	box-sizing:border-box;
+	min-width:0;
+}
+
+#searchPanel{
+	display:none;
+	height:37px;
+	padding:0 10px;
+	border-bottom:1px solid rgba(128,128,128,0.5);
+	box-sizing:border-box;
+	align-items:center;
+}
+body.searchPanelOpen #searchPanel{
+	display:flex;
 }
 
 #controlsLeft{
@@ -1326,41 +1347,6 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 	min-width:0;
 	flex:1 1 auto;
 	height:100%;
-}
-
-body.compactSearch #findWidgetHost{
-	display:none;
-}
-body.compactSearch.compactSearchWidgetOpen #findWidgetHost{
-	display:block !important;
-	position:fixed;
-	top:0;
-	left:0;
-	right:auto;
-	z-index:35;
-	min-width:0;
-	width:auto;
-	height:auto;
-	padding:0;
-	border:none;
-	background:transparent;
-	box-shadow:none;
-	flex:none;
-}
-body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findWidget{
-	background-color:var(--vscode-editor-background);
-	border:1px solid var(--vscode-widget-border, rgba(128,128,128,0.5));
-	border-radius:6px;
-	padding:4px 6px;
-	gap:4px;
-	box-shadow:0 2px 10px rgba(0,0,0,0.25);
-	width:auto;
-	max-width:none;
-}
-body.compactSearch.compactSearchWidgetOpen #findWidgetHost .findInputContainer{
-	width:180px;
-	min-width:180px;
-	max-width:180px;
 }
 
 #controlsBtns{
@@ -1487,15 +1473,15 @@ body.branchPanelHidden #sidebarTop{
 	opacity:1;
 }
 
-#findWidgetToggleBtn{
+#searchPanelToggleBtn{
 	position:relative;
 	width:20px;
 	height:20px;
 	-webkit-user-select:none;
 	user-select:none;
-	display:none;
+	display:block;
 }
-#findWidgetToggleBtn .codicon{
+#searchPanelToggleBtn .codicon{
 	position:absolute;
 	left:1px;
 	top:1px;
@@ -1506,16 +1492,13 @@ body.branchPanelHidden #sidebarTop{
 	color:var(--vscode-editor-foreground);
 	opacity:0.4;
 }
-#findWidgetToggleBtn:hover .codicon{
+#searchPanelToggleBtn:hover .codicon{
 	opacity:0.8;
 }
-body.compactSearch #findWidgetToggleBtn{
-	display:block;
-}
-#findWidgetToggleBtn.active .codicon{
+#searchPanelToggleBtn.active .codicon{
 	opacity:1;
 }
-#findWidgetToggleBtn.active:hover .codicon{
+#searchPanelToggleBtn.active:hover .codicon{
 	opacity:1;
 }
 

@@ -39,10 +39,8 @@ function commitsHandleEscapeKey(view: any, e: KeyboardEvent) {
 	} else if (view.settingsWidget.isVisible()) {
 		view.settingsWidget.close();
 		handledEvent(e);
-	} else if (view.findWidget.isVisible()) {
-		view.findWidget.close();
-		view.compactFindWidgetPinnedOpen = false;
-		view.updateCompactFindWidgetState();
+	} else if (document.body.classList.contains('searchPanelOpen')) {
+		commitsCloseSearchPanel(view);
 		handledEvent(e);
 	} else if (!view.filesPanel.isHidden() && view.expandedCommit === null) {
 		if (view.currentDiffRequest !== null) {

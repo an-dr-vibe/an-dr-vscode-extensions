@@ -1,5 +1,5 @@
 function commitsInitDomElements(view: any) {
-	view.controlsElem = document.getElementById('controls')!;
+	view.controlsElem = document.getElementById('controlsRow')!;
 	view.controlsLeftElem = document.getElementById('controlsLeft')!;
 	view.controlsBtnsElem = document.getElementById('controlsBtns')!;
 	view.commitGraphElem = document.getElementById('commitGraph')!;
@@ -9,7 +9,7 @@ function commitsInitDomElements(view: any) {
 	view.tableElem = document.getElementById('commitTable')!;
 	view.footerElem = document.getElementById('footer')!;
 	view.scrollShadowElem = document.getElementById('scrollShadow')!;
-	view.findWidgetToggleBtnElem = document.getElementById('findWidgetToggleBtn')!;
+	view.findWidgetToggleBtnElem = document.getElementById('searchPanelToggleBtn')!;
 	view.settingsBtnElem = document.getElementById('settingsBtn')!;
 	view.resetBtnElem = document.getElementById('resetBtn')!;
 	view.pullBtnElem = document.getElementById('pullBtn')!;
@@ -185,7 +185,7 @@ function addSingleDblClick(elem: HTMLElement, onSingle: () => void, onDouble: ()
 
 function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.innerHTML = ICONS.search;
-	view.findWidgetToggleBtnElem.addEventListener('click', () => view.showFindWidgetFromToggle());
+	view.findWidgetToggleBtnElem.addEventListener('click', () => view.toggleSearchPanel());
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.resetBtnElem.title = 'Reset to HEAD';
 	view.resetBtnElem.innerHTML = ICONS.discard;

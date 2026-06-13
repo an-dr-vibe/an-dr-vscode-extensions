@@ -68,17 +68,21 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 						</div>
 					</div>
 					<div id="controls">
-						<div id="controlsLeft">
-							<div id="sidebarToggleBtn"></div>
-							<div id="findWidgetHost"></div>
-							<div id="findWidgetToggleBtn" title="Search Graph"></div>
+						<div id="controlsRow">
+							<div id="controlsLeft">
+								<div id="sidebarToggleBtn"></div>
+								<div id="searchPanelToggleBtn" title="Search Graph"></div>
+							</div>
+							<div id="controlsBtns">
+								<div id="resetBtn"></div>
+								<div id="pullBtn"></div>
+								<div id="pushBtn"></div>
+								<div id="settingsBtn" title="Repository Settings"></div>
+								<div id="moreBtn" title="More Actions"></div>
+							</div>
 						</div>
-						<div id="controlsBtns">
-							<div id="resetBtn"></div>
-							<div id="pullBtn"></div>
-							<div id="pushBtn"></div>
-							<div id="settingsBtn" title="Repository Settings"></div>
-							<div id="moreBtn" title="More Actions"></div>
+						<div id="searchPanel">
+							<div id="findWidgetHost"></div>
 						</div>
 					</div>
 				</div>

@@ -194,6 +194,7 @@ class FindWidget {
 		if (this.text !== '') {
 			this.findMatches(state.currentHash, false);
 			this.visible = true;
+			alterClass(document.body, 'searchPanelOpen', true);
 		}
 		this.updateActiveState();
 	}

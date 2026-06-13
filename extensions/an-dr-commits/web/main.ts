@@ -114,7 +114,6 @@ class CommitsView {
 	private readonly pullBtnElem!: HTMLElement;
 	private readonly pushBtnElem!: HTMLElement;
 	private readonly moreBtnElem!: HTMLElement;
-	private compactFindWidgetPinnedOpen: boolean = false;
 	private pendingBranchPanelState: GG.CommitsBranchPanelState | null = null;
 	private sidebarTagContextRequestId: number = 0;
 	private sidebarTagContextResolvers: { [requestId: number]: SidebarTagContextResolver } = {};
@@ -463,14 +462,15 @@ class CommitsView {
 		this.updateControlsLayout();
 	}
 
+	public toggleSearchPanel() {
+		commitsShowFindWidgetFromToggle(this, true);
+	}
+
 	private showFindWidgetFromToggle() {
-		const pinnedOpen = this.compactFindWidgetPinnedOpen;
-		this.compactFindWidgetPinnedOpen = pinnedOpen;
-		commitsShowFindWidgetFromToggle(this);
+		commitsShowFindWidgetFromToggle(this, false);
 	}
 
 	private updateCompactFindWidgetState() {
-		void this.compactFindWidgetPinnedOpen;
 		commitsUpdateCompactFindWidgetState(this);
 	}
 

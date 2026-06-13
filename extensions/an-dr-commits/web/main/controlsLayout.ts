@@ -81,25 +81,18 @@ function commitsUpdateControlsLayout(view: any) {
 		const leftRect = view.controlsLeftElem.getBoundingClientRect();
 		const rightRect = view.controlsBtnsElem.getBoundingClientRect();
 		const touching = leftRect.right >= rightRect.left - 1;
-		const leftInternalOverflow = view.controlsLeftElem.scrollWidth > view.controlsLeftElem.clientWidth + 1;
-		return widthOverflow || touching || leftInternalOverflow;
+		return widthOverflow || touching;
 	};
 	if (view.controlsElem.clientWidth <= 0) {
 		requestAnimationFrame(() => view.updateControlsLayout());
 		return;
 	}
 
-	alterClass(document.body, 'compactSearch', false);
 	buttons.forEach((button) => alterClass(button.elem, 'overflowHidden', !button.visible));
 	alterClass(view.moreBtnElem, 'overflowHidden', true);
 
 	const applyLayout = () => {
 		let overflow = isOverflowing();
-		if (overflow) {
-			alterClass(document.body, 'compactSearch', true);
-			overflow = isOverflowing();
-		}
-
 		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn', 'resetBtn'];
 		for (let i = 0; i < hideOrder.length && overflow; i++) {
 			const button = buttons.find((item) => item.id === hideOrder[i]);
@@ -108,68 +101,47 @@ function commitsUpdateControlsLayout(view: any) {
 			alterClass(view.moreBtnElem, 'overflowHidden', false);
 			overflow = isOverflowing();
 		}
-		view.updateCompactFindWidgetState();
 	};
 
 	requestAnimationFrame(applyLayout);
 }
 
-function commitsShowFindWidgetFromToggle(view: any) {
-	const compact = document.body.classList.contains('compactSearch');
-	if (!compact) {
-		view.findWidget.show(true);
-		return;
-	}
-
-	const currentlyOpen = document.body.classList.contains('compactSearchWidgetOpen');
-	if (currentlyOpen) {
-		view.compactFindWidgetPinnedOpen = false;
-		view.findWidget.close();
-		view.updateCompactFindWidgetState();
-		return;
-	}
-
-	view.compactFindWidgetPinnedOpen = true;
-	view.findWidget.show(true);
-	view.updateCompactFindWidgetState();
-}
-
-function commitsUpdateCompactFindWidgetState(view: any) {
-	const compact = document.body.classList.contains('compactSearch');
-	if (!compact) {
-		view.compactFindWidgetPinnedOpen = false;
-		alterClass(document.body, 'compactSearchWidgetOpen', false);
-		alterClass(view.findWidgetToggleBtnElem, CLASS_ACTIVE, false);
-		const host = document.getElementById('findWidgetHost');
-		if (host !== null) {
-			host.style.removeProperty('left');
-			host.style.removeProperty('top');
+/**
+ * Toggle the search panel. If already open (e.g. via Ctrl+F), re-focus the input
+ * rather than closing — closing is reserved for the button click and Escape key.
+ * The button click uses the outer `toggleSearchPanel()` path which calls this only
+ * when the button is clicked directly, so we distinguish by caller intent via
+ * `fromButton`. Direct button click toggles; keyboard shortcut always opens.
+ */
+function commitsShowFindWidgetFromToggle(view: any, fromButton: boolean = false) {
+	const isOpen = document.body.classList.contains('searchPanelOpen');
+	if (isOpen) {
+		if (fromButton) {
+			commitsCloseSearchPanel(view);
+		} else {
+			view.findWidget.show(true);
 		}
-		return;
-	}
-
-	const shouldShowWidget = view.compactFindWidgetPinnedOpen || view.findWidget.isVisible();
-	alterClass(document.body, 'compactSearchWidgetOpen', shouldShowWidget);
-	alterClass(view.findWidgetToggleBtnElem, CLASS_ACTIVE, shouldShowWidget);
-	if (shouldShowWidget) {
-		commitsPositionCompactFindWidget(view);
+	} else {
+		commitsOpenSearchPanel(view);
 	}
 }
 
-function commitsPositionCompactFindWidget(view: any) {
-	const host = document.getElementById('findWidgetHost');
-	if (host === null) return;
+/** Open the search panel row and focus the find input. */
+function commitsOpenSearchPanel(view: any) {
+	alterClass(document.body, 'searchPanelOpen', true);
+	alterClass(view.findWidgetToggleBtnElem, CLASS_ACTIVE, true);
+	view.findWidget.show(true);
+	view.requestControlsLayoutUpdate();
+}
 
-	requestAnimationFrame(() => {
-		const btnRect = view.findWidgetToggleBtnElem.getBoundingClientRect();
-		const hostRect = host.getBoundingClientRect();
-		const margin = 8;
-		let left = btnRect.left;
-		const maxLeft = window.innerWidth - hostRect.width - margin;
-		if (left > maxLeft) left = Math.max(margin, maxLeft);
-		if (left < margin) left = margin;
-		const top = btnRect.bottom + 6;
-		host.style.left = Math.round(left) + 'px';
-		host.style.top = Math.round(top) + 'px';
-	});
+/** Close the search panel row and clear the find widget. */
+function commitsCloseSearchPanel(view: any) {
+	view.findWidget.close();
+	alterClass(document.body, 'searchPanelOpen', false);
+	alterClass(view.findWidgetToggleBtnElem, CLASS_ACTIVE, false);
+	view.requestControlsLayoutUpdate();
+}
+
+function commitsUpdateCompactFindWidgetState(_view: any) {
+	// No-op: compact floating mode removed; search always lives in #searchPanel.
 }

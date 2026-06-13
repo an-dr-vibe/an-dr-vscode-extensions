@@ -1717,10 +1717,14 @@ export class DataSource extends Disposable {
 	 * Reset to HEAD, hard. When deep=true also clean all untracked files/dirs and reinitialise submodules.
 	 */
 	public async resetToHead(repo: string, deep: boolean): Promise<ErrorInfo> {
-		let err = await this.runGitCommand(['reset', '--hard', '--recurse-submodules', 'HEAD'], repo);
+		let err = await this.runGitCommand(['reset', '--hard', 'HEAD'], repo);
+		if (err !== null) return err;
+		err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git', 'reset', '--hard', 'HEAD'], repo);
 		if (err !== null) return err;
 		if (!deep) return null;
-		err = await this.runGitCommand(['clean', '-ffdx', '--recurse-submodules'], repo);
+		err = await this.runGitCommand(['clean', '-ffdx'], repo);
+		if (err !== null) return err;
+		err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git', 'clean', '-ffdx'], repo);
 		if (err !== null) return err;
 		return this.runGitCommand(['submodule', 'update', '--init', '--recursive'], repo);
 	}

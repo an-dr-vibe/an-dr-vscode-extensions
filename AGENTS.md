@@ -4,11 +4,12 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 
 ## Primary instructions
 
-- Use `AGENTS.md` as the source of truth for agent instructions in this repo.
-- When working on anything inside `extensions/an-dr-commits/`, read
-  [extensions/an-dr-commits/AGENTS.md](extensions/an-dr-commits/AGENTS.md)
-  before touching any files. It contains the architecture overview, file map,
-  build instructions, and a "where to look by feature" table.
+- Use `agents/AGENTS.md` as the base instruction
+- Use `AGENTS.md` in the repo root and in the subfolders as scoped extensions of the base rules
+- Priority:
+  1. `REPO/agents/AGENTS.md` - base
+  2. `REPO/AGENTS.md` - extention/overwriting
+  3. `REPO/**/AGENTS.md` - any subdirectory with AGENTS.md extends/overwrites previous rools in a chain.
 
 ## User preferences
 
@@ -41,16 +42,6 @@ branch while work is in progress.
   - Linux/macOS: symlinks (`New-Item -ItemType SymbolicLink`) — no admin needed.
 - Extension TypeScript code must handle paths for all three platforms (e.g. tool
   install paths in `an-dr-git-tool` cover Win/Linux/Mac variants).
-
-## Shared agents
-
-Reusable agent prompts live in [`agents/`](agents/). Any extension can invoke them.
-
-| Agent          | File                                              | Purpose                                                                 |
-| -------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
-| adversarial-ut | [agents/adversarial-ut.md](agents/adversarial-ut.md) | Bug-finding UT run — three-pass adversarial suite, outputs TECHDEBT.md |
-
----
 
 ## Adding a new extension
 

@@ -65,7 +65,8 @@
       "Bash(git stash *)",
       "Bash(git -C \"c:\\\\Users\\\\mail\\\\.vscode-an-dr\" add extensions/an-dr-code-analysis/docs/ extensions/an-dr-code-analysis/package-lock.json)",
       "Bash(npx webpack *)",
-      "PowerShell(Remove-Item -Recurse -Force \"$HOME\\\\.vscode\\\\extensions\\\\an-dr.an-dr-code-analysis-0.1.0\")"
+      "PowerShell(Remove-Item -Recurse -Force \"$HOME\\\\.vscode\\\\extensions\\\\an-dr.an-dr-code-analysis-0.1.0\")",
+      "Bash(git -C \"c:/Users/mail/.vscode-an-dr\" log --oneline -6)"
     ]
   }
 }

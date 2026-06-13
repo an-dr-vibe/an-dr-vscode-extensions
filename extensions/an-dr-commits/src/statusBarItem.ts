@@ -56,10 +56,22 @@ export class StatusBarItem extends Disposable {
 		if (!gitExt) { return; }
 
 		const attach = (api: any) => {
-			const update = () => {
+			const pickRepo = () => {
+				// Prefer the repo rooted at the workspace folder to avoid picking a
+				// submodule when the active editor happens to be inside one.
+				const folders = vscode.workspace.workspaceFolders;
+				if (folders && folders.length > 0) {
+					const wsPath = folders[0].uri.fsPath;
+					const wsRepo = api.repositories.find((r: any) => r.rootUri?.fsPath === wsPath);
+					if (wsRepo) { return wsRepo; }
+				}
 				const activeUri = vscode.window.activeTextEditor?.document.uri;
-				let repo: any = activeUri ? api.getRepository(activeUri) : null;
-				if (!repo && api.repositories.length > 0) { repo = api.repositories[0]; }
+				const activeRepo = activeUri ? api.getRepository(activeUri) : null;
+				return activeRepo ?? (api.repositories.length > 0 ? api.repositories[0] : null);
+			};
+
+			const update = () => {
+				const repo = pickRepo();
 				this.branchName = (repo?.state?.HEAD?.name as string | undefined) ?? null;
 				this.changes = repo ? countChanges(repo) : { modified: 0, deleted: 0 };
 				this.refresh();

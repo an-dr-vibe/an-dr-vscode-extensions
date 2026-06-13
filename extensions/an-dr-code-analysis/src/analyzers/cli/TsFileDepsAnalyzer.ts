@@ -4,8 +4,9 @@ import * as fs from 'fs';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
+import { TS_JS_LANG_IDS } from '../../config/languageGroups';
+import { collectFiles, DEFAULT_SKIP_DIRS } from '../../utils/fsUtils';
 
-const TS_JS_LANG_IDS = new Set(['typescript', 'javascript', 'typescriptreact', 'javascriptreact']);
 const TS_JS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs']);
 
 // Matches: import ... from '...' / import('...') / require('...')
@@ -13,23 +14,6 @@ const IMPORT_RE = /(?:^|\s)(?:import|export)\s+(?:.+?\s+from\s+)?['"]([^'"]+)['"
 const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/gm;
 
 const MAX_SCAN_DEPTH = 6;
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'out', 'build', '.next', '.nuxt', 'coverage']);
-
-function collectSourceFiles(dir: string, depth: number, files: string[]): void {
-    if (depth >= MAX_SCAN_DEPTH) { return; }
-    let entries: fs.Dirent[];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-    catch { return; }
-    for (const e of entries) {
-        if (e.name.startsWith('.') || SKIP_DIRS.has(e.name)) { continue; }
-        const full = path.join(dir, e.name).replace(/\\/g, '/');
-        if (e.isDirectory()) {
-            collectSourceFiles(full, depth + 1, files);
-        } else if (e.isFile() && TS_JS_EXTS.has(path.extname(e.name))) {
-            files.push(full);
-        }
-    }
-}
 
 function parseImports(filePath: string): string[] {
     let content: string;
@@ -94,7 +78,7 @@ export class TsFileDepsAnalyzer implements IAnalyzer {
         if (signal?.aborted) { return null; }
 
         const allFiles: string[] = [];
-        collectSourceFiles(workspaceRoot, 0, allFiles);
+        collectFiles(workspaceRoot, 0, MAX_SCAN_DEPTH, TS_JS_EXTS, allFiles, DEFAULT_SKIP_DIRS);
 
         if (signal?.aborted) { return null; }
 

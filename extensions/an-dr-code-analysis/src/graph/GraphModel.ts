@@ -26,4 +26,5 @@ export interface GraphModel {
     depth: number;
     tool: string;
     confidence: 'high' | 'medium' | 'low';
+    warnings?: string[];
 }

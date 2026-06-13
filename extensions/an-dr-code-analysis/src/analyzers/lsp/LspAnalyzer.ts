@@ -5,9 +5,7 @@ import { buildCallGraph } from '../../graph/GraphBuilder';
 import { ContextTracker } from '../../context/ContextTracker';
 import { ClangdHealth } from '../../tools/ClangdHealth';
 import { log } from '../../logger';
-
-const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
-const TS_JS_LANG_IDS = new Set(['typescript', 'javascript', 'typescriptreact', 'javascriptreact']);
+import { C_CPP_LANG_IDS, TS_JS_LANG_IDS } from '../../config/languageGroups';
 
 export class LspAnalyzer implements IAnalyzer {
     readonly name: string;

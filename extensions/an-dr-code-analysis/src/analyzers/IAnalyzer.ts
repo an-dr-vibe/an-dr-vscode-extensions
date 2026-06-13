@@ -12,6 +12,7 @@ export interface AnalysisRequest {
 
 export interface AnalysisResult {
     graph: GraphModel;
+    warnings?: string[];
 }
 
 export interface IAnalyzer {

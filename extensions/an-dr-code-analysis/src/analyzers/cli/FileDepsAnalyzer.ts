@@ -4,32 +4,14 @@ import * as fs from 'fs';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
-
-const C_CPP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
+import { C_CPP_LANG_IDS } from '../../config/languageGroups';
+import { collectFiles, DEFAULT_SKIP_DIRS } from '../../utils/fsUtils';
 
 // Match: #include "foo.h" or #include <foo.h>
 const INCLUDE_RE = /^\s*#\s*include\s*["<]([^">]+)[">]/;
 
-// Walk workspace up to maxDepth and collect all C/C++ source/header files.
 const MAX_SCAN_DEPTH = 5;
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'build', 'out', 'subprojects', '.meson_build', '.cache']);
 const C_CPP_EXTS = new Set(['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx', '.inl']);
-
-function collectSourceFiles(dir: string, depth: number, files: string[]): void {
-    if (depth >= MAX_SCAN_DEPTH) { return; }
-    let entries: fs.Dirent[];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-    catch { return; }
-    for (const e of entries) {
-        if (e.name.startsWith('.') || SKIP_DIRS.has(e.name)) { continue; }
-        const full = path.join(dir, e.name).replace(/\\/g, '/');
-        if (e.isDirectory()) {
-            collectSourceFiles(full, depth + 1, files);
-        } else if (e.isFile() && C_CPP_EXTS.has(path.extname(e.name))) {
-            files.push(full);
-        }
-    }
-}
 
 // Parse #include directives from a file and return the list of included names.
 function parseIncludes(filePath: string): string[] {
@@ -92,7 +74,7 @@ export class FileDepsAnalyzer implements IAnalyzer {
 
         // Collect all C/C++ files in the workspace
         const allFiles: string[] = [];
-        collectSourceFiles(workspaceRoot, 0, allFiles);
+        collectFiles(workspaceRoot, 0, MAX_SCAN_DEPTH, C_CPP_EXTS, allFiles, DEFAULT_SKIP_DIRS);
 
         if (signal?.aborted) { return null; }
         if (allFiles.length === 0) { return null; }
@@ -144,7 +126,6 @@ export class FileDepsAnalyzer implements IAnalyzer {
         const queue: { filePath: string; depth: number }[] = [{ filePath: targetFilePath, depth: 0 }];
 
         // Pre-build reverse index: basename → files that include it, for caller lookup.
-        // We build it lazily as a full scan once.
         type ReverseEntry = { includer: string; resolvedTarget: string }[];
         const reverseIndex = new Map<string, ReverseEntry>();
         for (const f of allFiles) {
@@ -210,6 +191,7 @@ export class FileDepsAnalyzer implements IAnalyzer {
             depth: request.depth,
             tool: this.name,
             confidence: 'medium',
+            warnings: ['#include resolution is heuristic — system and generated headers are excluded.'],
         };
         return { graph };
     }

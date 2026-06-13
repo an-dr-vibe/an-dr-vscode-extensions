@@ -14,12 +14,13 @@ export function getLayout(name: LayoutName, nodeCount: number): cytoscape.Layout
                     if (role === 'callee')   { return 10; }
                     return 5; // external / folder
                 },
-                levelWidth: () => 1,
-                minNodeSpacing: 8,
+                // Group all nodes of the same role onto one ring (width covers full range per role)
+                levelWidth: () => 5,
+                minNodeSpacing: 40,
+                equidistant: false,
                 animate: false,
-                padding: 16,
-                // Stagger each ring's start angle so single-node rings don't stack vertically
-                startAngle: -Math.PI / 6,
+                padding: 24,
+                startAngle: 3 * Math.PI / 2,  // start from top
             } as cytoscape.LayoutOptions;
 
         case 'hierarchical':

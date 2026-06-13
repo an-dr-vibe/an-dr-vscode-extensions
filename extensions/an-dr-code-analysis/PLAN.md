@@ -284,32 +284,13 @@ Add TS/JS support.
 
 ---
 
-## Iteration 13 — Rust (rust-analyzer + cargo)
-
-Add Rust language support.
-
-- [ ] Extend `LspAnalyzer` to handle `rust` language via rust-analyzer
-- [ ] Create `src/analyzers/cli/CargoAnalyzer.ts` — `cargo metadata --format-version 1` → component deps `GraphModel`
-- [ ] Wire into factory: `rust` + `callGraph` → `[LspAnalyzer, CtagsAnalyzer]`; `rust` + `fileDeps` → `[LspAnalyzer, RegexAnalyzer]`; `rust` + `componentDeps` → `[CargoAnalyzer]`
-
-**Verification:**
-
-1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
-2. Open a `.rs` file in a Cargo workspace
-3. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
-4. Click "File Deps" → module dependency graph renders
-5. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`
-
-- [ ] **Approved**
-
----
-
-## Iteration 14 — Python (pyan3 + AST)
+## Iteration 13 — Python (pyan3 + AST)
 
 Add Python support.
 
 - [ ] Create `src/analyzers/cli/Pyan3Analyzer.ts` — runs `pyan3 --dot`, parses DOT → `GraphModel`; confidence `medium`
 - [ ] Create `src/analyzers/heuristic/AstWalkAnalyzer.ts` — `import` AST walk → file deps; confidence `low`
+- [ ] Extend `CtagsAnalyzer.canHandle()` to also accept `python` (universal fallback)
 - [ ] Wire into factory: `python` + `callGraph` → `[Pyan3Analyzer, CtagsAnalyzer]`; `python` + `fileDeps` → `[AstWalkAnalyzer]`
 
 **Verification:**
@@ -324,7 +305,53 @@ Add Python support.
 
 ---
 
-## Iteration 15 — Component Dependencies (CMake + directory heuristic)
+## Iteration 14 — Expand to Full Tab
+
+Wider graph in a `WebviewPanel` editor tab.
+
+- [ ] Clicking ↗ in GRAPH section opens `vscode.window.createWebviewPanel`
+- [ ] Title: `Code Analysis — {graphType} — {symbol or file}`
+- [ ] Same `CytoscapeRenderer` and layouts, higher depth default (max 8)
+- [ ] The tab receives the current graph from the sidebar and can independently trigger re-analysis via depth controls
+- [ ] Independent from sidebar (both work simultaneously)
+- [ ] No PNG/SVG export yet (deferred)
+
+**Verification:**
+
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Run any analysis in the sidebar to get a graph result
+3. Click ↗ → new editor tab opens titled "Code Analysis — Call Graph — {symbol}"
+4. Graph renders at wider width
+5. Interact with sidebar (pin, depth change) → sidebar still works independently
+6. Depth control in expanded tab goes up to 8
+
+- [ ] **Approved**
+
+---
+
+## Iteration 15 — Rust (rust-analyzer + cargo)
+
+Add Rust language support.
+
+- [ ] Add `RUST_LANG_IDS` to `languageGroups.ts`; add `LspAnalyzer.forRust()` static factory
+- [ ] Create `src/analyzers/heuristic/RustModAnalyzer.ts` — parses `mod <name>;` declarations → file deps; confidence `low`
+- [ ] Create `src/analyzers/cli/CargoAnalyzer.ts` — `cargo metadata --format-version 1` → component deps `GraphModel`; confidence `medium`
+- [ ] Extend `CtagsAnalyzer.canHandle()` to also accept `rust`
+- [ ] Wire into factory: `rust` + `callGraph` → `[LspAnalyzer, CtagsAnalyzer]`; `rust` + `fileDeps` → `[RustModAnalyzer]`; `rust` + `componentDeps` → `[CargoAnalyzer]`
+
+**Verification:**
+
+1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
+2. Open a `.rs` file in a Cargo workspace
+3. Click "Call Graph" → graph renders, badge shows 🟢 `rust-analyzer`
+4. Click "File Deps" → module dependency graph renders, badge shows 🔴 `rust-mod`
+5. Click "Component Deps" → crate/workspace graph renders using `cargo metadata`, badge shows 🟡 `cargo`
+
+- [ ] **Approved**
+
+---
+
+## Iteration 16 — Component Dependencies (CMake + directory heuristic)
 
 Add component-level analysis for C/C++.
 
@@ -338,29 +365,6 @@ Add component-level analysis for C/C++.
 2. Open a CMake project with multiple targets
 3. Click "Component Deps" → CMake target dependency graph renders, badge shows 🟡 `cmake`
 4. Remove `CMakeLists.txt` access (or open a non-CMake project) → heuristic fallback renders directory-level graph
-
-- [ ] **Approved**
-
----
-
-## Iteration 16 — Expand to Full Tab
-
-Wider graph in a `WebviewPanel` editor tab.
-
-- [ ] Clicking ↗ in GRAPH section opens `vscode.window.createWebviewPanel`
-- [ ] Title: `Code Analysis — {graphType} — {symbol or file}`
-- [ ] Same `CytoscapeRenderer` instance, hierarchical layout, higher depth default (max 8)
-- [ ] Independent from sidebar (both work simultaneously)
-- [ ] No PNG/SVG export yet (deferred)
-
-**Verification:**
-
-1. Run `npm run install-ext` and reload VS Code (`Developer: Reload Window`)
-2. Run any analysis in the sidebar to get a graph result
-3. Click ↗ → new editor tab opens titled "Code Analysis — Call Graph — {symbol}"
-4. Graph renders at wider width with hierarchical layout
-5. Interact with sidebar (pin, depth change) → sidebar still works independently
-6. Depth control in expanded tab goes up to 8
 
 - [ ] **Approved**
 

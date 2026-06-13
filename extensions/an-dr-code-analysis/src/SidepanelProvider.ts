@@ -10,6 +10,8 @@ import { WebviewToExtensionMessage } from './webview/messages';
 import { GraphType } from './graph/GraphModel';
 import { log } from './logger';
 import { ClangdHealth } from './tools/ClangdHealth';
+import { C_CPP_LANG_IDS, LSP_LANG_IDS } from './config/languageGroups';
+import { flattenSymbols } from './utils/symbolUtils';
 
 export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Disposable {
     static readonly viewType = 'an-dr-code-analysis.panel';
@@ -111,6 +113,8 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                 case 'runCommand':
                     void vscode.commands.executeCommand(msg.command, ...(msg.args ?? []));
                     break;
+                default:
+                    log.appendLine(`[webview] unexpected message type: ${(msg as {type: string}).type}`);
             }
         });
 
@@ -136,8 +140,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
 
     private _postClangdHealth(ctx: import('./context/ContextTracker').EditorContext | null): void {
         if (!this._view) { return; }
-        const C_CPP = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp']);
-        if (!ctx || !C_CPP.has(ctx.langId)) {
+        if (!ctx || !C_CPP_LANG_IDS.has(ctx.langId)) {
             this._view.webview.postMessage({ type: 'clangdHealth', issue: null, message: '' });
             return;
         }
@@ -183,9 +186,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                     const docSyms = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
                         'vscode.executeDocumentSymbolProvider', doc.uri
                     );
-                    const flat: vscode.DocumentSymbol[] = [];
-                    const flatten = (syms: vscode.DocumentSymbol[]) => { for (const s of syms) { flat.push(s); flatten(s.children); } };
-                    if (docSyms) { flatten(docSyms); }
+                    const flat = docSyms ? flattenSymbols(docSyms) : [];
                     log.appendLine(`[reanalyzeTo] doc symbols: ${flat.map(s => s.name).join(', ')}`);
                     const match = flat.find(s => s.name === bareName || s.name.startsWith(bareName + '('));
                     log.appendLine(`[reanalyzeTo] match: ${match?.name ?? 'none'} → pos ${match?.selectionRange.start.line}:${match?.selectionRange.start.character}`);
@@ -253,7 +254,6 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         this._analysisAbortController = controller;
         const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem, signal: controller.signal };
 
-        const LSP_LANG_IDS = new Set(['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp', 'typescript', 'javascript', 'typescriptreact', 'javascriptreact']);
         const waitingForLsp = !callHierarchyItem && LSP_LANG_IDS.has(ctx.langId);
         this._view.webview.postMessage({
             type: 'analysisBusy',

@@ -1,19 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { log } from '../logger';
+import type { SymbolSource, EditorContext } from '../webview/messages';
 
-export type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
-
-export interface EditorContext {
-    symbol?: string;
-    symbolKind?: number;
-    symbolSource: SymbolSource;
-    file: string;
-    filePath: string;
-    lang: string;
-    langId: string;
-    isPinned: boolean;
-}
+export type { SymbolSource, EditorContext };
 
 const LANG_DISPLAY: Record<string, string> = {
     c:                  'C',
@@ -49,6 +39,16 @@ function findDeepestContaining(
     return undefined;
 }
 
+// Result of the 3-tier resolution attempt.
+interface ResolveResult {
+    symbol: string | undefined;
+    symbolKind: number | undefined;
+    symbolSource: SymbolSource;
+    callHierarchyItem: vscode.CallHierarchyItem | undefined;
+    // Position that was actually used (may differ from requested pos after tier-2 upgrade)
+    resolvedPos: vscode.Position;
+}
+
 export class ContextTracker implements vscode.Disposable {
     private readonly _onContextChange = new vscode.EventEmitter<EditorContext | null>();
     readonly onContextChange = this._onContextChange.event;
@@ -56,6 +56,8 @@ export class ContextTracker implements vscode.Disposable {
     private _isPinned = false;
     private _current: EditorContext | null = null;
     private _currentCallHierarchyItem: vscode.CallHierarchyItem | undefined;
+    // Track the position at which the current item was resolved, to detect staleness.
+    private _callHierarchyItemPos: { fsPath: string; line: number; character: number } | undefined;
     private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
     private _updateId = 0;
     private _lastResolvedPos: { fsPath: string; line: number; character: number } | undefined;
@@ -100,7 +102,7 @@ export class ContextTracker implements vscode.Disposable {
     /**
      * Force an immediate re-resolve from the active editor at the given position.
      * Clears the position cache so the same-position guard doesn't skip the update.
-     * Returns the resolved context (or current after 3s safety timeout).
+     * Returns the resolved context (or current after safety timeout).
      */
     async forceUpdateAt(doc: vscode.TextDocument, pos: vscode.Position): Promise<EditorContext | null> {
         this._lastResolvedPos = undefined;
@@ -120,7 +122,7 @@ export class ContextTracker implements vscode.Disposable {
                         resolve(ctx);
                     }
                 });
-                void this._updateAt(doc, pos);
+                void this._resolveAt(doc, pos, ++this._updateId);
                 setTimeout(() => { disposable.dispose(); resolve(null); }, 1500);
             });
             if (ctx) {
@@ -133,12 +135,56 @@ export class ContextTracker implements vscode.Disposable {
         return this._current;
     }
 
-    private async _updateAt(doc: vscode.TextDocument, pos: vscode.Position): Promise<void> {
-        const id = ++this._updateId;
-        this._lastResolvedPos = undefined;
-        const tag = `[updateAt ${doc.uri.fsPath.split(/[\\/]/).pop()}:${pos.line}:${pos.character}]`;
+    get currentCallHierarchyItem(): vscode.CallHierarchyItem | undefined {
+        return this._currentCallHierarchyItem;
+    }
 
-        // Tier 1: call hierarchy at the exact position
+    private async _update(): Promise<void> {
+        const id = ++this._updateId;
+        const editor = vscode.window.activeTextEditor;
+
+        if (!editor || editor.document.uri.scheme !== 'file') {
+            // Webview panels and output channels fire onDidChangeActiveTextEditor with
+            // undefined or non-file URIs — don't clear the last valid source-file context.
+            return;
+        }
+
+        const doc = editor.document;
+        const pos = editor.selection.active;
+        const fsPath = doc.uri.fsPath;
+
+        // Skip if position hasn't changed since last completed resolve — VS Code fires
+        // onDidChangeTextEditorSelection for reasons beyond cursor movement (LSP responses,
+        // highlight updates) which would otherwise cause continuous re-polling.
+        if (
+            this._lastResolvedPos &&
+            this._lastResolvedPos.fsPath === fsPath &&
+            this._lastResolvedPos.line === pos.line &&
+            this._lastResolvedPos.character === pos.character
+        ) {
+            return;
+        }
+
+        // Clear the stored item only when switching to a different file — not when
+        // tier 1 simply fails at the current cursor position (e.g. cursor on whitespace).
+        if (this._currentCallHierarchyItem?.uri.fsPath !== fsPath) {
+            this._currentCallHierarchyItem = undefined;
+            this._callHierarchyItemPos = undefined;
+        }
+
+        await this._resolveAt(doc, pos, id);
+    }
+
+    /**
+     * 3-tier symbol resolution at the given position. Emits context change on success.
+     * id is the current _updateId snapshot — any async step checks it to detect
+     * superseded updates and bail out early.
+     */
+    private async _resolveAt(doc: vscode.TextDocument, pos: vscode.Position, id: number): Promise<void> {
+        const fsPath = doc.uri.fsPath;
+        const tag = `[resolveAt ${fsPath.split(/[\\/]/).pop()}:${pos.line}:${pos.character}]`;
+
+        // Tier 1: LSP call hierarchy — exact semantic symbol, reusable by analyzer
         try {
             log.appendLine(`${tag} tier1 prepareCallHierarchy…`);
             const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
@@ -148,6 +194,7 @@ export class ContextTracker implements vscode.Disposable {
             log.appendLine(`${tag} tier1 result: ${items?.length ?? 0} items`);
             if (items?.length) {
                 this._currentCallHierarchyItem = items[0];
+                this._callHierarchyItemPos = { fsPath, line: pos.line, character: pos.character };
                 this._emit(id, doc, {
                     symbol: items[0].name,
                     symbolKind: items[0].kind,
@@ -155,12 +202,18 @@ export class ContextTracker implements vscode.Disposable {
                 }, pos);
                 return;
             }
+            // Tier 1 returned no items at this position — clear stale item if it was
+            // resolved in this same file (it belongs to a different symbol now).
+            if (this._callHierarchyItemPos?.fsPath === fsPath) {
+                this._currentCallHierarchyItem = undefined;
+                this._callHierarchyItemPos = undefined;
+            }
         } catch (e) {
             log.appendLine(`${tag} tier1 threw: ${e}`);
             if (id !== this._updateId) { return; }
         }
 
-        // Tier 2: document symbol at the position
+        // Tier 2: Document symbol at the position
         try {
             log.appendLine(`${tag} tier2 executeDocumentSymbolProvider…`);
             const allSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
@@ -169,13 +222,10 @@ export class ContextTracker implements vscode.Disposable {
             if (id !== this._updateId) { log.appendLine(`${tag} tier2 cancelled`); return; }
             log.appendLine(`${tag} tier2 symbols: ${allSymbols?.length ?? 0} top-level`);
             if (allSymbols?.length) {
-                const flat: vscode.DocumentSymbol[] = [];
-                const flatten = (syms: vscode.DocumentSymbol[]) => { for (const s of syms) { flat.push(s); flatten(s.children); } };
-                flatten(allSymbols);
-                log.appendLine(`${tag} tier2 flat: ${flat.map(s => s.name).join(', ')}`);
                 const sym = findDeepestContaining(allSymbols, pos);
                 log.appendLine(`${tag} tier2 deepest: ${sym?.name ?? 'none'}`);
                 if (sym) {
+                    // Try to upgrade to call-hierarchy using the symbol's name token position.
                     const upgradePos = sym.selectionRange.start;
                     log.appendLine(`${tag} tier2 upgrade prepareCallHierarchy at ${upgradePos.line}:${upgradePos.character}…`);
                     try {
@@ -186,6 +236,7 @@ export class ContextTracker implements vscode.Disposable {
                         log.appendLine(`${tag} tier2 upgrade result: ${chItems?.length ?? 0} items`);
                         if (chItems?.length) {
                             this._currentCallHierarchyItem = chItems[0];
+                            this._callHierarchyItemPos = { fsPath, line: upgradePos.line, character: upgradePos.character };
                             this._emit(id, doc, {
                                 symbol: chItems[0].name,
                                 symbolKind: chItems[0].kind,
@@ -207,120 +258,10 @@ export class ContextTracker implements vscode.Disposable {
             if (id !== this._updateId) { return; }
         }
 
-        // Fall through — emit word context so forceUpdateAt caller can detect failure
+        // Tier 3: Word under cursor — always available, semantically unreliable
         const wordRange = doc.getWordRangeAtPosition(pos);
         log.appendLine(`${tag} fell through to word: ${wordRange ? doc.getText(wordRange) : 'none'}`);
         this._emit(id, doc, { symbol: wordRange ? doc.getText(wordRange) : undefined, symbolSource: 'word' }, pos);
-    }
-
-    get currentCallHierarchyItem(): vscode.CallHierarchyItem | undefined {
-        return this._currentCallHierarchyItem;
-    }
-
-    private async _update(): Promise<void> {
-        const id = ++this._updateId;
-        const editor = vscode.window.activeTextEditor;
-
-        if (!editor || editor.document.uri.scheme !== 'file') {
-            // Webview panels and output channels fire onDidChangeActiveTextEditor with
-            // undefined or non-file URIs — don't clear the last valid source-file context.
-            return;
-        }
-
-        const doc = editor.document;
-        const pos = editor.selection.active;
-
-        // Skip if position hasn't changed since last completed resolve — VS Code fires
-        // onDidChangeTextEditorSelection for reasons beyond cursor movement (LSP responses,
-        // highlight updates) which would otherwise cause continuous re-polling.
-        const fsPath = doc.uri.fsPath;
-        if (
-            this._lastResolvedPos &&
-            this._lastResolvedPos.fsPath === fsPath &&
-            this._lastResolvedPos.line === pos.line &&
-            this._lastResolvedPos.character === pos.character
-        ) {
-            return;
-        }
-
-        // Clear the stored item only when switching to a different file — not when
-        // tier 1 simply fails at the current cursor position (e.g. cursor on whitespace).
-        if (this._currentCallHierarchyItem?.uri.fsPath !== doc.uri.fsPath) {
-            this._currentCallHierarchyItem = undefined;
-        }
-
-        // Tier 1: LSP call hierarchy — exact semantic symbol, reusable by analyzer
-        try {
-            const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
-                'vscode.prepareCallHierarchy', doc.uri, pos
-            );
-            if (id !== this._updateId) { return; }
-            if (items && items.length > 0) {
-                this._currentCallHierarchyItem = items[0];
-                this._emit(id, doc, {
-                    symbol: items[0].name,
-                    symbolKind: items[0].kind,
-                    symbolSource: 'call-hierarchy',
-                }, pos);
-                return;
-            }
-        } catch {
-            if (id !== this._updateId) { return; }
-        }
-        // Do NOT clear _currentCallHierarchyItem here — keep the last resolved item
-        // so it's available when the user clicks the analysis panel.
-
-        // Tier 2: Document symbol provider — finds enclosing function from file structure,
-        // works for header files and projects without compile_commands.json
-        try {
-            const allSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-                'vscode.executeDocumentSymbolProvider', doc.uri
-            );
-            if (id !== this._updateId) { return; }
-            if (allSymbols && allSymbols.length > 0) {
-                const sym = findDeepestContaining(allSymbols, pos);
-                if (sym) {
-                    // Try to upgrade to call-hierarchy using the symbol's name token position.
-                    // This lets the analyzer reuse the item even when the cursor is inside
-                    // the function body rather than on its name.
-                    const upgradePos = sym.selectionRange.start;
-                    try {
-                        const chItems = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
-                            'vscode.prepareCallHierarchy', doc.uri, upgradePos
-                        );
-                        if (id !== this._updateId) { return; }
-                        if (chItems && chItems.length > 0) {
-                            this._currentCallHierarchyItem = chItems[0];
-                            this._emit(id, doc, {
-                                symbol: chItems[0].name,
-                                symbolKind: chItems[0].kind,
-                                symbolSource: 'call-hierarchy',
-                            }, pos);
-                            return;
-                        }
-                    } catch {
-                        if (id !== this._updateId) { return; }
-                    }
-
-                    this._emit(id, doc, {
-                        symbol: sym.name,
-                        symbolKind: sym.kind,
-                        symbolSource: 'document-symbol',
-                    }, pos);
-                    return;
-                }
-            }
-        } catch {
-            if (id !== this._updateId) { return; }
-        }
-
-        // Tier 3: Word under cursor — always available, semantically unreliable
-        this._lastResolvedPos = { fsPath, line: pos.line, character: pos.character };
-        const wordRange = doc.getWordRangeAtPosition(pos);
-        this._emit(id, doc, {
-            symbol: wordRange ? doc.getText(wordRange) : undefined,
-            symbolSource: 'word',
-        });
     }
 
     private _emit(

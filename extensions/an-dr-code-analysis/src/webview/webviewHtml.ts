@@ -402,6 +402,7 @@ export function generateWebviewHtml(
     </style>
 </head>
 <body>
+    <noscript><p style="padding:1rem;color:var(--vscode-errorForeground)">Graph panel failed to load. Check the Output channel &quot;Code Analysis&quot; for errors.</p></noscript>
     <div id="root">
         <div class="loading">Loading…</div>
     </div>

@@ -28,7 +28,9 @@ export class AnalysisCache implements vscode.Disposable {
     private readonly _watcher: vscode.FileSystemWatcher;
 
     constructor() {
-        this._watcher = vscode.workspace.createFileSystemWatcher('**/*');
+        this._watcher = vscode.workspace.createFileSystemWatcher(
+            '**/*.{c,cpp,cc,cxx,h,hpp,hxx,inl,ts,tsx,js,jsx,mts,cts,mjs,cjs,rs,py,go}'
+        );
         this._watcher.onDidChange(uri => this._invalidateFile(uri.fsPath));
         this._watcher.onDidCreate(uri => this._invalidateFile(uri.fsPath));
         this._watcher.onDidDelete(uri => this._invalidateFile(uri.fsPath));

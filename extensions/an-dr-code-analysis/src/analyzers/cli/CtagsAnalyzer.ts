@@ -195,6 +195,7 @@ export class CtagsAnalyzer implements IAnalyzer {
             depth: request.depth,
             tool: this.name,
             confidence: 'medium',
+            warnings: ['Macro-expanded calls and template instantiations are not visible with ctags fallback.'],
         };
         return { graph };
     }

@@ -4,8 +4,8 @@ import * as fs from 'fs';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
-
-const TS_JS_LANG_IDS = new Set(['typescript', 'javascript', 'typescriptreact', 'javascriptreact']);
+import { TS_JS_LANG_IDS } from '../../config/languageGroups';
+import { collectFiles } from '../../utils/fsUtils';
 
 interface TsConfig {
     references?: Array<{ path: string }>;
@@ -20,22 +20,6 @@ function readTsConfig(filePath: string): TsConfig | null {
         return JSON.parse(stripped);
     } catch {
         return null;
-    }
-}
-
-function findTsConfigs(dir: string, results: string[], depth = 0): void {
-    if (depth > 3) { return; }
-    let entries: fs.Dirent[];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-    catch { return; }
-    for (const e of entries) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') { continue; }
-        const full = path.join(dir, e.name);
-        if (e.isFile() && e.name === 'tsconfig.json') {
-            results.push(full.replace(/\\/g, '/'));
-        } else if (e.isDirectory() && depth < 3) {
-            findTsConfigs(full, results, depth + 1);
-        }
     }
 }
 
@@ -55,11 +39,13 @@ export class TsComponentDepsAnalyzer implements IAnalyzer {
 
         if (signal?.aborted) { return null; }
 
-        // Find all tsconfig.json files in workspace
+        // Find all tsconfig.json files in workspace (depth ≤ 3)
         const tsconfigs: string[] = [];
-        findTsConfigs(workspaceRoot, tsconfigs);
+        collectFiles(workspaceRoot, 0, 3, new Set(['.json']), tsconfigs);
+        // Keep only tsconfig.json files
+        const filteredTsconfigs = tsconfigs.filter(f => path.basename(f) === 'tsconfig.json');
 
-        if (tsconfigs.length === 0) {
+        if (filteredTsconfigs.length === 0) {
             log.appendLine('[TsComponentDepsAnalyzer] no tsconfig.json found in workspace');
             return null;
         }
@@ -103,12 +89,12 @@ export class TsComponentDepsAnalyzer implements IAnalyzer {
         }
 
         // Find the root tsconfig (the one in the workspace root, or first found)
-        const rootTsconfig = tsconfigs.find(t => path.dirname(t).replace(/\\/g, '/') === workspaceRoot)
-            ?? tsconfigs[0];
+        const rootTsconfig = filteredTsconfigs.find(t => path.dirname(t).replace(/\\/g, '/') === workspaceRoot)
+            ?? filteredTsconfigs[0];
         const rootId = addNode(rootTsconfig, 'target');
 
         // Walk all tsconfigs and resolve their references
-        for (const tsconfigPath of tsconfigs) {
+        for (const tsconfigPath of filteredTsconfigs) {
             if (signal?.aborted) { return null; }
             const config = readTsConfig(tsconfigPath);
             if (!config?.references?.length) { continue; }

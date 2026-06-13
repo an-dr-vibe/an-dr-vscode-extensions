@@ -11,6 +11,7 @@ export interface ToolStatus {
     detail?: string;
 }
 
+// Shared editor context types — single source of truth imported by ContextTracker and webview.
 export type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
 
 export interface EditorContext {

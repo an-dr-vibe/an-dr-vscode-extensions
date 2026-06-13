@@ -243,9 +243,13 @@ export class CytoscapeRenderer {
             cy.getElementById(n.id).remove();
         }
 
-        // Add new nodes — restore from cache if available, otherwise spawn near neighbours
+        // Add new nodes — restore from cache if available, otherwise place via angular layout
         const trulyNew: GraphNode[] = [];
         if (addedNodeIds.length > 0) {
+            const spawnPositions = this._placeNewNodes(
+                addedNodeIds.filter(n => !this._posCache.has(n.id)),
+                graph, cy
+            );
             const newEles: cytoscape.ElementDefinition[] = addedNodeIds.map(n => {
                 const cached = this._posCache.get(n.id);
                 if (!cached) { trulyNew.push(n); }
@@ -255,7 +259,7 @@ export class CytoscapeRenderer {
                         id: n.id, label: n.label, fullName: n.fullName,
                         filePath: n.filePath, line: n.line, role: n.role,
                     },
-                    position: cached ?? this._spawnPosition(n.id, graph, cy),
+                    position: cached ?? spawnPositions.get(n.id)!,
                 };
             });
             cy.add(newEles);
@@ -281,7 +285,10 @@ export class CytoscapeRenderer {
         // Resolve overlaps only for genuinely new nodes (no cached position)
         if (trulyNew.length > 0) {
             const selector = trulyNew.map(n => `#${CSS.escape(n.id)}`).join(',');
-            this._resolveOverlaps(cy.nodes(selector));
+            const newCol = cy.nodes(selector);
+            console.log(`[overlap] before: ${trulyNew.map(n => { const el = cy.getElementById(n.id); return `${n.id}=(${el.position().x.toFixed(1)},${el.position().y.toFixed(1)})`; }).join(', ')}`);
+            this._resolveOverlaps(newCol);
+            console.log(`[overlap] after:  ${trulyNew.map(n => { const el = cy.getElementById(n.id); return `${n.id}=(${el.position().x.toFixed(1)},${el.position().y.toFixed(1)})`; }).join(', ')}`);
         }
 
         // Decide whether to fit:
@@ -308,36 +315,152 @@ export class CytoscapeRenderer {
         }
     }
 
-    /** Pick a spawn position for a new node: centroid of neighbours (live or cached) + jitter. */
-    private _spawnPosition(nodeId: string, graph: GraphModel, cy: cytoscape.Core): { x: number; y: number } {
-        const neighbourIds = graph.edges
-            .filter(e => e.sourceId === nodeId || e.targetId === nodeId)
-            .map(e => e.sourceId === nodeId ? e.targetId : e.sourceId);
+    /**
+     * Place a batch of new nodes (no cached position) around their hubs using
+     * angular spacing. Returns a map nodeId → position.
+     *
+     * Strategy per hub:
+     *  1. Collect angles already occupied by live neighbours of the hub.
+     *  2. Find the largest free arc in [0, 2π).
+     *  3. Spread the new siblings evenly across that arc, keeping angular gap ≥ MIN_GAP_RAD.
+     *  4. Compute radius so that chord between adjacent nodes ≥ NODE_SPACING px.
+     *     r ≥ NODE_SPACING / (2 * sin(gap/2))
+     *  5. Also enforce r ≥ MIN_RADIUS so nodes don't pile on top of the hub.
+     */
+    private _placeNewNodes(
+        newNodes: GraphNode[],
+        graph: GraphModel,
+        cy: cytoscape.Core,
+    ): Map<string, { x: number; y: number }> {
+        const MIN_GAP_DEG  = 3;
+        const MIN_GAP_RAD  = MIN_GAP_DEG * Math.PI / 180;
+        const NODE_SPACING = 90;   // minimum px between adjacent siblings on the circle
+        const MIN_RADIUS   = 100;  // never place closer than this to the hub
 
-        const positions: { x: number; y: number }[] = [];
-        for (const id of neighbourIds) {
-            const live = cy.getElementById(id);
-            if (!live.empty()) { positions.push(live.position()); }
-            else {
-                const cached = this._posCache.get(id);
-                if (cached) { positions.push(cached); }
+        const result = new Map<string, { x: number; y: number }>();
+
+        // Helper: resolve a node's position — live cy node first, then cache.
+        const resolvePos = (id: string): { x: number; y: number } | null => {
+            const el = cy.getElementById(id);
+            if (!el.empty()) { return el.position(); }
+            return this._posCache.get(id) ?? null;
+        };
+
+        // Helper: normalise angle to [0, 2π)
+        const norm = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        // Shortest angular distance between two angles (always in [0, π])
+        const angDist = (a: number, b: number) => { const d = norm(b - a); return d > Math.PI ? 2 * Math.PI - d : d; };
+
+        // Group new nodes by their primary hub.
+        // Hub = first neighbour that is already live in cy (prefer graph.targetId).
+        const hubGroups = new Map<string, GraphNode[]>(); // hubId → new nodes
+        const noHub: GraphNode[] = [];
+
+        for (const node of newNodes) {
+            const neighbours = graph.edges
+                .filter(e => e.sourceId === node.id || e.targetId === node.id)
+                .map(e => e.sourceId === node.id ? e.targetId : e.sourceId);
+
+            // Prefer the graph target as hub if it's a neighbour, otherwise first live neighbour.
+            let hub: string | null = null;
+            if (neighbours.includes(graph.targetId) && resolvePos(graph.targetId)) {
+                hub = graph.targetId;
+            } else {
+                hub = neighbours.find(id => resolvePos(id) !== null) ?? null;
+            }
+
+            if (hub) {
+                if (!hubGroups.has(hub)) { hubGroups.set(hub, []); }
+                hubGroups.get(hub)!.push(node);
+            } else {
+                noHub.push(node);
             }
         }
 
-        if (positions.length > 0) {
-            const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
-            const cy2 = positions.reduce((s, p) => s + p.y, 0) / positions.length;
-            const angle = Math.random() * 2 * Math.PI;
-            const r = 60 + Math.random() * 40;
-            return { x: cx + Math.cos(angle) * r, y: cy2 + Math.sin(angle) * r };
+        // Process each hub group.
+        // We track angles already assigned in this batch so intra-batch siblings
+        // don't land on each other even before cy.add() happens.
+        for (const [hubId, siblings] of hubGroups) {
+            const hubPos = resolvePos(hubId)!;
+
+            // Collect occupied angles: all live nodes connected to this hub
+            // (excluding the new siblings themselves).
+            const newIds = new Set(siblings.map(n => n.id));
+            const occupiedAngles: number[] = [];
+            cy.getElementById(hubId).neighborhood('node').forEach(nb => {
+                if (newIds.has(nb.id())) { return; }
+                const p = nb.position();
+                occupiedAngles.push(norm(Math.atan2(p.y - hubPos.y, p.x - hubPos.x)));
+            });
+
+            // Find the largest free arc to place the siblings into.
+            const count = siblings.length;
+            let startAngle: number;
+            let bestGapSize = 2 * Math.PI;
+
+            if (occupiedAngles.length === 0) {
+                startAngle = -Math.PI / 2;
+            } else {
+                occupiedAngles.sort((a, b) => a - b);
+                bestGapSize = 0;
+                let bestGapStart = 0;
+                for (let i = 0; i < occupiedAngles.length; i++) {
+                    const a = occupiedAngles[i];
+                    const b = occupiedAngles[(i + 1) % occupiedAngles.length];
+                    const gap = norm(b - a);
+                    if (gap > bestGapSize) { bestGapSize = gap; bestGapStart = a; }
+                }
+                // Centre siblings in the best gap, leaving MIN_GAP_RAD margin from the gap edges
+                const needed = (count + 1) * MIN_GAP_RAD;
+                const usable = Math.max(needed, bestGapSize);
+                startAngle = bestGapStart + usable / 2 - ((count - 1) / 2) * MIN_GAP_RAD;
+            }
+
+            // Compute radius: large enough that chord between siblings ≥ NODE_SPACING.
+            const minRFromSpacing = count > 1
+                ? NODE_SPACING / (2 * Math.sin(MIN_GAP_RAD / 2))
+                : MIN_RADIUS;
+            let maxExistingR = MIN_RADIUS;
+            cy.getElementById(hubId).neighborhood('node').forEach(nb => {
+                const p = nb.position();
+                const d = Math.hypot(p.x - hubPos.x, p.y - hubPos.y);
+                if (d > maxExistingR) { maxExistingR = d; }
+            });
+            const r = Math.max(MIN_RADIUS, minRFromSpacing, maxExistingR * 0.9);
+
+            // Assign angles one by one. takenAngles = live neighbours + already-assigned siblings.
+            // For each sibling, start at the precomputed slot and nudge forward until clear.
+            const takenAngles = [...occupiedAngles];
+            console.log(`[place] hub=${hubId} r=${r.toFixed(1)} occupiedAngles=[${occupiedAngles.map(a=>(a*180/Math.PI).toFixed(1)).join(', ')}] startAngle=${(startAngle*180/Math.PI).toFixed(1)}° siblings=${siblings.map(n=>n.id).join(', ')}`);
+            for (let i = 0; i < count; i++) {
+                let θ = norm(startAngle + i * MIN_GAP_RAD);
+                let attempts = 0;
+                while (attempts < 72 && takenAngles.some(a => angDist(a, θ) < MIN_GAP_RAD * 0.95)) {
+                    θ = norm(θ + MIN_GAP_RAD * 0.5);
+                    attempts++;
+                }
+                takenAngles.push(θ);
+                console.log(`[place]   ${siblings[i].id} → θ=${( θ*180/Math.PI).toFixed(1)}° (${attempts} nudges) pos=(${(hubPos.x + r * Math.cos(θ)).toFixed(1)}, ${(hubPos.y + r * Math.sin(θ)).toFixed(1)})`);
+                result.set(siblings[i].id, {
+                    x: hubPos.x + r * Math.cos(θ),
+                    y: hubPos.y + r * Math.sin(θ),
+                });
+            }
         }
 
-        // No neighbours found anywhere — place near viewport center with jitter
-        const ext = cy.extent();
-        return {
-            x: (ext.x1 + ext.x2) / 2 + (Math.random() - 0.5) * 120,
-            y: (ext.y1 + ext.y2) / 2 + (Math.random() - 0.5) * 120,
-        };
+        // Nodes with no hub: scatter near viewport centre.
+        if (noHub.length > 0) {
+            const ext = cy.extent();
+            const cx = (ext.x1 + ext.x2) / 2;
+            const cy2 = (ext.y1 + ext.y2) / 2;
+            const spreadR = 120;
+            noHub.forEach((n, i) => {
+                const θ = (i / Math.max(noHub.length, 1)) * 2 * Math.PI;
+                result.set(n.id, { x: cx + spreadR * Math.cos(θ), y: cy2 + spreadR * Math.sin(θ) });
+            });
+        }
+
+        return result;
     }
 
     // ── Overlap resolver ──────────────────────────────────────────────────────

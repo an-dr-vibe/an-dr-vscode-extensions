@@ -98,11 +98,13 @@ export class ActivityBarView implements vscode.Disposable {
 	private readonly dataSource: DataSource;
 	private readonly extensionPath: string;
 	private readonly _disposables: vscode.Disposable[] = [];
+	private readonly _fileWatchers: vscode.Disposable[] = [];
 	private _api: any = null;
 	private _view: any = null;
 	private _currentRepo: string | null = null;
 	private _changes: GitWorkingTreeChange[] = [];
 	private _refreshSeq = 0;
+	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(context: vscode.ExtensionContext, dataSource: DataSource) {
 		this.dataSource = dataSource;
@@ -130,6 +132,24 @@ export class ActivityBarView implements vscode.Disposable {
 		void this._refreshPanel();
 	}
 
+	private _scheduleRefresh() {
+		if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
+		this._refreshTimer = setTimeout(() => {
+			this._refreshTimer = null;
+			this._updateBadge();
+			void this._refreshPanel();
+		}, 500);
+	}
+
+	private _watchRepo(repoPath: string) {
+		const watcher = vscode.workspace.createFileSystemWatcher(repoPath + '/.git/**');
+		const onEvent = () => this._scheduleRefresh();
+		watcher.onDidCreate(onEvent);
+		watcher.onDidChange(onEvent);
+		watcher.onDidDelete(onEvent);
+		this._fileWatchers.push(watcher);
+	}
+
 	private _subscribeToGitApi() {
 		const gitExt = vscode.extensions.getExtension('vscode.git');
 		if (!gitExt) { return; }
@@ -143,10 +163,14 @@ export class ActivityBarView implements vscode.Disposable {
 
 			for (const repo of api.repositories) {
 				this._disposables.push(repo.state.onDidChange(update));
+				const repoPath = repo.rootUri?.fsPath as string | undefined;
+				if (repoPath) this._watchRepo(repoPath);
 			}
 			this._disposables.push(
 				api.onDidOpenRepository((r: any) => {
 					this._disposables.push(r.state.onDidChange(update));
+					const repoPath = r.rootUri?.fsPath as string | undefined;
+					if (repoPath) this._watchRepo(repoPath);
 					update();
 				}),
 				vscode.window.onDidChangeActiveTextEditor(update)
@@ -507,5 +531,7 @@ updateCommitButton();
 
 	dispose() {
 		this._disposables.forEach(d => d.dispose());
+		this._fileWatchers.forEach(d => d.dispose());
+		if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
 	}
 }

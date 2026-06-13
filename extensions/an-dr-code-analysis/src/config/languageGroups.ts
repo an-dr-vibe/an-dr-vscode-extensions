@@ -8,4 +8,6 @@ export const TS_JS_LANG_IDS = new Set([
 
 export const PYTHON_LANG_IDS = new Set(['python']);
 
-export const LSP_LANG_IDS = new Set([...C_CPP_LANG_IDS, ...TS_JS_LANG_IDS]);
+export const RUST_LANG_IDS = new Set(['rust']);
+
+export const LSP_LANG_IDS = new Set([...C_CPP_LANG_IDS, ...TS_JS_LANG_IDS, ...RUST_LANG_IDS]);

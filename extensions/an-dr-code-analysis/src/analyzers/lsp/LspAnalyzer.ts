@@ -5,7 +5,7 @@ import { buildCallGraph } from '../../graph/GraphBuilder';
 import { ContextTracker } from '../../context/ContextTracker';
 import { ClangdHealth } from '../../tools/ClangdHealth';
 import { log } from '../../logger';
-import { C_CPP_LANG_IDS, TS_JS_LANG_IDS } from '../../config/languageGroups';
+import { C_CPP_LANG_IDS, TS_JS_LANG_IDS, RUST_LANG_IDS } from '../../config/languageGroups';
 
 export class LspAnalyzer implements IAnalyzer {
     readonly name: string;
@@ -33,6 +33,14 @@ export class LspAnalyzer implements IAnalyzer {
         return new LspAnalyzer(contextTracker, {
             name: 'tsserver',
             langIds: TS_JS_LANG_IDS,
+            requireClangdHealth: false,
+        });
+    }
+
+    static forRust(contextTracker: ContextTracker): LspAnalyzer {
+        return new LspAnalyzer(contextTracker, {
+            name: 'rust-analyzer',
+            langIds: RUST_LANG_IDS,
             requireClangdHealth: false,
         });
     }

@@ -5,9 +5,9 @@ import * as child_process from 'child_process';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
 import { log } from '../../logger';
-import { C_CPP_LANG_IDS, PYTHON_LANG_IDS } from '../../config/languageGroups';
+import { C_CPP_LANG_IDS, PYTHON_LANG_IDS, RUST_LANG_IDS } from '../../config/languageGroups';
 
-const CTAGS_LANG_IDS = new Set([...C_CPP_LANG_IDS, ...PYTHON_LANG_IDS]);
+const CTAGS_LANG_IDS = new Set([...C_CPP_LANG_IDS, ...PYTHON_LANG_IDS, ...RUST_LANG_IDS]);
 
 interface CtagsEntry {
     name: string;

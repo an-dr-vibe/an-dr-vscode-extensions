@@ -118,18 +118,6 @@
         "category": "Code Review"
       },
       {
-        "command": "an-dr-code-review.discardChanges",
-        "title": "Discard Changes",
-        "icon": "$(discard)",
-        "category": "Code Review"
-      },
-      {
-        "command": "an-dr-code-review.discardAllChanges",
-        "title": "Discard All Changes",
-        "icon": "$(discard)",
-        "category": "Code Review"
-      },
-      {
         "command": "an-dr-code-review.openAllChanges",
         "title": "Open All Changes",
         "icon": "$(git-compare)",
@@ -400,11 +388,6 @@
           "group": "2_files"
         },
         {
-          "command": "an-dr-code-review.discardAllChanges",
-          "when": "view == anDrCodeReviewChanges",
-          "group": "2_files"
-        },
-        {
           "command": "an-dr-code-review.refresh",
           "when": "view == anDrCodeReviewChanges",
           "group": "1_state"
@@ -487,21 +470,6 @@
           "group": "inline"
         },
         {
-          "command": "an-dr-code-review.discardChanges",
-          "when": "view == anDrCodeReviewChanges && viewItem == file",
-          "group": "inline"
-        },
-        {
-          "command": "an-dr-code-review.discardChanges",
-          "when": "view == anDrCodeReviewChanges && viewItem == folder",
-          "group": "inline"
-        },
-        {
-          "command": "an-dr-code-review.discardAllChanges",
-          "when": "view == anDrCodeReviewChanges && viewItem == ref",
-          "group": "inline"
-        },
-        {
           "command": "an-dr-code-review.openChanges",
           "when": "view == anDrCodeReviewChanges && viewItem == file && !config.codeReview.openChanges",
           "group": "1_open"
@@ -510,20 +478,6 @@
           "command": "an-dr-code-review.openFile",
           "when": "view == anDrCodeReviewChanges && viewItem == file && config.codeReview.openChanges",
           "group": "1_open"
-        },
-        {
-          "command": "an-dr-code-review.discardChanges",
-          "when": "view == anDrCodeReviewChanges && viewItem == file",
-          "group": "2_discard"
-        },
-        {
-          "command": "an-dr-code-review.discardChanges",
-          "when": "view == anDrCodeReviewChanges && viewItem == folder",
-          "group": "2_discard"
-        },
-        {
-          "command": "an-dr-code-review.discardAllChanges",
-          "when": "view == anDrCodeReviewChanges && viewItem == ref"
         },
         {
           "command": "an-dr-code-review.changeRepository",

@@ -45,18 +45,6 @@ export function activate(context: ExtensionContext, onSelectedSelectionChange?: 
         });
     });
 
-    commands.registerCommand(COMMAND_NAMESPACE + '.discardChanges', (node, nodes) => {
-        runAfterInit(() => {
-            provider!.discardChanges(nodes || [node]);
-        });
-    });
-
-    commands.registerCommand(COMMAND_NAMESPACE + '.discardAllChanges', () => {
-        runAfterInit(() => {
-            provider!.discardAllChanges();
-        });
-    });
-
     commands.registerCommand(COMMAND_NAMESPACE + '.changeRepository', () => {
         runAfterInit(() => {
             provider!.promptChangeRepository();

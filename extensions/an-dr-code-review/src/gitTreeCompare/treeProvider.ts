@@ -12,7 +12,7 @@ import { Ref, RefType } from './git/api/git'
 import { anyEvent, filterEvent, eventToPromise } from './git/util'
 import { getDefaultBranch, getHeadModificationDate, getBranchCommit,
          diffIndex, diffCommits, IDiffStatus, StatusCode, getAbsGitDir,
-         getWorkspaceFolders, getGitRepositoryFolders, hasUncommittedChanges, rmFile } from './gitHelper'
+         getWorkspaceFolders, getGitRepositoryFolders } from './gitHelper'
 import { debounce, throttle } from './git/decorators'
 import { normalizePath } from './fsUtils';
 import { API as GitAPI, Repository as GitAPIRepository } from './typings/git';
@@ -275,11 +275,13 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             return;
         }
         const repoName = path.basename(this.repoRoot);
-        if (this.searchFilter) {
-            this.treeView.title = `${repoName} (filtered)`;
-        } else {
-            this.treeView.title = repoName;
+        let suffix = '';
+        if (this.pinnedFrom && this.pinnedTo) {
+            suffix = ` ${this.pinnedFrom.substring(0, 8)}...${this.pinnedTo.substring(0, 8)}`;
+        } else if (this.searchFilter) {
+            suffix = ' (filtered)';
         }
+        this.treeView.title = repoName + suffix;
     }
 
     async unsetRepository() {
@@ -1318,132 +1320,6 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         return commands.executeCommand('vscode.open', uri, options);
     }
 
-    async discardChanges(entries: (FileElement | FolderElement)[]) {
-        let statuses: IDiffStatus[] = [];
-        for (const entry of entries) {
-            if (entry instanceof FolderElement) {
-                statuses = statuses.concat([...this.iterFiles(entry.dstAbsPath)]);
-            } else {
-                const diffStatus = this.getDiffStatus(entry);
-                if (diffStatus) {
-                    statuses.push(diffStatus);
-                }
-            }
-        }
-        await this.doDiscardChanges(statuses);
-    }
-
-    async discardAllChanges() {
-        const statuses = [...this.iterFiles()];
-        await this.doDiscardChanges(statuses);
-    }
-
-    async doDiscardChanges(statuses: IDiffStatus[]) {
-        if (statuses.length === 0) {
-            return;
-        }
-        const actions: Function[] = [];
-        const prompts: [string, string][] = [];
-        const uncommittedChanges: string[] = [];
-
-        for (const diffStatus of statuses) {
-            const filename = path.basename(diffStatus.dstAbsPath);
-            if (diffStatus.status === 'U') {
-                uncommittedChanges.push(filename);
-                prompts.push([
-                    `Do you really want to DELETE ${filename}?\nThis is IRREVERSIBLE!\nThis file will be FOREVER LOST if you proceed.`,
-                    'Delete File'
-                ]);
-                actions.push(async () => {
-                    fs.unlinkSync(diffStatus.dstAbsPath);
-                });
-            } else if (diffStatus.status === 'A') {
-                const dirty = await hasUncommittedChanges(this.repository!, diffStatus.dstAbsPath);
-                let msg = `Do you really want to delete ${filename}?`;
-                if (dirty) {
-                    uncommittedChanges.push(filename);
-                    msg = `${msg}\nThis file has UNCOMMITTED changes which will be FOREVER LOST!`;
-                }
-                prompts.push([msg, 'Delete File']);
-                actions.push(async () => {
-                    await rmFile(this.repository!, diffStatus.dstAbsPath);
-                });
-            } else if (diffStatus.status === 'M' || diffStatus.status === 'D') {
-                let msg = `Do you really want to restore ${filename} with the contents from ${this.baseRef}?`;
-                if (diffStatus.status !== 'D') {
-                    const dirty = await hasUncommittedChanges(this.repository!, diffStatus.dstAbsPath);
-                    if (dirty) {
-                        uncommittedChanges.push(filename);
-                        msg = `${msg}\nThis file has UNCOMMITTED changes which will be FOREVER LOST!`;
-                    }
-                }
-                prompts.push([msg, 'Restore File']);
-                actions.push(async () => {
-                    await this.repository!.checkout(this.mergeBase, [diffStatus.dstAbsPath]);
-                });
-            } else if (diffStatus.status === 'R') {
-                const srcFolder = path.dirname(diffStatus.srcAbsPath);
-                const dstFolder = path.dirname(diffStatus.dstAbsPath);
-                let srcFile: string;
-                let dstFile: string;
-                let verb: string;
-                if (srcFolder === dstFolder) {
-                    verb = 'rename';
-                    srcFile = path.basename(diffStatus.srcAbsPath);
-                    dstFile = path.basename(diffStatus.dstAbsPath);
-                } else {
-                    verb = 'move';
-                    const relPathBase = this.treeRoot;
-                    srcFile = path.relative(relPathBase, diffStatus.srcAbsPath);
-                    dstFile = path.relative(relPathBase, diffStatus.dstAbsPath);
-                }
-                let msg = `Do you really want to ${verb} ${srcFile} to ${dstFile} and restore contents from ${this.baseRef}?`;
-                const dirty = await hasUncommittedChanges(this.repository!, diffStatus.dstAbsPath);
-                if (dirty) {
-                    uncommittedChanges.push(filename);
-                    msg = `${msg}\nThis file has UNCOMMITTED changes which will be FOREVER LOST!`;
-                }
-                prompts.push([msg, 'Restore File']);
-                actions.push(async () => {
-                    await rmFile(this.repository!, diffStatus.dstAbsPath);
-                    await this.repository!.checkout(this.mergeBase, [diffStatus.srcAbsPath]);
-                });
-            } else {
-                window.showInformationMessage(
-                    `Discarding changes for files with git status ${diffStatus.status} is not yet supported.`);
-            }
-        }
-
-        if (prompts.length === 1) {
-            const [msg, btn] = prompts[0];
-            const answer = await window.showWarningMessage(
-                msg,
-                { modal: true },
-                btn);
-            if (answer !== btn) {
-                return;
-            }
-            actions[0]();
-        } else {
-            let msg = `Are you sure you want to discard changes in ${prompts.length} files?`;
-            if (uncommittedChanges.length > 0) {
-                msg = `${msg}\n\nThe following files have UNCOMMITTED changes which will be FOREVER LOST:\n` +
-                    uncommittedChanges.map(f => `${f}`).join('\n');
-            }
-            const btn = 'Discard Changes';
-            const answer = await window.showWarningMessage(
-                msg,
-                { modal: true },
-                btn);
-            if (answer !== btn) {
-                return;
-            }
-            for (const action of actions) {
-                await action();
-            }
-        }
-    }
-
     openChangedFiles(entry: RefElement | RepoRootElement | FolderElement | undefined) {
         const withinFolder = entry instanceof FolderElement ? entry.dstAbsPath : undefined;
         for (const file of this.iterFiles(withinFolder)) {
@@ -1529,6 +1405,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     async setPinnedRange(from: string, to: string): Promise<void> {
         this.pinnedFrom = from;
         this.pinnedTo = to;
+        this.updateTreeTitle();
         window.withProgress({ location: ProgressLocation.Window, title: 'Loading Commit Range' }, async _ => {
             try {
                 await this.updateDiff(false);
@@ -1536,6 +1413,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
                 window.showErrorMessage(`Failed to load commit range: ${e.message}`);
                 this.pinnedFrom = undefined;
                 this.pinnedTo = undefined;
+                this.updateTreeTitle();
                 return;
             }
             this._onDidChangeTreeData.fire();

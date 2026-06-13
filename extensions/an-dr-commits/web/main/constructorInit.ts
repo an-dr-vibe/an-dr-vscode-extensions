@@ -187,12 +187,9 @@ function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.innerHTML = ICONS.search;
 	view.findWidgetToggleBtnElem.addEventListener('click', () => view.showFindWidgetFromToggle());
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
-	view.resetBtnElem.title = 'Reset to HEAD · Double-click to Reset, Clean & Init Submodules';
+	view.resetBtnElem.title = 'Reset to HEAD';
 	view.resetBtnElem.innerHTML = ICONS.discard;
-	addSingleDblClick(view.resetBtnElem,
-		() => view.resetToHeadAction(false),
-		() => view.resetToHeadAction(true)
-	);
+	view.resetBtnElem.addEventListener('click', () => view.resetToHeadAction());
 	view.resetBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.pullBtnElem.title = 'Fetch from Remote(s) · Double-click to Pull';
 	view.pullBtnElem.innerHTML = ICONS.arrowDown;

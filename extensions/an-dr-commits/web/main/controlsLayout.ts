@@ -14,8 +14,8 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 			id: 'resetBtn',
 			elem: view.resetBtnElem,
 			visible: true,
-			title: 'Reset to HEAD · Double-click to Reset, Clean & Init Submodules',
-			onClick: () => view.resetToHeadAction(false)
+			title: 'Reset to HEAD',
+			onClick: () => view.resetToHeadAction()
 		},
 		{
 			id: 'pullBtn',
@@ -37,10 +37,7 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 
 function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButton): ContextMenuAction[] {
 	if (button.id === 'resetBtn') {
-		return [
-			{ title: 'Reset to HEAD (hard)', visible: true, onClick: () => view.resetToHeadAction(false) },
-			{ title: 'Reset, Clean & Init Submodules', visible: true, onClick: () => view.resetToHeadAction(true) }
-		];
+		return [{ title: 'Reset to HEAD', visible: true, onClick: () => view.resetToHeadAction() }];
 	} else if (button.id === 'pullBtn') {
 		if (view.gitRepoInProgressState !== null) {
 			return [{ title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue), visible: true, onClick: () => view.pullCurrentBranchAction() }];

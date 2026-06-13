@@ -201,14 +201,19 @@ function commitsFetchFromRemotesAction(view: any) {
 	runAction({ command: 'fetch', repo: view.currentRepo, name: null, prune: view.config.fetchAndPrune, pruneTags: view.config.fetchAndPruneTags }, 'Fetching from Remote(s)');
 }
 
-function commitsResetToHeadAction(view: any, deep: boolean) {
+function commitsResetToHeadAction(view: any) {
 	if (view.currentRepo === null) return;
-	const msg = deep
-		? 'Are you sure you want to <b>reset to HEAD</b>, <b>clean all untracked files</b>, and <b>reinitialise submodules</b>? All local changes will be permanently discarded.'
-		: 'Are you sure you want to <b>reset to HEAD</b>? All local changes will be permanently discarded.';
-	const label = deep ? 'Reset, Clean & Init Submodules' : 'Yes, reset to HEAD';
-	dialog.showConfirmation(msg, label, () => {
-		runAction({ command: 'resetToHead', repo: view.currentRepo, deep: deep }, deep ? 'Resetting, Cleaning & Initialising Submodules' : 'Resetting to HEAD');
+	dialog.showForm('Select reset operations to perform against <b>HEAD</b>:', [
+		{ type: DialogInputType.Checkbox, name: 'reset --hard HEAD', value: true, info: 'Reset the index and working tree. Changes to tracked files since HEAD are discarded.' },
+		{ type: DialogInputType.Checkbox, name: 'clean -fd (untracked)', value: false, info: 'Remove untracked files and directories from the working tree.' },
+		{ type: DialogInputType.Checkbox, name: 'clean -fdx (untracked + ignored)', value: false, info: 'Remove untracked and ignored files and directories. Superset of clean -fd.' },
+		{ type: DialogInputType.Checkbox, name: 'submodule foreach reset --hard HEAD', value: false, info: 'Run git reset --hard HEAD recursively in every submodule.' },
+		{ type: DialogInputType.Checkbox, name: 'submodule foreach clean -ffdx', value: false, info: 'Run git clean -ffdx recursively in every submodule.' },
+		{ type: DialogInputType.Checkbox, name: 'submodule update --init --recursive', value: false, info: 'Initialise and update all submodules recursively (registers missing ones).' }
+	], 'Run', (values: any[]) => {
+		const [resetTracked, cleanUntracked, cleanIgnored, resetSubmodules, cleanSubmodules, updateSubmodules] = values as boolean[];
+		if (!resetTracked && !cleanUntracked && !cleanIgnored && !resetSubmodules && !cleanSubmodules && !updateSubmodules) return;
+		runAction({ command: 'resetToHead', repo: view.currentRepo, resetTracked, cleanUntracked, cleanIgnored, resetSubmodules, cleanSubmodules, updateSubmodules }, 'Resetting to HEAD');
 	}, { type: TargetType.Repo });
 }
 

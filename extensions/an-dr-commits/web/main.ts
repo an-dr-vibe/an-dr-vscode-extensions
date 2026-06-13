@@ -396,7 +396,7 @@ class CommitsView {
 	private mergeAction(obj: string, name: string, actionOn: GG.MergeActionOn, target: DialogTarget & (CommitTarget | RefTarget)) { commitsMergeAction(this, obj, name, actionOn, target); }
 	private rebaseAction(obj: string, name: string, actionOn: GG.RebaseActionOn, target: DialogTarget & (CommitTarget | RefTarget)) { commitsRebaseAction(this, obj, name, actionOn, target); }
 	private resetCurrentBranchToCommitAction(hash: string, target: DialogTarget & CommitTarget) { commitsResetCurrentBranchToCommitAction(this, hash, target); }
-	private resetToHeadAction(deep: boolean) { commitsResetToHeadAction(this, deep); }
+	private resetToHeadAction() { commitsResetToHeadAction(this); }
 
 	/* Drag and Drop */
 

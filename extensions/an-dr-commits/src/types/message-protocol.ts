@@ -103,7 +103,12 @@ export interface ResponseCleanUntrackedFiles extends ResponseWithErrorInfo {
 
 export interface RequestResetToHead extends RepoRequest {
 	readonly command: 'resetToHead';
-	readonly deep: boolean;
+	readonly resetTracked: boolean;
+	readonly cleanUntracked: boolean;
+	readonly cleanIgnored: boolean;
+	readonly resetSubmodules: boolean;
+	readonly cleanSubmodules: boolean;
+	readonly updateSubmodules: boolean;
 }
 export interface ResponseResetToHead extends ResponseWithErrorInfo {
 	readonly command: 'resetToHead';

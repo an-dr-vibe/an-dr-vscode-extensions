@@ -724,7 +724,7 @@ export class CommitsView extends Disposable {
 			case 'resetToHead':
 				this.sendMessage({
 					command: 'resetToHead',
-					error: await this.dataSource.resetToHead(msg.repo, msg.deep)
+					error: await this.dataSource.resetToHead(msg.repo, msg.resetTracked, msg.cleanUntracked, msg.cleanIgnored, msg.resetSubmodules, msg.cleanSubmodules, msg.updateSubmodules)
 				});
 				break;
 			case 'revertCommit':

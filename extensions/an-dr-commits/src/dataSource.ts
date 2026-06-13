@@ -1716,17 +1716,29 @@ export class DataSource extends Disposable {
 	/**
 	 * Reset to HEAD, hard. When deep=true also clean all untracked files/dirs and reinitialise submodules.
 	 */
-	public async resetToHead(repo: string, deep: boolean): Promise<ErrorInfo> {
-		let err = await this.runGitCommand(['reset', '--hard', 'HEAD'], repo);
-		if (err !== null) return err;
-		err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git', 'reset', '--hard', 'HEAD'], repo);
-		if (err !== null) return err;
-		if (!deep) return null;
-		err = await this.runGitCommand(['clean', '-ffdx'], repo);
-		if (err !== null) return err;
-		err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git', 'clean', '-ffdx'], repo);
-		if (err !== null) return err;
-		return this.runGitCommand(['submodule', 'update', '--init', '--recursive'], repo);
+	public async resetToHead(repo: string, resetTracked: boolean, cleanUntracked: boolean, cleanIgnored: boolean, resetSubmodules: boolean, cleanSubmodules: boolean, updateSubmodules: boolean): Promise<ErrorInfo> {
+		if (resetTracked) {
+			const err = await this.runGitCommand(['reset', '--hard', 'HEAD'], repo);
+			if (err !== null) return err;
+		}
+		if (cleanUntracked || cleanIgnored) {
+			const flags = '-ff' + (cleanIgnored ? 'x' : '') + 'd';
+			const err = await this.runGitCommand(['clean', flags], repo);
+			if (err !== null) return err;
+		}
+		if (resetSubmodules) {
+			const err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git reset --hard HEAD'], repo);
+			if (err !== null) return err;
+		}
+		if (cleanSubmodules) {
+			const err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git clean -ffdx'], repo);
+			if (err !== null) return err;
+		}
+		if (updateSubmodules) {
+			const err = await this.runGitCommand(['submodule', 'update', '--init', '--recursive'], repo);
+			if (err !== null) return err;
+		}
+		return null;
 	}
 
 	/**

@@ -1402,7 +1402,14 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         });
     }
 
-    async setPinnedRange(from: string, to: string): Promise<void> {
+    /**
+     * Pins the tree to a commit range, optionally switching to the repository
+     * that produced the selected commits before diffing.
+     */
+    async setPinnedRange(from: string, to: string, repositoryRoot?: string): Promise<void> {
+        if (repositoryRoot && !await this.ensureRepositoryForPinnedRange(repositoryRoot)) {
+            return;
+        }
         this.pinnedFrom = from;
         this.pinnedTo = to;
         this.updateTreeTitle();
@@ -1418,6 +1425,39 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             }
             this._onDidChangeTreeData.fire();
         });
+    }
+
+    private async ensureRepositoryForPinnedRange(repositoryRoot: string): Promise<boolean> {
+        const targetRepository = getGitRepositoryFolders(this.gitApi)
+            .find(repo => this.isSameRepositoryRoot(repo, repositoryRoot));
+
+        if (!targetRepository) {
+            window.showErrorMessage(`Unable to load commit range: repository is not open in Code Review: ${repositoryRoot}`);
+            return false;
+        }
+
+        if (this.repository && this.isSameRepositoryRoot(this.repoRoot, targetRepository)) {
+            return true;
+        }
+
+        this.pinnedFrom = undefined;
+        this.pinnedTo = undefined;
+        await this.changeRepository(targetRepository);
+
+        if (!this.repository || !this.isSameRepositoryRoot(this.repoRoot, targetRepository)) {
+            window.showErrorMessage(`Unable to load commit range: failed to switch Code Review to repository: ${repositoryRoot}`);
+            return false;
+        }
+
+        return true;
+    }
+
+    private isSameRepositoryRoot(left: string, right: string): boolean {
+        const normalizedLeft = normalizePath(left);
+        const normalizedRight = normalizePath(right);
+        return process.platform === 'win32'
+            ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+            : normalizedLeft === normalizedRight;
     }
 
     async promptChangeBase() {

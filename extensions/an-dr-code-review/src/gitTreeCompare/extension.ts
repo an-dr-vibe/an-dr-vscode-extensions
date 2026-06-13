@@ -27,9 +27,9 @@ export function activate(context: ExtensionContext, onSelectedSelectionChange?: 
         }
     }
 
-    commands.registerCommand(COMMAND_NAMESPACE + '.setCommitRange', (from: string, to: string) => {
+    commands.registerCommand(COMMAND_NAMESPACE + '.setCommitRange', (from: string, to: string, repositoryRoot?: string) => {
         runAfterInit(() => {
-            provider!.setPinnedRange(from, to);
+            provider!.setPinnedRange(from, to, repositoryRoot);
         });
     });
 

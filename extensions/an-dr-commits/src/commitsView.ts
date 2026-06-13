@@ -922,7 +922,7 @@ export class CommitsView extends Disposable {
 				break;
 			}
 			case 'sendToCodeReview': {
-				void vscode.commands.executeCommand('an-dr-code-review.setCommitRange', msg.from, msg.to);
+				void vscode.commands.executeCommand('an-dr-code-review.setCommitRange', msg.from, msg.to, msg.repo);
 				break;
 			}
 		}

@@ -167,6 +167,9 @@ Webview sends `loadRepoInfo` / `loadCommits` messages → `commitsView.ts` recei
 ### Git operations
 User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` → `sendMessage({command: 'someAction', ...})` → `commitsView.ts` → `commands.ts` runs git → response sent back to webview.
 
+### Sending commit ranges to Code Review
+`web/main.ts` sends `sendToCodeReview` with `repo`, `from`, and `to`. `src/commitsView.ts` forwards all three values to `an-dr-code-review.setCommitRange`; Code Review uses the repository root to switch to the matching Git API repository before diffing the pinned commit range. Keep this repo argument when changing the contract so submodule and multi-root workspaces do not diff the wrong repository.
+
 ---
 
 ## Where to look by feature

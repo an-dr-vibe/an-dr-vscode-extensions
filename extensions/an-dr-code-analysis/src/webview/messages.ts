@@ -143,6 +143,12 @@ export interface ReanalyzeToMessage {
     depth: number;
 }
 
+export interface ExpandToTabMessage {
+    type: 'expandToTab';
+    graph: GraphModel;
+    depth: number;
+}
+
 export type WebviewToExtensionMessage =
     | ReadyMessage
     | RefreshToolsMessage
@@ -154,4 +160,5 @@ export type WebviewToExtensionMessage =
     | NodeDoubleClickMessage
     | RunCommandMessage
     | CancelAnalysisMessage
-    | ReanalyzeToMessage;
+    | ReanalyzeToMessage
+    | ExpandToTabMessage;

@@ -7,6 +7,7 @@ import { AnalyzerFactory } from './analyzers/AnalyzerFactory';
 import { AnalysisCache } from './cache/AnalysisCache';
 import { Settings } from './config/Settings';
 import { WebviewToExtensionMessage } from './webview/messages';
+import { FullTabPanel } from './FullTabPanel';
 import { GraphType } from './graph/GraphModel';
 import { log } from './logger';
 import { ClangdHealth } from './tools/ClangdHealth';
@@ -110,6 +111,15 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                     this._cancelRunningAnalysis();
                     void this._reanalyzeTo(msg.filePath, msg.line, msg.graphType, msg.depth, msg.fullName);
                     break;
+                case 'expandToTab':
+                    FullTabPanel.create(
+                        this._extensionUri,
+                        msg.graph,
+                        msg.depth,
+                        this._contextTracker,
+                        this._analyzerFactory,
+                    );
+                    break;
                 case 'runCommand':
                     void vscode.commands.executeCommand(msg.command, ...(msg.args ?? []));
                     break;
@@ -119,6 +129,9 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         });
 
     }
+
+    get contextTracker(): ContextTracker { return this._contextTracker; }
+    get analyzerFactory(): AnalyzerFactory { return this._analyzerFactory; }
 
     dispose(): void {
         this._contextTracker.dispose();

@@ -4,7 +4,8 @@ import * as crypto from 'crypto';
 export function generateWebviewHtml(
     webview: vscode.Webview,
     extensionUri: vscode.Uri,
-    webviewScriptUri: vscode.Uri
+    webviewScriptUri: vscode.Uri,
+    opts?: { fullTab?: boolean }
 ): string {
     const nonce = crypto.randomBytes(16).toString('hex');
 
@@ -407,6 +408,11 @@ export function generateWebviewHtml(
         <div class="loading">Loading…</div>
     </div>
     <div id="cy-tooltip"></div>
+    ${opts?.fullTab ? `<style>
+        body { background: var(--vscode-editor-background); }
+        .graph-area { height: calc(100vh - 100px) !important; }
+    </style>
+    <script nonce="${nonce}">window.__CA_FULL_TAB=true;</script>` : ''}
     <script nonce="${nonce}" src="${webviewScriptUri}"></script>
 </body>
 </html>`;

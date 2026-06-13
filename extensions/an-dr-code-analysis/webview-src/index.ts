@@ -196,6 +196,10 @@ function applyFoldState(): void {
     });
 }
 
+// ── Full-tab mode ────────────────────────────────────────────────────────────
+
+const IS_FULL_TAB = !!(window as unknown as { __CA_FULL_TAB?: boolean }).__CA_FULL_TAB;
+
 // ── Renderer instance ────────────────────────────────────────────────────────
 
 const vscode = acquireVsCodeApi();
@@ -587,8 +591,12 @@ function renderGraph(s: AnalysisState, depth: number): string {
       <button class="depth-btn" id="depth-reset">reset</button>
     </div>`;
 
+    const expandBtn = (!IS_FULL_TAB && s.status === 'result')
+        ? `<button class="pin-btn" id="expand-to-tab-btn" title="Open in full editor tab">↗</button>`
+        : '';
+
     return `<details class="section" data-section-id="graph" open>
-  <summary class="section-header">GRAPH${esc(graphTitle)}${toolBadge}</summary>
+  <summary class="section-header">GRAPH${esc(graphTitle)}${toolBadge}${expandBtn}</summary>
   <div class="section-body">
     ${bodyHtml}
     ${depthControls}
@@ -607,18 +615,21 @@ function render(): void {
     renderer?.destroy();
     renderer = null;
 
-    if (state.tools === null) {
+    if (state.tools === null && !IS_FULL_TAB) {
         root.innerHTML = '<div class="loading">Loading…</div>';
         return;
     }
 
-    let html = renderContext(state.context);
-    html += renderAnalysis(state.analysis);
+    let html = '';
+    if (!IS_FULL_TAB) {
+        html += renderContext(state.context);
+        html += renderAnalysis(state.analysis);
+    }
     html += renderGraph(state.analysis, state.depth);
     if (state.analysis.status === 'result' && state.analysis.graph) {
         html += renderFileFilter(state.analysis.graph);
     }
-    if (state.tools !== null) {
+    if (!IS_FULL_TAB && state.tools !== null) {
         html += renderToolsStatus(state.tools);
     }
     root.innerHTML = html;
@@ -692,6 +703,13 @@ root.addEventListener('click', (e: MouseEvent) => {
 
     if (target.id === 'refresh-tools-btn') {
         vscode.postMessage({ type: 'refreshTools' });
+        return;
+    }
+
+    if (target.id === 'expand-to-tab-btn') {
+        if (state.analysis.graph) {
+            vscode.postMessage({ type: 'expandToTab', graph: state.analysis.graph, depth: state.depth });
+        }
         return;
     }
 

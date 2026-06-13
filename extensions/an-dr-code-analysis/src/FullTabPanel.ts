@@ -1,0 +1,191 @@
+import * as vscode from 'vscode';
+import { generateWebviewHtml } from './webview/webviewHtml';
+import { ContextTracker } from './context/ContextTracker';
+import { AnalyzerFactory } from './analyzers/AnalyzerFactory';
+import { AnalysisCache } from './cache/AnalysisCache';
+import { GraphModel, GraphType } from './graph/GraphModel';
+import { WebviewToExtensionMessage } from './webview/messages';
+import { Settings } from './config/Settings';
+import { log } from './logger';
+
+const GRAPH_TYPE_LABELS: Record<GraphType, string> = {
+    callGraph: 'Call Graph',
+    fileDeps: 'File Deps',
+    componentDeps: 'Component Deps',
+};
+
+export class FullTabPanel implements vscode.Disposable {
+    private readonly _panel: vscode.WebviewPanel;
+    private readonly _cache = new AnalysisCache();
+    private readonly _disposables: vscode.Disposable[] = [];
+    private _abortController: AbortController | null = null;
+    private _pendingGraph: GraphModel | null;
+
+    static create(
+        extensionUri: vscode.Uri,
+        initialGraph: GraphModel,
+        depth: number,
+        contextTracker: ContextTracker,
+        analyzerFactory: AnalyzerFactory,
+    ): FullTabPanel {
+        const targetLabel = initialGraph.nodes.find(n => n.id === initialGraph.targetId)?.label
+            ?? initialGraph.nodes[0]?.label
+            ?? 'unknown';
+        const title = `Code Analysis — ${GRAPH_TYPE_LABELS[initialGraph.graphType]} — ${targetLabel}`;
+
+        const panel = vscode.window.createWebviewPanel(
+            'an-dr-code-analysis.fullTab',
+            title,
+            vscode.ViewColumn.Active,
+            {
+                enableScripts: true,
+                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')],
+                retainContextWhenHidden: true,
+            }
+        );
+        return new FullTabPanel(panel, extensionUri, initialGraph, depth, contextTracker, analyzerFactory);
+    }
+
+    private constructor(
+        panel: vscode.WebviewPanel,
+        extensionUri: vscode.Uri,
+        initialGraph: GraphModel,
+        private _depth: number,
+        private readonly _contextTracker: ContextTracker,
+        private readonly _analyzerFactory: AnalyzerFactory,
+    ) {
+        this._panel = panel;
+        this._pendingGraph = initialGraph;
+
+        const scriptUri = panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(extensionUri, 'out', 'webview.js')
+        );
+        panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')],
+        };
+        panel.webview.html = generateWebviewHtml(panel.webview, extensionUri, scriptUri, { fullTab: true });
+
+        this._disposables.push(
+            panel.webview.onDidReceiveMessage((msg: WebviewToExtensionMessage) => {
+                void this._handleMessage(msg);
+            }),
+            panel.onDidDispose(() => this.dispose()),
+        );
+    }
+
+    private async _handleMessage(msg: WebviewToExtensionMessage): Promise<void> {
+        switch (msg.type) {
+            case 'ready':
+                if (this._pendingGraph) {
+                    this._panel.webview.postMessage({ type: 'analysisResult', graph: this._pendingGraph });
+                    this._pendingGraph = null;
+                }
+                break;
+            case 'depthChange':
+                this._depth = msg.depth;
+                this._cancelRunning();
+                void this._runAnalysis(msg.graphType, msg.depth);
+                break;
+            case 'requestAnalysis':
+                this._cancelRunning();
+                void this._runAnalysis(msg.graphType, msg.depth);
+                break;
+            case 'nodeDoubleClick':
+                if (msg.filePath) {
+                    void vscode.workspace.openTextDocument(msg.filePath).then(doc =>
+                        vscode.window.showTextDocument(doc, {
+                            selection: msg.line !== undefined
+                                ? new vscode.Range(msg.line, 0, msg.line, 0)
+                                : undefined,
+                        })
+                    );
+                }
+                break;
+            case 'reanalyzeTo':
+                this._cancelRunning();
+                void this._reanalyzeTo(msg.filePath, msg.line, msg.graphType, msg.depth);
+                break;
+            case 'cancelAnalysis':
+                this._cancelRunning();
+                break;
+        }
+    }
+
+    private async _reanalyzeTo(filePath: string, line: number, graphType: GraphType, depth: number): Promise<void> {
+        try {
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            const editor = await vscode.window.showTextDocument(doc, { preserveFocus: false });
+            const pos = new vscode.Position(line, 0);
+            editor.selection = new vscode.Selection(pos, pos);
+            editor.revealRange(new vscode.Range(pos, pos));
+            const ctx = await this._contextTracker.forceUpdateAt(doc, pos);
+            if (!ctx?.symbol || ctx.symbolSource === 'word') {
+                this._panel.webview.postMessage({
+                    type: 'analysisError', graphType,
+                    message: 'Could not resolve symbol. Place cursor directly on the function name.',
+                });
+                return;
+            }
+            void this._runAnalysis(graphType, depth);
+        } catch (err) {
+            log.appendLine(`[fullTab] reanalyzeTo failed: ${err}`);
+        }
+    }
+
+    private _cancelRunning(): void {
+        this._abortController?.abort();
+        this._abortController = null;
+    }
+
+    private async _runAnalysis(graphType: GraphType, depth: number): Promise<void> {
+        const ctx = this._contextTracker.current;
+        if (!ctx) { return; }
+        const clampedDepth = Math.min(Math.max(depth, 1), Settings.maxDepth());
+        const callHierarchyItem = this._contextTracker.currentCallHierarchyItem;
+
+        const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
+        if (cached) {
+            this._panel.webview.postMessage({ type: 'analysisResult', graph: cached.graph });
+            return;
+        }
+
+        const controller = new AbortController();
+        this._abortController = controller;
+        const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem, signal: controller.signal };
+
+        this._panel.webview.postMessage({ type: 'analysisBusy', graphType });
+
+        const chain = this._analyzerFactory.getChain(request);
+        for (const analyzer of chain) {
+            if (controller.signal.aborted) { break; }
+            try {
+                const result = await analyzer.analyze(request);
+                if (controller.signal.aborted) { break; }
+                if (result) {
+                    this._cache.set({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol }, result);
+                    this._abortController = null;
+                    this._panel.webview.postMessage({ type: 'analysisResult', graph: result.graph });
+                    return;
+                }
+            } catch (err) {
+                if (controller.signal.aborted) { break; }
+                log.appendLine(`[fullTab] ${analyzer.name} threw: ${err}`);
+            }
+        }
+
+        this._abortController = null;
+        if (controller.signal.aborted) {
+            this._panel.webview.postMessage({ type: 'analysisCancelled', graphType });
+            return;
+        }
+        this._panel.webview.postMessage({ type: 'analysisError', graphType, message: 'No results found.' });
+    }
+
+    dispose(): void {
+        this._cancelRunning();
+        this._cache.dispose();
+        this._disposables.forEach(d => d.dispose());
+        try { this._panel.dispose(); } catch { /* already disposed */ }
+    }
+}

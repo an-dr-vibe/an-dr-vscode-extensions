@@ -7,6 +7,7 @@ function commitsObserveWindowSizeChanges(view: any) {
 		view.updateCommittedColumnDisplayMode();
 		view.collapseReferenceBadgesToFit();
 		view.updateRepoInProgressBannerOffset();
+		commitsAutoHideBranchPanel(view);
 		if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
 			view.renderGraph();
 		} else {

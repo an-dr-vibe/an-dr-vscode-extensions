@@ -145,3 +145,22 @@ function commitsCloseSearchPanel(view: any) {
 function commitsUpdateCompactFindWidgetState(_view: any) {
 	// No-op: compact floating mode removed; search always lives in #searchPanel.
 }
+
+const MIN_CONTENT_WIDTH = 300;
+
+/**
+ * Temporarily hide the branch panel via CSS only (no state change) when
+ * the files panel is open and the content area is too narrow to read.
+ * The branch panel's own hidden/visible state is never touched.
+ */
+function commitsAutoHideBranchPanel(view: any) {
+	const content = document.getElementById('content');
+	if (content === null) return;
+
+	const filesPanelOpen = !view.filesPanel.isHidden();
+	const branchPanelUserHidden = view.branchDropdown.isHidden();
+	const tooNarrow = content.clientWidth < MIN_CONTENT_WIDTH;
+
+	const shouldAutoHide = filesPanelOpen && tooNarrow && !branchPanelUserHidden;
+	alterClass(document.body, 'branchPanelAutoHidden', shouldAutoHide);
+}

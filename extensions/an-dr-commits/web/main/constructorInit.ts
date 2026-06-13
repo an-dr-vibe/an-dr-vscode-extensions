@@ -23,7 +23,7 @@ function commitsInitDropdowns(view: any) {
 	view.repoDropdown = new Dropdown('repoDropdown', true, false, 'Repos', (values: string[]) => {
 		view.loadRepo(values[0]);
 	});
-	view.filesPanel = new FilesPanel(() => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); });
+	view.filesPanel = new FilesPanel(() => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); commitsAutoHideBranchPanel(view); });
 	view.filesPanel.getContentElem().addEventListener('click', (e: MouseEvent) => commitsHandleFilesPanelClick(view, e));
 	view.filesPanel.getContentElem().addEventListener('dblclick', (e: MouseEvent) => commitsHandleFilesPanelDblClick(view, e));
 	view.branchDropdown = new BranchPanel('branchPanel', (values: string[]) => {

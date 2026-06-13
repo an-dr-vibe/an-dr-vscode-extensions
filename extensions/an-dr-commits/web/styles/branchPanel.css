@@ -52,6 +52,10 @@ body.branchPanelHidden #sidebarResizeHandle{
 	left:0;
 }
 
+body.branchPanelAutoHidden #sidebarResizeHandle{
+	left:0 !important;
+}
+
 /* Toggle button in toolbar */
 #sidebarToggle{
 	display:flex;
@@ -404,6 +408,12 @@ body.branchPanelHidden #sidebarResizeHandle{
 }
 
 body.branchPanelHidden #sidebar{
+	border-right:none;
+}
+
+body.branchPanelAutoHidden #sidebar{
+	width:0 !important;
+	overflow:hidden;
 	border-right:none;
 }
 

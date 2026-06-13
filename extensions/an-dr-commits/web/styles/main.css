@@ -96,6 +96,10 @@ body.branchPanelHidden #content{
 	margin-left:0;
 }
 
+body.branchPanelAutoHidden #content{
+	margin-left:0 !important;
+}
+
 
 /* Overlays */
 
@@ -1464,6 +1468,13 @@ body.branchPanelHidden #sidebarTop{
 	padding:0;
 }
 
+body.branchPanelAutoHidden #sidebarTop{
+	width:0;
+	flex-basis:0;
+	border-right:none;
+	padding:0;
+}
+
 #topFullDiffBtn, #settingsBtn, #pullBtn, #pushBtn, #moreBtn{
 	position:relative;
 	width:20px;
@@ -1580,6 +1591,14 @@ body.branchPanelHidden #sidebarTop{
 }
 
 body.branchPanelHidden #sidebarTop{
+	width:0;
+	flex-basis:0;
+	padding:0;
+	border-right:none;
+	overflow:hidden;
+}
+
+body.branchPanelAutoHidden #sidebarTop{
 	width:0;
 	flex-basis:0;
 	padding:0;

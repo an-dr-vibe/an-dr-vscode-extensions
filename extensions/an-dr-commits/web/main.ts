@@ -111,6 +111,7 @@ class CommitsView {
 	private readonly findWidgetToggleBtnElem!: HTMLElement;
 	private readonly commitFilterElem!: HTMLInputElement;
 	public commitFilterText: string = '';
+	private readonly sendToReviewBtnElem!: HTMLElement;
 	private readonly settingsBtnElem!: HTMLElement;
 	private readonly resetBtnElem!: HTMLElement;
 	private readonly pullBtnElem!: HTMLElement;
@@ -283,7 +284,7 @@ class CommitsView {
 	public getRemoteHeadTargets(): { readonly [remoteName: string]: string } { return commitsGetRemoteHeadTargets(this); }
 	public getCommitId(hash: string) { return commitsGetCommitId(this, hash); }
 	private getCommitOfElem(elem: HTMLElement) { return commitsGetCommitOfElem(this, elem); }
-	private updateSelectionClasses() { commitsUpdateSelectionClasses(this); }
+	private updateSelectionClasses() { commitsUpdateSelectionClasses(this); this.updateSendToReviewBtn(); }
 	private selectCommit(hash: string, index: number) { commitsSelectCommit(this, hash, index); }
 	private toggleCommitSelection(hash: string, index: number) { commitsToggleCommitSelection(this, hash, index); }
 	private rangeSelectCommits(toIndex: number) { commitsRangeSelectCommits(this, toIndex); }
@@ -466,6 +467,22 @@ class CommitsView {
 
 	public toggleSearchPanel() {
 		commitsShowFindWidgetFromToggle(this, true);
+	}
+
+	public updateSendToReviewBtn() {
+		const show = this.selectedCommits.size === 2;
+		alterClass(this.sendToReviewBtnElem, 'overflowHidden', !show);
+	}
+
+	public sendSelectedCommitsToReview() {
+		if (this.selectedCommits.size !== 2) return;
+		const hashes = Array.from(this.selectedCommits);
+		const i0 = this.commitLookup[hashes[0]];
+		const i1 = this.commitLookup[hashes[1]];
+		// Lower index = newer commit; from = older (higher index), to = newer (lower index)
+		const from = i0 > i1 ? hashes[0] : hashes[1];
+		const to   = i0 > i1 ? hashes[1] : hashes[0];
+		sendMessage({ command: 'sendToCodeReview', repo: this.currentRepo, from, to });
 	}
 
 	/** Apply or clear the commit filter. Updates the input element, hides non-matching rows, and saves state. */

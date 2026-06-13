@@ -11,7 +11,7 @@ import { Repository, Git } from './git/git'
 import { Ref, RefType } from './git/api/git'
 import { anyEvent, filterEvent, eventToPromise } from './git/util'
 import { getDefaultBranch, getHeadModificationDate, getBranchCommit,
-         diffIndex, IDiffStatus, StatusCode, getAbsGitDir,
+         diffIndex, diffCommits, IDiffStatus, StatusCode, getAbsGitDir,
          getWorkspaceFolders, getGitRepositoryFolders, hasUncommittedChanges, rmFile } from './gitHelper'
 import { debounce, throttle } from './git/decorators'
 import { normalizePath } from './fsUtils';
@@ -160,6 +160,8 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
 
     // Diff parameters, derived
     private mergeBase: string;
+    private pinnedFrom: string | undefined;
+    private pinnedTo: string | undefined;
 
     // Diff results
     private filesInsideTreeRoot: Map<FolderAbsPath, IDiffStatus[]>;
@@ -738,7 +740,9 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
         const filesInsideTreeRoot = new Map<FolderAbsPath, IDiffStatus[]>();
         const filesOutsideTreeRoot = new Map<FolderAbsPath, IDiffStatus[]>();
 
-        const diff = await diffIndex(this.repository!, this.mergeBase, this.refreshIndex, this.findRenames, this.renameThreshold, this.omitUntrackedFiles, this.omitUnstagedChanges);
+        const diff = this.pinnedFrom && this.pinnedTo
+            ? await diffCommits(this.repository!, this.pinnedFrom, this.pinnedTo, this.findRenames, this.renameThreshold)
+            : await diffIndex(this.repository!, this.mergeBase, this.refreshIndex, this.findRenames, this.renameThreshold, this.omitUntrackedFiles, this.omitUnstagedChanges);
         const untrackedCount = diff.reduce((prev, cur, _) => prev + (cur.status === 'U' ? 1 : 0), 0);
         this.log(`${diff.length} diff entries (${untrackedCount} untracked)`);
 
@@ -1266,8 +1270,10 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     }
 
     async doOpenChanges(srcAbsPath: string, dstAbsPath: string, status: StatusCode, preview=true) {
-        const right = Uri.file(dstAbsPath);
-        const left = this.gitApi.toGitUri(Uri.file(srcAbsPath), this.mergeBase);
+        const right = this.pinnedTo
+            ? this.gitApi.toGitUri(Uri.file(dstAbsPath), this.pinnedTo)
+            : Uri.file(dstAbsPath);
+        const left = this.gitApi.toGitUri(Uri.file(srcAbsPath), this.pinnedFrom ?? this.mergeBase);
 
         if (status === 'U' || status === 'A') {
             return commands.executeCommand('vscode.open', right);
@@ -1301,8 +1307,10 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
     }
 
     async doOpenFile(dstAbsPath: string, status: StatusCode, preview=false) {
-        const right = Uri.file(dstAbsPath);
-        const left = this.gitApi.toGitUri(right, this.mergeBase);
+        const right = this.pinnedTo
+            ? this.gitApi.toGitUri(Uri.file(dstAbsPath), this.pinnedTo)
+            : Uri.file(dstAbsPath);
+        const left = this.gitApi.toGitUri(Uri.file(dstAbsPath), this.pinnedFrom ?? this.mergeBase);
         const uri = status === 'D' ? left : right;
         const options: TextDocumentShowOptions = {
             preview: preview
@@ -1515,6 +1523,22 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             void hideDisposable;
         }).finally(() => {
             quickPick.dispose();
+        });
+    }
+
+    async setPinnedRange(from: string, to: string): Promise<void> {
+        this.pinnedFrom = from;
+        this.pinnedTo = to;
+        window.withProgress({ location: ProgressLocation.Window, title: 'Loading Commit Range' }, async _ => {
+            try {
+                await this.updateDiff(false);
+            } catch (e: any) {
+                window.showErrorMessage(`Failed to load commit range: ${e.message}`);
+                this.pinnedFrom = undefined;
+                this.pinnedTo = undefined;
+                return;
+            }
+            this._onDidChangeTreeData.fire();
         });
     }
 

@@ -11,6 +11,7 @@ function commitsInitDomElements(view: any) {
 	view.scrollShadowElem = document.getElementById('scrollShadow')!;
 	view.findWidgetToggleBtnElem = document.getElementById('searchPanelToggleBtn')!;
 	view.commitFilterElem = <HTMLInputElement>document.getElementById('commitFilter')!;
+	view.sendToReviewBtnElem = document.getElementById('sendToReviewBtn')!;
 	view.settingsBtnElem = document.getElementById('settingsBtn')!;
 	view.resetBtnElem = document.getElementById('resetBtn')!;
 	view.pullBtnElem = document.getElementById('pullBtn')!;
@@ -189,6 +190,11 @@ function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.innerHTML = ICONS.search;
 	view.findWidgetToggleBtnElem.addEventListener('click', () => view.toggleSearchPanel());
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
+	view.sendToReviewBtnElem.title = 'Send to Code Review';
+	view.sendToReviewBtnElem.innerHTML = ICONS.review;
+	view.sendToReviewBtnElem.classList.add('overflowHidden');
+	view.sendToReviewBtnElem.addEventListener('click', () => view.sendSelectedCommitsToReview());
+	view.sendToReviewBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.resetBtnElem.title = 'Reset to HEAD';
 	view.resetBtnElem.innerHTML = ICONS.discard;
 	view.resetBtnElem.addEventListener('click', () => view.resetToHeadAction());

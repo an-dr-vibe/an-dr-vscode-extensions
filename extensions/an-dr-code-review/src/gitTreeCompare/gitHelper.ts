@@ -250,3 +250,10 @@ export async function hasUncommittedChanges(repo: Repository, path: string, igno
 export async function rmFile(repo: Repository, absPath: string): Promise<void> {
     await repo.exec(['rm', '-f', absPath]);
 }
+
+export async function diffCommits(repo: Repository, from: string, to: string, findRenames: boolean, renameThreshold: number): Promise<IDiffStatus[]> {
+    const repoRoot = normalizePath(repo.root);
+    const renamesFlag = findRenames ? `--find-renames=${renameThreshold}%` : '--no-renames';
+    const result = await repo.exec(['diff-tree', '-r', '-z', renamesFlag, from, to, '--']);
+    return parseDiffIndexOutput(repoRoot, result.stdout);
+}

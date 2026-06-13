@@ -1392,12 +1392,13 @@ body.searchPanelOpen #searchPanel{
 	align-items:center;
 	gap:10px;
 	flex-shrink:0;
+	margin-left:auto;
 }
 
 .dropdownCurrentValue{
 	max-width:30vw;
 }
-#controls.singleRepo .dropdownCurrentValue{
+#controlsRow.singleRepo .dropdownCurrentValue{
 	max-width:40vw;
 }
 
@@ -1475,7 +1476,7 @@ body.branchPanelAutoHidden #sidebarTop{
 	padding:0;
 }
 
-#topFullDiffBtn, #settingsBtn, #pullBtn, #pushBtn, #moreBtn{
+#topFullDiffBtn, #settingsBtn, #sendToReviewBtn, #pullBtn, #pushBtn, #moreBtn{
 	position:relative;
 	width:20px;
 	height:20px;
@@ -1485,7 +1486,7 @@ body.branchPanelAutoHidden #sidebarTop{
 #topFullDiffBtn, #pullBtn, #pushBtn, #moreBtn{
 	display:none;
 }
-#topFullDiffBtn .codicon, #settingsBtn .codicon, #pullBtn .codicon, #pushBtn .codicon{
+#topFullDiffBtn .codicon, #settingsBtn .codicon, #sendToReviewBtn .codicon, #pullBtn .codicon, #pushBtn .codicon{
 	position:absolute;
 	left:1px;
 	top:2px;
@@ -1496,7 +1497,7 @@ body.branchPanelAutoHidden #sidebarTop{
 	color:var(--vscode-editor-foreground);
 	opacity:0.4;
 }
-#topFullDiffBtn:hover .codicon, #settingsBtn:hover .codicon, #pullBtn:hover .codicon, #pushBtn:hover .codicon{
+#topFullDiffBtn:hover .codicon, #settingsBtn:hover .codicon, #sendToReviewBtn:hover .codicon, #pullBtn:hover .codicon, #pushBtn:hover .codicon{
 	opacity:0.8;
 }
 #topFullDiffBtn.active .codicon{
@@ -1547,15 +1548,15 @@ body.branchPanelAutoHidden #sidebarTop{
 	opacity:1;
 }
 
-#controls.pullPushSupported #pullBtn,
-#controls.pullPushSupported #pushBtn{
+#controlsRow.pullPushSupported #pullBtn,
+#controlsRow.pullPushSupported #pushBtn{
 	display:block;
 }
 #topFullDiffBtn:not(.overflowHidden){
 	display:block;
 }
-#controls.repoInProgressSupported #pullBtn,
-#controls.repoInProgressSupported #pushBtn{
+#controlsRow.repoInProgressSupported #pullBtn,
+#controlsRow.repoInProgressSupported #pushBtn{
 	display:flex;
 }
 

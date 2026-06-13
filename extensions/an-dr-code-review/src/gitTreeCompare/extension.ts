@@ -27,6 +27,12 @@ export function activate(context: ExtensionContext, onSelectedSelectionChange?: 
         }
     }
 
+    commands.registerCommand(COMMAND_NAMESPACE + '.setCommitRange', (from: string, to: string) => {
+        runAfterInit(() => {
+            provider!.setPinnedRange(from, to);
+        });
+    });
+
     commands.registerCommand(COMMAND_NAMESPACE + '.openChanges', node => {
         runAfterInit(() => {
             provider!.openChanges(node);

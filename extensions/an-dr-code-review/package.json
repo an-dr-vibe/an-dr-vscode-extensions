@@ -148,6 +148,11 @@
         "category": "Code Review"
       },
       {
+        "command": "an-dr-code-review.setCommitRange",
+        "title": "Set Commit Range",
+        "category": "Code Review"
+      },
+      {
         "command": "an-dr-code-review.refresh",
         "title": "Refresh Changes",
         "icon": "$(refresh)",

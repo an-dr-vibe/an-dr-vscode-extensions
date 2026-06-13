@@ -914,6 +914,12 @@ export interface RequestAddToGitignore extends RepoRequest {
 	readonly filePath: string;
 	readonly type: 'root' | 'local' | 'extension';
 }
+
+export interface RequestSendToCodeReview extends RepoRequest {
+	readonly command: 'sendToCodeReview';
+	readonly from: string;
+	readonly to: string;
+}
 export interface ResponseAddToGitignore {
 	readonly command: 'addToGitignore';
 	readonly error: ErrorInfo;
@@ -998,7 +1004,8 @@ export type RequestMessage =
 	| RequestUnstageFiles
 	| RequestCommitChanges
 	| RequestDiscardFileChanges
-	| RequestAddToGitignore;
+	| RequestAddToGitignore
+	| RequestSendToCodeReview;
 
 export type ResponseMessage =
 	ResponseAddRemote

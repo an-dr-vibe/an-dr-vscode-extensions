@@ -75,6 +75,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 							</div>
 							<input id="commitFilter" type="text" placeholder="Filter..." autocomplete="off" spellcheck="false"/>
 							<div id="controlsBtns">
+								<div id="sendToReviewBtn" title="Send to Code Review"></div>
 								<div id="resetBtn"></div>
 								<div id="pullBtn"></div>
 								<div id="pushBtn"></div>

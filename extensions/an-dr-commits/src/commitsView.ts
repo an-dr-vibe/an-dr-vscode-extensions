@@ -921,6 +921,10 @@ export class CommitsView extends Disposable {
 				this.sendMessage({ command: 'addToGitignore', error: ignoreError });
 				break;
 			}
+			case 'sendToCodeReview': {
+				void vscode.commands.executeCommand('an-dr-code-review.setCommitRange', msg.from, msg.to);
+				break;
+			}
 		}
 
 		this.repoFileWatcher.unmute();

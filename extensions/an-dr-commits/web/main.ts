@@ -110,6 +110,7 @@ class CommitsView {
 	private readonly scrollShadowElem!: HTMLElement;
 	private readonly findWidgetToggleBtnElem!: HTMLElement;
 	private readonly settingsBtnElem!: HTMLElement;
+	private readonly resetBtnElem!: HTMLElement;
 	private readonly pullBtnElem!: HTMLElement;
 	private readonly pushBtnElem!: HTMLElement;
 	private readonly moreBtnElem!: HTMLElement;
@@ -395,6 +396,7 @@ class CommitsView {
 	private mergeAction(obj: string, name: string, actionOn: GG.MergeActionOn, target: DialogTarget & (CommitTarget | RefTarget)) { commitsMergeAction(this, obj, name, actionOn, target); }
 	private rebaseAction(obj: string, name: string, actionOn: GG.RebaseActionOn, target: DialogTarget & (CommitTarget | RefTarget)) { commitsRebaseAction(this, obj, name, actionOn, target); }
 	private resetCurrentBranchToCommitAction(hash: string, target: DialogTarget & CommitTarget) { commitsResetCurrentBranchToCommitAction(this, hash, target); }
+	private resetToHeadAction(deep: boolean) { commitsResetToHeadAction(this, deep); }
 
 	/* Drag and Drop */
 

@@ -101,6 +101,14 @@ export interface ResponseCleanUntrackedFiles extends ResponseWithErrorInfo {
 	readonly command: 'cleanUntrackedFiles';
 }
 
+export interface RequestResetToHead extends RepoRequest {
+	readonly command: 'resetToHead';
+	readonly deep: boolean;
+}
+export interface ResponseResetToHead extends ResponseWithErrorInfo {
+	readonly command: 'resetToHead';
+}
+
 export interface RequestCommitDetails extends RepoRequest {
 	readonly command: 'commitDetails';
 	readonly commitHash: string;
@@ -963,6 +971,7 @@ export type RequestMessage =
 	| RequestRescanForRepos
 	| RequestResetFileToRevision
 	| RequestResetToCommit
+	| RequestResetToHead
 	| RequestRevertCommit
 	| RequestSetColumnVisibility
 	| RequestSetGlobalViewState
@@ -1043,6 +1052,7 @@ export type ResponseMessage =
 	| ResponseUnsetBranchUpstream
 	| ResponseResetFileToRevision
 	| ResponseResetToCommit
+	| ResponseResetToHead
 	| ResponseRevertCommit
 	| ResponseSetColumnVisibility
 	| ResponseSetGlobalViewState

@@ -74,6 +74,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 							<div id="findWidgetToggleBtn" title="Search Graph"></div>
 						</div>
 						<div id="controlsBtns">
+							<div id="resetBtn"></div>
 							<div id="pullBtn"></div>
 							<div id="pushBtn"></div>
 							<div id="settingsBtn" title="Repository Settings"></div>

@@ -11,6 +11,7 @@ function commitsInitDomElements(view: any) {
 	view.scrollShadowElem = document.getElementById('scrollShadow')!;
 	view.findWidgetToggleBtnElem = document.getElementById('findWidgetToggleBtn')!;
 	view.settingsBtnElem = document.getElementById('settingsBtn')!;
+	view.resetBtnElem = document.getElementById('resetBtn')!;
 	view.pullBtnElem = document.getElementById('pullBtn')!;
 	view.pushBtnElem = document.getElementById('pushBtn')!;
 	view.moreBtnElem = document.getElementById('moreBtn')!;
@@ -186,6 +187,13 @@ function commitsInitButtonHandlers(view: any) {
 	view.findWidgetToggleBtnElem.innerHTML = ICONS.search;
 	view.findWidgetToggleBtnElem.addEventListener('click', () => view.showFindWidgetFromToggle());
 	view.findWidgetToggleBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
+	view.resetBtnElem.title = 'Reset to HEAD · Double-click to Reset, Clean & Init Submodules';
+	view.resetBtnElem.innerHTML = ICONS.discard;
+	addSingleDblClick(view.resetBtnElem,
+		() => view.resetToHeadAction(false),
+		() => view.resetToHeadAction(true)
+	);
+	view.resetBtnElem.addEventListener('contextmenu', (e: Event) => handledEvent(e));
 	view.pullBtnElem.title = 'Fetch from Remote(s) · Double-click to Pull';
 	view.pullBtnElem.innerHTML = ICONS.arrowDown;
 	addSingleDblClick(view.pullBtnElem,

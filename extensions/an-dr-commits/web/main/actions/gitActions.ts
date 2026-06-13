@@ -201,6 +201,17 @@ function commitsFetchFromRemotesAction(view: any) {
 	runAction({ command: 'fetch', repo: view.currentRepo, name: null, prune: view.config.fetchAndPrune, pruneTags: view.config.fetchAndPruneTags }, 'Fetching from Remote(s)');
 }
 
+function commitsResetToHeadAction(view: any, deep: boolean) {
+	if (view.currentRepo === null) return;
+	const msg = deep
+		? 'Are you sure you want to <b>reset to HEAD</b>, <b>clean all untracked files</b>, and <b>reinitialise submodules</b>? All local changes will be permanently discarded.'
+		: 'Are you sure you want to <b>reset to HEAD</b>? All local changes will be permanently discarded.';
+	const label = deep ? 'Reset, Clean & Init Submodules' : 'Yes, reset to HEAD';
+	dialog.showConfirmation(msg, label, () => {
+		runAction({ command: 'resetToHead', repo: view.currentRepo, deep: deep }, deep ? 'Resetting, Cleaning & Initialising Submodules' : 'Resetting to HEAD');
+	}, { type: TargetType.Repo });
+}
+
 function commitsMergeAction(view: any, obj: string, name: string, actionOn: GG.MergeActionOn, target: any) {
 	dialog.showForm('Are you sure you want to merge ' + actionOn.toLowerCase() + ' <b><i>' + escapeHtml(name) + '</i></b> into ' + (view.gitBranchHead !== null ? '<b><i>' + escapeHtml(view.gitBranchHead) + '</i></b> (the current branch)' : 'the current branch') + '?', [
 		{ type: DialogInputType.Checkbox, name: 'Create a new commit even if fast-forward is possible', value: view.config.dialogDefaults.merge.noFastForward },

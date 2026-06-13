@@ -11,6 +11,13 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 	const pullPushVisible = view.gitBranchHead !== null && view.gitBranchHead !== 'HEAD' && view.gitRemotes.length > 0;
 	return [
 		{
+			id: 'resetBtn',
+			elem: view.resetBtnElem,
+			visible: true,
+			title: 'Reset to HEAD · Double-click to Reset, Clean & Init Submodules',
+			onClick: () => view.resetToHeadAction(false)
+		},
+		{
 			id: 'pullBtn',
 			elem: view.pullBtnElem,
 			visible: repoInProgress || pullPushVisible,
@@ -29,7 +36,12 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 }
 
 function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButton): ContextMenuAction[] {
-	if (button.id === 'pullBtn') {
+	if (button.id === 'resetBtn') {
+		return [
+			{ title: 'Reset to HEAD (hard)', visible: true, onClick: () => view.resetToHeadAction(false) },
+			{ title: 'Reset, Clean & Init Submodules', visible: true, onClick: () => view.resetToHeadAction(true) }
+		];
+	} else if (button.id === 'pullBtn') {
 		if (view.gitRepoInProgressState !== null) {
 			return [{ title: view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Continue), visible: true, onClick: () => view.pullCurrentBranchAction() }];
 		} else {
@@ -91,7 +103,7 @@ function commitsUpdateControlsLayout(view: any) {
 			overflow = isOverflowing();
 		}
 
-		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn'];
+		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn', 'resetBtn'];
 		for (let i = 0; i < hideOrder.length && overflow; i++) {
 			const button = buttons.find((item) => item.id === hideOrder[i]);
 			if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;

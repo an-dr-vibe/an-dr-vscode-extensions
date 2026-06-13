@@ -226,6 +226,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'resetToCommit':
 				refreshOrDisplayError(msg.error, 'Unable to Reset to Commit');
 				break;
+			case 'resetToHead':
+				refreshOrDisplayError(msg.error, 'Unable to Reset to HEAD');
+				break;
 			case 'revertCommit':
 				refreshOrDisplayError(msg.error, 'Unable to Revert Commit');
 				break;

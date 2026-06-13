@@ -154,13 +154,20 @@ const MIN_CONTENT_WIDTH = 300;
  * The branch panel's own hidden/visible state is never touched.
  */
 function commitsAutoHideBranchPanel(view: any) {
-	const content = document.getElementById('content');
-	if (content === null) return;
-
 	const filesPanelOpen = !view.filesPanel.isHidden();
 	const branchPanelUserHidden = view.branchDropdown.isHidden();
-	const tooNarrow = content.clientWidth < MIN_CONTENT_WIDTH;
 
-	const shouldAutoHide = filesPanelOpen && tooNarrow && !branchPanelUserHidden;
-	alterClass(document.body, 'branchPanelAutoHidden', shouldAutoHide);
+	if (!filesPanelOpen || branchPanelUserHidden) {
+		alterClass(document.body, 'branchPanelAutoHidden', false);
+		return;
+	}
+
+	// Measure the viewport width minus the files panel — this is stable regardless
+	// of whether the branch panel is currently auto-hidden, avoiding oscillation.
+	const filesPanel = document.getElementById('filesPanel');
+	const filesPanelWidth = filesPanel ? filesPanel.offsetWidth : 0;
+	const availableWidth = document.documentElement.clientWidth - filesPanelWidth;
+	const tooNarrow = availableWidth < MIN_CONTENT_WIDTH;
+
+	alterClass(document.body, 'branchPanelAutoHidden', tooNarrow);
 }

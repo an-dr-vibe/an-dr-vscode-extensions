@@ -102,6 +102,7 @@ export class ActivityBarView implements vscode.Disposable {
 	private _api: any = null;
 	private _view: any = null;
 	private _currentRepo: string | null = null;
+	private _pinnedRepo: string | null = null;
 	private _changes: GitWorkingTreeChange[] = [];
 	private _refreshSeq = 0;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -187,12 +188,24 @@ export class ActivityBarView implements vscode.Disposable {
 
 	private _resolveActiveRepoPath(): string | null {
 		if (this._api === null || this._api.repositories.length === 0) return null;
+		if (this._pinnedRepo !== null) {
+			const still = this._api.repositories.find((r: any) => r.rootUri?.fsPath === this._pinnedRepo);
+			if (still) return this._pinnedRepo;
+			this._pinnedRepo = null;
+		}
 		const activeUri = vscode.window.activeTextEditor?.document.uri;
 		let repo = activeUri && typeof this._api.getRepository === 'function'
 			? this._api.getRepository(activeUri)
 			: null;
 		if (!repo) repo = this._api.repositories[0];
 		return (repo?.rootUri?.fsPath as string | undefined) ?? null;
+	}
+
+	private _getRepoPaths(): string[] {
+		if (this._api === null) return [];
+		return (this._api.repositories as any[])
+			.map((r) => r.rootUri?.fsPath as string | undefined)
+			.filter((p): p is string => typeof p === 'string');
 	}
 
 	private _updateBadge() {
@@ -212,23 +225,29 @@ export class ActivityBarView implements vscode.Disposable {
 	private async _refreshPanel() {
 		if (this._view === null) return;
 		const seq = ++this._refreshSeq;
+		const repoPaths = this._getRepoPaths();
 		const repo = this._resolveActiveRepoPath();
 		this._currentRepo = repo;
 		if (repo === null) {
 			this._changes = [];
-			this._view.webview.html = this._renderHtml(null, [], null);
+			this._view.webview.html = this._renderHtml(null, [], null, repoPaths);
 			return;
 		}
 		const result = await this.dataSource.getWorkingTreeChanges(repo);
 		if (seq !== this._refreshSeq) return;
 		this._changes = result.changes;
-		this._view.webview.html = this._renderHtml(repo, result.changes, result.error);
+		this._view.webview.html = this._renderHtml(repo, result.changes, result.error, repoPaths);
 	}
 
 	private async _handleMessage(msg: ActivityBarMessage) {
 		const repo = this._currentRepo;
 		if (msg.command === 'openCommits') {
 			await vscode.commands.executeCommand('an-dr-commits.view');
+			return;
+		}
+		if (msg.command === 'selectRepo' && msg.filePath) {
+			this._pinnedRepo = msg.filePath;
+			await this._refreshPanel();
 			return;
 		}
 		if (msg.command === 'refresh') {
@@ -294,10 +313,11 @@ export class ActivityBarView implements vscode.Disposable {
 		return GitFileStatus.Modified;
 	}
 
-	private _renderHtml(repo: string | null, changes: GitWorkingTreeChange[], error: ErrorInfo) {
+	private _renderHtml(repo: string | null, changes: GitWorkingTreeChange[], error: ErrorInfo, repoPaths: string[] = []) {
 		const nonce = Date.now().toString(36);
 		const cssUri = this._view.webview.asWebviewUri(vscode.Uri.file(path.join(this.extensionPath, 'media', 'out.min.css')));
 		const cspSource = String(this._view.webview.cspSource).replace(/\/$/g, '');
+		const repoSelector = this._renderRepoSelector(repo, repoPaths);
 		return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -310,14 +330,43 @@ export class ActivityBarView implements vscode.Disposable {
 <body class="activityChangesBody">
 <div id="activityTop">
 	<button id="activityOpenCommits" class="activityPrimaryBtn">${this._codicon('git-commit')}<span>Open Commits</span></button>
+</div>
+<div id="activityRepoRow">
+	${repoSelector}
 	<button id="activityRefresh" class="activityIconBtn" title="Refresh">${this._codicon('sync')}</button>
 </div>
-<div id="activityRepo" title="${this._esc(repo ?? '')}">${repo === null ? 'No Git repository' : this._esc(path.basename(repo))}</div>
 <div id="activityContent">${error !== null ? '<div class="cpError">' + this._esc(error) + '</div>' : this._renderContent(changes)}</div>
 <div id="activityFooter">${this._renderFooter()}</div>
 <script nonce="${nonce}">${this._activityScript()}</script>
 </body>
 </html>`;
+	}
+
+	private _renderRepoSelector(currentRepo: string | null, repoPaths: string[]): string {
+		if (repoPaths.length === 0) {
+			return `<div id="activityRepo">No Git repository</div>`;
+		}
+		if (repoPaths.length === 1) {
+			const name = this._esc(path.basename(repoPaths[0]));
+			return `<div id="activityRepo" title="${this._esc(repoPaths[0])}">${name}</div>`;
+		}
+		const selectedName = currentRepo !== null ? this._esc(path.basename(currentRepo)) : '';
+		const optionsHtml = repoPaths.map((p, i) => {
+			const name = this._esc(path.basename(p));
+			const isSel = p === currentRepo;
+			return `<div class="dropdownOption${isSel ? ' selected' : ''}" data-id="${i}" data-value="${this._esc(p)}" title="${name}">` +
+				`${name}` +
+				`<div class="dropdownOptionInfo" title="${this._esc(p)}">${this._codicon('info')}</div>` +
+				`</div>`;
+		}).join('');
+		return `<div id="activityRepoDropdown" class="dropdown loaded">` +
+			`<div class="dropdownCurrentValue" title="${selectedName}">${selectedName}</div>` +
+			`<div class="dropdownMenu">` +
+			`<div class="dropdownFilter"><input class="dropdownFilterInput" placeholder="Filter Repos..." style="display:none"></div>` +
+			`<div class="dropdownOptions showInfo">${optionsHtml}</div>` +
+			`<div class="dropdownNoResults" style="display:none">No results found.</div>` +
+			`</div>` +
+			`</div>`;
 	}
 
 	private _renderFooter() {
@@ -424,9 +473,14 @@ body.activityChangesBody{position:fixed;inset:0;margin:0;background:var(--vscode
 #activityTop{display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid rgba(128,128,128,0.22);box-sizing:border-box;}
 .activityPrimaryBtn{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;flex:1;border:1px solid var(--vscode-button-border,transparent);border-radius:3px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);font:inherit;font-weight:600;padding:5px 8px;cursor:pointer;}
 .activityPrimaryBtn:hover{background:var(--vscode-button-hoverBackground);}
-.activityIconBtn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:3px;background:transparent;color:inherit;opacity:0.72;cursor:pointer;}
-.activityIconBtn:hover{opacity:1;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,0.18));}
 #activityRepo{padding:5px 10px;border-bottom:1px solid rgba(128,128,128,0.16);color:var(--vscode-descriptionForeground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#activityRepoRow{display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid rgba(128,128,128,0.16);box-sizing:border-box;}
+#activityRepoDropdown{flex:1;min-width:0;margin:0;display:block;width:100%;}
+#activityRepoDropdown .dropdown,#activityRepoDropdown .dropdown.loaded{display:block;width:100%;}
+#activityRepoDropdown .dropdownCurrentValue{width:100% !important;max-width:none;box-sizing:border-box;}
+#activityRepoDropdown .dropdownMenu{width:100%;box-sizing:border-box;left:0;right:auto;}
+.activityIconBtn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border:none;border-radius:3px;background:transparent;color:inherit;opacity:0.72;cursor:pointer;}
+.activityIconBtn:hover{opacity:1;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,0.18));}
 #activityContent{flex:1 1 0;overflow:auto;min-height:0;padding-top:4px;}
 #activityFooter{flex:0 0 auto;border-top:1px solid rgba(128,128,128,0.2);}
 #activityContent > .fileTreeFolderContents{display:inline-block;min-width:100%;}
@@ -452,6 +506,50 @@ function updateCommitButton() {
 }
 document.getElementById('activityOpenCommits')?.addEventListener('click', () => post('openCommits'));
 document.getElementById('activityRefresh')?.addEventListener('click', () => post('refresh'));
+(function() {
+	const dd = document.getElementById('activityRepoDropdown');
+	if (!dd) return;
+	const currentValueElem = dd.querySelector('.dropdownCurrentValue');
+	const menuElem = dd.querySelector('.dropdownMenu');
+	const filterInput = dd.querySelector('.dropdownFilterInput');
+	const optionsElem = dd.querySelector('.dropdownOptions');
+	const noResults = dd.querySelector('.dropdownNoResults');
+	function closeDropdown() { dd.classList.remove('dropdownOpen'); }
+	function applyFilter() {
+		if (!filterInput || !optionsElem) return;
+		const val = filterInput.value.toLowerCase();
+		let any = false;
+		for (const opt of optionsElem.children) {
+			const match = opt.textContent.toLowerCase().indexOf(val) > -1;
+			opt.style.display = match ? 'block' : 'none';
+			if (match) any = true;
+		}
+		if (noResults) noResults.style.display = any ? 'none' : 'block';
+	}
+	if (filterInput) filterInput.addEventListener('keyup', applyFilter);
+	document.addEventListener('click', (e) => {
+		if (!dd.contains(e.target)) { closeDropdown(); return; }
+		if (e.target === currentValueElem || currentValueElem?.contains(e.target)) {
+			const opening = !dd.classList.contains('dropdownOpen');
+			dd.classList.toggle('dropdownOpen');
+			if (opening && filterInput) {
+				filterInput.style.display = 'block';
+				filterInput.value = '';
+				applyFilter();
+				filterInput.focus();
+			}
+			return;
+		}
+		const opt = e.target.closest?.('.dropdownOption');
+		if (opt && optionsElem?.contains(opt)) {
+			const value = opt.dataset.value;
+			if (value) {
+				closeDropdown();
+				post('selectRepo', { filePath: value });
+			}
+		}
+	}, true);
+})();
 message?.addEventListener('input', updateCommitButton);
 message?.addEventListener('keydown', (e) => {
 	if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && commitBtn && !commitBtn.disabled) {

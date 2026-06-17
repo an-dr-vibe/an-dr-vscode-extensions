@@ -162,11 +162,13 @@ function commitsAutoHideBranchPanel(view: any) {
 		return;
 	}
 
-	// Measure the viewport width minus the files panel — this is stable regardless
-	// of whether the branch panel is currently auto-hidden, avoiding oscillation.
+	// Read branch panel's natural width from its CSS variable — this is stable regardless
+	// of whether the panel is currently auto-hidden (the CSS override doesn't change the
+	// variable, only the visual width), so there is no oscillation risk.
 	const filesPanel = document.getElementById('filesPanel');
 	const filesPanelWidth = filesPanel ? filesPanel.offsetWidth : 0;
-	const availableWidth = document.documentElement.clientWidth - filesPanelWidth;
+	const branchPanelWidth = parseInt(document.body.style.getPropertyValue('--branch-panel-width') || '200', 10) || 200;
+	const availableWidth = document.documentElement.clientWidth - filesPanelWidth - branchPanelWidth;
 	const tooNarrow = availableWidth < MIN_CONTENT_WIDTH;
 
 	alterClass(document.body, 'branchPanelAutoHidden', tooNarrow);

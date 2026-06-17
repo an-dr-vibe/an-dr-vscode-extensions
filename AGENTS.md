@@ -43,6 +43,19 @@ branch while work is in progress.
 - Extension TypeScript code must handle paths for all three platforms (e.g. tool
   install paths in `an-dr-git-tool` cover Win/Linux/Mac variants).
 
+## Building web code in an-dr-commits
+
+`an-dr-commits` has a two-step web build: TypeScript compiles to individual JS files in
+`media/`, then `package-web.js` concatenates and uglifies them into `media/out.min.js`
+(deleting the individual files). The webview loads **only** `out.min.js`.
+
+- **Always use `npm run compile-web`** (or the full `npm run compile`) after editing
+  anything under `web/`. Running bare `tsc -p web/tsconfig.json` produces individual JS
+  files that the webview never loads — changes will appear to have no effect.
+- For a readable bundle during debugging, use `npm run compile-web-debug`.
+- `install.ps1` runs `npm run compile` and is already correct; this applies to manual
+  dev iteration only.
+
 ## Adding a new extension
 
 1. Create `extensions/<name>/` with `package.json`, `tsconfig.json`, `.vscodeignore`,

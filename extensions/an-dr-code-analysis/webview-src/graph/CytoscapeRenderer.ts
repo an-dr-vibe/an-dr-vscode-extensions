@@ -29,12 +29,17 @@ export interface GraphModel {
 
 export type NodeEventCallback = (nodeId: string, filePath?: string, line?: number, fullName?: string) => void;
 
-const ROLE_COLORS = {
-    target:   { bg: 'var(--vscode-terminal-ansiGreen,  #4caf50)', border: 'var(--vscode-terminal-ansiGreen,  #388e3c)', label: 'var(--vscode-editor-foreground, #fff)' },
-    caller:   { bg: 'var(--vscode-terminal-ansiBlue,   #42a5f5)', border: 'var(--vscode-terminal-ansiBlue,   #1976d2)', label: 'var(--vscode-editor-foreground, #fff)' },
-    callee:   { bg: 'var(--vscode-terminal-ansiCyan,   #26c6da)', border: 'var(--vscode-terminal-ansiCyan,   #0097a7)', label: 'var(--vscode-editor-foreground, #fff)' },
-    external: { bg: 'var(--vscode-disabledForeground,  #888)',    border: 'var(--vscode-panel-border,        #555)',    label: 'var(--vscode-editor-foreground, #ccc)' },
-};
+/** Colors per BFS depth level from the target node. Index = level; index 5 is the fallback for level ≥ 5. */
+const LEVEL_COLORS = [
+    { bg: '#E05565', border: '#B83040', label: '#fff' }, // 0 — coral/red   (target)
+    { bg: '#E8A838', border: '#C07828', label: '#fff' }, // 1 — amber/yellow
+    { bg: '#2FB8A0', border: '#1A8870', label: '#fff' }, // 2 — aqua/teal
+    { bg: '#28AACC', border: '#1880A0', label: '#fff' }, // 3 — cyan
+    { bg: '#5B6AC4', border: '#3A48A0', label: '#fff' }, // 4 — indigo
+    { bg: '#8B5CF6', border: '#6D35CC', label: '#fff' }, // 5+ — purple
+];
+
+const EXTERNAL_COLORS = { bg: 'var(--vscode-disabledForeground, #888)', border: 'var(--vscode-panel-border, #555)', label: 'var(--vscode-editor-foreground, #ccc)' };
 
 function isLightTheme(): boolean {
     return document.body.dataset['vscodeThemeKind'] === 'vscode-light' ||
@@ -282,6 +287,10 @@ export class CytoscapeRenderer {
 
         this._lastGraph = graph;
 
+        // Recompute BFS levels after structural changes and apply to all live nodes
+        const levels = this._computeLevels(graph);
+        cy.nodes().forEach(n => { n.data('level', levels.get(n.id()) ?? 99); });
+
         // Resolve overlaps only for genuinely new nodes (no cached position)
         if (trulyNew.length > 0) {
             const selector = trulyNew.map(n => `#${CSS.escape(n.id)}`).join(',');
@@ -515,13 +524,35 @@ export class CytoscapeRenderer {
         return getLayout(name, graph.nodes.length);
     }
 
+    /** BFS from targetId (undirected) → level per node id. Disconnected nodes get level 99. */
+    private _computeLevels(graph: GraphModel): Map<string, number> {
+        const adj = new Map<string, string[]>(graph.nodes.map(n => [n.id, []]));
+        for (const e of graph.edges) {
+            adj.get(e.sourceId)?.push(e.targetId);
+            adj.get(e.targetId)?.push(e.sourceId);
+        }
+        const levels = new Map<string, number>();
+        const queue: string[] = [graph.targetId];
+        levels.set(graph.targetId, 0);
+        while (queue.length > 0) {
+            const cur = queue.shift()!;
+            const curLevel = levels.get(cur)!;
+            for (const nb of (adj.get(cur) ?? [])) {
+                if (!levels.has(nb)) { levels.set(nb, curLevel + 1); queue.push(nb); }
+            }
+        }
+        return levels;
+    }
+
     private _toElements(graph: GraphModel): cytoscape.ElementDefinition[] {
+        const levels = this._computeLevels(graph);
         return [
             ...graph.nodes.map(n => ({
                 group: 'nodes' as const,
                 data: {
                     id: n.id, label: n.label, fullName: n.fullName,
                     filePath: n.filePath, line: n.line, role: n.role,
+                    level: levels.get(n.id) ?? 99,
                 },
             })),
             ...graph.edges.map(e => ({
@@ -586,55 +617,52 @@ export class CytoscapeRenderer {
                     'height': 'label',
                     'shape': 'roundrectangle',
                     'padding': '10px 14px',
-                    'background-color': ROLE_COLORS.callee.bg,
-                    'border-color': ROLE_COLORS.callee.border,
+                    'background-color': LEVEL_COLORS[5].bg,
+                    'border-color': LEVEL_COLORS[5].border,
                     'border-width': 1.5,
-                    'color': ROLE_COLORS.callee.label,
+                    'color': LEVEL_COLORS[5].label,
                     'text-wrap': 'wrap',
                     'text-max-width': '160px',
                     'transition-property': 'opacity, background-color, border-color',
                     'transition-duration': '200ms' as any,
                 },
             },
+            // Level 0 = target node: coral, larger and bold
             {
-                selector: 'node[role = "target"]',
+                selector: 'node[level = 0]',
                 style: {
-                    'width': 'label',
-                    'height': 'label',
+                    'background-color': LEVEL_COLORS[0].bg,
+                    'border-color': LEVEL_COLORS[0].border,
+                    'border-width': 3,
+                    'color': LEVEL_COLORS[0].label,
                     'padding': '12px 18px',
                     'font-size': '15px',
                     'font-weight': 'bold',
-                    'background-color': ROLE_COLORS.target.bg,
-                    'border-color': ROLE_COLORS.target.border,
-                    'border-width': 3,
-                    'color': ROLE_COLORS.target.label,
                 },
             },
-            {
-                selector: 'node[role = "caller"]',
-                style: {
-                    'background-color': ROLE_COLORS.caller.bg,
-                    'border-color': ROLE_COLORS.caller.border,
-                    'color': ROLE_COLORS.caller.label,
-                },
-            },
+            { selector: 'node[level = 1]', style: { 'background-color': LEVEL_COLORS[1].bg, 'border-color': LEVEL_COLORS[1].border, 'color': LEVEL_COLORS[1].label } },
+            { selector: 'node[level = 2]', style: { 'background-color': LEVEL_COLORS[2].bg, 'border-color': LEVEL_COLORS[2].border, 'color': LEVEL_COLORS[2].label } },
+            { selector: 'node[level = 3]', style: { 'background-color': LEVEL_COLORS[3].bg, 'border-color': LEVEL_COLORS[3].border, 'color': LEVEL_COLORS[3].label } },
+            { selector: 'node[level = 4]', style: { 'background-color': LEVEL_COLORS[4].bg, 'border-color': LEVEL_COLORS[4].border, 'color': LEVEL_COLORS[4].label } },
+            // Levels ≥ 5 use the base node style (purple fallback already set above)
+            // External and folder nodes override level colors with neutral gray
             {
                 selector: 'node[role = "external"]',
                 style: {
-                    'background-color': ROLE_COLORS.external.bg,
-                    'border-color': ROLE_COLORS.external.border,
-                    'color': ROLE_COLORS.external.label,
+                    'background-color': EXTERNAL_COLORS.bg,
+                    'border-color': EXTERNAL_COLORS.border,
+                    'color': EXTERNAL_COLORS.label,
                     'opacity': 0.65,
                 },
             },
             {
                 selector: 'node[role = "folder"]',
                 style: {
-                    'background-color': ROLE_COLORS.external.bg,
-                    'border-color': ROLE_COLORS.external.border,
+                    'background-color': EXTERNAL_COLORS.bg,
+                    'border-color': EXTERNAL_COLORS.border,
                     'border-width': 1.5,
                     'border-style': 'dashed' as any,
-                    'color': ROLE_COLORS.external.label,
+                    'color': EXTERNAL_COLORS.label,
                     'font-style': 'italic' as any,
                     'opacity': 0.85,
                 },

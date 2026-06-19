@@ -59,7 +59,8 @@ interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; 
 interface AnalysisBusyMessage      { type: 'analysisBusy';      graphType: GraphType; message?: string; }
 interface AnalysisCancelledMessage { type: 'analysisCancelled'; graphType: GraphType; }
 interface ClangdHealthMessage   { type: 'clangdHealth'; issue: ClangdHealth['issue']; message: string; recoveryActions?: RecoveryAction[]; }
-type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | AnalysisCancelledMessage | ClangdHealthMessage;
+interface ConfigPathsMessage    { type: 'configPaths'; compileCommandsPath?: string; tsconfigPath?: string; }
+type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | AnalysisCancelledMessage | ClangdHealthMessage | ConfigPathsMessage;
 
 // ── Stub graph (verification / Iteration 5) ──────────────────────────────────
 
@@ -146,6 +147,8 @@ interface ClangdHealth {
     message: string;
 }
 
+interface ConfigPaths { compileCommandsPath?: string; tsconfigPath?: string; }
+
 interface AppState {
     tools: ToolStatus[] | null;
     context: EditorContext | null;
@@ -154,6 +157,7 @@ interface AppState {
     uncheckedPaths: Set<string>;
     collapsedDirs: Set<string>;
     clangdHealth: ClangdHealth | null;
+    configPaths: ConfigPaths;
     mergeCircular: boolean;
     selectedFilePath: string | null;
     layout: LayoutName | null;
@@ -166,6 +170,7 @@ const state: AppState = {
     uncheckedPaths: new Set(),
     collapsedDirs: new Set(),
     clangdHealth: null,
+    configPaths: {},
     mergeCircular: true,
     selectedFilePath: null,
     layout: null,
@@ -337,20 +342,13 @@ function renderAnalysis(s: AnalysisState): string {
     }).join('');
 
     let configHtml = '';
-    if (isCCppContext()) {
-        const health = state.clangdHealth;
-        if (health?.issue) {
-            const icon = health.issue === 'STALE_COMPILE_COMMANDS' ? '⚠' : '✗';
-            configHtml = `<div class="analysis-config">
-  <div class="health-warning"><span class="health-icon">${icon}</span> ${esc(health.message)}</div>
-</div>`;
+    const setupBtn = findSetupButton(state.context?.langId);
+    if (setupBtn) {
+        const warning = setupBtn.getWarning?.();
+        if (warning) {
+            configHtml = `<div class="analysis-config"><div class="health-warning">${warning}</div></div>`;
         } else {
-            // Healthy: show compile_commands path + setup button
-            const clangdTool = state.tools?.find(t => t.name === 'clangd');
-            const isSet = clangdTool?.state === 'ok' && !!clangdTool.detail;
-            const indicator = isSet ? `<span class="cc-indicator" title="${esc(clangdTool!.detail!)}">●</span>` : '';
-            const ccPath = isSet ? `<div class="cc-path">${esc(clangdTool!.detail!)}</div>` : '';
-            configHtml = `<div class="analysis-config"><button class="analysis-btn" id="setup-compile-commands">${indicator}Setup compile_commands.json</button>${ccPath}</div>`;
+            configHtml = renderSetupButton(setupBtn);
         }
     }
 
@@ -543,9 +541,47 @@ const CONFIDENCE_BADGE: Record<string, string> = {
     low:    '🔴',
 };
 
-function isCCppContext(): boolean {
-    const id = state.context?.langId;
-    return id === 'c' || id === 'cpp' || id === 'cuda-cpp' || id === 'objective-c' || id === 'objective-cpp';
+// ── Config-setup button table ────────────────────────────────────────────────
+// Add one entry per language group. No other code needs to change.
+
+interface ConfigButtonDef {
+    langIds: readonly string[];
+    label: string;
+    command: string;
+    getDetail: () => string | undefined;
+    getWarning?: () => string | undefined;
+}
+
+const SETUP_BUTTONS: ConfigButtonDef[] = [
+    {
+        langIds: ['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp'],
+        label: 'Setup compile_commands.json',
+        command: 'an-dr-code-analysis.selectCompileCommands',
+        getDetail: () => state.configPaths.compileCommandsPath,
+        getWarning: () => {
+            const h = state.clangdHealth;
+            if (!h?.issue) { return undefined; }
+            const icon = h.issue === 'STALE_COMPILE_COMMANDS' ? '⚠' : '✗';
+            return `<span class="health-icon">${icon}</span> ${esc(h.message)}`;
+        },
+    },
+    {
+        langIds: ['typescript', 'javascript', 'typescriptreact', 'javascriptreact'],
+        label: 'Setup tsconfig.json',
+        command: 'an-dr-code-analysis.selectTsconfig',
+        getDetail: () => state.configPaths.tsconfigPath,
+    },
+];
+
+function findSetupButton(langId: string | undefined): ConfigButtonDef | undefined {
+    return SETUP_BUTTONS.find(b => b.langIds.includes(langId ?? ''));
+}
+
+function renderSetupButton(def: ConfigButtonDef): string {
+    const detail = def.getDetail();
+    const indicator = detail ? `<span class="cc-indicator" title="${esc(detail)}">●</span>` : '';
+    const pathEl   = detail ? `<div class="cc-path">${esc(detail)}</div>` : '';
+    return `<div class="analysis-config"><button class="analysis-btn" data-command="${def.command}">${indicator}${def.label}</button>${pathEl}</div>`;
 }
 
 function renderGraph(s: AnalysisState, depth: number): string {
@@ -734,8 +770,9 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
-    if (target.id === 'setup-compile-commands') {
-        vscode.postMessage({ type: 'runCommand', command: 'an-dr-code-analysis.selectCompileCommands' });
+    const configBtn = target.closest<HTMLButtonElement>('.analysis-btn[data-command]');
+    if (configBtn?.dataset['command']) {
+        vscode.postMessage({ type: 'runCommand', command: configBtn.dataset['command'] });
         return;
     }
 
@@ -879,6 +916,10 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
             break;
         case 'clangdHealth':
             state.clangdHealth = { issue: msg.issue, message: msg.message };
+            renderAnalysisSection();
+            break;
+        case 'configPaths':
+            state.configPaths = { compileCommandsPath: msg.compileCommandsPath, tsconfigPath: msg.tsconfigPath };
             renderAnalysisSection();
             break;
         case 'analysisBusy':

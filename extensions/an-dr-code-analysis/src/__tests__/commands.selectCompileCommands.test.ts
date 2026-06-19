@@ -80,24 +80,26 @@ describe('selectCompileCommandsCommand — discovery', () => {
 });
 
 describe('selectCompileCommandsCommand — "No compile_commands" selection', () => {
-    it('removes .clangd and clears setting when user picks None', async () => {
+    it('removes .clangd and clears config entry when user picks None', async () => {
         // Create a .clangd file that should be removed
         const clangdPath = path.join(tmpDir, '.clangd');
         fs.writeFileSync(clangdPath, 'CompileFlags:\n  CompilationDatabase: build\n');
 
+        // Pre-populate a config.json so clearConfigKey has something to clear
+        const configDir = path.join(tmpDir, '.vscode', 'code-analyser');
+        fs.mkdirSync(configDir, { recursive: true });
+        const configPath = path.join(configDir, 'config.json');
+        fs.writeFileSync(configPath, JSON.stringify({ compileCommandsPath: '/old/path' }));
+
         const NONE_LABEL = '$(circle-slash) No compile_commands (use ctags fallback)';
         (window.showQuickPick as jest.Mock).mockResolvedValue({ label: NONE_LABEL });
-        const mockUpdate = jest.fn();
-        (workspace.getConfiguration as jest.Mock).mockReturnValue({
-            get: jest.fn((k: string, d: unknown) => d),
-            update: mockUpdate,
-        });
 
         const { selectCompileCommandsCommand } = await import('../commands/selectCompileCommands');
         await selectCompileCommandsCommand();
 
         expect(fs.existsSync(clangdPath)).toBe(false);
-        expect(mockUpdate).toHaveBeenCalledWith('tools.compileCommandsPath', '', expect.anything());
+        // Config file should be gone (all keys removed)
+        expect(fs.existsSync(configPath)).toBe(false);
     });
 });
 
@@ -125,23 +127,21 @@ describe('selectCompileCommandsCommand — file selected', () => {
         expect(content).toMatch(/CompilationDatabase:\s+build/);
     });
 
-    it('saves compileCommandsPath to settings when file is selected', async () => {
+    it('saves compileCommandsPath to config.json when file is selected', async () => {
         const ccPath = makeCompileCommands('build');
         (window.showQuickPick as jest.Mock).mockResolvedValue({
             label: 'build/compile_commands.json',
             detail: ccPath,
-        });
-        const mockUpdate = jest.fn();
-        (workspace.getConfiguration as jest.Mock).mockReturnValue({
-            get: jest.fn((k: string, d: unknown) => d),
-            update: mockUpdate,
         });
         (window.showInformationMessage as jest.Mock).mockResolvedValue(undefined);
 
         const { selectCompileCommandsCommand } = await import('../commands/selectCompileCommands');
         await selectCompileCommandsCommand();
 
-        expect(mockUpdate).toHaveBeenCalledWith('tools.compileCommandsPath', ccPath, expect.anything());
+        const configPath = path.join(tmpDir, '.vscode', 'code-analyser', 'config.json');
+        expect(fs.existsSync(configPath)).toBe(true);
+        const stored = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        expect(stored.compileCommandsPath).toBe(ccPath);
     });
 });
 

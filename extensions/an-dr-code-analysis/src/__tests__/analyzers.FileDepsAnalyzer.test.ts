@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { workspace, Uri } from '../__mocks__/vscode';
-import { FileDepsAnalyzer } from '../analyzers/cli/FileDepsAnalyzer';
+import { FileDepsAnalyzer } from '../analyzers/language-agnostic/FileDepsAnalyzer';
 import { AnalysisRequest } from '../analyzers/IAnalyzer';
 import { EditorContext } from '../context/ContextTracker';
 

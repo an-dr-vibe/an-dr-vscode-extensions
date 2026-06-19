@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { getIncomingCalls, getOutgoingCalls, prepareCallHierarchy } from './LspClient';
@@ -6,6 +7,7 @@ import { ContextTracker } from '../../context/ContextTracker';
 import { ClangdHealth } from '../../tools/ClangdHealth';
 import { log } from '../../logger';
 import { C_CPP_LANG_IDS, TS_JS_LANG_IDS, RUST_LANG_IDS } from '../../config/languageGroups';
+import { resolveTsconfigForFile, scanForCallers, workspaceRoot } from '../typescript/TsconfigScanner';
 
 export class LspAnalyzer implements IAnalyzer {
     readonly name: string;
@@ -118,6 +120,35 @@ export class LspAnalyzer implements IAnalyzer {
             for (const c of out) {
                 if (!visited.has(itemKey(c.to))) {
                     queue.push({ item: c.to, level: level + 1 });
+                }
+            }
+        }
+
+        // Supplement incoming calls with cross-project text scan for TS/JS.
+        // tsserver's _executeProvideIncomingCalls is bounded to a single tsconfig project;
+        // files in a different project (e.g. webview-src/ vs src/) are invisible to it.
+        if (this.name === 'tsserver') {
+            const root = workspaceRoot();
+            if (root) {
+                const tsconfig = resolveTsconfigForFile(context.filePath, root);
+                if (tsconfig) {
+                    const existingFiles = new Set(allIncoming.map(c => c.from.uri.fsPath));
+                    const callerFiles = scanForCallers(target.name, tsconfig);
+                    for (const filePath of callerFiles) {
+                        if (existingFiles.has(filePath)) { continue; }
+                        // Synthesise a file-level CallHierarchyItem — line precision is not
+                        // available from a text scan; callers show as file nodes (line 0).
+                        const synthetic = new vscode.CallHierarchyItem(
+                            vscode.SymbolKind.File,
+                            path.basename(filePath),
+                            '',
+                            vscode.Uri.file(filePath),
+                            new vscode.Range(0, 0, 0, 0),
+                            new vscode.Range(0, 0, 0, 0),
+                        );
+                        allIncoming.push(new vscode.CallHierarchyIncomingCall(synthetic, [new vscode.Range(0, 0, 0, 0)]));
+                        log.appendLine(`[LspAnalyzer] tsconfig-scan caller: ${path.basename(filePath)}`);
+                    }
                 }
             }
         }

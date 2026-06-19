@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { log } from '../logger';
-
-const NS = 'an-dr-code-analysis';
+import { writeConfig, clearConfigKey } from '../config/CodeAnalyserConfig';
 
 // S1: MAX_SCAN_DEPTH is the exclusive limit; scan(dir, depth) with depth >= MAX_SCAN_DEPTH
 // returns immediately, so files up to MAX_SCAN_DEPTH-1 subdirectory levels deep are found.
@@ -78,7 +77,7 @@ export async function selectCompileCommandsCommand(): Promise<void> {
             const found = await findCompileCommandsFiles(workspaceRoot);
             log.appendLine(`[selectCompileCommands] found ${found.length} compile_commands.json files`);
 
-            const NONE_LABEL  = '$(circle-slash) No compile_commands (use ctags fallback)';
+            const NONE_LABEL   = '$(circle-slash) No compile_commands (use ctags fallback)';
             const BROWSE_LABEL = '$(folder-opened) Browse…';
 
             const items: vscode.QuickPickItem[] = found.map(f => ({
@@ -96,16 +95,14 @@ export async function selectCompileCommandsCommand(): Promise<void> {
             });
             if (!picked) { return; }
 
-            // "No compile_commands" — remove .clangd and clear setting
+            // "No compile_commands" — remove .clangd and clear stored path
             if (picked.label === NONE_LABEL) {
-                const cfg = vscode.workspace.getConfiguration(NS);
-                await cfg.update('tools.compileCommandsPath', '', vscode.ConfigurationTarget.Workspace);
+                clearConfigKey('compileCommandsPath');
                 const clangdPath = path.join(workspaceRoot, '.clangd');
                 if (fs.existsSync(clangdPath)) {
                     fs.unlinkSync(clangdPath);
                     log.appendLine(`[selectCompileCommands] removed .clangd at ${clangdPath}`);
                 }
-                // S4: no showInformationMessage for a remove action — it's just noise
                 return;
             }
 
@@ -127,11 +124,10 @@ export async function selectCompileCommandsCommand(): Promise<void> {
 
             const dir = path.dirname(filePath);
 
-            // Save to extension settings
-            const cfg = vscode.workspace.getConfiguration(NS);
-            await cfg.update('tools.compileCommandsPath', filePath, vscode.ConfigurationTarget.Workspace);
+            // Persist to .vscode/code-analyser/config.json (not workspace settings)
+            writeConfig({ compileCommandsPath: filePath });
 
-            // Write .clangd at workspace root (S3: may prompt if .clangd already exists)
+            // Write .clangd at workspace root so clangd itself picks up the path
             const written = await writeClangdConfig(workspaceRoot, dir);
             if (!written) { return; }
 

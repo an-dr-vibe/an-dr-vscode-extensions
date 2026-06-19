@@ -3,7 +3,7 @@
 
 import { commands, Uri, Position, Range, CallHierarchyItem, CallHierarchyItemKind,
     CallHierarchyIncomingCall, CallHierarchyOutgoingCall } from '../__mocks__/vscode';
-import { prepareCallHierarchy, getIncomingCalls, getOutgoingCalls } from '../analyzers/lsp/LspClient';
+import { prepareCallHierarchy, getIncomingCalls, getOutgoingCalls } from '../analyzers/language-agnostic/LspClient';
 
 const mockExecute = commands.executeCommand as jest.Mock;
 

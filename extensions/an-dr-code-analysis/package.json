@@ -48,6 +48,11 @@
 				"command": "an-dr-code-analysis.selectCompileCommands",
 				"title": "Select compile_commands.json",
 				"category": "Code Analysis"
+			},
+			{
+				"command": "an-dr-code-analysis.selectTsconfig",
+				"title": "Select tsconfig (cross-project override)",
+				"category": "Code Analysis"
 			}
 		],
 		"configuration": {
@@ -59,11 +64,6 @@
 					"minimum": 1,
 					"maximum": 8,
 					"description": "Hard cap on depth in sidebar."
-				},
-				"an-dr-code-analysis.tools.compileCommandsPath": {
-					"type": "string",
-					"default": "",
-					"description": "Override compile_commands.json path. Empty = search standard locations."
 				}
 			}
 		}

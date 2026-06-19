@@ -71,6 +71,12 @@ export interface ClangdHealthMessage {
     message: string;
 }
 
+export interface ConfigPathsMessage {
+    type: 'configPaths';
+    compileCommandsPath?: string;
+    tsconfigPath?: string;
+}
+
 export type ExtensionToWebviewMessage =
     | ToolsStatusMessage
     | ContextUpdateMessage
@@ -78,7 +84,8 @@ export type ExtensionToWebviewMessage =
     | AnalysisErrorMessage
     | AnalysisBusyMessage
     | AnalysisCancelledMessage
-    | ClangdHealthMessage;
+    | ClangdHealthMessage
+    | ConfigPathsMessage;
 
 // Webview → extension
 export interface ReadyMessage {

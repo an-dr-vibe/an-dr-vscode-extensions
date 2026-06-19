@@ -12,6 +12,7 @@ import { GraphType } from './graph/GraphModel';
 import { log } from './logger';
 import { ClangdHealth } from './tools/ClangdHealth';
 import { C_CPP_LANG_IDS, LSP_LANG_IDS } from './config/languageGroups';
+import { readConfig } from './config/CodeAnalyserConfig';
 import { flattenSymbols } from './utils/symbolUtils';
 
 export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -39,13 +40,15 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         clangdWatcher.onDidChange(() => void this._sendToolsStatus());
         this._disposables.push(clangdWatcher);
 
-        // Refresh when tools.compileCommandsPath setting changes.
-        const cfgWatcher = vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('an-dr-code-analysis.tools.compileCommandsPath')) {
-                void this._sendToolsStatus();
-            }
-        });
-        this._disposables.push(cfgWatcher);
+        // Refresh config-path indicators whenever the shared config.json changes
+        // (written by selectCompileCommands and selectTsconfig commands).
+        const configJsonWatcher = vscode.workspace.createFileSystemWatcher(
+            '**/.vscode/code-analyser/config.json'
+        );
+        configJsonWatcher.onDidCreate(() => this._postConfigPaths());
+        configJsonWatcher.onDidChange(() => this._postConfigPaths());
+        configJsonWatcher.onDidDelete(() => this._postConfigPaths());
+        this._disposables.push(configJsonWatcher);
     }
 
     resolveWebviewView(
@@ -75,6 +78,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                 case 'ready':
                     void this._sendToolsStatus();
                     this._postContext(this._contextTracker.current);
+                    this._postConfigPaths();
                     break;
                 case 'refreshTools':
                     void this._sendToolsStatus();
@@ -144,6 +148,16 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         this._view.webview.postMessage({ type: 'toolsStatus', tools });
         // Re-evaluate health now that tool statuses are fresh (ctags availability may have changed).
         this._postClangdHealth(this._contextTracker.current);
+    }
+
+    private _postConfigPaths(): void {
+        if (!this._view) { return; }
+        const cfg = readConfig();
+        this._view.webview.postMessage({
+            type: 'configPaths',
+            compileCommandsPath: cfg.compileCommandsPath,
+            tsconfigPath: cfg.tsconfigPath,
+        });
     }
 
     private _postContext(ctx: import('./context/ContextTracker').EditorContext | null): void {

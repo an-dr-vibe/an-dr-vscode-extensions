@@ -1,13 +1,13 @@
 import { IAnalyzer, AnalysisRequest } from './IAnalyzer';
-import { LspAnalyzer } from './lsp/LspAnalyzer';
-import { CtagsAnalyzer } from './cli/CtagsAnalyzer';
-import { FileDepsAnalyzer } from './cli/FileDepsAnalyzer';
-import { TsFileDepsAnalyzer } from './cli/TsFileDepsAnalyzer';
-import { TsComponentDepsAnalyzer } from './cli/TsComponentDepsAnalyzer';
-import { Pyan3Analyzer } from './cli/Pyan3Analyzer';
-import { CargoAnalyzer } from './cli/CargoAnalyzer';
-import { AstWalkAnalyzer } from './heuristic/AstWalkAnalyzer';
-import { RustModAnalyzer } from './heuristic/RustModAnalyzer';
+import { LspAnalyzer } from './language-agnostic/LspAnalyzer';
+import { CtagsAnalyzer } from './language-agnostic/CtagsAnalyzer';
+import { FileDepsAnalyzer } from './language-agnostic/FileDepsAnalyzer';
+import { TsFileDepsAnalyzer } from './typescript/TsFileDepsAnalyzer';
+import { TsComponentDepsAnalyzer } from './typescript/TsComponentDepsAnalyzer';
+import { Pyan3Analyzer } from './python/Pyan3Analyzer';
+import { CargoAnalyzer } from './rust/CargoAnalyzer';
+import { AstWalkAnalyzer } from './python/AstWalkAnalyzer';
+import { RustModAnalyzer } from './rust/RustModAnalyzer';
 import { ContextTracker } from '../context/ContextTracker';
 
 export class AnalyzerFactory {

@@ -14,7 +14,7 @@ jest.mock('child_process', () => ({
 }));
 
 import * as cp from 'child_process';
-import { CtagsAnalyzer } from '../analyzers/cli/CtagsAnalyzer';
+import { CtagsAnalyzer } from '../analyzers/language-agnostic/CtagsAnalyzer';
 import { AnalysisRequest } from '../analyzers/IAnalyzer';
 import { EditorContext } from '../context/ContextTracker';
 

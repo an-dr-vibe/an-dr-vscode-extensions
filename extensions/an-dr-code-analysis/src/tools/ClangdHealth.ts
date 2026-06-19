@@ -1,8 +1,9 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { ToolStatus, ToolGroup } from '../webview/messages';
 import { ClangdIssue, detectCrossCompile } from './RecoveryActions';
+import { readConfig } from '../config/CodeAnalyserConfig';
 
 const GROUP: ToolGroup = 'c-cpp';
 
@@ -33,8 +34,8 @@ function readClangdCompilationDatabase(root: string): string | null {
 }
 
 function resolveCompileCommandsPath(root: string): string | null {
-    // 1. Explicit extension setting
-    const configured = vscode.workspace.getConfiguration('an-dr-code-analysis').get<string>('tools.compileCommandsPath');
+    // 1. User override stored in .vscode/code-analyser/config.json
+    const configured = readConfig().compileCommandsPath;
     if (configured && configured.trim()) { return configured.trim(); }
 
     // 2. .clangd CompilationDatabase directive

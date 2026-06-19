@@ -1,6 +1,7 @@
-import { CytoscapeRenderer } from './graph/CytoscapeRenderer';
+import { createRenderer } from './graph-renderers/CytoscapeRenderer';
+import { GraphRenderer } from './graph-renderers/IGraphRenderer';
+import { LayoutName, LAYOUT_META } from './graph-renderers/types';
 import { resolveNodeDblClick } from '../src/webview/nodeActions';
-import { LayoutName } from './graph/layouts';
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
@@ -207,13 +208,13 @@ const IS_FULL_TAB = !!(window as unknown as { __CA_FULL_TAB?: boolean }).__CA_FU
 
 const vscode = acquireVsCodeApi();
 
-let renderer: CytoscapeRenderer | null = null;
+let renderer: GraphRenderer | null = null;
 
-function getOrCreateRenderer(): CytoscapeRenderer {
+function getOrCreateRenderer(): GraphRenderer {
     const container = document.getElementById('cy-container') as HTMLElement;
     const tooltip   = document.getElementById('cy-tooltip')   as HTMLElement;
     if (!renderer) {
-        renderer = new CytoscapeRenderer(
+        renderer = createRenderer(
             container,
             tooltip,
             (nodeId, filePath, line) => {
@@ -594,12 +595,6 @@ function renderGraph(s: AnalysisState, depth: number): string {
       <button class="depth-btn" id="depth-reset">reset</button>
     </div>`;
 
-    const LAYOUT_META: Record<LayoutName, [label: string, hint: string]> = {
-        force:        ['Force',  'Force-directed — nodes repel, edges attract; good for dense graphs'],
-        radial:       ['Radial', 'Concentric rings — target at centre, callers and callees on outer rings'],
-        hierarchical: ['Tree',   'Breadth-first hierarchy — layers flow top-down'],
-        rose:         ['Rose',   'BFS radial tree — branches fan outward from the target node'],
-    };
     const layoutBtns = (['force', 'radial', 'hierarchical', 'rose'] as LayoutName[])
         .map(n => {
             const [label, hint] = LAYOUT_META[n];

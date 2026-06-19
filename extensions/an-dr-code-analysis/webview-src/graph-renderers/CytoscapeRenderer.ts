@@ -1,34 +1,7 @@
 import cytoscape from 'cytoscape';
-import { getLayout, layoutForGraphType, LayoutName } from './layouts';
+import { GraphModel, GraphNode, LayoutName, NodeEventCallback, layoutForGraphType } from './types';
+import { GraphRenderer } from './IGraphRenderer';
 import { computeLevels, resolveOverlaps, roseLayout, treeLayout, radialLayout, Box, Pos } from '../../src/graph/positionEngine';
-
-export interface GraphNode {
-    id: string;
-    label: string;
-    fullName: string;
-    filePath?: string;
-    line?: number;
-    role: 'target' | 'caller' | 'callee' | 'external' | 'folder';
-}
-
-export interface GraphEdge {
-    sourceId: string;
-    targetId: string;
-    isExternal?: boolean;
-    isBidirectional?: boolean;
-}
-
-export interface GraphModel {
-    graphType: string;
-    targetId: string;
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-    depth: number;
-    tool: string;
-    confidence: 'high' | 'medium' | 'low';
-}
-
-export type NodeEventCallback = (nodeId: string, filePath?: string, line?: number, fullName?: string) => void;
 
 /** Colors per BFS depth level from the target node. Index = level; index 5 is the fallback for level ≥ 5. */
 const LEVEL_COLORS = [
@@ -57,7 +30,7 @@ const HL = {
     dimOpacity:      0.12,
 };
 
-export class CytoscapeRenderer {
+export class CytoscapeRenderer implements GraphRenderer {
     private _cy: cytoscape.Core | null = null;
     private _container: HTMLElement;
     private _tooltip: HTMLElement;
@@ -109,7 +82,7 @@ export class CytoscapeRenderer {
         return btn;
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
+    // ── Public API (implements GraphRenderer) ─────────────────────────────────
 
     /** Full or incremental render. First call builds from scratch; subsequent calls patch. */
     update(graph: GraphModel): void {
@@ -144,7 +117,7 @@ export class CytoscapeRenderer {
             cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
         } else {
             cy.layout({
-                ...getLayout('force', cy.nodes().length),
+                ...CytoscapeRenderer._forceLayout(cy.nodes().length),
                 stop: () => {
                     if (!cy || cy.destroyed()) { return; }
                     this._resolveOverlaps(cy.nodes());
@@ -153,13 +126,6 @@ export class CytoscapeRenderer {
                 },
             } as any).run();
         }
-    }
-
-    private _computePureLayout(name: LayoutName, graph: GraphModel): Map<string, Pos> | null {
-        if (name === 'rose')         { return roseLayout(graph); }
-        if (name === 'hierarchical') { return treeLayout(graph); }
-        if (name === 'radial')       { return radialLayout(graph); }
-        return null;
     }
 
     selectNode(nodeId: string): void {
@@ -204,11 +170,43 @@ export class CytoscapeRenderer {
         cy.animate({ fit: { eles: matching, padding: 40 } } as any, { duration: 200 });
     }
 
-    // ── First render ──────────────────────────────────────────────────────────
+    // ── Layout ────────────────────────────────────────────────────────────────
 
     private _getEffectiveLayoutName(graph: GraphModel): LayoutName {
         return this._layoutName ?? layoutForGraphType(graph.graphType, false);
     }
+
+    private static _forceLayout(_nodeCount: number): cytoscape.LayoutOptions {
+        return {
+            name: 'cose',
+            animate: false,
+            padding: 30,
+            nodeRepulsion: (node: cytoscape.NodeSingular) => {
+                const bb = node.boundingBox({});
+                const size = Math.max(bb.w, bb.h, 40);
+                return size * size * 80;
+            },
+            nodeOverlap: 20,
+            idealEdgeLength: (edge: cytoscape.EdgeSingular) => {
+                const srcBb = edge.source().boundingBox({});
+                const tgtBb = edge.target().boundingBox({});
+                return (Math.max(srcBb.w, tgtBb.w, 40) / 2) + 80;
+            },
+            edgeElasticity: () => 100,
+            gravity: 1,
+            numIter: 2000,
+            randomize: true,
+        } as cytoscape.LayoutOptions;
+    }
+
+    private _computePureLayout(name: LayoutName, graph: GraphModel): Map<string, Pos> | null {
+        if (name === 'rose')         { return roseLayout(graph); }
+        if (name === 'hierarchical') { return treeLayout(graph); }
+        if (name === 'radial')       { return radialLayout(graph); }
+        return null;
+    }
+
+    // ── First render ──────────────────────────────────────────────────────────
 
     private _initFresh(graph: GraphModel): void {
         this._cy?.destroy();
@@ -224,7 +222,7 @@ export class CytoscapeRenderer {
         const layoutOpts: cytoscape.LayoutOptions = prePos
             ? { name: 'preset', animate: false, fit: true, padding: 24 } as cytoscape.LayoutOptions
             : {
-                ...getLayout('force', graph.nodes.length),
+                ...CytoscapeRenderer._forceLayout(graph.nodes.length),
                 stop: () => {
                     if (!cy || (this._cy !== cy && this._cy !== null)) { return; }
                     if (cy.destroyed()) { return; }
@@ -379,14 +377,6 @@ export class CytoscapeRenderer {
     /**
      * Place a batch of new nodes (no cached position) around their hubs using
      * angular spacing. Returns a map nodeId → position.
-     *
-     * Strategy per hub:
-     *  1. Collect angles already occupied by live neighbours of the hub.
-     *  2. Find the largest free arc in [0, 2π).
-     *  3. Spread the new siblings evenly across that arc, keeping angular gap ≥ MIN_GAP_RAD.
-     *  4. Compute radius so that chord between adjacent nodes ≥ NODE_SPACING px.
-     *     r ≥ NODE_SPACING / (2 * sin(gap/2))
-     *  5. Also enforce r ≥ MIN_RADIUS so nodes don't pile on top of the hub.
      */
     private _placeNewNodes(
         newNodes: GraphNode[],
@@ -395,26 +385,21 @@ export class CytoscapeRenderer {
     ): Map<string, { x: number; y: number }> {
         const MIN_GAP_DEG  = 3;
         const MIN_GAP_RAD  = MIN_GAP_DEG * Math.PI / 180;
-        const NODE_SPACING = 90;   // minimum px between adjacent siblings on the circle
-        const MIN_RADIUS   = 100;  // never place closer than this to the hub
+        const NODE_SPACING = 90;
+        const MIN_RADIUS   = 100;
 
         const result = new Map<string, { x: number; y: number }>();
 
-        // Helper: resolve a node's position — live cy node first, then cache.
         const resolvePos = (id: string): { x: number; y: number } | null => {
             const el = cy.getElementById(id);
             if (!el.empty()) { return el.position(); }
             return this._posCache.get(id) ?? null;
         };
 
-        // Helper: normalise angle to [0, 2π)
         const norm = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-        // Shortest angular distance between two angles (always in [0, π])
         const angDist = (a: number, b: number) => { const d = norm(b - a); return d > Math.PI ? 2 * Math.PI - d : d; };
 
-        // Group new nodes by their primary hub.
-        // Hub = first neighbour that is already live in cy (prefer graph.targetId).
-        const hubGroups = new Map<string, GraphNode[]>(); // hubId → new nodes
+        const hubGroups = new Map<string, GraphNode[]>();
         const noHub: GraphNode[] = [];
 
         for (const node of newNodes) {
@@ -422,7 +407,6 @@ export class CytoscapeRenderer {
                 .filter(e => e.sourceId === node.id || e.targetId === node.id)
                 .map(e => e.sourceId === node.id ? e.targetId : e.sourceId);
 
-            // Prefer the graph target as hub if it's a neighbour, otherwise first live neighbour.
             let hub: string | null = null;
             if (neighbours.includes(graph.targetId) && resolvePos(graph.targetId)) {
                 hub = graph.targetId;
@@ -438,14 +422,8 @@ export class CytoscapeRenderer {
             }
         }
 
-        // Process each hub group.
-        // We track angles already assigned in this batch so intra-batch siblings
-        // don't land on each other even before cy.add() happens.
         for (const [hubId, siblings] of hubGroups) {
             const hubPos = resolvePos(hubId)!;
-
-            // Collect occupied angles: all live nodes connected to this hub
-            // (excluding the new siblings themselves).
             const newIds = new Set(siblings.map(n => n.id));
             const occupiedAngles: number[] = [];
             cy.getElementById(hubId).neighborhood('node').forEach(nb => {
@@ -454,7 +432,6 @@ export class CytoscapeRenderer {
                 occupiedAngles.push(norm(Math.atan2(p.y - hubPos.y, p.x - hubPos.x)));
             });
 
-            // Find the largest free arc to place the siblings into.
             const count = siblings.length;
             let startAngle: number;
             let bestGapSize = 2 * Math.PI;
@@ -471,13 +448,11 @@ export class CytoscapeRenderer {
                     const gap = norm(b - a);
                     if (gap > bestGapSize) { bestGapSize = gap; bestGapStart = a; }
                 }
-                // Centre siblings in the best gap, leaving MIN_GAP_RAD margin from the gap edges
                 const needed = (count + 1) * MIN_GAP_RAD;
                 const usable = Math.max(needed, bestGapSize);
                 startAngle = bestGapStart + usable / 2 - ((count - 1) / 2) * MIN_GAP_RAD;
             }
 
-            // Compute radius: large enough that chord between siblings ≥ NODE_SPACING.
             const minRFromSpacing = count > 1
                 ? NODE_SPACING / (2 * Math.sin(MIN_GAP_RAD / 2))
                 : MIN_RADIUS;
@@ -489,8 +464,6 @@ export class CytoscapeRenderer {
             });
             const r = Math.max(MIN_RADIUS, minRFromSpacing, maxExistingR * 0.9);
 
-            // Assign angles one by one. takenAngles = live neighbours + already-assigned siblings.
-            // For each sibling, start at the precomputed slot and nudge forward until clear.
             const takenAngles = [...occupiedAngles];
             console.log(`[place] hub=${hubId} r=${r.toFixed(1)} occupiedAngles=[${occupiedAngles.map(a=>(a*180/Math.PI).toFixed(1)).join(', ')}] startAngle=${(startAngle*180/Math.PI).toFixed(1)}° siblings=${siblings.map(n=>n.id).join(', ')}`);
             for (let i = 0; i < count; i++) {
@@ -509,7 +482,6 @@ export class CytoscapeRenderer {
             }
         }
 
-        // Nodes with no hub: scatter near viewport centre.
         if (noHub.length > 0) {
             const ext = cy.extent();
             const cx = (ext.x1 + ext.x2) / 2;
@@ -581,18 +553,14 @@ export class CytoscapeRenderer {
     private _applyHighlight(nodeId: string): void {
         const cy = this._cy;
         if (!cy) { return; }
-
         const node = cy.getElementById(nodeId);
         if (node.empty()) { return; }
-
         cy.elements().unselect();
         this._clearHighlight();
-
         const incomingEdges = node.incomers('edge');
         const outgoingEdges = node.outgoers('edge');
         const connectedEdges = incomingEdges.union(outgoingEdges);
         const connectedNodes = connectedEdges.connectedNodes();
-
         cy.elements().addClass('hl-dim');
         node.removeClass('hl-dim').addClass('hl-selected');
         connectedNodes.removeClass('hl-dim');
@@ -635,7 +603,6 @@ export class CytoscapeRenderer {
                     'transition-duration': '200ms' as any,
                 },
             },
-            // Level 0 = target node: coral, larger and bold
             {
                 selector: 'node[level = 0]',
                 style: {
@@ -652,74 +619,29 @@ export class CytoscapeRenderer {
             { selector: 'node[level = 2]', style: { 'background-color': LEVEL_COLORS[2].bg, 'border-color': LEVEL_COLORS[2].border, 'color': LEVEL_COLORS[2].label } },
             { selector: 'node[level = 3]', style: { 'background-color': LEVEL_COLORS[3].bg, 'border-color': LEVEL_COLORS[3].border, 'color': LEVEL_COLORS[3].label } },
             { selector: 'node[level = 4]', style: { 'background-color': LEVEL_COLORS[4].bg, 'border-color': LEVEL_COLORS[4].border, 'color': LEVEL_COLORS[4].label } },
-            // Levels ≥ 5 use the base node style (purple fallback already set above)
-            // External and folder nodes override level colors with neutral gray
             {
                 selector: 'node[role = "external"]',
-                style: {
-                    'background-color': EXTERNAL_COLORS.bg,
-                    'border-color': EXTERNAL_COLORS.border,
-                    'color': EXTERNAL_COLORS.label,
-                    'opacity': 0.65,
-                },
+                style: { 'background-color': EXTERNAL_COLORS.bg, 'border-color': EXTERNAL_COLORS.border, 'color': EXTERNAL_COLORS.label, 'opacity': 0.65 },
             },
             {
                 selector: 'node[role = "folder"]',
-                style: {
-                    'background-color': EXTERNAL_COLORS.bg,
-                    'border-color': EXTERNAL_COLORS.border,
-                    'border-width': 1.5,
-                    'border-style': 'dashed' as any,
-                    'color': EXTERNAL_COLORS.label,
-                    'font-style': 'italic' as any,
-                    'opacity': 0.85,
-                },
+                style: { 'background-color': EXTERNAL_COLORS.bg, 'border-color': EXTERNAL_COLORS.border, 'border-width': 1.5, 'border-style': 'dashed' as any, 'color': EXTERNAL_COLORS.label, 'font-style': 'italic' as any, 'opacity': 0.85 },
             },
-            {
-                selector: 'node:selected',
-                style: { 'border-width': 1.5, 'overlay-opacity': 0 },
-            },
-            {
-                selector: 'edge:selected',
-                style: { 'overlay-opacity': 0 },
-            },
-            // ── Highlight classes ─────────────────────────────────────────────
-            {
-                selector: '.hl-dim',
-                style: { 'opacity': HL.dimOpacity },
-            },
+            { selector: 'node:selected',  style: { 'border-width': 1.5, 'overlay-opacity': 0 } },
+            { selector: 'edge:selected',  style: { 'overlay-opacity': 0 } },
+            { selector: '.hl-dim',        style: { 'opacity': HL.dimOpacity } },
             {
                 selector: 'node.hl-selected',
-                style: {
-                    'border-width': 2,
-                    'border-color': HL.selectedBorder,
-                    'background-color': HL.selectedBg,
-                    'color': HL.selectedLabel,
-                },
+                style: { 'border-width': 2, 'border-color': HL.selectedBorder, 'background-color': HL.selectedBg, 'color': HL.selectedLabel },
             },
             {
                 selector: 'edge.hl-incoming',
-                style: {
-                    'line-color': HL.incoming,
-                    'target-arrow-color': HL.incoming,
-                    'source-arrow-color': HL.incoming,
-                    'width': 2,
-                    'opacity': 1,
-                    'line-style': 'solid' as any,
-                },
+                style: { 'line-color': HL.incoming, 'target-arrow-color': HL.incoming, 'source-arrow-color': HL.incoming, 'width': 2, 'opacity': 1, 'line-style': 'solid' as any },
             },
             {
                 selector: 'edge.hl-outgoing',
-                style: {
-                    'line-color': HL.outgoing(),
-                    'target-arrow-color': HL.outgoing(),
-                    'source-arrow-color': HL.outgoing(),
-                    'width': 2,
-                    'opacity': 1,
-                    'line-style': 'solid' as any,
-                },
+                style: { 'line-color': HL.outgoing(), 'target-arrow-color': HL.outgoing(), 'source-arrow-color': HL.outgoing(), 'width': 2, 'opacity': 1, 'line-style': 'solid' as any },
             },
-            // ── Base edge ─────────────────────────────────────────────────────
             {
                 selector: 'edge',
                 style: {
@@ -733,25 +655,10 @@ export class CytoscapeRenderer {
                     'transition-duration': '200ms' as any,
                 },
             },
-            {
-                selector: 'edge[?isExternal]',
-                style: {
-                    'line-style': 'dashed',
-                    'line-dash-pattern': [6, 3],
-                    'opacity': 0.6,
-                },
-            },
+            { selector: 'edge[?isExternal]',     style: { 'line-style': 'dashed', 'line-dash-pattern': [6, 3], 'opacity': 0.6 } },
             {
                 selector: 'edge[?isBidirectional]',
-                style: {
-                    'line-color': '#ef5350',
-                    'target-arrow-color': '#ef5350',
-                    'source-arrow-color': '#ef5350',
-                    'source-arrow-shape': 'triangle',
-                    'target-arrow-shape': 'triangle',
-                    'width': 3,
-                    'opacity': 1,
-                },
+                style: { 'line-color': '#ef5350', 'target-arrow-color': '#ef5350', 'source-arrow-color': '#ef5350', 'source-arrow-shape': 'triangle', 'target-arrow-shape': 'triangle', 'width': 3, 'opacity': 1 },
             },
         ];
     }
@@ -766,9 +673,7 @@ export class CytoscapeRenderer {
             const nodeId: string = node.id();
             const filePath: string | undefined = node.data('filePath');
             const line: number | undefined = node.data('line');
-
             this._onNodeClick(nodeId, filePath, line);
-
             if (this._selectedNodeId === nodeId) {
                 this._selectedNodeId = null;
                 this._clearHighlight();
@@ -811,10 +716,7 @@ export class CytoscapeRenderer {
             if (filePath) { lines.push(filePath + (line !== undefined ? `:${line + 1}` : '')); }
             const containerRect = this._container.getBoundingClientRect();
             const rp = evt.renderedPosition as { x: number; y: number };
-            this._showTooltip(lines.join('\n'), {
-                x: containerRect.left + rp.x,
-                y: containerRect.top  + rp.y,
-            });
+            this._showTooltip(lines.join('\n'), { x: containerRect.left + rp.x, y: containerRect.top + rp.y });
         });
 
         this._cy.on('mouseout', 'node', () => this._hideTooltip());
@@ -838,4 +740,14 @@ export class CytoscapeRenderer {
     private _hideTooltip(): void {
         this._tooltip.style.display = 'none';
     }
+}
+
+/** Factory — returns the default renderer without exposing the concrete class. */
+export function createRenderer(
+    container: HTMLElement,
+    tooltip: HTMLElement,
+    onNodeClick: NodeEventCallback,
+    onNodeDblClick: NodeEventCallback,
+): GraphRenderer {
+    return new CytoscapeRenderer(container, tooltip, onNodeClick, onNodeDblClick);
 }

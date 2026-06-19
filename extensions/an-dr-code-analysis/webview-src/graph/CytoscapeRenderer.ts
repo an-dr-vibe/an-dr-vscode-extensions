@@ -1,5 +1,6 @@
 import cytoscape from 'cytoscape';
 import { getLayout, layoutForGraphType, LayoutName } from './layouts';
+import { computeLevels, resolveOverlaps, roseLayout, treeLayout, radialLayout, Box, Pos } from '../../src/graph/positionEngine';
 
 export interface GraphNode {
     id: string;
@@ -67,6 +68,8 @@ export class CytoscapeRenderer {
     private _lastGraph: GraphModel | null = null;
     // Remembers the last known position of every node by id — survives fold/unfold cycles.
     private _posCache: Map<string, { x: number; y: number }> = new Map();
+    // null = use graph-type default; set by applyLayout() when the user picks explicitly.
+    private _layoutName: LayoutName | null = null;
 
     constructor(
         container: HTMLElement,
@@ -126,6 +129,39 @@ export class CytoscapeRenderer {
         this._jumpBtn.style.display = 'none';
     }
 
+    /** Change the active layout and immediately re-apply it to the current graph. */
+    applyLayout(name: LayoutName): void {
+        this._layoutName = name;
+        const cy = this._cy;
+        const graph = this._lastGraph;
+        if (!cy || cy.destroyed() || !graph) { return; }
+
+        const pure = this._computePureLayout(name, graph);
+        if (pure) {
+            cy.nodes().forEach(n => { const p = pure.get(n.id()); if (p) { n.position(p); } });
+            this._resolveOverlaps(cy.nodes());
+            cy.fit(undefined, 24);
+            cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
+        } else {
+            cy.layout({
+                ...getLayout('force', cy.nodes().length),
+                stop: () => {
+                    if (!cy || cy.destroyed()) { return; }
+                    this._resolveOverlaps(cy.nodes());
+                    cy.fit(undefined, 24);
+                    cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
+                },
+            } as any).run();
+        }
+    }
+
+    private _computePureLayout(name: LayoutName, graph: GraphModel): Map<string, Pos> | null {
+        if (name === 'rose')         { return roseLayout(graph); }
+        if (name === 'hierarchical') { return treeLayout(graph); }
+        if (name === 'radial')       { return radialLayout(graph); }
+        return null;
+    }
+
     selectNode(nodeId: string): void {
         const cy = this._cy;
         if (!cy) { return; }
@@ -170,6 +206,10 @@ export class CytoscapeRenderer {
 
     // ── First render ──────────────────────────────────────────────────────────
 
+    private _getEffectiveLayoutName(graph: GraphModel): LayoutName {
+        return this._layoutName ?? layoutForGraphType(graph.graphType, false);
+    }
+
     private _initFresh(graph: GraphModel): void {
         this._cy?.destroy();
         this._container.appendChild(this._jumpBtn);
@@ -177,29 +217,41 @@ export class CytoscapeRenderer {
         this._jumpBtn.style.display = 'none';
         this._jumpBtn.onclick = null;
 
-        const elements = this._toElements(graph);
+        const layoutName = this._getEffectiveLayoutName(graph);
+        const prePos = this._computePureLayout(layoutName, graph) ?? undefined;
+        const elements = this._toElements(graph, prePos);
+
+        const layoutOpts: cytoscape.LayoutOptions = prePos
+            ? { name: 'preset', animate: false, fit: true, padding: 24 } as cytoscape.LayoutOptions
+            : {
+                ...getLayout('force', graph.nodes.length),
+                stop: () => {
+                    if (!cy || (this._cy !== cy && this._cy !== null)) { return; }
+                    if (cy.destroyed()) { return; }
+                    this._resolveOverlaps(cy.nodes());
+                    cy.fit(undefined, 24);
+                    cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
+                },
+            } as any;
 
         let cy: cytoscape.Core;
         cy = cytoscape({
             container: this._container,
             elements,
             style: this._buildStyle(),
-            layout: {
-                ...this._pickLayout(graph), stop: () => {
-                    if (!cy || (this._cy !== cy && this._cy !== null)) { return; }
-                    if (cy.destroyed()) { return; }
-                    this._resolveOverlaps(cy.nodes());
-                    cy.fit(undefined, 24);
-                    // Seed position cache with post-layout positions
-                    cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
-                },
-            } as any,
+            layout: layoutOpts,
             userZoomingEnabled: true,
             userPanningEnabled: true,
             boxSelectionEnabled: false,
         });
         this._cy = cy;
         this._lastGraph = graph;
+        if (prePos) {
+            // preset layout runs synchronously; resolve overlaps and cache positions now
+            this._resolveOverlaps(cy.nodes());
+            cy.fit(undefined, 24);
+            cy.nodes().forEach(n => { this._posCache.set(n.id(), n.position()); });
+        }
         this._bindEvents();
     }
 
@@ -288,7 +340,7 @@ export class CytoscapeRenderer {
         this._lastGraph = graph;
 
         // Recompute BFS levels after structural changes and apply to all live nodes
-        const levels = this._computeLevels(graph);
+        const levels = computeLevels(graph);
         cy.nodes().forEach(n => { n.data('level', levels.get(n.id()) ?? 99); });
 
         // Resolve overlaps only for genuinely new nodes (no cached position)
@@ -478,83 +530,39 @@ export class CytoscapeRenderer {
         const cy = this._cy;
         if (!cy || cy.destroyed()) { return; }
 
-        const MARGIN = 12;
-        const MAX_PASSES = 80;
-        const allNodes = cy.nodes();
+        const boxes = new Map<string, Box>();
+        cy.nodes().forEach(n => {
+            const p  = n.position();
+            const bb = n.boundingBox({});
+            boxes.set(n.id(), { x: p.x, y: p.y, w: bb.x2 - bb.x1, h: bb.y2 - bb.y1 });
+        });
 
-        for (let pass = 0; pass < MAX_PASSES; pass++) {
-            if (cy.destroyed()) { break; }
-            let moved = false;
+        const movers = new Set<string>();
+        nodes.forEach((n: cytoscape.NodeSingular) => { movers.add(n.id()); });
 
-            nodes.forEach(a => {
-                allNodes.forEach(b => {
-                    if (a.id() === b.id()) { return; }
-                    const bb1 = a.boundingBox({});
-                    const bb2 = b.boundingBox({});
-
-                    const ox = Math.min(bb1.x2 + MARGIN, bb2.x2 + MARGIN) - Math.max(bb1.x1 - MARGIN, bb2.x1 - MARGIN);
-                    const oy = Math.min(bb1.y2 + MARGIN, bb2.y2 + MARGIN) - Math.max(bb1.y1 - MARGIN, bb2.y1 - MARGIN);
-
-                    if (ox <= 0 || oy <= 0) { return; }
-
-                    const half = 0.5;
-                    if (ox < oy) {
-                        const c1 = (bb1.x1 + bb1.x2) / 2;
-                        const c2 = (bb2.x1 + bb2.x2) / 2;
-                        const dir = c1 <= c2 ? -1 : 1;
-                        a.shift({ x: dir * ox * half, y: 0 });
-                        b.shift({ x: -dir * ox * half, y: 0 });
-                    } else {
-                        const c1 = (bb1.y1 + bb1.y2) / 2;
-                        const c2 = (bb2.y1 + bb2.y2) / 2;
-                        const dir = c1 <= c2 ? -1 : 1;
-                        a.shift({ x: 0, y: dir * oy * half });
-                        b.shift({ x: 0, y: -dir * oy * half });
-                    }
-                    moved = true;
-                });
-            });
-
-            if (!moved) { break; }
-        }
+        const updated = resolveOverlaps(boxes, movers);
+        updated.forEach((pos, id) => {
+            const el = cy.getElementById(id);
+            if (!el.empty()) { el.position(pos); }
+        });
     }
 
-    private _pickLayout(graph: GraphModel): cytoscape.LayoutOptions {
-        const name: LayoutName = layoutForGraphType(graph.graphType, false);
-        return getLayout(name, graph.nodes.length);
-    }
-
-    /** BFS from targetId (undirected) → level per node id. Disconnected nodes get level 99. */
-    private _computeLevels(graph: GraphModel): Map<string, number> {
-        const adj = new Map<string, string[]>(graph.nodes.map(n => [n.id, []]));
-        for (const e of graph.edges) {
-            adj.get(e.sourceId)?.push(e.targetId);
-            adj.get(e.targetId)?.push(e.sourceId);
-        }
-        const levels = new Map<string, number>();
-        const queue: string[] = [graph.targetId];
-        levels.set(graph.targetId, 0);
-        while (queue.length > 0) {
-            const cur = queue.shift()!;
-            const curLevel = levels.get(cur)!;
-            for (const nb of (adj.get(cur) ?? [])) {
-                if (!levels.has(nb)) { levels.set(nb, curLevel + 1); queue.push(nb); }
-            }
-        }
-        return levels;
-    }
-
-    private _toElements(graph: GraphModel): cytoscape.ElementDefinition[] {
-        const levels = this._computeLevels(graph);
+    private _toElements(graph: GraphModel, positions?: Map<string, Pos>): cytoscape.ElementDefinition[] {
+        const levels = computeLevels(graph);
         return [
-            ...graph.nodes.map(n => ({
-                group: 'nodes' as const,
-                data: {
-                    id: n.id, label: n.label, fullName: n.fullName,
-                    filePath: n.filePath, line: n.line, role: n.role,
-                    level: levels.get(n.id) ?? 99,
-                },
-            })),
+            ...graph.nodes.map(n => {
+                const def: cytoscape.ElementDefinition = {
+                    group: 'nodes' as const,
+                    data: {
+                        id: n.id, label: n.label, fullName: n.fullName,
+                        filePath: n.filePath, line: n.line, role: n.role,
+                        level: levels.get(n.id) ?? 99,
+                    },
+                };
+                const pos = positions?.get(n.id);
+                if (pos) { def.position = pos; }
+                return def;
+            }),
             ...graph.edges.map(e => ({
                 group: 'edges' as const,
                 data: {

@@ -374,7 +374,18 @@ export function generateWebviewHtml(
             background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
         }
         .depth-btn:disabled { opacity: 0.4; cursor: default; }
+        .depth-btn.active {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border-color: var(--vscode-button-background);
+        }
         .depth-label { font-size: 0.88em; color: var(--vscode-foreground); min-width: 54px; }
+        .layout-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 0 4px;
+        }
         .header-tool-badge {
             font-size: 0.82em;
             font-weight: normal;

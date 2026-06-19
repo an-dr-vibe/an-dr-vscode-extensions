@@ -1,5 +1,6 @@
 import { CytoscapeRenderer } from './graph/CytoscapeRenderer';
 import { resolveNodeDblClick } from '../src/webview/nodeActions';
+import { LayoutName } from './graph/layouts';
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
@@ -154,6 +155,7 @@ interface AppState {
     clangdHealth: ClangdHealth | null;
     mergeCircular: boolean;
     selectedFilePath: string | null;
+    layout: LayoutName | null;
 }
 const state: AppState = {
     tools: null,
@@ -165,6 +167,7 @@ const state: AppState = {
     clangdHealth: null,
     mergeCircular: true,
     selectedFilePath: null,
+    layout: null,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -591,6 +594,20 @@ function renderGraph(s: AnalysisState, depth: number): string {
       <button class="depth-btn" id="depth-reset">reset</button>
     </div>`;
 
+    const LAYOUT_META: Record<LayoutName, [label: string, hint: string]> = {
+        force:        ['Force',  'Force-directed — nodes repel, edges attract; good for dense graphs'],
+        radial:       ['Radial', 'Concentric rings — target at centre, callers and callees on outer rings'],
+        hierarchical: ['Tree',   'Breadth-first hierarchy — layers flow top-down'],
+        rose:         ['Rose',   'BFS radial tree — branches fan outward from the target node'],
+    };
+    const layoutBtns = (['force', 'radial', 'hierarchical', 'rose'] as LayoutName[])
+        .map(n => {
+            const [label, hint] = LAYOUT_META[n];
+            return `<button class="depth-btn${state.layout === n ? ' active' : ''}" data-layout="${n}" title="${hint}">${label}</button>`;
+        })
+        .join('');
+    const layoutControls = `<div class="layout-controls">${layoutBtns}</div>`;
+
     const expandBtn = (!IS_FULL_TAB && s.status === 'result')
         ? `<button class="pin-btn" id="expand-to-tab-btn" title="Open in full editor tab">↗</button>`
         : '';
@@ -600,6 +617,7 @@ function renderGraph(s: AnalysisState, depth: number): string {
   <div class="section-body">
     ${bodyHtml}
     ${depthControls}
+    ${layoutControls}
   </div>
 </details>`;
 }
@@ -639,7 +657,9 @@ function render(): void {
     if (state.analysis.status === 'result' && state.analysis.graph) {
         let g = foldCollapsedDirs(applyFilter(state.analysis.graph));
         if (state.mergeCircular) { g = mergeCircularEdges(g); }
-        getOrCreateRenderer().update(g);
+        const r = getOrCreateRenderer();
+        r.update(g);
+        if (state.layout) { r.applyLayout(state.layout); }
     }
 }
 
@@ -735,6 +755,17 @@ root.addEventListener('click', (e: MouseEvent) => {
             render();
             vscode.postMessage({ type: 'requestAnalysis', graphType: gt, depth: state.depth });
         }
+        return;
+    }
+
+    const layoutBtn = target.closest<HTMLButtonElement>('[data-layout]');
+    if (layoutBtn) {
+        const name = layoutBtn.dataset['layout'] as LayoutName;
+        state.layout = name;
+        renderer?.applyLayout(name);
+        document.querySelectorAll<HTMLButtonElement>('[data-layout]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset['layout'] === name);
+        });
         return;
     }
 

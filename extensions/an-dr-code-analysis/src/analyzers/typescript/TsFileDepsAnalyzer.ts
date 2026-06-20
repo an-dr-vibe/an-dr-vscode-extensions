@@ -126,32 +126,36 @@ export class TsFileDepsAnalyzer implements IAnalyzer {
 
         if (signal?.aborted) { return null; }
 
-        // BFS from target
+        // BFS from target — role is propagated directionally:
+        // following "imports" chains stays callee; following "imported by" chains stays caller.
+        type QItem = { filePath: string; depth: number; role: 'target' | 'caller' | 'callee' };
         const visited = new Set<string>();
-        const queue: { filePath: string; depth: number }[] = [{ filePath: targetFilePath, depth: 0 }];
+        const queue: QItem[] = [{ filePath: targetFilePath, depth: 0, role: 'target' }];
 
         while (queue.length > 0) {
             if (signal?.aborted) { return null; }
-            const { filePath: current, depth } = queue.shift()!;
+            const { filePath: current, depth, role: curRole } = queue.shift()!;
             if (visited.has(current)) { continue; }
             visited.add(current);
             if (depth >= request.depth) { continue; }
 
-            // Outgoing: what current imports
+            // Outgoing: what current imports — propagates callee chain
+            const outRole: 'caller' | 'callee' = curRole === 'caller' ? 'caller' : 'callee';
             for (const spec of parseImports(current)) {
                 const resolved = resolveImport(spec, current, fileSet);
                 if (!resolved || resolved === targetFilePath) { continue; }
-                addNode(resolved, current === targetFilePath ? 'callee' : 'external');
+                addNode(resolved, outRole);
                 addEdge(current, resolved);
-                if (!visited.has(resolved)) { queue.push({ filePath: resolved, depth: depth + 1 }); }
+                if (!visited.has(resolved)) { queue.push({ filePath: resolved, depth: depth + 1, role: outRole }); }
             }
 
-            // Incoming: who imports current
+            // Incoming: who imports current — propagates caller chain
+            const inRole: 'caller' | 'callee' = curRole === 'callee' ? 'callee' : 'caller';
             for (const importer of reverseIndex.get(current) ?? []) {
                 if (importer === targetFilePath) { continue; }
-                addNode(importer, current === targetFilePath ? 'caller' : 'external');
+                addNode(importer, inRole);
                 addEdge(importer, current);
-                if (!visited.has(importer)) { queue.push({ filePath: importer, depth: depth + 1 }); }
+                if (!visited.has(importer)) { queue.push({ filePath: importer, depth: depth + 1, role: inRole }); }
             }
         }
 

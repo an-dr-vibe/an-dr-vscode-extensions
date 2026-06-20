@@ -79,6 +79,7 @@
 		"test:coverage": "jest --coverage"
 	},
 	"devDependencies": {
+		"@types/d3": "^7.4.3",
 		"@types/jest": "^30.0.0",
 		"@types/node": "^18.0.0",
 		"@types/vscode": "^1.90.0",
@@ -91,7 +92,6 @@
 		"webpack-cli": "^5.1.4"
 	},
 	"dependencies": {
-		"@types/cytoscape": "^3.31.0",
-		"cytoscape": "^3.34.0"
+		"d3": "^7.9.0"
 	}
 }

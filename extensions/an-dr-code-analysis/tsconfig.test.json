@@ -2,11 +2,10 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "module": "commonjs",
-        "rootDir": "./src",
         "outDir": "./out-test",
         "paths": {
             "vscode": ["./src/__mocks__/vscode.ts"]
         }
     },
-    "include": ["src/**/*"]
+    "include": ["src/**/*", "webview-src/**/*"]
 }

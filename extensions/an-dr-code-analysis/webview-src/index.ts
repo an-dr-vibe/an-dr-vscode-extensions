@@ -1,4 +1,4 @@
-import { createRenderer } from './graph-renderers/CytoscapeRenderer';
+import { createRenderer } from './graph-renderers/D3Renderer';
 import { GraphRenderer } from './graph-renderers/IGraphRenderer';
 import { LayoutName, LAYOUT_META } from './graph-renderers/types';
 import { resolveNodeDblClick } from '../src/webview/nodeActions';

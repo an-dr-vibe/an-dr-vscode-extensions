@@ -123,7 +123,9 @@ export class FileDepsAnalyzer implements IAnalyzer {
         // BFS: simultaneously expand outgoing includes (callees) and incoming
         // includes (callers) for every node at each depth level.
         const visited = new Set<string>();
-        const queue: { filePath: string; depth: number }[] = [{ filePath: targetFilePath, depth: 0 }];
+        const queue: { filePath: string; depth: number; role: 'target' | 'caller' | 'callee' }[] = [
+            { filePath: targetFilePath, depth: 0, role: 'target' },
+        ];
 
         // Pre-build reverse index: basename → files that include it, for caller lookup.
         type ReverseEntry = { includer: string; resolvedTarget: string }[];
@@ -143,37 +145,40 @@ export class FileDepsAnalyzer implements IAnalyzer {
 
         if (signal?.aborted) { return null; }
 
+        // BFS from target — role is propagated directionally:
+        // following "includes" chains stays callee; following "included by" chains stays caller.
+        type QItem = { filePath: string; depth: number; role: 'target' | 'caller' | 'callee' };
         while (queue.length > 0) {
             if (signal?.aborted) { return null; }
-            const { filePath: current, depth } = queue.shift()!;
+            const { filePath: current, depth, role: curRole } = queue.shift()! as QItem;
             if (visited.has(current)) { continue; }
             visited.add(current);
 
             if (depth >= request.depth) { continue; }
 
-            // Outgoing: what current includes
+            // Outgoing: what current includes — propagates callee chain
+            const outRole: 'caller' | 'callee' = curRole === 'caller' ? 'caller' : 'callee';
             const includes = parseIncludes(current);
             for (const inc of includes) {
                 const resolved = resolveInclude(inc, current, fileSet, basenameIndex);
                 if (!resolved || resolved === targetFilePath) { continue; }
-                const role = current === targetFilePath ? 'callee' : 'external';
-                addNode(resolved, role);
+                addNode(resolved, outRole);
                 addEdge(current, resolved);
                 if (!visited.has(resolved)) {
-                    queue.push({ filePath: resolved, depth: depth + 1 });
+                    queue.push({ filePath: resolved, depth: depth + 1, role: outRole } as QItem);
                 }
             }
 
-            // Incoming: who includes current
+            // Incoming: who includes current — propagates caller chain
+            const inRole: 'caller' | 'callee' = curRole === 'callee' ? 'callee' : 'caller';
             const base = path.basename(current);
             for (const { includer, resolvedTarget } of reverseIndex.get(base) ?? []) {
                 if (resolvedTarget !== current) { continue; }
                 if (includer === targetFilePath) { continue; }
-                const role = current === targetFilePath ? 'caller' : 'external';
-                addNode(includer, role);
+                addNode(includer, inRole);
                 addEdge(includer, current);
                 if (!visited.has(includer)) {
-                    queue.push({ filePath: includer, depth: depth + 1 });
+                    queue.push({ filePath: includer, depth: depth + 1, role: inRole } as QItem);
                 }
             }
         }

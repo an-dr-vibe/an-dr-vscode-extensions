@@ -2,6 +2,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GraphModel, GraphNode, GraphEdge, GraphType, NodeRole } from './GraphModel';
 
+/** A directed call edge with both endpoints resolved to concrete items. */
+export interface CallEdge {
+    from: vscode.CallHierarchyItem;
+    to:   vscode.CallHierarchyItem;
+}
+
 function itemId(item: vscode.CallHierarchyItem): string {
     const line = item.selectionRange?.start?.line ?? item.range?.start?.line ?? 0;
     return `${item.uri.fsPath}:${line}:${item.name}`;
@@ -29,13 +35,19 @@ function toolConfidence(tool: string): 'high' | 'medium' | 'low' {
     return 'low';
 }
 
+/**
+ * Builds a GraphModel from a set of resolved call edges.
+ *
+ * Each `CallEdge` carries both endpoints, so depth-2+ edges correctly connect
+ * intermediate nodes rather than collapsing onto the target.
+ * Node role is assigned on first insertion; the target always wins 'target'.
+ */
 export function buildCallGraph(
-    target: vscode.CallHierarchyItem,
-    incoming: vscode.CallHierarchyIncomingCall[],
-    outgoing: vscode.CallHierarchyOutgoingCall[],
+    target:    vscode.CallHierarchyItem,
+    callEdges: CallEdge[],
     graphType: GraphType,
-    depth: number,
-    tool: string,
+    depth:     number,
+    tool:      string,
 ): GraphModel {
     const nodesMap = new Map<string, GraphNode>();
     const edgeSet  = new Set<string>();
@@ -46,18 +58,16 @@ export function buildCallGraph(
         if (!nodesMap.has(id)) {
             nodesMap.set(id, {
                 id,
-                label: itemLabel(item),
+                label:    itemLabel(item),
                 fullName: itemFullName(item),
                 filePath: item.uri?.fsPath,
-                line: item.selectionRange?.start?.line ?? item.range?.start?.line,
+                line:     item.selectionRange?.start?.line ?? item.range?.start?.line,
                 role,
-                langId: itemLangId(item.uri?.fsPath),
+                langId:   itemLangId(item.uri?.fsPath),
             });
-        } else {
-            // G1: a node that appears as both caller and callee keeps its first role
-            // but we must still emit the edge — the role field stays as-is because
-            // there is only one role slot; callers of this function handle the edge.
         }
+        // G1: first role wins — a node that appears as both caller and callee keeps its
+        // initial role; but the edge is still emitted by the caller of this function.
         return id;
     }
 
@@ -71,14 +81,10 @@ export function buildCallGraph(
 
     const targetId = addNode(target, 'target');
 
-    for (const call of incoming) {
-        const callerId = addNode(call.from, 'caller');
-        addEdge(callerId, targetId);
-    }
-
-    for (const call of outgoing) {
-        const calleeId = addNode(call.to, 'callee');
-        addEdge(targetId, calleeId);
+    for (const { from, to } of callEdges) {
+        const fromId = addNode(from, 'caller');
+        const toId   = addNode(to,   'callee');
+        addEdge(fromId, toId);
     }
 
     return {

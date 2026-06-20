@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
 import { getIncomingCalls, getOutgoingCalls, prepareCallHierarchy } from './LspClient';
-import { buildCallGraph } from '../../graph/GraphBuilder';
+import { buildCallGraph, CallEdge } from '../../graph/GraphBuilder';
 import { ContextTracker } from '../../context/ContextTracker';
 import { ClangdHealth } from '../../tools/ClangdHealth';
 import { log } from '../../logger';
@@ -83,11 +83,12 @@ export class LspAnalyzer implements IAnalyzer {
         if (signal?.aborted) { return null; }
 
         // BFS up to `depth` levels. Each visited item expands one level of callers + callees.
-        // allIncoming/allOutgoing accumulate every call edge found across all levels.
+        // allEdges accumulates resolved {from, to} pairs so intermediate-node edges are
+        // preserved (e.g. bar→baz at depth 2 rather than target→baz).
         const visited = new Set<string>();
         const queue: { item: vscode.CallHierarchyItem; level: number }[] = [{ item: target, level: 0 }];
-        const allIncoming: vscode.CallHierarchyIncomingCall[] = [];
-        const allOutgoing: vscode.CallHierarchyOutgoingCall[] = [];
+        const allEdges: CallEdge[] = [];
+        const incomingCallerFiles = new Set<string>(); // for tsconfig-scan dedup
 
         function itemKey(item: vscode.CallHierarchyItem): string {
             const line = item.selectionRange?.start?.line ?? item.range?.start?.line ?? 0;
@@ -109,15 +110,15 @@ export class LspAnalyzer implements IAnalyzer {
             ]);
             if (signal?.aborted) { return null; }
 
-            allIncoming.push(...inc);
-            allOutgoing.push(...out);
-
             for (const c of inc) {
+                allEdges.push({ from: c.from, to: item });
+                incomingCallerFiles.add(c.from.uri.fsPath);
                 if (!visited.has(itemKey(c.from))) {
                     queue.push({ item: c.from, level: level + 1 });
                 }
             }
             for (const c of out) {
+                allEdges.push({ from: item, to: c.to });
                 if (!visited.has(itemKey(c.to))) {
                     queue.push({ item: c.to, level: level + 1 });
                 }
@@ -132,10 +133,9 @@ export class LspAnalyzer implements IAnalyzer {
             if (root) {
                 const tsconfig = resolveTsconfigForFile(context.filePath, root);
                 if (tsconfig) {
-                    const existingFiles = new Set(allIncoming.map(c => c.from.uri.fsPath));
                     const callerFiles = scanForCallers(target.name, tsconfig);
                     for (const filePath of callerFiles) {
-                        if (existingFiles.has(filePath)) { continue; }
+                        if (incomingCallerFiles.has(filePath)) { continue; }
                         // Synthesise a file-level CallHierarchyItem — line precision is not
                         // available from a text scan; callers show as file nodes (line 0).
                         const synthetic = new vscode.CallHierarchyItem(
@@ -146,14 +146,14 @@ export class LspAnalyzer implements IAnalyzer {
                             new vscode.Range(0, 0, 0, 0),
                             new vscode.Range(0, 0, 0, 0),
                         );
-                        allIncoming.push(new vscode.CallHierarchyIncomingCall(synthetic, [new vscode.Range(0, 0, 0, 0)]));
+                        allEdges.push({ from: synthetic, to: target });
                         log.appendLine(`[LspAnalyzer] tsconfig-scan caller: ${path.basename(filePath)}`);
                     }
                 }
             }
         }
 
-        const graph = buildCallGraph(target, allIncoming, allOutgoing, graphType, depth, this.name);
+        const graph = buildCallGraph(target, allEdges, graphType, depth, this.name);
         return { graph };
     }
 }

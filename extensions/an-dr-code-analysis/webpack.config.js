@@ -7,6 +7,7 @@ const path = require('path');
 const extensionConfig = {
     target: 'node',
     mode: 'none',
+    cache: false,
     entry: './src/extension.ts',
     output: {
         path: path.resolve(__dirname, 'out'),
@@ -41,6 +42,7 @@ const extensionConfig = {
 const webviewConfig = {
     target: 'web',
     mode: 'none',
+    cache: false,
     entry: './webview-src/index.ts',
     output: {
         path: path.resolve(__dirname, 'out'),

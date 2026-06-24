@@ -3,8 +3,8 @@ import { GraphModel, LayoutName } from './types';
 /**
  * Renderer-agnostic contract for graph visualisation.
  * Implementations may use Cytoscape, D3, Canvas, SVG, etc.
- * All layout computation is handled externally by positionEngine;
- * the renderer only draws and handles user interaction.
+ * Layout computation is resolved by webview graph layout strategies;
+ * concrete renderers draw and handle user interaction.
  */
 export interface GraphRenderer {
     /** Full or incremental render. First call initialises; subsequent calls patch in-place. */

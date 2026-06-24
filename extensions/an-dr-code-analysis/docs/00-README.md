@@ -25,6 +25,8 @@ Do not skip `01-overview.md` — it defines constraints that apply everywhere.
 | `08-configuration.md` | All settings with types, defaults, descriptions |
 | `09-error-handling.md` | Failure modes, recovery actions, user-facing messages |
 | `10-constraints.md` | Known limitations, out of scope, explicit non-goals |
+| `adr/001-grouped-graph-layout.md` | Decision record for grouped file/folder graph layout |
+| `adr/002-graph-layout-strategies.md` | Decision record for graph layout strategy ownership |
 
 ## Key Design Decisions (Summary)
 
@@ -32,6 +34,7 @@ Do not skip `01-overview.md` — it defines constraints that apply everywhere.
 - **Fallback chain**: LSP → cscope/ctags → regex → AI (explicit opt-in)
 - **AI is external**: AI capability provided by a separate companion extension via `vscode.commands.executeCommand`
 - **Single WebviewView**: entire sidepanel is one webview, not a TreeView mix
+- **Layout strategies**: graph layout selection lives in the webview layout layer, not renderer code
 - **Confidence indicators**: every graph result is tagged with the tool that produced it
 - **No Doxygen**: not a dependency; optional bonus if pre-generated XML detected
 - **AI is opt-in, confirmed, explicit**: never triggers silently

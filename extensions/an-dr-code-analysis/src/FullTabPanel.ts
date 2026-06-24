@@ -5,6 +5,7 @@ import { AnalyzerFactory } from './analyzers/AnalyzerFactory';
 import { AnalysisCache } from './cache/AnalysisCache';
 import { GraphModel, GraphType } from './graph/GraphModel';
 import { WebviewToExtensionMessage } from './webview/messages';
+import { withWorkspaceRoot } from './webview/graphPayload';
 import { Settings } from './config/Settings';
 import { log } from './logger';
 
@@ -78,7 +79,7 @@ export class FullTabPanel implements vscode.Disposable {
         switch (msg.type) {
             case 'ready':
                 if (this._pendingGraph) {
-                    this._panel.webview.postMessage({ type: 'analysisResult', graph: this._pendingGraph });
+                    this._panel.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(this._pendingGraph) });
                     this._pendingGraph = null;
                 }
                 break;
@@ -146,7 +147,7 @@ export class FullTabPanel implements vscode.Disposable {
 
         const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
         if (cached) {
-            this._panel.webview.postMessage({ type: 'analysisResult', graph: cached.graph });
+            this._panel.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(cached.graph) });
             return;
         }
 
@@ -165,7 +166,7 @@ export class FullTabPanel implements vscode.Disposable {
                 if (result) {
                     this._cache.set({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol }, result);
                     this._abortController = null;
-                    this._panel.webview.postMessage({ type: 'analysisResult', graph: result.graph });
+                    this._panel.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(result.graph) });
                     return;
                 }
             } catch (err) {

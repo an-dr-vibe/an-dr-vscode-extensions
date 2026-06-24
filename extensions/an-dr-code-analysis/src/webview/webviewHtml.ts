@@ -165,9 +165,15 @@ export function generateWebviewHtml(
             padding: 4px 0;
             font-size: 0.92em;
         }
-        /* Pin button — inline in summary */
+        /* Pin button and header actions — inline in summary */
         .section-header { display: flex; align-items: center; }
-        .section-header .pin-btn { margin-left: auto; }
+        .section-header > .pin-btn { margin-left: auto; }
+        .header-actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
         .pin-btn {
             background: none;
             border: 1px solid transparent;
@@ -380,11 +386,20 @@ export function generateWebviewHtml(
             border-color: var(--vscode-button-background);
         }
         .depth-label { font-size: 0.88em; color: var(--vscode-foreground); min-width: 54px; }
-        .layout-controls {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 0 4px;
+        .layout-select {
+            background: var(--vscode-dropdown-background, #3c3c3c);
+            color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+            border: 1px solid var(--vscode-dropdown-border, rgba(128,128,128,0.3));
+            border-radius: 3px;
+            padding: 2px 4px;
+            cursor: pointer;
+            font-size: 0.88em;
+            font-family: var(--vscode-font-family);
+            color-scheme: dark;
+        }
+        .layout-select option {
+            background: var(--vscode-dropdown-background, #3c3c3c);
+            color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
         }
         .header-tool-badge {
             font-size: 0.82em;

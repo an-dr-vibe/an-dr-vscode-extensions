@@ -33,7 +33,7 @@ an-dr-code-analysis/
 │   ├── graph/
 │   │   ├── GraphModel.ts       # node/edge types
 │   │   ├── GraphBuilder.ts     # normalizes analyzer output → GraphModel
-│   │   └── GraphLayout.ts      # layout hints per graph type + view mode
+│   │   └── positionEngine.ts   # pure primitive positioning algorithms
 │   │
 │   ├── tools/
 │   │   ├── ToolRegistry.ts     # detects installed tools, reports health
@@ -55,14 +55,17 @@ an-dr-code-analysis/
 │
 └── webview-src/                # compiled separately by webpack
     ├── index.ts                # webview entry point
-    ├── panel/
-    │   ├── ContextSection.ts
-    │   ├── AnalysisSection.ts
-    │   ├── GraphSection.ts
-    │   └── ToolsSection.ts
-    └── graph/
-        ├── CytoscapeRenderer.ts
-        └── layouts.ts
+    ├── graph-layouts/
+    │   ├── GraphLayoutStrategy.ts # shared layout strategy base and contracts
+    │   ├── layoutStrategies.ts # class-based layout strategy registry
+    │   ├── *LayoutStrategy.ts  # one concrete layout strategy class per file
+    │   └── groupedLayout.ts    # D3-backed file/folder grouped layout engine
+    └── graph-renderers/
+        ├── IGraphRenderer.ts   # renderer contract used by webview host
+        ├── BaseGraphRenderer.ts # renderer-agnostic geometry, fold/routing/frame state
+        ├── d3Colors.ts         # D3 renderer colour palette and level mapping
+        ├── D3Renderer.ts       # D3/SVG drawing, zoom, drag, tooltip bindings
+        └── types.ts            # webview graph model + layout metadata
 ```
 
 ## 7.2 IAnalyzer Interface
@@ -143,6 +146,7 @@ interface GraphModel {
   graphType: GraphType
   nodes: GraphNode[]
   edges: GraphEdge[]
+  workspaceRoot?: string         // UI hint: group in-workspace paths relative to this root
   metadata: GraphMetadata
 }
 

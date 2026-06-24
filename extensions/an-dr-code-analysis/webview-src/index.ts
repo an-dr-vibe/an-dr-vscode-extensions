@@ -47,6 +47,7 @@ interface GraphModel {
     targetId: string;
     nodes: GraphNode[];
     edges: GraphEdge[];
+    workspaceRoot?: string;
     depth: number;
     tool: string;
     confidence: 'high' | 'medium' | 'low';
@@ -631,24 +632,23 @@ function renderGraph(s: AnalysisState, depth: number): string {
       <button class="depth-btn" id="depth-reset">reset</button>
     </div>`;
 
-    const layoutBtns = (['force', 'radial', 'hierarchical', 'rose'] as LayoutName[])
+    const layoutOptions = (['force', 'radial', 'hierarchical', 'rose', 'grouped'] as LayoutName[])
         .map(n => {
             const [label, hint] = LAYOUT_META[n];
-            return `<button class="depth-btn${state.layout === n ? ' active' : ''}" data-layout="${n}" title="${hint}">${label}</button>`;
+            return `<option value="${n}" title="${hint}"${state.layout === n ? ' selected' : ''}>${label}</option>`;
         })
         .join('');
-    const layoutControls = `<div class="layout-controls">${layoutBtns}</div>`;
-
     const expandBtn = (!IS_FULL_TAB && s.status === 'result')
         ? `<button class="pin-btn" id="expand-to-tab-btn" title="Open in full editor tab">↗</button>`
         : '';
 
+    const headerActions = `<div class="header-actions">${expandBtn}<select id="layout-select" class="layout-select">${layoutOptions}</select></div>`;
+
     return `<details class="section" data-section-id="graph" open>
-  <summary class="section-header">GRAPH${esc(graphTitle)}${toolBadge}${expandBtn}</summary>
+  <summary class="section-header">GRAPH${esc(graphTitle)}${toolBadge}${headerActions}</summary>
   <div class="section-body">
     ${bodyHtml}
     ${depthControls}
-    ${layoutControls}
   </div>
 </details>`;
 }
@@ -790,17 +790,6 @@ root.addEventListener('click', (e: MouseEvent) => {
         return;
     }
 
-    const layoutBtn = target.closest<HTMLButtonElement>('[data-layout]');
-    if (layoutBtn) {
-        const name = layoutBtn.dataset['layout'] as LayoutName;
-        state.layout = name;
-        renderer?.applyLayout(name);
-        document.querySelectorAll<HTMLButtonElement>('[data-layout]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset['layout'] === name);
-        });
-        return;
-    }
-
     if (target.id === 'depth-minus') {
         if (state.depth > 1) { state.depth--; render(); triggerDepthChange(); }
         return;
@@ -863,6 +852,13 @@ root.addEventListener('dblclick', (e: MouseEvent) => {
 // File filter checkboxes — use 'change' so the checkbox value is correct
 root.addEventListener('change', (e: Event) => {
     const target = e.target as HTMLElement;
+
+    if (target.id === 'layout-select') {
+        const name = (target as HTMLSelectElement).value as LayoutName;
+        state.layout = name;
+        renderer?.applyLayout(name);
+        return;
+    }
 
     if ((target as HTMLInputElement).id === 'merge-circular-chk') {
         state.mergeCircular = (target as HTMLInputElement).checked;

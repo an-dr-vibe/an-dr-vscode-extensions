@@ -39,7 +39,7 @@ export function computeLevels(graph: PosGraph): Map<string, number> {
     return levels;
 }
 
-// ── roseLayout ────────────────────────────────────────────────────────────────
+// ── computeRoseLayout ────────────────────────────────────────────────────────
 
 export interface RoseOptions {
     /** Radial step between consecutive rings in pixels. Default 150. */
@@ -59,7 +59,7 @@ export interface RoseOptions {
  *
  * Positions are returned in a coordinate system centred on (0, 0).
  */
-export function roseLayout(graph: PosGraph, opts?: RoseOptions): Map<string, Pos> {
+export function computeRoseLayout(graph: PosGraph, opts?: RoseOptions): Map<string, Pos> {
     const LEVEL_R   = opts?.levelRadius       ?? 150;
     const MIN_CHORD = opts?.minSiblingSpacing ?? 120;
     const START_ANG = opts?.startAngle        ?? -Math.PI / 2;
@@ -136,7 +136,7 @@ export function roseLayout(graph: PosGraph, opts?: RoseOptions): Map<string, Pos
     return positions;
 }
 
-// ── treeLayout ────────────────────────────────────────────────────────────────
+// ── computeTreeLayout ────────────────────────────────────────────────────────
 
 export interface TreeOptions {
     /** Vertical distance between BFS levels in pixels. Default 120. */
@@ -150,7 +150,7 @@ export interface TreeOptions {
  * Target is at y=0; each BFS level is placed at y = level × levelSpacing.
  * Nodes within a level are spread evenly, centred on x=0.
  */
-export function treeLayout(graph: PosGraph, opts?: TreeOptions): Map<string, Pos> {
+export function computeTreeLayout(graph: PosGraph, opts?: TreeOptions): Map<string, Pos> {
     const LEVEL_SPACING = opts?.levelSpacing ?? 120;
     const NODE_SPACING  = opts?.nodeSpacing  ?? 100;
 
@@ -182,7 +182,7 @@ export function treeLayout(graph: PosGraph, opts?: TreeOptions): Map<string, Pos
     return positions;
 }
 
-// ── radialLayout ──────────────────────────────────────────────────────────────
+// ── computeRadialLayout ──────────────────────────────────────────────────────
 
 export interface RadialOptions {
     /** Radius step per BFS level in pixels. Default 150. */
@@ -193,9 +193,9 @@ export interface RadialOptions {
  * Pure BFS-ring radial layout.
  * Target sits at (0,0); all nodes at BFS level L are placed on a circle of
  * radius L × ringRadius, distributed evenly by angle.
- * Unlike roseLayout, angles are not parent-relative — each ring is independent.
+ * Unlike computeRoseLayout, angles are not parent-relative — each ring is independent.
  */
-export function radialLayout(graph: PosGraph, opts?: RadialOptions): Map<string, Pos> {
+export function computeRadialLayout(graph: PosGraph, opts?: RadialOptions): Map<string, Pos> {
     const RING_R    = opts?.ringRadius ?? 150;
     const START_ANG = -Math.PI / 2;
 
@@ -233,7 +233,7 @@ export function radialLayout(graph: PosGraph, opts?: RadialOptions): Map<string,
 
 // ── Metrics ───────────────────────────────────────────────────────────────────
 
-function segmentsIntersect(a: Pos, b: Pos, c: Pos, d: Pos): boolean {
+function doSegmentsIntersect(a: Pos, b: Pos, c: Pos, d: Pos): boolean {
     const cross = (p: Pos, q: Pos, r: Pos) =>
         (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
     const d1 = cross(c, d, a), d2 = cross(c, d, b);
@@ -256,7 +256,7 @@ export function countEdgeCrossings(
             if (!c || !d) { continue; }
             if (edges[i].sourceId === edges[j].sourceId || edges[i].sourceId === edges[j].targetId ||
                 edges[i].targetId === edges[j].sourceId || edges[i].targetId === edges[j].targetId) { continue; }
-            if (segmentsIntersect(a, b, c, d)) { count++; }
+            if (doSegmentsIntersect(a, b, c, d)) { count++; }
         }
     }
     return count;

@@ -7,6 +7,7 @@ import { AnalyzerFactory } from './analyzers/AnalyzerFactory';
 import { AnalysisCache } from './cache/AnalysisCache';
 import { Settings } from './config/Settings';
 import { WebviewToExtensionMessage } from './webview/messages';
+import { withWorkspaceRoot } from './webview/graphPayload';
 import { FullTabPanel } from './FullTabPanel';
 import { GraphType } from './graph/GraphModel';
 import { log } from './logger';
@@ -273,7 +274,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
 
         const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
         if (cached) {
-            this._view.webview.postMessage({ type: 'analysisResult', graph: cached.graph });
+            this._view.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(cached.graph) });
             return;
         }
 
@@ -303,7 +304,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
                         result
                     );
                     this._analysisAbortController = null;
-                    this._view?.webview.postMessage({ type: 'analysisResult', graph: result.graph });
+                    this._view?.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(result.graph) });
                     return;
                 }
             } catch (err) {

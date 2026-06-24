@@ -1,6 +1,6 @@
 import {
-    computeLevels, roseLayout, resolveOverlaps,
-    treeLayout, radialLayout,
+    computeLevels, computeRoseLayout, resolveOverlaps,
+    computeTreeLayout, computeRadialLayout,
     countEdgeCrossings, countLayerViolations, countRadiusViolations,
     PosGraph, Box, Pos,
 } from '../graph/positionEngine';
@@ -75,18 +75,18 @@ describe('computeLevels', () => {
     });
 });
 
-// ── roseLayout ────────────────────────────────────────────────────────────────
+// ── computeRoseLayout ────────────────────────────────────────────────────────────────
 
-describe('roseLayout', () => {
+describe('computeRoseLayout', () => {
     it('places the target at the origin', () => {
-        const pos = roseLayout(g('T', ['T'], []));
+        const pos = computeRoseLayout(g('T', ['T'], []));
         expect(pos.get('T')!.x).toBeCloseTo(0, 5);
         expect(pos.get('T')!.y).toBeCloseTo(0, 5);
     });
 
     it('returns a position for every node in the graph', () => {
         const graph = g('T', ['T', 'A', 'B'], [['T', 'A'], ['T', 'B']]);
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         expect(pos.has('T')).toBe(true);
         expect(pos.has('A')).toBe(true);
         expect(pos.has('B')).toBe(true);
@@ -96,7 +96,7 @@ describe('roseLayout', () => {
         const graph = g('T', ['T', 'A', 'B', 'C', 'D'], [
             ['T', 'A'], ['T', 'B'], ['T', 'C'], ['T', 'D'],
         ]);
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         const origin = pos.get('T')!;
         const radii = ['A', 'B', 'C', 'D'].map(id => dist(origin, pos.get(id)!));
         for (const r of radii) { expect(r).toBeCloseTo(radii[0], 3); }
@@ -104,7 +104,7 @@ describe('roseLayout', () => {
 
     it('level-1 nodes are spread at evenly spaced angles', () => {
         const graph = g('T', ['T', 'A', 'B', 'C'], [['T', 'A'], ['T', 'B'], ['T', 'C']]);
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         const origin = pos.get('T')!;
         const angles = ['A', 'B', 'C']
             .map(id => angle(origin, pos.get(id)!))
@@ -115,7 +115,7 @@ describe('roseLayout', () => {
 
     it('level-2 node is further from origin than its level-1 parent', () => {
         const graph = g('T', ['T', 'A', 'B'], [['T', 'A'], ['A', 'B']]);
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         const origin = pos.get('T')!;
         expect(dist(origin, pos.get('B')!)).toBeGreaterThan(dist(origin, pos.get('A')!) + EPS);
     });
@@ -124,7 +124,7 @@ describe('roseLayout', () => {
         // T at centre; A is the single level-1 node so it goes to startAngle (-π/2, i.e. upward).
         // B is A's only child and should be further in the same direction.
         const graph = g('T', ['T', 'A', 'B'], [['T', 'A'], ['A', 'B']]);
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         const origin = pos.get('T')!;
         const aAngle = angle(origin, pos.get('A')!);
         const bAngle = angle(pos.get('A')!, pos.get('B')!);
@@ -138,7 +138,7 @@ describe('roseLayout', () => {
         const graph = g('T', ids, [
             ['T', 'A'], ['T', 'B'], ['A', 'C'], ['A', 'D'], ['B', 'E'],
         ]);
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         const keys = ids.map(id => {
             const p = pos.get(id)!;
             return `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
@@ -148,14 +148,14 @@ describe('roseLayout', () => {
 
     it('levelRadius option scales ring distance', () => {
         const graph = g('T', ['T', 'A'], [['T', 'A']]);
-        const d150 = dist(roseLayout(graph, { levelRadius: 150 }).get('T')!, roseLayout(graph, { levelRadius: 150 }).get('A')!);
-        const d300 = dist(roseLayout(graph, { levelRadius: 300 }).get('T')!, roseLayout(graph, { levelRadius: 300 }).get('A')!);
+        const d150 = dist(computeRoseLayout(graph, { levelRadius: 150 }).get('T')!, computeRoseLayout(graph, { levelRadius: 150 }).get('A')!);
+        const d300 = dist(computeRoseLayout(graph, { levelRadius: 300 }).get('T')!, computeRoseLayout(graph, { levelRadius: 300 }).get('A')!);
         expect(d300).toBeGreaterThan(d150 + EPS);
     });
 
     it('disconnected nodes still get a position (not undefined)', () => {
         const graph = g('T', ['T', 'A', 'X'], [['T', 'A']]); // X is isolated
-        const pos = roseLayout(graph);
+        const pos = computeRoseLayout(graph);
         expect(pos.get('X')).toBeDefined();
     });
 });
@@ -256,60 +256,60 @@ const balancedTree: PosGraph = (() => {
     ]);
 })();
 
-// ── treeLayout metrics ────────────────────────────────────────────────────────
+// ── computeTreeLayout metrics ────────────────────────────────────────────────────────
 
-describe('treeLayout — layer violations', () => {
+describe('computeTreeLayout — layer violations', () => {
     it('hub graph: zero layer violations', () => {
-        const pos = treeLayout(hubGraph);
+        const pos = computeTreeLayout(hubGraph);
         const levels = computeLevels(hubGraph);
         expect(countLayerViolations(pos, levels)).toBe(0);
     });
 
     it('chain graph: zero layer violations', () => {
-        const pos = treeLayout(chainGraph);
+        const pos = computeTreeLayout(chainGraph);
         const levels = computeLevels(chainGraph);
         expect(countLayerViolations(pos, levels)).toBe(0);
     });
 
     it('balanced tree: zero layer violations', () => {
-        const pos = treeLayout(balancedTree);
+        const pos = computeTreeLayout(balancedTree);
         const levels = computeLevels(balancedTree);
         expect(countLayerViolations(pos, levels)).toBe(0);
     });
 });
 
-// ── radialLayout metrics ──────────────────────────────────────────────────────
+// ── computeRadialLayout metrics ──────────────────────────────────────────────────────
 
-describe('radialLayout — radius violations', () => {
+describe('computeRadialLayout — radius violations', () => {
     it('hub graph: zero radius violations', () => {
-        const pos = radialLayout(hubGraph);
+        const pos = computeRadialLayout(hubGraph);
         const levels = computeLevels(hubGraph);
         expect(countRadiusViolations(pos, levels)).toBe(0);
     });
 
     it('chain graph: zero radius violations', () => {
-        const pos = radialLayout(chainGraph);
+        const pos = computeRadialLayout(chainGraph);
         const levels = computeLevels(chainGraph);
         expect(countRadiusViolations(pos, levels)).toBe(0);
     });
 
     it('balanced tree: zero radius violations', () => {
-        const pos = radialLayout(balancedTree);
+        const pos = computeRadialLayout(balancedTree);
         const levels = computeLevels(balancedTree);
         expect(countRadiusViolations(pos, levels)).toBe(0);
     });
 });
 
-// ── roseLayout metrics ────────────────────────────────────────────────────────
+// ── computeRoseLayout metrics ────────────────────────────────────────────────────────
 
-describe('roseLayout — edge crossings', () => {
+describe('computeRoseLayout — edge crossings', () => {
     it('chain graph: zero crossings (single path, no branches)', () => {
-        const pos = roseLayout(chainGraph);
+        const pos = computeRoseLayout(chainGraph);
         expect(countEdgeCrossings(pos, chainGraph.edges)).toBe(0);
     });
 
     it('balanced tree: zero crossings (pure tree, no cycles)', () => {
-        const pos = roseLayout(balancedTree);
+        const pos = computeRoseLayout(balancedTree);
         expect(countEdgeCrossings(pos, balancedTree.edges)).toBe(0);
     });
 
@@ -317,7 +317,7 @@ describe('roseLayout — edge crossings', () => {
         // Random baseline: scatter all nodes on a fixed grid, count crossings
         const ids = hubGraph.nodes.map(n => n.id);
         const randomPos = new Map(ids.map((id, i) => [id, { x: (i % 4) * 50, y: Math.floor(i / 4) * 50 }]));
-        const roseCrossings   = countEdgeCrossings(roseLayout(hubGraph), hubGraph.edges);
+        const roseCrossings   = countEdgeCrossings(computeRoseLayout(hubGraph), hubGraph.edges);
         const randomCrossings = countEdgeCrossings(randomPos,            hubGraph.edges);
         expect(roseCrossings).toBeLessThan(randomCrossings);
     });

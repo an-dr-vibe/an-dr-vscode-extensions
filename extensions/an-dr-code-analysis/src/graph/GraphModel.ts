@@ -23,6 +23,8 @@ export interface GraphModel {
     targetId: string;
     nodes: GraphNode[];
     edges: GraphEdge[];
+    /** Workspace root used by webview layouts to display workspace-relative paths. */
+    workspaceRoot?: string;
     depth: number;
     tool: string;
     confidence: 'high' | 'medium' | 'low';

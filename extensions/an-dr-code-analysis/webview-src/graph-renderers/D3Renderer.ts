@@ -1,8 +1,18 @@
 import * as d3 from 'd3';
-import { GraphModel, GraphNode, LayoutName, NodeEventCallback, layoutForGraphType } from './types';
+import { GraphModel, GraphNode, NodeEventCallback } from './types';
 import { GraphRenderer } from './IGraphRenderer';
-import { computeLevels, roseLayout, treeLayout, radialLayout, Pos } from '../../src/graph/positionEngine';
-import { estW, clipToRect, levelCol } from './rendererHelpers';
+import { computeLevels, Pos } from '../../src/graph/positionEngine';
+import {
+    BaseGraphRenderer,
+    Bounds,
+    clipLineToRect,
+    computeFrameDragHandleBounds,
+    estimateNodeWidth,
+    GroupedRenderState,
+} from './BaseGraphRenderer';
+import { GraphLayoutInput } from '../graph-layouts/layoutStrategies';
+import { GroupFrame } from '../graph-layouts/groupedLayout';
+import { getLevelColors } from './d3Colors';
 
 const COLOR_EDGE_DEFAULT      = 'var(--vscode-panel-border,#666)';
 const COLOR_EDGE_INCOMING     = '#2FB8A0';  // teal  — incoming to selected node
@@ -14,7 +24,9 @@ const NODE_RX  = 5;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class D3Renderer implements GraphRenderer {
+// D3-specific drawing/event binding stays here; renderer-agnostic layout,
+// folded-frame state, and edge routing live in BaseGraphRenderer.
+export class D3Renderer extends BaseGraphRenderer {
     private _container:      HTMLElement;
     private _tooltip:        HTMLElement;
     private _jumpBtn:        HTMLElement;
@@ -22,12 +34,9 @@ export class D3Renderer implements GraphRenderer {
     private _onNodeDblClick: NodeEventCallback;
     private _svg:  d3.Selection<SVGSVGElement, unknown, any, any> | null = null;
     private _zoom: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
-    private _lastGraph:      GraphModel | null = null;
-    private _selectedNodeId: string | null = null;
-    private _layoutName:     LayoutName | null = null;
-    private _positions:     Map<string, Pos> = new Map();
     private _edgeEls:      Map<string, d3.Selection<SVGLineElement, unknown, any, any>> = new Map();
     private _nodeEls:      Map<string, d3.Selection<SVGGElement,    unknown, any, any>> = new Map();
+    private _frameEls:     Map<string, d3.Selection<SVGGElement,    unknown, any, any>> = new Map();
     private _externalEdges: Set<string> = new Set();
     /** Original stroke color+width per node, for restoring after focus clear. */
     private _nodeBorderColors: Map<string, { stroke: string; strokeWidth: string }> = new Map();
@@ -38,6 +47,7 @@ export class D3Renderer implements GraphRenderer {
         container: HTMLElement, tooltip: HTMLElement,
         onNodeClick: NodeEventCallback, onNodeDblClick: NodeEventCallback,
     ) {
+        super();
         this._container      = container;
         this._tooltip        = tooltip;
         this._onNodeClick    = onNodeClick;
@@ -73,10 +83,10 @@ export class D3Renderer implements GraphRenderer {
         this._svg?.remove();
         this._svg = null;
         this._zoom = null;
-        this._lastGraph = null;
-        this._positions        = new Map();
+        this._resetBaseState();
         this._edgeEls          = new Map();
         this._nodeEls          = new Map();
+        this._frameEls         = new Map();
         this._externalEdges    = new Set();
         this._nodeBorderColors = new Map();
         this._edgeOrigColors   = new Map();
@@ -85,8 +95,7 @@ export class D3Renderer implements GraphRenderer {
         this._jumpBtn.onclick = null;
     }
 
-    applyLayout(name: LayoutName): void {
-        this._layoutName = name;
+    protected _rerenderLastGraph(): void {
         if (this._lastGraph) { this._initFresh(this._lastGraph); }
     }
 
@@ -105,15 +114,7 @@ export class D3Renderer implements GraphRenderer {
 
     // ── Layout ────────────────────────────────────────────────────────────────
 
-    private _resolvePositions(graph: GraphModel, hints?: Map<string, Pos>): Map<string, Pos> {
-        const name = this._layoutName ?? layoutForGraphType(graph.graphType, false);
-        if (name === 'rose')         { return roseLayout(graph); }
-        if (name === 'hierarchical') { return treeLayout(graph); }
-        if (name === 'force')        { return this._forceLayout(graph, hints); }
-        return radialLayout(graph);
-    }
-
-    private _forceLayout(graph: GraphModel, hints?: Map<string, Pos>): Map<string, Pos> {
+    private _forceLayout(graph: GraphLayoutInput, hints?: Map<string, Pos>): Map<string, Pos> {
         interface FNode extends d3.SimulationNodeDatum { _id: string; }
         const nodes: FNode[] = graph.nodes.map(n => {
             const h = hints?.get(n.id);
@@ -135,7 +136,7 @@ export class D3Renderer implements GraphRenderer {
 
     // ── Render ────────────────────────────────────────────────────────────────
 
-    private _initFresh(graph: GraphModel, hints?: Map<string, Pos>): void {
+    private _initFresh(graph: GraphModel, hints?: Map<string, Pos>, preserveTransform?: d3.ZoomTransform): void {
         this._svg?.remove();
         this._container.appendChild(this._jumpBtn);
         this._selectedNodeId   = null;
@@ -161,25 +162,27 @@ export class D3Renderer implements GraphRenderer {
         svg.call(zoom);
         this._zoom = zoom;
 
-        const pos  = this._resolvePositions(graph, hints);
+        const pos  = this._resolvePositions(graph, hints, (g, h) => this._forceLayout(g, h));
         const lvls = computeLevels(graph);
         this._positions     = new Map(pos);
         this._edgeEls       = new Map();
         this._nodeEls       = new Map();
+        this._frameEls      = new Map();
         this._externalEdges = new Set();
 
         const dims = new Map<string, { w: number; h: number }>();
-        for (const n of graph.nodes) { dims.set(n.id, { w: estW(n.label), h: n.id === graph.targetId ? 34 : NODE_H }); }
+        for (const n of graph.nodes) { dims.set(n.id, { w: estimateNodeWidth(n.label), h: n.id === graph.targetId ? 34 : NODE_H }); }
+        this._groupedRenderState = this._groupedLayout ? this._buildGroupedRenderState(this._groupedLayout, dims) : null;
+
+        if (this._groupedRenderState) { this._drawGroupFrames(root, graph, dims, this._groupedRenderState, svg.node()!); }
 
         // ── Edges ──────────────────────────────────────────────────────────────
         const eg = root.append('g').attr('class', 'edges');
         for (const e of graph.edges) {
-            const sp = pos.get(e.sourceId), tp = pos.get(e.targetId);
-            if (!sp || !tp) { continue; }
-            const td  = dims.get(e.targetId) ?? { w: 100, h: NODE_H };
-            const sd  = dims.get(e.sourceId) ?? { w: 100, h: NODE_H };
-            const ep  = clipToRect(sp.x, sp.y, tp.x, tp.y, td.w / 2, td.h / 2);
-            const sp2 = clipToRect(tp.x, tp.y, sp.x, sp.y, sd.w / 2, sd.h / 2);
+            const route = this._edgeRoute(e, dims, this._groupedRenderState);
+            if (!route) { continue; }
+            const ep  = clipLineToRect(route.source.x, route.source.y, route.target.x, route.target.y, route.target.w / 2, route.target.h / 2);
+            const sp2 = clipLineToRect(route.target.x, route.target.y, route.source.x, route.source.y, route.source.w / 2, route.source.h / 2);
             const col = e.isBidirectional ? COLOR_EDGE_BIDIRECTIONAL : COLOR_EDGE_DEFAULT;
             const ln  = eg.append('line')
                 .attr('x1', sp2.x).attr('y1', sp2.y).attr('x2', ep.x).attr('y2', ep.y)
@@ -196,10 +199,11 @@ export class D3Renderer implements GraphRenderer {
         const ng      = root.append('g').attr('class', 'nodes');
         const svgNode = svg.node()!;
         for (const n of graph.nodes) {
+            if (this._groupedRenderState?.hiddenNodeIds.has(n.id)) { continue; }
             const p  = pos.get(n.id) ?? { x: 0, y: 0 };
             const lv = lvls.get(n.id) ?? 99;
             const dm = dims.get(n.id)!;
-            const cl = levelCol(lv, n.role);
+            const cl = getLevelColors(lv, n.role);
             const isTgt = n.id === graph.targetId;
 
             const g = ng.append('g')
@@ -233,23 +237,122 @@ export class D3Renderer implements GraphRenderer {
                     const p2 = this._positions.get(n.id)!;
                     p2.x += ev.dx / k;  p2.y += ev.dy / k;
                     g.attr('transform', `translate(${p2.x},${p2.y})`);
-                    this._updateEdgesForNode(n.id, graph.edges, dims);
+                    this._refreshFrameElements(dims, this._groupedRenderState);
+                    this._updateAllEdges(graph.edges, dims, this._groupedRenderState);
                 })
                 .on('end', () => { g.style('cursor', 'grab'); });
             g.call(drag);
         }
 
-        this._fitView(pos, dims);
+        if (preserveTransform) {
+            this._zoom.transform(this._svg, preserveTransform);
+        } else {
+            this._fitView(pos, dims, this._groupedRenderState?.frameBounds, this._groupedRenderState?.hiddenNodeIds);
+        }
     }
 
-    private _getNeighborIds(nodeId: string): Set<string> {
-        const ids = new Set([nodeId]);
-        if (!this._lastGraph) { return ids; }
-        for (const e of this._lastGraph.edges) {
-            if (e.sourceId === nodeId) { ids.add(e.targetId); }
-            if (e.targetId === nodeId) { ids.add(e.sourceId); }
+    private _drawGroupFrames(
+        root: d3.Selection<SVGGElement, unknown, any, any>,
+        graph: GraphModel,
+        dims: Map<string, { w: number; h: number }>,
+        state: GroupedRenderState,
+        svgNode: SVGSVGElement,
+    ): void {
+        const fg = root.append('g').attr('class', 'group-frames');
+        for (const frame of this._groupedLayout?.frames ?? []) {
+            if (!state.visibleFrameIds.has(frame.id)) { continue; }
+            const b = state.frameBounds.get(frame.id);
+            if (!b) { continue; }
+            const g = fg.append('g')
+                .attr('class', frame.isFile ? 'group-frame file-frame' : 'group-frame dir-frame')
+                .attr('data-frame-id', frame.id);
+            g.append('rect')
+                .attr('x', b.x).attr('y', b.y)
+                .attr('width', b.w).attr('height', b.h)
+                .attr('rx', frame.isFile ? 6 : 8).attr('ry', frame.isFile ? 6 : 8)
+                .attr('fill', frame.isFile ? 'var(--vscode-editor-background,#1e1e1e)' : 'var(--vscode-sideBar-background,#252526)')
+                .attr('stroke', frame.isFile ? 'var(--vscode-panel-border,#555)' : 'var(--vscode-focusBorder,#4A9EDB)')
+                .attr('stroke-width', frame.isFile ? 1 : 1.5)
+                .attr('stroke-dasharray', frame.isFile ? null : '6 4')
+                .attr('opacity', frame.isFile ? 0.72 : 0.38);
+            this._drawFrameHandle(g, frame, b, graph.edges, dims, state, svgNode);
+            this._drawFrameToggle(g, frame, b);
+            this._frameEls.set(frame.id, g as d3.Selection<SVGGElement, unknown, any, any>);
         }
-        return ids;
+    }
+
+    private _drawFrameHandle(
+        g: d3.Selection<SVGGElement, unknown, any, any>,
+        frame: GroupFrame,
+        b: Bounds,
+        edges: GraphModel['edges'],
+        dims: Map<string, { w: number; h: number }>,
+        state: GroupedRenderState,
+        svgNode: SVGSVGElement,
+    ): void {
+        const hb = computeFrameDragHandleBounds(frame.label, b);
+        const handle = g.append('g')
+            .attr('class', 'frame-drag-handle')
+            .attr('transform', `translate(${hb.x},${hb.y})`)
+            .style('cursor', 'grab');
+        handle.append('rect')
+            .attr('width', hb.w).attr('height', hb.h)
+            .attr('rx', 4).attr('ry', 4)
+            .attr('fill', 'transparent')
+            .attr('pointer-events', 'all');
+        if (frame.fullLabel) { handle.append('title').text(frame.fullLabel); }
+        handle.append('text')
+            .attr('class', 'frame-label')
+            .attr('x', 4).attr('y', 12)
+            .attr('fill', 'var(--vscode-descriptionForeground,#aaa)')
+            .attr('font-size', frame.isFile ? '11px' : '12px')
+            .attr('font-weight', frame.isFile ? 'normal' : 'bold')
+            .attr('pointer-events', 'none')
+            .text(frame.label);
+
+        const drag = d3.drag<SVGGElement, unknown>()
+            .clickDistance(4)
+            .on('start', (ev: d3.D3DragEvent<SVGGElement, unknown, unknown>) => {
+                ev.sourceEvent?.stopPropagation();
+                this._hideTooltip();
+                handle.style('cursor', 'grabbing');
+            })
+            .on('drag', (ev: d3.D3DragEvent<SVGGElement, unknown, unknown>) => {
+                ev.sourceEvent?.stopPropagation();
+                const k = d3.zoomTransform(svgNode).k;
+                this._dragFrame(frame.id, ev.dx / k, ev.dy / k, edges, dims, state);
+            })
+            .on('end', (ev: d3.D3DragEvent<SVGGElement, unknown, unknown>) => {
+                ev.sourceEvent?.stopPropagation();
+                handle.style('cursor', 'grab');
+            });
+        handle.call(drag);
+    }
+
+    private _drawFrameToggle(g: d3.Selection<SVGGElement, unknown, any, any>, frame: GroupFrame, b: Bounds): void {
+        const folded = this._isFrameFolded(frame.id);
+        const btn = g.append('g')
+            .attr('class', 'frame-toggle')
+            .attr('transform', `translate(${b.x + b.w - 20},${b.y + 4})`)
+            .style('cursor', 'pointer');
+        btn.append('rect')
+            .attr('width', 16).attr('height', 16).attr('rx', 3).attr('ry', 3)
+            .attr('fill', 'var(--vscode-button-secondaryBackground,#3a3d41)')
+            .attr('stroke', 'var(--vscode-panel-border,#666)');
+        btn.append('text')
+            .attr('x', 8).attr('y', 11)
+            .attr('text-anchor', 'middle')
+            .attr('fill', 'var(--vscode-button-secondaryForeground,#fff)')
+            .attr('font-size', '12px')
+            .attr('pointer-events', 'none')
+            .text(folded ? '+' : '-');
+        btn.on('mousedown', (ev: MouseEvent) => ev.stopPropagation());
+        btn.on('click', (ev: MouseEvent) => {
+            ev.stopPropagation();
+            const savedTransform = this._svg?.node() ? d3.zoomTransform(this._svg.node()!) : undefined;
+            this._toggleFrameFold(frame.id);
+            if (this._lastGraph) { this._initFresh(this._lastGraph, undefined, savedTransform); }
+        });
     }
 
     private _applyFocus(focusIds: Set<string>, selectedId?: string): void {
@@ -297,23 +400,74 @@ export class D3Renderer implements GraphRenderer {
         }
     }
 
-    private _updateEdgesForNode(
-        nodeId: string,
+    private _updateAllEdges(
         edges: GraphModel['edges'],
         dims:  Map<string, { w: number; h: number }>,
+        state: GroupedRenderState | null,
     ): void {
         for (const e of edges) {
-            if (e.sourceId !== nodeId && e.targetId !== nodeId) { continue; }
             const ln = this._edgeEls.get(`${e.sourceId}:${e.targetId}`);
             if (!ln) { continue; }
-            const sp = this._positions.get(e.sourceId), tp = this._positions.get(e.targetId);
-            if (!sp || !tp) { continue; }
-            const td  = dims.get(e.targetId) ?? { w: 100, h: NODE_H };
-            const sd  = dims.get(e.sourceId) ?? { w: 100, h: NODE_H };
-            const ep  = clipToRect(sp.x, sp.y, tp.x, tp.y, td.w / 2, td.h / 2);
-            const sp2 = clipToRect(tp.x, tp.y, sp.x, sp.y, sd.w / 2, sd.h / 2);
+            const route = this._edgeRoute(e, dims, state);
+            if (!route) { continue; }
+            const ep  = clipLineToRect(route.source.x, route.source.y, route.target.x, route.target.y, route.target.w / 2, route.target.h / 2);
+            const sp2 = clipLineToRect(route.target.x, route.target.y, route.source.x, route.source.y, route.source.w / 2, route.source.h / 2);
             ln.attr('x1', sp2.x).attr('y1', sp2.y).attr('x2', ep.x).attr('y2', ep.y);
         }
+    }
+
+    private _dragFrame(
+        frameId: string,
+        dx: number,
+        dy: number,
+        edges: GraphModel['edges'],
+        dims: Map<string, { w: number; h: number }>,
+        state: GroupedRenderState,
+    ): void {
+        const moved = this._moveFrameModel(frameId, dx, dy, state);
+        for (const nodeId of moved.nodeIds) {
+            const p = this._positions.get(nodeId);
+            if (!p) { continue; }
+            this._nodeEls.get(nodeId)?.attr('transform', `translate(${p.x},${p.y})`);
+        }
+        const frameIds = new Set([...moved.frameIds, ...this._refreshDynamicFrameBounds(dims, state)]);
+        for (const id of frameIds) {
+            const b = state.frameBounds.get(id);
+            if (!b) { continue; }
+            this._updateFrameElement(id, b);
+        }
+        this._updateAllEdges(edges, dims, state);
+    }
+
+    private _refreshFrameElements(
+        dims: Map<string, { w: number; h: number }>,
+        state: GroupedRenderState | null,
+    ): void {
+        if (!state) { return; }
+        for (const id of this._refreshDynamicFrameBounds(dims, state)) {
+            const b = state.frameBounds.get(id);
+            if (b) { this._updateFrameElement(id, b); }
+        }
+    }
+
+    private _updateFrameElement(frameId: string, b: Bounds): void {
+        const g = this._frameEls.get(frameId);
+        if (!g) { return; }
+        g.select('rect')
+            .attr('x', b.x).attr('y', b.y)
+            .attr('width', b.w).attr('height', b.h);
+        const frame = this._groupedRenderState?.frameById.get(frameId);
+        if (frame) {
+            const hb = computeFrameDragHandleBounds(frame.label, b);
+            const handle = g.select('g.frame-drag-handle')
+                .attr('transform', `translate(${hb.x},${hb.y})`);
+            handle.select('rect')
+                .attr('width', hb.w).attr('height', hb.h);
+            handle.select('text.frame-label')
+                .attr('x', 4).attr('y', 12);
+        }
+        g.select('g.frame-toggle')
+            .attr('transform', `translate(${b.x + b.w - 20},${b.y + 4})`);
     }
 
     private _addMarker(defs: d3.Selection<SVGDefsElement, unknown, any, any>, id: string, color: string, orient: string): void {
@@ -323,21 +477,17 @@ export class D3Renderer implements GraphRenderer {
             .append('path').attr('d', 'M0,0 L8,3 L0,6 Z').attr('fill', color);
     }
 
-    private _fitView(pos: Map<string, Pos>, dims: Map<string, { w: number; h: number }>): void {
+    private _fitView(pos: Map<string, Pos>, dims: Map<string, { w: number; h: number }>, frameBounds?: Map<string, Bounds>, hiddenNodeIds?: Set<string>): void {
         if (!this._svg || !this._zoom || pos.size === 0) { return; }
-        let x1 = Infinity, x2 = -Infinity, y1 = Infinity, y2 = -Infinity;
-        for (const [id, p] of pos) {
-            const d = dims.get(id) ?? { w: 100, h: NODE_H };
-            x1 = Math.min(x1, p.x - d.w / 2);  x2 = Math.max(x2, p.x + d.w / 2);
-            y1 = Math.min(y1, p.y - d.h / 2);  y2 = Math.max(y2, p.y + d.h / 2);
-        }
+        const bounds = this._fitBounds(pos, dims, frameBounds, hiddenNodeIds);
+        if (!bounds) { return; }
         const cw = this._container.clientWidth  || 400;
         const ch = this._container.clientHeight || 400;
         const pad = 24;
-        const bw = x2 - x1 + 2 * pad, bh = y2 - y1 + 2 * pad;
+        const bw = bounds.w + 2 * pad, bh = bounds.h + 2 * pad;
         const sc = Math.min(cw / bw, ch / bh, 1.5);
         const t  = d3.zoomIdentity
-            .translate((cw - bw * sc) / 2 - (x1 - pad) * sc, (ch - bh * sc) / 2 - (y1 - pad) * sc)
+            .translate((cw - bw * sc) / 2 - (bounds.x - pad) * sc, (ch - bh * sc) / 2 - (bounds.y - pad) * sc)
             .scale(sc);
         this._zoom.transform(this._svg, t);
     }

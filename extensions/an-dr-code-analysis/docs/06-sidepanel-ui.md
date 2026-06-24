@@ -104,7 +104,7 @@ Only one analysis can run at a time. Starting a new analysis cancels the previou
 - Refresh button (↺): re-runs current analysis
 
 ### Graph Area
-- Rendered by Cytoscape.js (bundled, no CDN)
+- Rendered by bundled D3/SVG (no CDN)
 - Minimum height: 200px
 - Resizable: user can drag the section border
 - Empty state: placeholder text "Run an analysis to see results"
@@ -115,6 +115,7 @@ Only one analysis can run at a time. Starting a new analysis cancels the previou
 - **Call Graph (expanded)**: hierarchical top-down, callers above, callees below
 - **File Deps**: force-directed, active file at center
 - **Component Deps**: hierarchical or force-directed depending on graph size
+- **Manual option**: grouped layout frames functions by compressed file/folder paths; paths inside the workspace are shown relative to the workspace root, outside paths are grouped under `external/`, frames auto-fit around visible contents, can be folded, and drag from the label handle
 
 ### Node Styling
 - Selected/target node: larger, distinct color, bold label

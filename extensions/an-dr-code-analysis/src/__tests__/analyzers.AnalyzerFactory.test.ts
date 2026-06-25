@@ -126,9 +126,9 @@ describe('CtagsAnalyzer.canHandle', () => {
         });
     });
 
-    it('does not handle rust + callGraph', () => {
+    it('handles rust + callGraph as a fallback', () => {
         const chain = factory.getChain(makeRequest('rust', 'callGraph'));
-        expect(chain.some(a => a.name === 'ctags')).toBe(false);
+        expect(chain.some(a => a.name === 'ctags')).toBe(true);
     });
 
     it('does not handle c + fileDeps', () => {

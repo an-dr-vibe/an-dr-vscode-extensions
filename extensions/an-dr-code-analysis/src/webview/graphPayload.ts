@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GraphModel } from '../graph/GraphModel';
+import { GraphModel } from '../../shared/graph/GraphModel';
 
 /** Return the primary workspace root path used for webview graph display. */
 export function currentWorkspaceRoot(): string | undefined {

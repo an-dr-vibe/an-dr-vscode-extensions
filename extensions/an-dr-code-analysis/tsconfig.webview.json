@@ -9,6 +9,6 @@
 		"skipLibCheck": true,
 		"sourceMap": true
 	},
-	"include": ["webview-src/**/*"],
+	"include": ["webview-src/**/*", "shared/**/*"],
 	"exclude": ["node_modules", "out", "src"]
 }

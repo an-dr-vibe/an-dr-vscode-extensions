@@ -1,4 +1,4 @@
-import { computeTreeLayout } from '../../src/graph/positionEngine';
+import { computeTreeLayout } from '../../shared/graph/positionEngine';
 import {
     createLayoutResult,
     GraphLayoutInput,

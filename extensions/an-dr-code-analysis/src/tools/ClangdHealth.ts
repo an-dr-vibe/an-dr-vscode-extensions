@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ToolStatus, ToolGroup } from '../webview/messages';
+import { ToolStatus, ToolGroup } from '../../shared/protocol/messages';
 import { ClangdIssue, detectCrossCompile } from './RecoveryActions';
 import { readConfig } from '../config/CodeAnalyserConfig';
 

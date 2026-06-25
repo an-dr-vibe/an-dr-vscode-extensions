@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { IAnalyzer, AnalysisRequest, AnalysisResult } from '../IAnalyzer';
-import { GraphModel, GraphNode, GraphEdge } from '../../graph/GraphModel';
+import { GraphModel, GraphNode, GraphEdge } from '../../../shared/graph/GraphModel';
 import { log } from '../../logger';
 import { RUST_LANG_IDS } from '../../config/languageGroups';
 

@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { Pos } from '../../src/graph/positionEngine';
+import { Pos } from '../../shared/graph/positionEngine';
 
 // ── Public interfaces ──────────────────────────────────────────────────────────
 

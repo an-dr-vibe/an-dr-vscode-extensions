@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { log } from '../logger';
-import type { SymbolSource, EditorContext } from '../webview/messages';
+import type { SymbolSource, EditorContext } from '../../shared/protocol/messages';
+import { SymbolResolver, SymbolResolveResult } from './SymbolResolver';
 
 export type { SymbolSource, EditorContext };
 
@@ -27,31 +28,10 @@ const LANG_DISPLAY: Record<string, string> = {
     xml:                'XML',
 };
 
-function findDeepestContaining(
-    symbols: vscode.DocumentSymbol[],
-    pos: vscode.Position
-): vscode.DocumentSymbol | undefined {
-    for (const sym of symbols) {
-        if (sym.range.contains(pos)) {
-            return findDeepestContaining(sym.children, pos) ?? sym;
-        }
-    }
-    return undefined;
-}
-
-// Result of the 3-tier resolution attempt.
-interface ResolveResult {
-    symbol: string | undefined;
-    symbolKind: number | undefined;
-    symbolSource: SymbolSource;
-    callHierarchyItem: vscode.CallHierarchyItem | undefined;
-    // Position that was actually used (may differ from requested pos after tier-2 upgrade)
-    resolvedPos: vscode.Position;
-}
-
 export class ContextTracker implements vscode.Disposable {
     private readonly _onContextChange = new vscode.EventEmitter<EditorContext | null>();
     readonly onContextChange = this._onContextChange.event;
+    private readonly _symbolResolver = new SymbolResolver();
 
     private _isPinned = false;
     private _current: EditorContext | null = null;
@@ -175,93 +155,31 @@ export class ContextTracker implements vscode.Disposable {
         await this._resolveAt(doc, pos, id);
     }
 
-    /**
-     * 3-tier symbol resolution at the given position. Emits context change on success.
-     * id is the current _updateId snapshot — any async step checks it to detect
-     * superseded updates and bail out early.
-     */
+    /** Resolve the symbol at the given position and emit context when still current. */
     private async _resolveAt(doc: vscode.TextDocument, pos: vscode.Position, id: number): Promise<void> {
+        const result = await this._symbolResolver.resolveAt(doc, pos, () => id === this._updateId);
+        if (!result) { return; }
+        this._applyResolveResult(id, doc, result);
+    }
+
+    private _applyResolveResult(id: number, doc: vscode.TextDocument, result: SymbolResolveResult): void {
         const fsPath = doc.uri.fsPath;
-        const tag = `[resolveAt ${fsPath.split(/[\\/]/).pop()}:${pos.line}:${pos.character}]`;
-
-        // Tier 1: LSP call hierarchy — exact semantic symbol, reusable by analyzer
-        try {
-            log.appendLine(`${tag} tier1 prepareCallHierarchy…`);
-            const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
-                'vscode.prepareCallHierarchy', doc.uri, pos
-            );
-            if (id !== this._updateId) { log.appendLine(`${tag} tier1 cancelled`); return; }
-            log.appendLine(`${tag} tier1 result: ${items?.length ?? 0} items`);
-            if (items?.length) {
-                this._currentCallHierarchyItem = items[0];
-                this._callHierarchyItemPos = { fsPath, line: pos.line, character: pos.character };
-                this._emit(id, doc, {
-                    symbol: items[0].name,
-                    symbolKind: items[0].kind,
-                    symbolSource: 'call-hierarchy',
-                }, pos);
-                return;
-            }
-            // Tier 1 returned no items at this position — clear stale item if it was
-            // resolved in this same file (it belongs to a different symbol now).
-            if (this._callHierarchyItemPos?.fsPath === fsPath) {
-                this._currentCallHierarchyItem = undefined;
-                this._callHierarchyItemPos = undefined;
-            }
-        } catch (e) {
-            log.appendLine(`${tag} tier1 threw: ${e}`);
-            if (id !== this._updateId) { return; }
+        if (result.callHierarchyItem) {
+            this._currentCallHierarchyItem = result.callHierarchyItem;
+            this._callHierarchyItemPos = {
+                fsPath,
+                line: result.resolvedPos.line,
+                character: result.resolvedPos.character,
+            };
+        } else if (result.callHierarchyMissed && this._callHierarchyItemPos?.fsPath === fsPath) {
+            this._currentCallHierarchyItem = undefined;
+            this._callHierarchyItemPos = undefined;
         }
-
-        // Tier 2: Document symbol at the position
-        try {
-            log.appendLine(`${tag} tier2 executeDocumentSymbolProvider…`);
-            const allSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-                'vscode.executeDocumentSymbolProvider', doc.uri
-            );
-            if (id !== this._updateId) { log.appendLine(`${tag} tier2 cancelled`); return; }
-            log.appendLine(`${tag} tier2 symbols: ${allSymbols?.length ?? 0} top-level`);
-            if (allSymbols?.length) {
-                const sym = findDeepestContaining(allSymbols, pos);
-                log.appendLine(`${tag} tier2 deepest: ${sym?.name ?? 'none'}`);
-                if (sym) {
-                    // Try to upgrade to call-hierarchy using the symbol's name token position.
-                    const upgradePos = sym.selectionRange.start;
-                    log.appendLine(`${tag} tier2 upgrade prepareCallHierarchy at ${upgradePos.line}:${upgradePos.character}…`);
-                    try {
-                        const chItems = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
-                            'vscode.prepareCallHierarchy', doc.uri, upgradePos
-                        );
-                        if (id !== this._updateId) { return; }
-                        log.appendLine(`${tag} tier2 upgrade result: ${chItems?.length ?? 0} items`);
-                        if (chItems?.length) {
-                            this._currentCallHierarchyItem = chItems[0];
-                            this._callHierarchyItemPos = { fsPath, line: upgradePos.line, character: upgradePos.character };
-                            this._emit(id, doc, {
-                                symbol: chItems[0].name,
-                                symbolKind: chItems[0].kind,
-                                symbolSource: 'call-hierarchy',
-                            }, upgradePos);
-                            return;
-                        }
-                    } catch (e) {
-                        log.appendLine(`${tag} tier2 upgrade threw: ${e}`);
-                        if (id !== this._updateId) { return; }
-                    }
-                    log.appendLine(`${tag} tier2 emitting document-symbol: ${sym.name}`);
-                    this._emit(id, doc, { symbol: sym.name, symbolKind: sym.kind, symbolSource: 'document-symbol' }, pos);
-                    return;
-                }
-            }
-        } catch (e) {
-            log.appendLine(`${tag} tier2 threw: ${e}`);
-            if (id !== this._updateId) { return; }
-        }
-
-        // Tier 3: Word under cursor — always available, semantically unreliable
-        const wordRange = doc.getWordRangeAtPosition(pos);
-        log.appendLine(`${tag} fell through to word: ${wordRange ? doc.getText(wordRange) : 'none'}`);
-        this._emit(id, doc, { symbol: wordRange ? doc.getText(wordRange) : undefined, symbolSource: 'word' }, pos);
+        this._emit(id, doc, {
+            symbol: result.symbol,
+            symbolKind: result.symbolKind,
+            symbolSource: result.symbolSource,
+        }, result.resolvedPos);
     }
 
     private _emit(
@@ -271,16 +189,18 @@ export class ContextTracker implements vscode.Disposable {
         pos?: vscode.Position
     ): void {
         if (id !== this._updateId) { return; }
+        const filePath = doc.fileName ?? doc.uri.fsPath;
+        const langId = doc.languageId ?? '';
         if (pos) {
-            this._lastResolvedPos = { fsPath: doc.uri.fsPath, line: pos.line, character: pos.character };
+            this._lastResolvedPos = { fsPath: filePath, line: pos.line, character: pos.character };
         }
         this._current = {
             ...partial,
             symbolSource: partial.symbolSource,
-            file: path.basename(doc.fileName),
-            filePath: doc.fileName,
-            lang: LANG_DISPLAY[doc.languageId] ?? doc.languageId,
-            langId: doc.languageId,
+            file: path.basename(filePath),
+            filePath,
+            lang: LANG_DISPLAY[langId] ?? langId,
+            langId,
             isPinned: this._isPinned,
         };
         this._onContextChange.fire(this._current);

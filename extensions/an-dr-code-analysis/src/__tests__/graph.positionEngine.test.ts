@@ -3,7 +3,7 @@ import {
     computeTreeLayout, computeRadialLayout,
     countEdgeCrossings, countLayerViolations, countRadiusViolations,
     PosGraph, Box, Pos,
-} from '../graph/positionEngine';
+} from '../../shared/graph/positionEngine';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

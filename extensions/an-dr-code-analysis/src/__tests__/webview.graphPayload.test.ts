@@ -1,5 +1,5 @@
 import { Uri, workspace } from 'vscode';
-import { GraphModel } from '../graph/GraphModel';
+import { GraphModel } from '../../shared/graph/GraphModel';
 import { withWorkspaceRoot } from '../webview/graphPayload';
 
 function graph(): GraphModel {

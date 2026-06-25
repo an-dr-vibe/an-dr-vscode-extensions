@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { GraphModel, GraphNode, NodeEventCallback } from './types';
 import { GraphRenderer } from './IGraphRenderer';
-import { computeLevels, Pos } from '../../src/graph/positionEngine';
+import { computeLevels, Pos } from '../../shared/graph/positionEngine';
 import {
     BaseGraphRenderer,
     Bounds,

@@ -1,4 +1,4 @@
-import { Pos } from '../../src/graph/positionEngine';
+import { Pos } from '../../shared/graph/positionEngine';
 import type { GroupedLayout } from './groupedLayout';
 
 /** Layout identifiers exposed to the webview controls and renderer contract. */

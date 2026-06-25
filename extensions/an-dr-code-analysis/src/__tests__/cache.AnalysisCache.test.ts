@@ -4,7 +4,7 @@ import * as path from 'path';
 import { AnalysisCache } from '../cache/AnalysisCache';
 import { workspace, Uri } from '../__mocks__/vscode';
 import { AnalysisResult } from '../analyzers/IAnalyzer';
-import { GraphModel } from '../graph/GraphModel';
+import { GraphModel } from '../../shared/graph/GraphModel';
 
 function makeResult(tool = 'clangd'): AnalysisResult {
     const graph: GraphModel = {

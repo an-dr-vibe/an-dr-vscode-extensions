@@ -4,13 +4,13 @@
 		"module": "commonjs",
 		"lib": ["ES2020"],
 		"outDir": "./out",
-		"rootDir": "./src",
+		"rootDir": ".",
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"declaration": true
 	},
-	"include": ["src/**/*"],
+	"include": ["src/**/*", "shared/**/*"],
 	"exclude": ["node_modules", "out", "webview-src", "src/__tests__", "src/__mocks__"]
 }

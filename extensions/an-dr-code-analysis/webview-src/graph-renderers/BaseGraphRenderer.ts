@@ -2,7 +2,7 @@ import { GraphRenderer } from './IGraphRenderer';
 import { GraphEdge, GraphModel, LayoutName } from './types';
 import { ForceLayout, resolveGraphLayout } from '../graph-layouts/layoutStrategies';
 import { GroupFrame, GroupedLayout } from '../graph-layouts/groupedLayout';
-import { Pos } from '../../src/graph/positionEngine';
+import { Pos } from '../../shared/graph/positionEngine';
 
 export interface Bounds { x: number; y: number; w: number; h: number }
 export interface EdgeAnchor { id: string; x: number; y: number; w: number; h: number }

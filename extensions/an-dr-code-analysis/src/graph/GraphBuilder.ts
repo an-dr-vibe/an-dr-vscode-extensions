@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { GraphModel, GraphNode, GraphEdge, GraphType, NodeRole } from './GraphModel';
+import { GraphModel, GraphNode, GraphEdge, GraphType, NodeRole } from '../../shared/graph/GraphModel';
 
 /** A directed call edge with both endpoints resolved to concrete items. */
 export interface CallEdge {

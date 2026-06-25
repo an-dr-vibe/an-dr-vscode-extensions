@@ -2,11 +2,10 @@ import * as vscode from 'vscode';
 import { generateWebviewHtml } from './webview/webviewHtml';
 import { ContextTracker } from './context/ContextTracker';
 import { AnalyzerFactory } from './analyzers/AnalyzerFactory';
-import { AnalysisCache } from './cache/AnalysisCache';
-import { GraphModel, GraphType } from './graph/GraphModel';
-import { WebviewToExtensionMessage } from './webview/messages';
+import { AnalysisRunner, AnalysisRunnerEvent } from './application/AnalysisRunner';
+import { GraphModel, GraphType } from '../shared/graph/GraphModel';
+import { WebviewToExtensionMessage } from '../shared/protocol/messages';
 import { withWorkspaceRoot } from './webview/graphPayload';
-import { Settings } from './config/Settings';
 import { log } from './logger';
 
 const GRAPH_TYPE_LABELS: Record<GraphType, string> = {
@@ -17,9 +16,8 @@ const GRAPH_TYPE_LABELS: Record<GraphType, string> = {
 
 export class FullTabPanel implements vscode.Disposable {
     private readonly _panel: vscode.WebviewPanel;
-    private readonly _cache = new AnalysisCache();
+    private readonly _analysisRunner: AnalysisRunner;
     private readonly _disposables: vscode.Disposable[] = [];
-    private _abortController: AbortController | null = null;
     private _pendingGraph: GraphModel | null;
 
     static create(
@@ -57,6 +55,7 @@ export class FullTabPanel implements vscode.Disposable {
     ) {
         this._panel = panel;
         this._pendingGraph = initialGraph;
+        this._analysisRunner = new AnalysisRunner(this._analyzerFactory);
 
         const scriptUri = panel.webview.asWebviewUri(
             vscode.Uri.joinPath(extensionUri, 'out', 'webview.js')
@@ -68,6 +67,7 @@ export class FullTabPanel implements vscode.Disposable {
         panel.webview.html = generateWebviewHtml(panel.webview, extensionUri, scriptUri, { fullTab: true });
 
         this._disposables.push(
+            this._analysisRunner,
             panel.webview.onDidReceiveMessage((msg: WebviewToExtensionMessage) => {
                 void this._handleMessage(msg);
             }),
@@ -135,57 +135,51 @@ export class FullTabPanel implements vscode.Disposable {
     }
 
     private _cancelRunning(): void {
-        this._abortController?.abort();
-        this._abortController = null;
+        this._analysisRunner.cancel();
     }
 
     private async _runAnalysis(graphType: GraphType, depth: number): Promise<void> {
-        const ctx = this._contextTracker.current;
-        if (!ctx) { return; }
-        const clampedDepth = Math.min(Math.max(depth, 1), Settings.maxDepth());
-        const callHierarchyItem = this._contextTracker.currentCallHierarchyItem;
+        await this._analysisRunner.run({
+            graphType,
+            depth,
+            context: this._contextTracker.current,
+            callHierarchyItem: this._contextTracker.currentCallHierarchyItem,
+        }, event => this._postAnalysisEvent(event));
+    }
 
-        const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
-        if (cached) {
-            this._panel.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(cached.graph) });
-            return;
+    private _postAnalysisEvent(event: AnalysisRunnerEvent): void {
+        switch (event.type) {
+            case 'busy':
+                this._panel.webview.postMessage({
+                    type: 'analysisBusy',
+                    graphType: event.graphType,
+                    message: event.message,
+                });
+                break;
+            case 'result':
+                this._panel.webview.postMessage({
+                    type: 'analysisResult',
+                    graph: withWorkspaceRoot(event.graph),
+                });
+                break;
+            case 'cancelled':
+                this._panel.webview.postMessage({
+                    type: 'analysisCancelled',
+                    graphType: event.graphType,
+                });
+                break;
+            case 'error':
+                this._panel.webview.postMessage({
+                    type: 'analysisError',
+                    graphType: event.graphType,
+                    message: event.message,
+                });
+                break;
         }
-
-        const controller = new AbortController();
-        this._abortController = controller;
-        const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem, signal: controller.signal };
-
-        this._panel.webview.postMessage({ type: 'analysisBusy', graphType });
-
-        const chain = this._analyzerFactory.getChain(request);
-        for (const analyzer of chain) {
-            if (controller.signal.aborted) { break; }
-            try {
-                const result = await analyzer.analyze(request);
-                if (controller.signal.aborted) { break; }
-                if (result) {
-                    this._cache.set({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol }, result);
-                    this._abortController = null;
-                    this._panel.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(result.graph) });
-                    return;
-                }
-            } catch (err) {
-                if (controller.signal.aborted) { break; }
-                log.appendLine(`[fullTab] ${analyzer.name} threw: ${err}`);
-            }
-        }
-
-        this._abortController = null;
-        if (controller.signal.aborted) {
-            this._panel.webview.postMessage({ type: 'analysisCancelled', graphType });
-            return;
-        }
-        this._panel.webview.postMessage({ type: 'analysisError', graphType, message: 'No results found.' });
     }
 
     dispose(): void {
         this._cancelRunning();
-        this._cache.dispose();
         this._disposables.forEach(d => d.dispose());
         try { this._panel.dispose(); } catch { /* already disposed */ }
     }

@@ -1,4 +1,4 @@
-// Tests for the message types defined in src/webview/messages.ts.
+// Tests for the shared webview message protocol.
 // Since the module only exports interfaces and re-exports, we validate
 // structural conformance: that objects with the right shape are accepted
 // by TypeScript (compile-time) and that discriminant fields have correct values.
@@ -21,8 +21,8 @@ import type {
     RunCommandMessage,
     ToolStatus,
     RecoveryAction,
-} from '../webview/messages';
-import { GraphModel } from '../graph/GraphModel';
+} from '../../shared/protocol/messages';
+import { GraphModel } from '../../shared/graph/GraphModel';
 
 // ── type discriminant helpers ────────────────────────────────────────────────
 

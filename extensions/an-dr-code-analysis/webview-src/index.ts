@@ -1,67 +1,19 @@
 import { createRenderer } from './graph-renderers/D3Renderer';
 import { GraphRenderer } from './graph-renderers/IGraphRenderer';
-import { LayoutName, LAYOUT_META } from './graph-renderers/types';
-import { resolveNodeDblClick } from '../src/webview/nodeActions';
+import { GraphModel, GraphNode, LayoutName, LAYOUT_META } from './graph-renderers/types';
+import { applyFilter, foldCollapsedDirs, isNodeFiltered, mergeCircularEdges } from './graph/graphTransforms';
+import { resolveNodeDblClick } from '../shared/protocol/nodeActions';
+import {
+    EditorContext,
+    ExtensionToWebviewMessage as IncomingMessage,
+    GraphType,
+    RecoveryAction,
+    ToolGroup,
+    ToolState,
+    ToolStatus,
+} from '../shared/protocol/messages';
 
 declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-type ToolState = 'ok' | 'warn' | 'missing';
-type ToolGroup = 'universal' | 'c-cpp' | 'rust' | 'python' | 'typescript';
-type GraphType = 'callGraph' | 'fileDeps' | 'componentDeps';
-
-interface ToolStatus {
-    name: string;
-    state: ToolState;
-    group: ToolGroup;
-    detail?: string;
-}
-
-type SymbolSource = 'call-hierarchy' | 'document-symbol' | 'word';
-
-interface EditorContext {
-    symbol?: string;
-    symbolKind?: number;
-    symbolSource: SymbolSource;
-    file: string;
-    filePath: string;
-    lang: string;
-    langId: string;
-    isPinned: boolean;
-}
-
-interface GraphNode {
-    id: string;
-    label: string;
-    fullName: string;
-    filePath?: string;
-    line?: number;
-    role: 'target' | 'caller' | 'callee' | 'external' | 'folder';
-}
-
-interface GraphEdge { sourceId: string; targetId: string; isExternal?: boolean; isBidirectional?: boolean; }
-
-interface GraphModel {
-    graphType: GraphType;
-    targetId: string;
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-    workspaceRoot?: string;
-    depth: number;
-    tool: string;
-    confidence: 'high' | 'medium' | 'low';
-}
-
-interface ToolsStatusMessage  { type: 'toolsStatus';   tools: ToolStatus[]; }
-interface ContextUpdateMessage { type: 'contextUpdate'; context: EditorContext | null; }
-interface AnalysisResultMessage { type: 'analysisResult'; graph: GraphModel; }
-interface AnalysisErrorMessage  { type: 'analysisError';  graphType: GraphType; message: string; recoveryActions?: RecoveryAction[]; }
-interface AnalysisBusyMessage      { type: 'analysisBusy';      graphType: GraphType; message?: string; }
-interface AnalysisCancelledMessage { type: 'analysisCancelled'; graphType: GraphType; }
-interface ClangdHealthMessage   { type: 'clangdHealth'; issue: ClangdHealth['issue']; message: string; recoveryActions?: RecoveryAction[]; }
-interface ConfigPathsMessage    { type: 'configPaths'; compileCommandsPath?: string; tsconfigPath?: string; }
-type IncomingMessage = ToolsStatusMessage | ContextUpdateMessage | AnalysisResultMessage | AnalysisErrorMessage | AnalysisBusyMessage | AnalysisCancelledMessage | ClangdHealthMessage | ConfigPathsMessage;
 
 // ── Stub graph (verification / Iteration 5) ──────────────────────────────────
 
@@ -87,8 +39,6 @@ const STUB_GRAPH: GraphModel = {
 };
 
 // ── State ────────────────────────────────────────────────────────────────────
-
-interface RecoveryAction { label: string; command: string; args?: unknown[]; }
 
 interface AnalysisState {
     status: 'idle' | 'busy' | 'result' | 'error';
@@ -373,7 +323,9 @@ function renderAnalysisSection(): void {
 // ── File filter tree ─────────────────────────────────────────────────────────
 
 function allDescendantFilesUnchecked(node: TreeNode): boolean {
-    if (!node.isDir) { return isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode); }
+    if (!node.isDir) {
+        return isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode, state.uncheckedPaths);
+    }
     return node.children.length > 0 && node.children.every(c => allDescendantFilesUnchecked(c));
 }
 
@@ -390,7 +342,7 @@ function renderTreeNode(node: TreeNode, indent: number): string {
   <span class="ft-label ft-dir" data-dir="${esc(node.fullPath)}">${esc(node.name)}/</span>
 </div>${childrenHtml}`;
     } else {
-        const checked = !isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode);
+        const checked = !isNodeFiltered({ filePath: node.fullPath, role: 'caller' } as GraphNode, state.uncheckedPaths);
         const graph = state.analysis.graph;
         const norm = (s: string) => s.replace(/\\/g, '/');
         const isTarget = graph ? norm(graph.nodes.find(n => n.id === graph.targetId)?.filePath ?? '') === norm(node.fullPath) : false;
@@ -412,126 +364,6 @@ function renderFileFilter(graph: GraphModel): string {
   <summary class="section-header">TREE</summary>
   <div class="section-body ft-body">${childrenHtml}</div>
 </details>`;
-}
-
-function isNodeFiltered(node: GraphNode): boolean {
-    if (!node.filePath || node.role === 'target') { return false; }
-    const norm = node.filePath.replace(/\\/g, '/');
-    for (const p of state.uncheckedPaths) {
-        const np = p.replace(/\\/g, '/');
-        if (norm === np || norm.startsWith(np + '/')) { return true; }
-    }
-    return false;
-}
-
-function applyFilter(graph: GraphModel): GraphModel {
-    if (state.uncheckedPaths.size === 0) { return graph; }
-    const visibleNodes = graph.nodes.filter(n => !isNodeFiltered(n));
-    const visibleIds = new Set(visibleNodes.map(n => n.id));
-    const visibleEdges = graph.edges.filter(e => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId));
-    // Drop nodes that became orphans after edge filtering (keep target always).
-    const connectedIds = new Set<string>();
-    connectedIds.add(graph.targetId);
-    for (const e of visibleEdges) { connectedIds.add(e.sourceId); connectedIds.add(e.targetId); }
-    const finalNodes = visibleNodes.filter(n => connectedIds.has(n.id));
-    return { ...graph, nodes: finalNodes, edges: visibleEdges };
-}
-
-// Replace all nodes whose filePath falls under a collapsed dir with a single
-// folder node. Edges are redirected; intra-folder edges are dropped.
-function foldCollapsedDirs(graph: GraphModel): GraphModel {
-    if (state.collapsedDirs.size === 0) { return graph; }
-    const norm = (s: string) => s.replace(/\\/g, '/');
-
-    // Map each node id → the folder id it collapses into (if any).
-    const nodeToFolder = new Map<string, string>();
-    for (const node of graph.nodes) {
-        if (!node.filePath || node.role === 'target') { continue; }
-        const fp = norm(node.filePath);
-        for (const dir of state.collapsedDirs) {
-            const nd = norm(dir);
-            if (fp.startsWith(nd + '/') || fp === nd) {
-                nodeToFolder.set(node.id, nd);
-                break;
-            }
-        }
-    }
-
-    if (nodeToFolder.size === 0) { return graph; }
-
-    // Build folder nodes for every dir that actually absorbed something.
-    const folderIds = new Set(nodeToFolder.values());
-    const folderNodes = new Map<string, GraphNode>();
-    for (const dirPath of folderIds) {
-        const parts = dirPath.split('/');
-        const label = parts[parts.length - 1] + '/';
-        folderNodes.set(dirPath, {
-            id: dirPath,
-            label,
-            fullName: dirPath,
-            filePath: dirPath,
-            role: 'folder',
-        });
-    }
-
-    // Keep nodes that are not collapsed.
-    const keptNodes: GraphNode[] = [];
-    for (const node of graph.nodes) {
-        if (!nodeToFolder.has(node.id)) { keptNodes.push(node); }
-    }
-
-    // Redirect edges; drop intra-folder edges; dedup.
-    const edgeSet = new Set<string>();
-    const newEdges: GraphEdge[] = [];
-    const resolve = (id: string) => nodeToFolder.get(id) ?? id;
-
-    for (const edge of graph.edges) {
-        const src = resolve(edge.sourceId);
-        const tgt = resolve(edge.targetId);
-        if (src === tgt) { continue; } // intra-folder
-        const key = `${src}->${tgt}`;
-        if (!edgeSet.has(key)) {
-            edgeSet.add(key);
-            newEdges.push({ sourceId: src, targetId: tgt, isExternal: edge.isExternal });
-        }
-    }
-
-    return {
-        ...graph,
-        nodes: [...keptNodes, ...folderNodes.values()],
-        edges: newEdges,
-    };
-}
-
-// Merge A→B + B→A pairs into a single bidirectional edge.
-function mergeCircularEdges(graph: GraphModel): GraphModel {
-    const forward = new Set<string>();
-    for (const e of graph.edges) { forward.add(`${e.sourceId}->${e.targetId}`); }
-
-    const kept: GraphEdge[] = [];
-    const seen = new Set<string>();
-    for (const e of graph.edges) {
-        const key  = `${e.sourceId}->${e.targetId}`;
-        const back = `${e.targetId}->${e.sourceId}`;
-        if (seen.has(key)) { continue; }
-        if (forward.has(back)) {
-            // Circular pair — emit one merged edge (sourceId < targetId for stability)
-            const [a, b] = e.sourceId < e.targetId
-                ? [e.sourceId, e.targetId]
-                : [e.targetId, e.sourceId];
-            const mergedKey = `${a}->${b}`;
-            if (!seen.has(mergedKey)) {
-                seen.add(mergedKey);
-                kept.push({ sourceId: a, targetId: b, isBidirectional: true });
-            }
-            seen.add(key);
-            seen.add(back);
-        } else {
-            seen.add(key);
-            kept.push(e);
-        }
-    }
-    return { ...graph, edges: kept };
 }
 
 // ── GRAPH section ────────────────────────────────────────────────────────────
@@ -686,7 +518,10 @@ function render(): void {
 
     // mount cytoscape into the freshly created #cy-container
     if (state.analysis.status === 'result' && state.analysis.graph) {
-        let g = foldCollapsedDirs(applyFilter(state.analysis.graph));
+        let g = foldCollapsedDirs(
+            applyFilter(state.analysis.graph, state.uncheckedPaths),
+            state.collapsedDirs,
+        );
         if (state.mergeCircular) { g = mergeCircularEdges(g); }
         const r = getOrCreateRenderer();
         r.update(g);
@@ -719,7 +554,10 @@ function rebuildFilterBody(): void {
 // only the filter changes so <details> open/collapsed state is preserved.
 function renderGraphOnly(): void {
     if (state.analysis.status !== 'result' || !state.analysis.graph) { return; }
-    let filtered = foldCollapsedDirs(applyFilter(state.analysis.graph));
+    let filtered = foldCollapsedDirs(
+        applyFilter(state.analysis.graph, state.uncheckedPaths),
+        state.collapsedDirs,
+    );
     if (state.mergeCircular) { filtered = mergeCircularEdges(filtered); }
     const container = document.getElementById('cy-container');
     if (!container) { render(); return; }
@@ -968,7 +806,10 @@ window.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
                     if (ftSection) { ftSection.replaceWith(tmpl2.content.firstElementChild!); }
                     else { document.querySelector('[data-section-id="graph"]')?.after(tmpl2.content.firstElementChild!); }
                 }
-                let g = foldCollapsedDirs(applyFilter(msg.graph));
+                let g = foldCollapsedDirs(
+                    applyFilter(msg.graph, state.uncheckedPaths),
+                    state.collapsedDirs,
+                );
                 if (state.mergeCircular) { g = mergeCircularEdges(g); }
                 renderer.update(g);
             } else {

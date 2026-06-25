@@ -10,6 +10,10 @@ an-dr-code-analysis/
 ├── src/
 │   ├── extension.ts            # activation, command registration, lifecycle
 │   ├── SidepanelProvider.ts    # WebviewViewProvider implementation
+│   ├── FullTabPanel.ts         # expanded graph WebviewPanel implementation
+│   │
+│   ├── application/
+│   │   └── AnalysisRunner.ts   # cache, cancellation, fallback chain, result events
 │   │
 │   ├── analyzers/
 │   │   ├── IAnalyzer.ts        # base analyzer interface
@@ -41,7 +45,8 @@ an-dr-code-analysis/
 │   │   └── RecoveryActions.ts  # generate compile_commands, .clangd, etc.
 │   │
 │   ├── context/
-│   │   └── ContextTracker.ts   # tracks active file + symbol from editor events
+│   │   ├── ContextTracker.ts   # tracks active editor events, pin state, context cache
+│   │   └── SymbolResolver.ts   # resolves cursor positions via LSP, symbols, and words
 │   │
 │   ├── cache/
 │   │   └── AnalysisCache.ts    # mtime-based cache, FileSystemWatcher invalidation
@@ -52,6 +57,13 @@ an-dr-code-analysis/
 │   │
 │   └── config/
 │       └── Settings.ts         # typed settings accessors
+│
+├── shared/                     # runtime-neutral code used by extension tests and webview
+│   ├── graph/
+│   │   ├── GraphModel.ts       # graph payload and graph type contracts
+│   │   └── positionEngine.ts   # pure primitive positioning algorithms
+│   └── protocol/
+│       └── nodeActions.ts      # pure node double-click action resolution
 │
 └── webview-src/                # compiled separately by webpack
     ├── index.ts                # webview entry point
@@ -264,7 +276,33 @@ interface EditorContext {
 }
 ```
 
-## 7.8 AnalysisCache
+## 7.8 AnalysisRunner
+
+`AnalysisRunner` is the application-layer use case for graph analysis. UI
+adapters provide the current editor context and translate runner events into
+webview messages; the runner owns depth clamping, cache lookup/storage,
+cancellation, analyzer-chain execution, and no-result/no-context outcomes.
+
+```typescript
+type AnalysisRunnerEvent =
+  | { type: 'busy'; graphType: GraphType; message?: string }
+  | { type: 'result'; graph: GraphModel; fromCache: boolean }
+  | { type: 'cancelled'; graphType: GraphType }
+  | { type: 'error'; graphType: GraphType; message: string }
+
+class AnalysisRunner {
+  run(request: AnalysisRunnerRequest, emit: (event: AnalysisRunnerEvent) => void): Promise<void>
+  cancel(): void
+  dispose(): void
+}
+```
+
+Current adapters:
+
+- `SidepanelProvider` posts runner events to the sidebar webview.
+- `FullTabPanel` posts runner events to the expanded graph tab.
+
+## 7.9 AnalysisCache
 
 ```typescript
 class AnalysisCache {
@@ -286,7 +324,7 @@ Cache key: `{filePath}:{symbol}:{graphType}:{depth}:{tool}`
 Invalidation: watch `CMakeLists.txt`, `meson.build`, `Cargo.toml`, `package.json`, `tsconfig.json`,
 `compile_commands.json` for changes → clear affected entries.
 
-## 7.9 SidepanelProvider
+## 7.10 SidepanelProvider
 
 ```typescript
 class SidepanelProvider implements vscode.WebviewViewProvider {
@@ -299,7 +337,7 @@ class SidepanelProvider implements vscode.WebviewViewProvider {
   // Called by ContextTracker
   updateContext(ctx: EditorContext): void
 
-  // Called by analysis pipeline
+  // Called by AnalysisRunner event adapter
   sendResult(result: AnalysisResult): void
   sendError(graphType: GraphType, message: string, actions?: RecoveryAction[]): void
   sendLoading(graphType: GraphType): void

@@ -4,15 +4,14 @@ import { ToolRegistry } from './tools/ToolRegistry';
 import { ToolHelpPanel } from './tools/ToolHelpPanel';
 import { ContextTracker } from './context/ContextTracker';
 import { AnalyzerFactory } from './analyzers/AnalyzerFactory';
-import { AnalysisCache } from './cache/AnalysisCache';
-import { Settings } from './config/Settings';
-import { WebviewToExtensionMessage } from './webview/messages';
+import { AnalysisRunner, AnalysisRunnerEvent } from './application/AnalysisRunner';
+import { WebviewToExtensionMessage } from '../shared/protocol/messages';
 import { withWorkspaceRoot } from './webview/graphPayload';
 import { FullTabPanel } from './FullTabPanel';
-import { GraphType } from './graph/GraphModel';
+import { GraphType } from '../shared/graph/GraphModel';
 import { log } from './logger';
 import { ClangdHealth } from './tools/ClangdHealth';
-import { C_CPP_LANG_IDS, LSP_LANG_IDS } from './config/languageGroups';
+import { C_CPP_LANG_IDS } from './config/languageGroups';
 import { readConfig } from './config/CodeAnalyserConfig';
 import { flattenSymbols } from './utils/symbolUtils';
 
@@ -23,15 +22,15 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
     private readonly _toolRegistry = new ToolRegistry();
     private readonly _contextTracker: ContextTracker;
     private readonly _analyzerFactory: AnalyzerFactory;
-    private readonly _cache = new AnalysisCache();
+    private readonly _analysisRunner: AnalysisRunner;
     private readonly _disposables: vscode.Disposable[] = [];
-    private _analysisAbortController: AbortController | null = null;
 
     constructor(private readonly _extensionUri: vscode.Uri) {
         this._contextTracker = new ContextTracker();
         this._contextTracker.onContextChange(ctx => this._postContext(ctx));
         this._analyzerFactory = new AnalyzerFactory(this._contextTracker);
-        this._disposables.push(this._cache);
+        this._analysisRunner = new AnalysisRunner(this._analyzerFactory);
+        this._disposables.push(this._analysisRunner);
 
         // Refresh tool status whenever .clangd is created/deleted/changed so the
         // panel updates immediately after "Setup compile_commands.json" completes.
@@ -192,7 +191,7 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
         });
     }
 
-    private async _reanalyzeTo(filePath: string, line: number, graphType: import('./graph/GraphModel').GraphType, depth: number, fullName?: string): Promise<void> {
+    private async _reanalyzeTo(filePath: string, line: number, graphType: import('../shared/graph/GraphModel').GraphType, depth: number, fullName?: string): Promise<void> {
         try {
             const doc = await vscode.workspace.openTextDocument(filePath);
             const editor = await vscode.window.showTextDocument(doc, { preserveFocus: false });
@@ -247,84 +246,48 @@ export class SidepanelProvider implements vscode.WebviewViewProvider, vscode.Dis
     }
 
     private _cancelRunningAnalysis(): void {
-        if (this._analysisAbortController) {
-            this._analysisAbortController.abort();
-            this._analysisAbortController = null;
-        }
+        this._analysisRunner.cancel();
     }
 
     private async _runAnalysis(graphType: GraphType, depth: number): Promise<void> {
         if (!this._view) { return; }
-
-        const ctx = this._contextTracker.current;
-        if (!ctx) {
-            this._view.webview.postMessage({
-                type: 'analysisError',
-                graphType,
-                message: 'No file open. Open a file and place the cursor on a symbol.',
-            });
-            return;
-        }
-
-        // P1/P2: clamp depth to [1, maxDepth] — reject depth ≤ 0
-        const clampedDepth = Math.min(Math.max(depth, 1), Settings.maxDepth());
-        // Snapshot the CallHierarchyItem NOW before the webview steals focus and
-        // onDidChangeActiveTextEditor fires and potentially clears it.
-        const callHierarchyItem = this._contextTracker.currentCallHierarchyItem;
-
-        const cached = this._cache.get({ filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol });
-        if (cached) {
-            this._view.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(cached.graph) });
-            return;
-        }
-
-        const controller = new AbortController();
-        this._analysisAbortController = controller;
-        const request = { context: ctx, graphType, depth: clampedDepth, callHierarchyItem, signal: controller.signal };
-
-        const waitingForLsp = !callHierarchyItem && LSP_LANG_IDS.has(ctx.langId);
-        this._view.webview.postMessage({
-            type: 'analysisBusy',
+        await this._analysisRunner.run({
             graphType,
-            message: waitingForLsp ? 'Waiting for IntelliSense…' : undefined,
-        });
+            depth,
+            context: this._contextTracker.current,
+            callHierarchyItem: this._contextTracker.currentCallHierarchyItem,
+        }, event => this._postAnalysisEvent(event));
+    }
 
-        const chain = this._analyzerFactory.getChain(request);
-        log.appendLine(`[analysis] graphType=${graphType} symbol=${ctx.symbol} lang=${ctx.langId} chain=[${chain.map(a => a.name).join(', ')}]`);
-
-        for (const analyzer of chain) {
-            if (controller.signal.aborted) { break; }
-            try {
-                const result = await analyzer.analyze(request);
-                if (controller.signal.aborted) { break; }
-                log.appendLine(`[analysis] ${analyzer.name}: ${result ? `${result.graph.nodes.length} nodes` : 'null (trying next)'}`);
-                if (result) {
-                    this._cache.set(
-                        { filePath: ctx.filePath, graphType, depth: clampedDepth, symbol: ctx.symbol },
-                        result
-                    );
-                    this._analysisAbortController = null;
-                    this._view?.webview.postMessage({ type: 'analysisResult', graph: withWorkspaceRoot(result.graph) });
-                    return;
-                }
-            } catch (err) {
-                if (controller.signal.aborted) { break; }
-                log.appendLine(`[analysis] ${analyzer.name} threw: ${err}`);
-            }
+    private _postAnalysisEvent(event: AnalysisRunnerEvent): void {
+        if (!this._view) { return; }
+        switch (event.type) {
+            case 'busy':
+                this._view.webview.postMessage({
+                    type: 'analysisBusy',
+                    graphType: event.graphType,
+                    message: event.message,
+                });
+                break;
+            case 'result':
+                this._view.webview.postMessage({
+                    type: 'analysisResult',
+                    graph: withWorkspaceRoot(event.graph),
+                });
+                break;
+            case 'cancelled':
+                this._view.webview.postMessage({
+                    type: 'analysisCancelled',
+                    graphType: event.graphType,
+                });
+                break;
+            case 'error':
+                this._view.webview.postMessage({
+                    type: 'analysisError',
+                    graphType: event.graphType,
+                    message: event.message,
+                });
+                break;
         }
-
-        this._analysisAbortController = null;
-
-        if (controller.signal.aborted) {
-            // User cancelled — return to idle without showing an error.
-            this._view?.webview.postMessage({ type: 'analysisCancelled', graphType });
-            return;
-        }
-
-        this._view?.webview.postMessage({
-            type: 'analysisError',
-            graphType,
-            message: 'No results found.',
-        });
     }
 }

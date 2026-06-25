@@ -80,13 +80,13 @@ afterEach(() => {
 describe('CtagsAnalyzer.canHandle', () => {
     const analyzer = new CtagsAnalyzer();
 
-    ['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp'].forEach(lang => {
+    ['c', 'cpp', 'cuda-cpp', 'objective-c', 'objective-cpp', 'python', 'rust'].forEach(lang => {
         it(`returns true for ${lang} + callGraph`, () => {
             expect(analyzer.canHandle(makeRequest('foo', lang))).toBe(true);
         });
     });
 
-    ['python', 'typescript', 'rust', 'go'].forEach(lang => {
+    ['typescript', 'go'].forEach(lang => {
         it(`returns false for ${lang} + callGraph`, () => {
             expect(analyzer.canHandle(makeRequest('foo', lang))).toBe(false);
         });

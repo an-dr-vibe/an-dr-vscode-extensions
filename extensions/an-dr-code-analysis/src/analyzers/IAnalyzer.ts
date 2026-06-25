@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GraphModel, GraphType } from '../graph/GraphModel';
+import { GraphModel, GraphType } from '../../shared/graph/GraphModel';
 import { EditorContext } from '../context/ContextTracker';
 
 export interface AnalysisRequest {

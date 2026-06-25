@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { AnalysisResult } from '../analyzers/IAnalyzer';
-import { GraphType } from '../graph/GraphModel';
+import { GraphType } from '../../shared/graph/GraphModel';
 
 interface CacheKey {
     filePath: string;

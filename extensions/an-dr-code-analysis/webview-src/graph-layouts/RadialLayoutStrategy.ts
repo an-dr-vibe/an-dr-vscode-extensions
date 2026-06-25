@@ -1,4 +1,4 @@
-import { computeRadialLayout } from '../../src/graph/positionEngine';
+import { computeRadialLayout } from '../../shared/graph/positionEngine';
 import {
     createLayoutResult,
     GraphLayoutInput,

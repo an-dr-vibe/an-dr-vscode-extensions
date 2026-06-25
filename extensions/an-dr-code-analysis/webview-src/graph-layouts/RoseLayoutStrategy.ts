@@ -1,4 +1,4 @@
-import { computeRoseLayout } from '../../src/graph/positionEngine';
+import { computeRoseLayout } from '../../shared/graph/positionEngine';
 import {
     createLayoutResult,
     GraphLayoutInput,

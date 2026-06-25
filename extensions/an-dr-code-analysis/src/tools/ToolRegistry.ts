@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ToolStatus, ToolState, ToolGroup } from '../webview/messages';
+import { ToolStatus, ToolState, ToolGroup } from '../../shared/protocol/messages';
 import { ClangdHealth } from './ClangdHealth';
 
 const execFileAsync = promisify(execFile);

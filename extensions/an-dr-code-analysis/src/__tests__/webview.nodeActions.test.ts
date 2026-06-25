@@ -1,4 +1,4 @@
-import { resolveNodeDblClick } from '../webview/nodeActions';
+import { resolveNodeDblClick } from '../../shared/protocol/nodeActions';
 
 const GRAPH_TYPE = 'callGraph' as const;
 

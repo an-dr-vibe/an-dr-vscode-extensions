@@ -72,7 +72,7 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `extensionState.ts` | Persists view state across sessions |
 | `types.ts` | Shared TypeScript interfaces for the backend |
 | `avatarManager.ts` | Fetches and caches author avatars |
-| `activityBarView.ts` | Activity-bar webview: Open Commits action, uncommitted changes panel, and dirty-count badge |
+| `activityBarView/` | Activity-bar webview: Open Commits action, repo selector, uncommitted changes panel, mini graph, tag pills, and dirty-count badge |
 | `statusBarItem.ts` | The status bar button that opens the graph |
 | `inlineBlame.ts` | Active editor inline blame + optional status bar current-commit display |
 | `diffDocProvider.ts` | Virtual document provider for diff views |
@@ -86,6 +86,19 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `repo-manager/externalRepoConfig.ts` | External repo config read/write/validate/apply/export helpers |
 | `view/webviewHtml.ts` | Webview HTML + CSP rendering helpers |
 | `types/*` | Grouped contract exports by concern; `types.ts` is the public barrel |
+
+### Activity Bar view (`src/activityBarView/`)
+
+| File | Purpose |
+|---|---|
+| `index.ts` | Activity Bar webview provider, Git API subscription, repository selection sync, commit actions |
+| `html.ts` | Activity Bar HTML shell and uncommitted-changes tree rendering |
+| `css.ts` | Activity Bar scoped CSS |
+| `script.ts` | Activity Bar webview script |
+| `gitUtils.ts` | Git API working-tree helpers |
+| `miniGraph.ts` | Current branch/upstream mini graph data and SVG/row rendering |
+| `repoSelection.ts` | Shared repository selection event contract |
+| `ui.ts` | Shared Activity Bar UI helpers for escaping, codicons, repo selector, refresh button, and tag pills |
 
 ---
 

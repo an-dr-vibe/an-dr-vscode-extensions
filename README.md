@@ -190,6 +190,20 @@ with attribution preserved in the extension sources and notice files.
 
 ---
 
+### an-dr: Commits
+
+Git commit graph webview with branch/tag filtering, repository selection, common Git actions,
+and an Activity Bar sidebar for working-tree changes. The sidebar shares the selected repository
+with the main Commits tab and shows a compact current-branch graph below the commit controls.
+
+**Config** (`an-dr-commits.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`graph.showTagsInActivityBar`|`true`|Show tag labels on the Activity Bar commit graph.|
+
+---
+
 ## Install
 
 ### One-liner (fresh machine or update)

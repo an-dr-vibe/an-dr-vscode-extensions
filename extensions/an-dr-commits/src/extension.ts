@@ -15,6 +15,7 @@ import { Logger } from './logger';
 import { RepoManager } from './repoManager';
 import { StatusBarItem } from './statusBarItem';
 import { ActivityBarView } from './activityBarView';
+import { RepoSelectionEvent } from './activityBarView/repoSelection';
 import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from './tabUtils';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, findGit, getGitExecutableFromPaths, showErrorMessage, showInformationMessage } from './utils';
 import { EventEmitter } from './utils/event';
@@ -66,7 +67,9 @@ export async function activate(context: vscode.ExtensionContext) {
 	const avatarManager = new AvatarManager(dataSource, extensionState, logger);
 	const repoManager = new RepoManager(dataSource, extensionState, onDidChangeConfiguration, logger);
 	const statusBarItem = new StatusBarItem(repoManager.getNumRepos(), repoManager.onDidChangeRepos, onDidChangeConfiguration, logger);
-	const activityBarView = new ActivityBarView(context, dataSource);
+	const repoSelectionEmitter = new EventEmitter<RepoSelectionEvent>();
+	CommitsView.configureRepoSelectionSync(repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
+	const activityBarView = new ActivityBarView(context, dataSource, extensionState, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
 	const inlineBlameController = new InlineBlameController(dataSource, repoManager, statusBarItem, onDidChangeConfiguration, logger);
 	const commandManager = new CommandManager(context, avatarManager, dataSource, extensionState, repoManager, gitExecutable, onDidChangeGitExecutable, logger);
 	const diffDocProvider = new DiffDocProvider(dataSource);
@@ -103,6 +106,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		diffDocProvider,
 		commandManager,
 		statusBarItem,
+		repoSelectionEmitter,
 		activityBarView,
 		inlineBlameController,
 		repoManager,

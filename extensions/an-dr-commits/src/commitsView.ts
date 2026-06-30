@@ -12,8 +12,10 @@ import { RepoManager } from './repoManager';
 import { ErrorInfo, GitConfigLocation, CommitsViewInitialState, GitPushBranchMode, GitRepoSet, LoadCommitsViewTo, RequestMessage, RequestSidebarBatchRefAction, ResponseMessage, SidebarBatchRefActionTarget, SidebarBatchRefActionType, SidebarBatchRefType, TabIconColourTheme } from './types';
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, isPathInWorkspace, openExtensionSettings, openExternalUrl, openFile, resolveToSymbolicPath, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { Disposable, toDisposable } from './utils/disposable';
+import { Event } from './utils/event';
 import { renderCommitsWebviewHtml } from './view/webviewHtml';
 import { getMatchingTabs, isMatchingWebviewTab } from './tabUtils';
+import { RepoSelectionEvent } from './activityBarView/repoSelection';
 
 /**
  * Manages the Commits View.
@@ -24,6 +26,16 @@ export class CommitsView extends Disposable {
 	public static readonly VIEW_TYPE = 'an-dr-commits';
 
 	private static nextInstanceId = 1;
+	private static onDidChangeRepoSelection: Event<RepoSelectionEvent> | null = null;
+	private static emitRepoSelection: ((event: RepoSelectionEvent) => void) | null = null;
+
+	/**
+	 * Connects the Commits tab to the extension-level repository selection bus.
+	 */
+	public static configureRepoSelectionSync(onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void) {
+		CommitsView.onDidChangeRepoSelection = onDidChangeRepoSelection;
+		CommitsView.emitRepoSelection = emitRepoSelection;
+	}
 
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionPath: string;
@@ -208,6 +220,12 @@ export class CommitsView extends Disposable {
 			this.panel.webview.onDidReceiveMessage((msg) => {
 				this.messageHandlerChain = this.messageHandlerChain.then(() => this.respondToMessage(msg));
 			}),
+
+			CommitsView.onDidChangeRepoSelection !== null
+				? CommitsView.onDidChangeRepoSelection((event) => {
+					if (event.source !== 'commits') void this.loadRepoFromSharedSelection(event.repo);
+				})
+				: toDisposable(() => { }),
 
 			// Dispose the Webview Panel when disposed
 			this.panel
@@ -561,6 +579,9 @@ export class CommitsView extends Disposable {
 					this.currentRepo = msg.repo;
 					this.extensionState.setLastActiveRepo(msg.repo);
 					this.repoFileWatcher.start(msg.repo);
+					if (CommitsView.emitRepoSelection !== null) {
+						CommitsView.emitRepoSelection({ repo: msg.repo, source: 'commits' });
+					}
 				}
 				break;
 			case 'loadRepos':
@@ -1018,6 +1039,21 @@ export class CommitsView extends Disposable {
 	 */
 	private update() {
 		this.panel.webview.html = this.getHtmlForWebview();
+	}
+
+	private async loadRepoFromSharedSelection(repoPath: string) {
+		let loadRepo = await this.repoManager.getKnownRepo(repoPath);
+		if (loadRepo === null && isPathInWorkspace(repoPath)) {
+			const registeredRepo = await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), false);
+			loadRepo = registeredRepo.root;
+		}
+		if (loadRepo === null || loadRepo === this.currentRepo) return;
+		const loadViewTo: LoadCommitsViewTo = { repo: loadRepo };
+		if (this.panel.visible) {
+			this.respondLoadRepos(this.repoManager.getRepos(), loadViewTo);
+		} else {
+			this.loadViewTo = loadViewTo;
+		}
 	}
 
 	/**

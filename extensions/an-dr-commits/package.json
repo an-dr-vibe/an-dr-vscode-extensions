@@ -754,6 +754,11 @@
 					"default": "Open Circle at the Uncommitted Changes",
 					"description": "Specifies how the Uncommitted Changes are displayed on the graph."
 				},
+				"an-dr-commits.graph.showTagsInActivityBar": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show tag labels on the Activity Bar commit graph."
+				},
 				"an-dr-commits.integratedTerminalShell": {
 					"type": "string",
 					"default": "",

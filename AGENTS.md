@@ -6,10 +6,10 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 
 - Use `agents/AGENTS.md` as the base instruction
 - Use `AGENTS.md` in the repo root and in the subfolders as scoped extensions of the base rules
-- Priority:
-  1. `REPO/agents/AGENTS.md` - base
-  2. `REPO/AGENTS.md` - extention/overwriting
-  3. `REPO/**/AGENTS.md` - any subdirectory with AGENTS.md extends/overwrites previous rools in a chain.
+- Priority (later entries extend or overwrite earlier ones):
+  1. `REPO/agents/AGENTS.md` — base
+  2. `REPO/AGENTS.md` — this file
+  3. `REPO/**/AGENTS.md` — any subdirectory AGENTS.md, chained by depth
 
 ## User preferences
 
@@ -19,12 +19,7 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 
 ## Commit hygiene
 
-Before committing, always run `git log --oneline -6` and check the previous commit(s).
-If the most recent commit(s) are WIP commits that touch the same extension or the same
-concern as the current work, squash them together into a single descriptive commit
-(`git reset --soft <hash-before-wips>` then one clean commit). The goal is no WIP
-commits left between proper commits; WIPs are only acceptable as the very tip of the
-branch while work is in progress.
+Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commit).
 
 ## Architecture decisions
 
@@ -33,6 +28,10 @@ branch while work is in progress.
 - No monorepo tooling. Each extension under `extensions/` is fully self-contained with its
   own `package.json`, `tsconfig.json`, `node_modules/`, and `out/`.
 - `install.ps1` picks up new extensions automatically — just add a dir under `extensions/`.
+- `install.ps1` marks every linked `an-dr.*` extension as application-scoped
+  (`metadata.isApplicationScoped = true` in `~/.vscode/extensions/extensions.json`) so they
+  stay installed across every VS Code Profile, not just the one that first discovered them.
+  See `docs/adr/ADR-007-install-application-scoped-extensions.md`.
 
 ## Platform
 

@@ -1,0 +1,65 @@
+{
+  "name": "an-dr-extensions",
+  "displayName": "an-dr: Extensions Grid",
+  "description": "Grid overview of installed extensions, grouped by category, with quick access to their details page.",
+  "version": "0.1.0",
+  "publisher": "an-dr",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["extensions", "grid", "categories", "overview"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "anDrExtensions",
+          "icon": "./resources/activitybar.svg",
+          "title": "Extensions Grid"
+        }
+      ]
+    },
+    "views": {
+      "anDrExtensions": [
+        {
+          "id": "anDrExtensionsGrid",
+          "name": "Extensions",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "an-dr-extensions.openGrid",
+        "title": "Extensions Grid: Open in Editor Tab",
+        "category": "an-dr"
+      }
+    ],
+    "configuration": {
+      "title": "an-dr: Extensions Grid",
+      "properties": {
+        "an-dr-extensions.customGroups": {
+          "type": "object",
+          "description": "Custom extension groups for the \"My Groups\" grouping mode. Maps a group name to the extension IDs in it; each extension belongs to at most one group. Managed via the grid's \"Add to group\" context menu action (a move, not a toggle), but editable by hand.",
+          "default": {},
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.36"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

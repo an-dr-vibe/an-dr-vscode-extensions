@@ -204,6 +204,98 @@ with the main Commits tab and shows a compact current-branch graph below the com
 
 ---
 
+### an-dr: Extensions Grid
+
+Grid overview of every installed extension (an-dr and third-party alike, enabled or
+disabled), for managing hundreds of extensions at once. Reads each extension's own
+`package.json` — no custom registry to maintain — plus a disk scan for disabled extensions,
+since VS Code has no API to enumerate those.
+
+Available from the Activity Bar ("Extensions Grid" icon) or as a full editor tab via
+`Extensions Grid: Open in Editor Tab`. Both views share the same state.
+
+- Extensions with no `icon` in their `package.json` show VS Code's own default extension
+  icon (the same `codicon-extensions-large` glyph the native Extensions view uses), instead
+  of a blank box.
+- **Filter** box narrows the grid by name, ID, or description as you type.
+- **Group by** selector: **Category** (default, from each extension's `categories` field —
+  an extension in multiple categories appears once per category), **Alphabetical**,
+  **Enabled / Disabled**, **Startup Time** (slowest first; see below), **My Groups** (your
+  own custom groups, with an "Ungrouped" catch-all), or **None** (one flat grid).
+- **Categories ▾** toolbar button opens a checklist to hide/show individual categories, or
+  "Show all" to reset. This filter applies in every Group by mode, not just Category.
+  Extensions bundled with VS Code itself are tagged with a synthetic **System** category,
+  hidden by default, since they can't be uninstalled.
+- **Startup Time** mode requires pressing **Measure Startup** (shown only in this mode) —
+  it runs "Developer: Startup Performance" and reads its report; it's a manual action since
+  it briefly opens/closes an editor tab and more extensions can activate lazily as your
+  session goes on, so re-measuring later can surface new data.
+- **Multi-select**: each card has a checkbox stacked under its icon, hidden until a
+  selection exists. **Ctrl/Cmd-click** a card to toggle it (starting a selection, without
+  opening its details); once any card is checked, checkboxes on every card become visible
+  too. **Shift-click** selects the range between the last-touched card and the clicked one;
+  **Esc** clears the selection. A plain click still always opens Details, regardless of any
+  existing selection.
+  With one or more checked, right-clicking a *checked* card opens a bulk version of the
+  context menu (same actions, minus Open Details) acting on every checked extension at once —
+  counts are shown per item, e.g. "Uninstall (3)". Apply to All Profiles is additive-only in
+  bulk (it only turns on, never off), and ineligible items (System extensions for
+  Uninstall/Apply to All Profiles) are silently skipped rather than blocking the batch.
+  Add to group moves every selected extension into the chosen group (see below — it's a
+  move, not a toggle, in bulk mode same as single). Right-clicking an *unchecked* card
+  always shows the normal single-item menu regardless of what else is checked. Selection
+  persists across filtering/re-renders and clears after a bulk action completes (Copy ID
+  excepted, since it's non-destructive).
+- **Right-click a card** for Open Details, Uninstall, Copy ID, Add to group ▸ (moves the
+  extension into the chosen group — each extension belongs to at most one custom group at a
+  time, so picking a group removes it from whatever group it was in before; "Remove from
+  group" clears it back to Ungrouped), Add to Profile ▸ (adds the extension to a specific
+  other VS Code Profile's own extension list — unlike Apply to All Profiles, this targets
+  one chosen profile rather than all of them, and takes effect the next time *that* profile
+  is loaded or reloaded, not the current window), and Apply to All Profiles (toggles whether
+  the extension is scoped to every VS Code Profile instead of just the current one; shows a
+  checkmark when already active). There's no command for targeting one specific other
+  profile, so Add to Profile reads the profile list (name and internal id) from VS Code's
+  own `storage.json` and writes directly into that profile's own extension list — the same
+  kind of direct file access this grid already uses elsewhere where no command exists.
+  Uninstall asks for confirmation; since VS Code applies
+  uninstalls on window reload, the card is marked "uninstalled — reload to apply" and a reload
+  is offered. System extensions can't be uninstalled or scoped to all profiles, so both
+  entries are hidden for them; disabled extensions also don't get the Apply to All Profiles
+  item, since there's no public API to resolve their install location. An extension already
+  applied to all profiles shows an **All Profiles** badge on its card, in every grouping mode.
+- Click a card (or use "Open Details" from the context menu) to open the extension's native
+  Details page. From the editor-tab view, this reuses an existing split group to the right
+  if one is open, or creates one; from the Activity Bar view it opens in place.
+- Category visibility, Group by mode, and Startup Time results are stored per machine
+  (`ExtensionContext.globalState`), not synced via Settings Sync. Custom groups are stored
+  in the `an-dr-extensions.customGroups` setting, which *does* sync, since group membership
+  is curated content you'd want on every machine.
+
+**Config** (`an-dr-extensions.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`customGroups`|`{}`|Maps a custom group name to the extension IDs in it. Each extension belongs to at most one group. Managed via the grid's "Add to group" context menu action (a move, not a toggle), but editable by hand.|
+
+- **Switch Profile...** toolbar button opens VS Code's native Profile switcher. There is no
+  public API to read the active profile's name, list profiles, or group/manage extensions
+  by profile (confirmed via [microsoft/vscode#226355](https://github.com/microsoft/vscode/issues/226355),
+  closed *not planned*), so this is deliberately just a shortcut to the native picker.
+  Switching profiles restarts the extension host in place rather than reloading the window;
+  VS Code doesn't reconnect an already-open grid to the new host on its own. If the grid was
+  open as an editor tab, switching via this button automatically closes and reopens that tab
+  with the new profile's data — no reload needed. If only the sidebar view was open, you'll
+  be prompted to reload the window instead, since there's no equivalent automatic fix for it.
+  Switching profile through any other route (Command Palette, Profiles editor, etc.) gives no
+  such prompt or auto-fix — reload manually if the grid looks stale.
+
+**Commands** (Ctrl+Shift+P → `an-dr`):
+
+- `Extensions Grid: Open in Editor Tab` — open the grid as a full editor-area tab
+
+---
+
 ## Install
 
 ### One-liner (fresh machine or update)

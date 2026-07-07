@@ -1,6 +1,8 @@
 # CLAUDE.md
 
 **Before every task:** Read `agents/AGENTS.md` and `AGENTS.md`.
-Open your response by stating which phase you are entering and why.
+Open your response by stating the active flow and phase — or that no flow
+applies (pure question/analysis, or edits to the agents repo itself) — and why.
 
-`AGENTS.md` is the source of truth for agents working in this repo.
+`agents/AGENTS.md` is the base instruction set; the root `AGENTS.md` extends it
+with repo-specific context.

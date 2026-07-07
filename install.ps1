@@ -94,6 +94,45 @@ function Test-ExtDirty ([string]$ExtName) {
     return $LASTEXITCODE -ne 0
 }
 
+# Junctioned/symlinked extensions have no 'metadata' object in extensions.json at all (VS
+# Code only fully populates that for extensions installed via the Marketplace or a .vsix),
+# which means they belong only to the profile they were first discovered in - switching to
+# another profile hides them. Setting metadata.isApplicationScoped = true is the same flag
+# VS Code's own "Apply Extension to all Profiles" command sets, so these extensions show up
+# in every profile. See docs/adr/ADR-007-install-application-scoped-extensions.md.
+function Set-ApplicationScopedExtensions ([string[]]$Ids) {
+    $manifestPath = Join-Path $VscodeExtensions 'extensions.json'
+    if (-not (Test-Path $manifestPath)) { return }
+
+    $entries = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $idSet = @{}
+    foreach ($id in $Ids) { $idSet[$id.ToLowerInvariant()] = $true }
+
+    $changed = $false
+    foreach ($entry in $entries) {
+        if (-not $idSet.ContainsKey($entry.identifier.id.ToLowerInvariant())) { continue }
+        if ($null -eq $entry.metadata) {
+            $entry | Add-Member -MemberType NoteProperty -Name 'metadata' -Value ([PSCustomObject]@{ isApplicationScoped = $true })
+            $changed = $true
+        } elseif ($entry.metadata.isApplicationScoped -ne $true) {
+            if ($entry.metadata.PSObject.Properties.Name -contains 'isApplicationScoped') {
+                $entry.metadata.isApplicationScoped = $true
+            } else {
+                $entry.metadata | Add-Member -MemberType NoteProperty -Name 'isApplicationScoped' -Value $true
+            }
+            $changed = $true
+        }
+    }
+
+    if ($changed) {
+        $json = $entries | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($manifestPath, $json, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "  Marked $($Ids.Count) an-dr extension(s) as application-scoped (visible in every profile)." -ForegroundColor DarkGray
+        Write-Host '  If VS Code is currently running, reload the window for this to take effect;' -ForegroundColor DarkGray
+        Write-Host '  re-run install.ps1 if a later VS Code action ever resets it.' -ForegroundColor DarkGray
+    }
+}
+
 function Build-Extension ([string]$ExtDir, [string]$ExtName) {
     if (-not (Test-Path (Join-Path $ExtDir 'package.json'))) { return }
 
@@ -134,6 +173,7 @@ function Build-Extension ([string]$ExtDir, [string]$ExtName) {
 
 $linked  = 0
 $skipped = 0
+$extensionIds = @()
 
 foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     $src = $ext.FullName
@@ -146,6 +186,7 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
         $pkg = Get-Content $pkgJson -Raw | ConvertFrom-Json
         if ($pkg.publisher -and $pkg.name -and $pkg.version) {
             $dstName = "$($pkg.publisher).$($pkg.name)-$($pkg.version)"
+            $extensionIds += "$($pkg.publisher).$($pkg.name)"
         }
     }
     $dst = Join-Path $VscodeExtensions $dstName
@@ -175,6 +216,10 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     New-ManagedLink $dst $src
     Write-Host ' linked' -ForegroundColor Green
     $linked++
+}
+
+if ($extensionIds.Count -gt 0) {
+    Set-ApplicationScopedExtensions $extensionIds
 }
 
 Write-Host ''

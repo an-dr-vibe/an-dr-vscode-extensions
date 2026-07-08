@@ -22,6 +22,7 @@ export interface ActivityBarMessage {
 	readonly amend?: boolean;
 	readonly isUntracked?: boolean;
 	readonly restoreToIndex?: boolean;
+	readonly height?: number;
 }
 
 export function normalizePath(filePath: string) {

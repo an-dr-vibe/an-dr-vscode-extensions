@@ -69,6 +69,34 @@ window.addEventListener('message', (e) => {
 		graphLoading = false;
 	});
 });
+(function() {
+	const handle = document.getElementById('activityGraphResizeHandle');
+	if (!handle || !activityGraph) return;
+	let startY = 0;
+	let startHeight = 0;
+	const onMove = (e) => {
+		// The handle sits above the graph (the graph is the last, bottom-most element in
+		// the stack), so dragging up grows it and dragging down shrinks it.
+		const height = Math.max(60, Math.min(400, startHeight + (startY - e.clientY)));
+		document.body.style.setProperty('--activity-graph-height', height + 'px');
+		updateThumb();
+	};
+	const onUp = () => {
+		document.removeEventListener('mousemove', onMove);
+		document.removeEventListener('mouseup', onUp);
+		handle.classList.remove('resizing');
+		const height = parseInt(getComputedStyle(document.body).getPropertyValue('--activity-graph-height'), 10);
+		if (!isNaN(height)) post('setGraphHeight', { height });
+	};
+	handle.addEventListener('mousedown', (e) => {
+		e.preventDefault();
+		startY = e.clientY;
+		startHeight = activityGraph.clientHeight;
+		handle.classList.add('resizing');
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
+	});
+})();
 document.getElementById('activityRefresh')?.addEventListener('click', () => post('refresh'));
 (function() {
 	const dd = document.getElementById('activityRepoDropdown');

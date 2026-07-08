@@ -127,12 +127,14 @@ export function renderHtml(
 	changes: GitWorkingTreeChange[],
 	error: ErrorInfo,
 	repoPaths: string[] = [],
-	miniGraph: MiniGraphData | null = null
+	miniGraph: MiniGraphData | null = null,
+	graphHeight: number = 120
 ): string {
 	const nonce = Date.now().toString(36);
 	const cssUri = webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, 'media', 'out.min.css')));
 	const cspSource = String(webview.cspSource).replace(/\/$/g, '');
 	const repoSelector = renderRepoSelector(repo, repoPaths);
+	const graphHtml = renderMiniGraph(miniGraph);
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -142,7 +144,7 @@ export function renderHtml(
 <link rel="stylesheet" href="${cssUri}">
 <style>${activityCss()}</style>
 </head>
-<body class="activityChangesBody">
+<body class="activityChangesBody" style="--activity-graph-height:${graphHeight}px">
 <div id="activityTop">
 	<button id="activityOpenCommits" class="activityPrimaryBtn">${codicon('git-commit')}<span>Open Commits</span></button>
 </div>
@@ -152,7 +154,8 @@ export function renderHtml(
 </div>
 <div id="activityContent">${error !== null ? '<div class="cpError">' + esc(error) + '</div>' : renderContent(changes)}</div>
 <div id="activityFooter">${renderFooter()}</div>
-${renderMiniGraph(miniGraph)}
+${graphHtml !== '' ? '<div id="activityGraphResizeHandle"></div>' : ''}
+${graphHtml}
 <script nonce="${nonce}">${activityScript()}</script>
 </body>
 </html>`;

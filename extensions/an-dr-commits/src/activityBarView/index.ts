@@ -188,9 +188,10 @@ export class ActivityBarView implements vscode.Disposable {
 		const repo = this._resolveActiveRepoPath();
 		if (repo !== this._currentRepo) this._miniGraphLimit = MINI_GRAPH_LIMIT;
 		this._currentRepo = repo;
+		const graphHeight = this.extensionState.getActivityGraphHeight();
 		if (repo === null) {
 			this._changes = [];
-			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, null, [], null, repoPaths, null);
+			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, null, [], null, repoPaths, null, graphHeight);
 			return;
 		}
 		const [result, miniGraph] = await Promise.all([
@@ -199,7 +200,7 @@ export class ActivityBarView implements vscode.Disposable {
 		]);
 		if (seq !== this._refreshSeq) return;
 		this._changes = result.changes;
-		this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, repo, result.changes, result.error, repoPaths, miniGraph);
+		this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, repo, result.changes, result.error, repoPaths, miniGraph, graphHeight);
 	}
 
 	private async _handleMessage(msg: ActivityBarMessage) {
@@ -229,6 +230,10 @@ export class ActivityBarView implements vscode.Disposable {
 		}
 		if (msg.command === 'refresh') {
 			await this._refreshPanel();
+			return;
+		}
+		if (msg.command === 'setGraphHeight' && typeof msg.height === 'number') {
+			await this.extensionState.setActivityGraphHeight(msg.height);
 			return;
 		}
 		if (repo === null) return;

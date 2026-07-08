@@ -7,6 +7,7 @@ import { GitExecutable, getPathFromStr } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
 
+const ACTIVITY_GRAPH_HEIGHT = 'activityGraphHeight';
 const AVATAR_STORAGE_FOLDER = '/avatars';
 const AVATAR_CACHE = 'avatarCache';
 const GLOBAL_VIEW_STATE = 'globalViewState';
@@ -16,6 +17,8 @@ const LAST_KNOWN_GIT_PATH = 'lastKnownGitPath';
 const REPO_STATES = 'repoStates';
 const REOPEN_GIT_GRAPH_ON_STARTUP = 'reopenCommitsOnStartup';
 const WORKSPACE_VIEW_STATE = 'workspaceViewState';
+
+export const DEFAULT_ACTIVITY_GRAPH_HEIGHT = 120;
 
 export const DEFAULT_REPO_STATE: GitRepoState = {
 	commitDetailsViewDivider: 0.5,
@@ -200,6 +203,25 @@ export class ExtensionState extends Disposable {
 	 */
 	public setIgnoredRepos(ignoredRepos: string[]) {
 		return this.updateWorkspaceState(IGNORED_REPOS, ignoredRepos);
+	}
+
+
+	/* Activity Bar Graph Height */
+
+	/**
+	 * Get the persisted height of the Activity Bar mini commit graph.
+	 * @returns The height in pixels.
+	 */
+	public getActivityGraphHeight() {
+		return this.globalState.get<number>(ACTIVITY_GRAPH_HEIGHT, DEFAULT_ACTIVITY_GRAPH_HEIGHT);
+	}
+
+	/**
+	 * Set the persisted height of the Activity Bar mini commit graph.
+	 * @param height The height in pixels.
+	 */
+	public setActivityGraphHeight(height: number) {
+		return this.updateGlobalState(ACTIVITY_GRAPH_HEIGHT, height);
 	}
 
 

@@ -12,11 +12,7 @@ body.activityChangesBody{position:fixed;inset:0;margin:0;background:var(--vscode
 #activityRepoDropdown .dropdownMenu{width:100%;box-sizing:border-box;left:0;right:auto;}
 .activityIconBtn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border:none;border-radius:3px;background:transparent;color:inherit;opacity:0.72;cursor:pointer;}
 .activityIconBtn:hover{opacity:1;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,0.18));}
-#activityGraph{flex:0 0 auto;overflow-y:auto;max-height:var(--activity-graph-height);position:relative;scrollbar-width:none;}
-#activityGraph::-webkit-scrollbar{display:none;}
-#activityScrollbar{position:absolute;right:2px;top:2px;bottom:2px;width:4px;pointer-events:none;z-index:1;}
-#activityScrollbar .thumb{position:absolute;width:4px;border-radius:2px;background:rgba(128,128,128,0.5);opacity:0;transition:opacity 0.25s;}
-#activityScrollbar .thumb.visible{opacity:1;}
+#activityGraph{flex:0 0 auto;overflow-y:auto;max-height:var(--activity-graph-height);position:relative;}
 #activityGraphResizeHandle{flex:0 0 auto;height:4px;cursor:ns-resize;position:relative;border-top:1px solid rgba(128,128,128,0.16);}
 #activityGraphResizeHandle::after{content:'';position:absolute;left:0;right:0;top:1px;height:2px;border-radius:1px;}
 #activityGraphResizeHandle:hover::after,#activityGraphResizeHandle.resizing::after{background:var(--vscode-sash-hoverBorder,rgba(128,128,128,0.5));}

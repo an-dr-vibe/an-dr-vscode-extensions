@@ -11,7 +11,7 @@ import {
 	countChanges
 } from './gitUtils';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph, renderMiniGraphInner } from './miniGraph';
-import { renderHtml } from './html';
+import { renderContentHtml, renderHtml } from './html';
 import { RepoSelectionEvent } from './repoSelection';
 
 export { GitActivityChange, GitChangeCounts, getWorkingTreeChanges, countChanges, countWorkingTreeChanges } from './gitUtils';
@@ -35,6 +35,8 @@ export class ActivityBarView implements vscode.Disposable {
 	private _refreshSeq = 0;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _miniGraphLimit = MINI_GRAPH_LIMIT;
+	private _hasRenderedOnce = false;
+	private _hadMiniGraph = false;
 
 	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void) {
 		this.dataSource = dataSource;
@@ -181,26 +183,59 @@ export class ActivityBarView implements vscode.Disposable {
 			: undefined;
 	}
 
+	/**
+	 * Refreshes the panel's data. By default this patches the existing DOM in place
+	 * (preserving scroll position, in-progress graph resize, and any typed-but-uncommitted
+	 * message) since most refreshes are triggered by routine file-watcher events while the
+	 * same repo stays open. A full page replace only happens when what's being shown
+	 * actually changes identity - the very first render, a repo switch, or the mini graph
+	 * appearing/disappearing (which changes the DOM structure a patch can't handle) - since
+	 * those are the only cases where resetting scroll/resize state is expected anyway.
+	 */
 	private async _refreshPanel() {
 		if (this._view === null) return;
 		const seq = ++this._refreshSeq;
 		const repoPaths = this._getRepoPaths();
 		const repo = this._resolveActiveRepoPath();
-		if (repo !== this._currentRepo) this._miniGraphLimit = MINI_GRAPH_LIMIT;
+		const repoChanged = repo !== this._currentRepo;
+		if (repoChanged) this._miniGraphLimit = MINI_GRAPH_LIMIT;
 		this._currentRepo = repo;
 		const graphHeight = this.extensionState.getActivityGraphHeight();
+		const needsFullRender = !this._hasRenderedOnce || repoChanged;
+
 		if (repo === null) {
 			this._changes = [];
-			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, null, [], null, repoPaths, null, graphHeight);
+			this._hadMiniGraph = false;
+			if (needsFullRender) {
+				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, null, [], null, repoPaths, null, graphHeight);
+				this._hasRenderedOnce = true;
+			} else {
+				await this._view.webview.postMessage({ command: 'updateContent', contentHtml: renderContentHtml([], null), graphHtml: '', hasGraph: false });
+			}
 			return;
 		}
+
 		const [result, miniGraph] = await Promise.all([
 			this.dataSource.getWorkingTreeChanges(repo),
 			fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit)
 		]);
 		if (seq !== this._refreshSeq) return;
 		this._changes = result.changes;
-		this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, repo, result.changes, result.error, repoPaths, miniGraph, graphHeight);
+		const hasGraph = miniGraph !== null && miniGraph.commits.length > 0;
+
+		if (needsFullRender || hasGraph !== this._hadMiniGraph) {
+			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, repo, result.changes, result.error, repoPaths, miniGraph, graphHeight);
+			this._hasRenderedOnce = true;
+		} else {
+			await this._view.webview.postMessage({
+				command: 'updateContent',
+				contentHtml: renderContentHtml(result.changes, result.error),
+				graphHtml: hasGraph ? renderMiniGraphInner(miniGraph!) : '',
+				graphMore: miniGraph?.moreAvailable ?? false,
+				hasGraph
+			});
+		}
+		this._hadMiniGraph = hasGraph;
 	}
 
 	private async _handleMessage(msg: ActivityBarMessage) {

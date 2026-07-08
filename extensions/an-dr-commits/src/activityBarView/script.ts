@@ -21,31 +21,7 @@ activityGraph?.addEventListener('click', (e) => {
 	if (row) post('openCommits');
 });
 let graphLoading = false;
-let hideScrollbarTimer = null;
-let thumbEl = null;
-if (activityGraph) {
-	const track = document.createElement('div');
-	track.id = 'activityScrollbar';
-	thumbEl = document.createElement('div');
-	thumbEl.className = 'thumb';
-	track.appendChild(thumbEl);
-	activityGraph.appendChild(track);
-}
-const updateThumb = () => {
-	if (!activityGraph || !thumbEl) return;
-	const sh = activityGraph.scrollHeight, ch = activityGraph.clientHeight;
-	if (sh <= ch) { thumbEl.classList.remove('visible'); return; }
-	const trackH = ch - 4;
-	const thumbH = Math.max(20, (ch / sh) * trackH);
-	const maxTop = trackH - thumbH;
-	thumbEl.style.height = thumbH + 'px';
-	thumbEl.style.top = (activityGraph.scrollTop / (sh - ch) * maxTop) + 'px';
-	thumbEl.classList.add('visible');
-	if (hideScrollbarTimer) clearTimeout(hideScrollbarTimer);
-	hideScrollbarTimer = setTimeout(() => { if (thumbEl) thumbEl.classList.remove('visible'); }, 1000);
-};
 activityGraph?.addEventListener('scroll', () => {
-	updateThumb();
 	if (!activityGraph || graphLoading || activityGraph.dataset.more !== 'true') return;
 	if (activityGraph.scrollTop + activityGraph.clientHeight >= activityGraph.scrollHeight - 8) {
 		graphLoading = true;
@@ -65,9 +41,30 @@ window.addEventListener('message', (e) => {
 	activityGraph.dataset.more = e.data.more ? 'true' : 'false';
 	requestAnimationFrame(() => {
 		activityGraph.scrollTop = top;
-		updateThumb();
 		graphLoading = false;
 	});
+});
+const activityContent = document.getElementById('activityContent');
+window.addEventListener('message', (e) => {
+	if (!e.data || e.data.command !== 'updateContent') return;
+	if (activityContent && typeof e.data.contentHtml === 'string') {
+		const top = activityContent.scrollTop;
+		activityContent.innerHTML = e.data.contentHtml;
+		requestAnimationFrame(() => { activityContent.scrollTop = top; });
+	}
+	if (activityGraph && e.data.hasGraph && e.data.graphHtml) {
+		const graphTop = activityGraph.scrollTop;
+		const existing = activityGraph.querySelector('#miniGraph');
+		if (existing) {
+			const tmp = document.createElement('div');
+			tmp.innerHTML = e.data.graphHtml;
+			const updated = tmp.firstElementChild;
+			if (updated) existing.replaceWith(updated);
+		}
+		activityGraph.dataset.more = e.data.graphMore ? 'true' : 'false';
+		requestAnimationFrame(() => { activityGraph.scrollTop = graphTop; });
+	}
+	updateCommitButton();
 });
 (function() {
 	const handle = document.getElementById('activityGraphResizeHandle');
@@ -79,7 +76,6 @@ window.addEventListener('message', (e) => {
 		// the stack), so dragging up grows it and dragging down shrinks it.
 		const height = Math.max(60, Math.min(400, startHeight + (startY - e.clientY)));
 		document.body.style.setProperty('--activity-graph-height', height + 'px');
-		updateThumb();
 	};
 	const onUp = () => {
 		document.removeEventListener('mousemove', onMove);

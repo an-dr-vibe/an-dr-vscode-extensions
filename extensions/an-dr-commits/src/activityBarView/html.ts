@@ -107,6 +107,14 @@ function renderContent(changes: GitWorkingTreeChange[]) {
 		renderSection('Changes', allUnstaged, false);
 }
 
+/**
+ * Renders the inner HTML of #activityContent - shared by the full-page render
+ * and the incremental data-update path, so both stay in sync by construction.
+ */
+export function renderContentHtml(changes: GitWorkingTreeChange[], error: ErrorInfo): string {
+	return error !== null ? '<div class="cpError">' + esc(error) + '</div>' : renderContent(changes);
+}
+
 function renderFooter() {
 	return `<div id="cpFooter">` +
 		`<textarea id="cpMessage" placeholder="Message (Ctrl+Enter to commit)" rows="3"></textarea>` +
@@ -152,7 +160,7 @@ export function renderHtml(
 	${repoSelector}
 	${renderRefreshButton()}
 </div>
-<div id="activityContent">${error !== null ? '<div class="cpError">' + esc(error) + '</div>' : renderContent(changes)}</div>
+<div id="activityContent">${renderContentHtml(changes, error)}</div>
 <div id="activityFooter">${renderFooter()}</div>
 ${graphHtml !== '' ? '<div id="activityGraphResizeHandle"></div>' : ''}
 ${graphHtml}

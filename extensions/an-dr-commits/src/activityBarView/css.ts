@@ -12,6 +12,9 @@ body.activityChangesBody{position:fixed;inset:0;margin:0;background:var(--vscode
 #activityRepoDropdown .dropdownMenu{width:100%;box-sizing:border-box;left:0;right:auto;}
 .activityIconBtn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border:none;border-radius:3px;background:transparent;color:inherit;opacity:0.72;cursor:pointer;}
 .activityIconBtn:hover{opacity:1;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,0.18));}
+#activityActionsRow{display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid rgba(128,128,128,0.16);box-sizing:border-box;}
+#activityActionsRow .activityIconBtn{flex:1 1 0;}
+.activityIconBtn.danger:hover{color:var(--vscode-errorForeground);background:var(--vscode-inputValidation-errorBackground,rgba(128,128,128,0.18));}
 #activityGraph{flex:0 0 auto;overflow-y:auto;max-height:var(--activity-graph-height);position:relative;}
 #activityGraphResizeHandle{flex:0 0 auto;height:4px;cursor:ns-resize;position:relative;border-top:1px solid rgba(128,128,128,0.16);}
 #activityGraphResizeHandle::after{content:'';position:absolute;left:0;right:0;top:1px;height:2px;border-radius:1px;}

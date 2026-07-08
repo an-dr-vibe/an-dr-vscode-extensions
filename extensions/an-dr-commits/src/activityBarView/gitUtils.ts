@@ -39,6 +39,34 @@ export function getRepoRoot(repo: any) {
 	return (repo.rootUri?.fsPath as string | undefined) ?? '';
 }
 
+export interface HeadInfo {
+	readonly branchName: string;
+	readonly headHash: string | null;
+	readonly upstreamRemote: string | null;
+	readonly upstreamRef: string | null;
+	readonly remoteNames: string[];
+}
+
+/**
+ * Resolves the current branch, its HEAD commit, and its upstream (if any) from the
+ * vscode.git extension API. Shared by the mini graph (local/remote lane split) and the
+ * sidebar's Pull/Push/Reset actions (branch/remote/commit target resolution).
+ */
+export function getHeadInfo(api: any, repoPath: string): HeadInfo | null {
+	const repo = (api.repositories as any[]).find((r) => r.rootUri?.fsPath === repoPath);
+	if (!repo) return null;
+	const head = repo.state.HEAD as { name?: string; commit?: string; upstream?: { name: string; remote: string } } | undefined;
+	if (!head?.name) return null;
+	const remotes = (repo.state.remotes as any[] | undefined) ?? [];
+	return {
+		branchName: head.name,
+		headHash: head.commit ?? null,
+		upstreamRemote: head.upstream?.remote ?? null,
+		upstreamRef: head.upstream ? `${head.upstream.remote}/${head.upstream.name}` : null,
+		remoteNames: remotes.map((r) => r.name as string).filter((name) => typeof name === 'string')
+	};
+}
+
 export function getWorkingTreeChanges(repo: any): GitActivityChange[] {
 	const all: any[] = [
 		...(repo.state.workingTreeChanges ?? []),

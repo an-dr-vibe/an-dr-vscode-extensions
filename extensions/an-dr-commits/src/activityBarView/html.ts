@@ -7,7 +7,7 @@ import { MiniGraphData, renderMiniGraph } from './miniGraph';
 import { activityCss } from './css';
 import { activityScript } from './script';
 import { normalizePath } from './gitUtils';
-import { codicon, esc, renderRefreshButton, renderRepoSelector } from './ui';
+import { codicon, esc, renderActionsRow, renderRefreshButton, renderRepoSelector } from './ui';
 
 type CpTreeFolder = {
 	folders: { [name: string]: CpTreeFolder };
@@ -160,6 +160,7 @@ export function renderHtml(
 	${repoSelector}
 	${renderRefreshButton()}
 </div>
+${repo !== null ? renderActionsRow() : ''}
 <div id="activityContent">${renderContentHtml(changes, error)}</div>
 <div id="activityFooter">${renderFooter()}</div>
 ${graphHtml !== '' ? '<div id="activityGraphResizeHandle"></div>' : ''}

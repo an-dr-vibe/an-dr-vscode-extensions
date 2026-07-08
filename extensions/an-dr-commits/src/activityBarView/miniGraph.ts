@@ -2,6 +2,7 @@ import { getConfig } from '../config';
 import { DataSource } from '../dataSource';
 import { CommitOrdering, GitCommit } from '../types';
 import { GitCommitData } from '../data-source/models';
+import { getHeadInfo } from './gitUtils';
 import { esc, renderTagOverflowPill, renderTagPill } from './ui';
 
 export const MINI_GRAPH_LIMIT = 10;
@@ -25,16 +26,12 @@ export interface MiniGraphData {
 }
 
 export async function fetchMiniGraph(api: any, dataSource: DataSource, repoPath: string, limit: number): Promise<MiniGraphData | null> {
-	const repo = (api.repositories as any[]).find((r) => r.rootUri?.fsPath === repoPath);
-	if (!repo) return null;
+	const head = getHeadInfo(api, repoPath);
+	if (!head) return null;
 
-	const head = repo.state.HEAD as { name?: string; upstream?: { name: string; remote: string } } | undefined;
-	const localBranch = head?.name;
-	if (!localBranch) return null;
-
-	const upstream = head?.upstream;
-	const upstreamRef = upstream ? `${upstream.remote}/${upstream.name}` : null;
-	const remote = upstream?.remote ?? 'origin';
+	const localBranch = head.branchName;
+	const upstreamRef = head.upstreamRef;
+	const remote = head.upstreamRemote ?? 'origin';
 
 	const branches = upstreamRef ? [localBranch, upstreamRef] : [localBranch];
 	const data: GitCommitData | null = await dataSource.getCommits(

@@ -3,18 +3,26 @@ import * as vscode from 'vscode';
 import { getConfig } from '../config';
 import { DataSource, GitWorkingTreeChange } from '../dataSource';
 import { ExtensionState } from '../extensionState';
-import { ErrorInfo, GitFileStatus } from '../types';
+import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode } from '../types';
 import { UNCOMMITTED, viewDiff } from '../utils';
 import { Event } from '../utils/event';
 import {
-	ActivityBarMessage, GitChangeCounts,
-	countChanges
+	ActivityBarMessage, GitChangeCounts, HeadInfo,
+	countChanges, getHeadInfo
 } from './gitUtils';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph, renderMiniGraphInner } from './miniGraph';
 import { renderContentHtml, renderHtml } from './html';
 import { RepoSelectionEvent } from './repoSelection';
 
 export { GitActivityChange, GitChangeCounts, getWorkingTreeChanges, countChanges, countWorkingTreeChanges } from './gitUtils';
+
+function resetModeLabel(mode: GitResetMode): string {
+	switch (mode) {
+		case GitResetMode.Soft: return 'Soft - Keep all changes, but reset head';
+		case GitResetMode.Mixed: return 'Mixed - Keep working tree, but reset index';
+		case GitResetMode.Hard: return 'Hard - Discard all changes';
+	}
+}
 
 /**
  * Activity Bar webview that mirrors the Commits uncommitted-changes panel for
@@ -291,12 +299,70 @@ export class ActivityBarView implements vscode.Disposable {
 			if (change !== undefined && change.status !== 'U') {
 				error = await viewDiff(repo, UNCOMMITTED, UNCOMMITTED, change.oldPath || change.path, change.path, this._toGitFileStatus(change.status));
 			}
+		} else if (msg.command === 'gitFetch') {
+			error = await this._gitFetch(repo);
+		} else if (msg.command === 'gitPull') {
+			error = await this._gitPull(repo);
+		} else if (msg.command === 'gitPush') {
+			error = await this._gitPush(repo, GitPushBranchMode.Normal);
+		} else if (msg.command === 'gitForcePush') {
+			error = await this._gitPush(repo, GitPushBranchMode.ForceWithLease);
+		} else if (msg.command === 'gitReset') {
+			error = await this._gitReset(repo);
 		}
 
 		if (error !== null) {
 			void vscode.window.showErrorMessage(error);
 		}
 		await this._refreshPanel();
+	}
+
+	private _resolveHead(repo: string): HeadInfo | null {
+		return getHeadInfo(this._api, repo);
+	}
+
+	private async _gitFetch(repo: string): Promise<ErrorInfo> {
+		const cfg = getConfig().dialogDefaults.fetchRemote;
+		return this.dataSource.fetch(repo, null, cfg.prune, cfg.pruneTags);
+	}
+
+	private async _gitPull(repo: string): Promise<ErrorInfo> {
+		const head = this._resolveHead(repo);
+		if (head === null) return 'Unable to pull: there is no checked out local branch.';
+		if (head.upstreamRemote === null) return 'Unable to pull because the current branch has no configured remote.';
+		const cfg = getConfig().dialogDefaults.pullBranch;
+		return this.dataSource.pullBranch(repo, head.branchName, head.upstreamRemote, cfg.noFastForward, cfg.squash);
+	}
+
+	private async _gitPush(repo: string, mode: GitPushBranchMode): Promise<ErrorInfo> {
+		const head = this._resolveHead(repo);
+		if (head === null) return 'Unable to push: there is no checked out local branch.';
+		const remote = head.upstreamRemote ?? (head.remoteNames.length === 1 ? head.remoteNames[0] : null);
+		if (remote === null) {
+			return 'Unable to push: no upstream is configured and the repository has no single unambiguous remote. Use the Commits tab to choose a remote.';
+		}
+		if (mode === GitPushBranchMode.ForceWithLease) {
+			const choice = await vscode.window.showWarningMessage(
+				`Force push "${head.branchName}" to "${remote}"? This can overwrite commits on the remote.`,
+				{ modal: true }, 'Force Push'
+			);
+			if (choice !== 'Force Push') return null;
+		}
+		return this.dataSource.pushBranch(repo, head.branchName, remote, head.upstreamRemote === null, mode);
+	}
+
+	private async _gitReset(repo: string): Promise<ErrorInfo> {
+		const head = this._resolveHead(repo);
+		if (head === null || head.headHash === null) return 'Unable to reset: there is no checked out local branch.';
+		const defaultMode = getConfig().dialogDefaults.resetCommit.mode;
+		const order = Array.from(new Set([defaultMode, GitResetMode.Soft, GitResetMode.Mixed, GitResetMode.Hard]));
+		const picked = await vscode.window.showQuickPick(
+			order.map((mode) => resetModeLabel(mode)),
+			{ placeHolder: `Reset "${head.branchName}" to HEAD (${head.headHash.substring(0, 7)})` }
+		);
+		if (!picked) return null;
+		const mode = order.find((m) => resetModeLabel(m) === picked)!;
+		return this.dataSource.resetToCommit(repo, head.headHash, mode);
 	}
 
 	private async _commit(repo: string, message: string, amend: boolean): Promise<ErrorInfo> {

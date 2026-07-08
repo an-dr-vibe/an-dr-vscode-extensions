@@ -44,6 +44,22 @@ export function renderRefreshButton() {
 }
 
 /**
+ * Renders the Reset/Fetch/Pull/Push/Force Push action row, using the same codicon
+ * glyphs as the tab's toolbar (ICONS.discard/arrowDown/arrowUp in web/utils.ts) for
+ * Reset/Pull/Push, plus a distinct icon for Fetch and a danger-tinted variant of the
+ * push icon for Force Push so the two aren't visually identical.
+ */
+export function renderActionsRow(): string {
+	return `<div id="activityActionsRow">` +
+		`<button id="activityReset" class="activityIconBtn" title="Reset...">${codicon('discard')}</button>` +
+		`<button id="activityFetch" class="activityIconBtn" title="Fetch">${codicon('cloud-download')}</button>` +
+		`<button id="activityPull" class="activityIconBtn" title="Pull">${codicon('arrow-down')}</button>` +
+		`<button id="activityPush" class="activityIconBtn" title="Push">${codicon('arrow-up')}</button>` +
+		`<button id="activityForcePush" class="activityIconBtn danger" title="Force Push (with lease)...">${codicon('arrow-up')}</button>` +
+		`</div>`;
+}
+
+/**
  * Renders a tag reference using the same gitRef/tag/compact class contract as
  * the main commit table. The color variable is supplied by the graph row.
  */

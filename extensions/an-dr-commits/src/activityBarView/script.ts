@@ -94,6 +94,11 @@ window.addEventListener('message', (e) => {
 	});
 })();
 document.getElementById('activityRefresh')?.addEventListener('click', () => post('refresh'));
+document.getElementById('activityReset')?.addEventListener('click', () => post('gitReset'));
+document.getElementById('activityFetch')?.addEventListener('click', () => post('gitFetch'));
+document.getElementById('activityPull')?.addEventListener('click', () => post('gitPull'));
+document.getElementById('activityPush')?.addEventListener('click', () => post('gitPush'));
+document.getElementById('activityForcePush')?.addEventListener('click', () => post('gitForcePush'));
 (function() {
 	const dd = document.getElementById('activityRepoDropdown');
 	if (!dd) return;

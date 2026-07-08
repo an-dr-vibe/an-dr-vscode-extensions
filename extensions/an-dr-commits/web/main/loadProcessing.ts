@@ -40,6 +40,10 @@ function commitsLoadRepos(view: any, repos: GG.GitRepoSet, lastActiveRepo: strin
 function commitsLoadRepo(view: any, repo: string) {
 	view.currentRepo = repo;
 	view.currentRepoLoading = true;
+	// Hides everything behind the loading splash again - covers both the very first load and
+	// a repo switch, since both funnel through here. Removed once commitsLoadCommits actually
+	// renders the new repo's data (or commitsDisplayLoadDataError, on failure).
+	alterClass(document.body, 'commitsLoaded', false);
 	view.maxCommits = view.config.initialLoadCommits;
 	view.gitConfig = null;
 	view.gitRemotes = [];
@@ -262,6 +266,9 @@ function commitsLoadCommits(view: any, commits: GG.GitCommit[], commitHead: stri
 	view.saveState();
 	view.graph.loadCommits(view.commits, view.commitHead, view.commitLookup, view.onlyFollowFirstParent);
 	view.render();
+	// Toolbar, branch panel, graph and table are all populated by this point - reveal them
+	// together rather than the toolbar having appeared instantly while this was pending.
+	alterClass(document.body, 'commitsLoaded', true);
 	if (view.pendingRevealRef !== null) {
 		const ref = view.pendingRevealRef;
 		view.pendingRevealRef = null;
@@ -376,6 +383,9 @@ function commitsDisplayLoadDataError(view: any, message: string, reason: string)
 	view.currentRepoRefreshState.inProgress = false;
 	view.loadViewTo = null;
 	view.renderRefreshButton();
+	// Otherwise a failed initial load / repo switch would leave the splash spinning forever -
+	// reveal the (now cleared) view so the error dialog below is actually visible.
+	alterClass(document.body, 'commitsLoaded', true);
 	dialog.showError(message, reason, 'Retry', () => {
 		view.refresh(true);
 	});

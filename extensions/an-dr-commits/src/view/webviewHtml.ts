@@ -57,6 +57,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 
 	if (numRepos > 0) {
 		return `<body>
+			<div id="initialLoadSplash"><span class="codicon codicon-loading codicon-modifier-spin"></span><span>Loading...</span></div>
 			<div id="view" tabindex="-1">
 				<div id="topBar">
 					<div id="sidebarTop">

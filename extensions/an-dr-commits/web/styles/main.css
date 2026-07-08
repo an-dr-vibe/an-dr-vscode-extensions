@@ -33,6 +33,27 @@ body #view{
 	overflow-x:hidden;
 	overflow-y:auto;
 }
+
+/*
+ * Shown by default (before any script has run) so there is never a flash of the bare,
+ * not-yet-populated toolbar/graph/table - hidden only once the first repo load (or a repo
+ * switch) has actually finished rendering. Same spinning codicon the Activity Bar sidebar
+ * uses for its own equivalent splash.
+ */
+#initialLoadSplash{
+	position:fixed;
+	inset:0;
+	z-index:1000;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	gap:8px;
+	background-color:var(--vscode-editor-background);
+	color:var(--vscode-descriptionForeground);
+}
+body.commitsLoaded #initialLoadSplash{
+	display:none;
+}
 body.filesPanelHidden #view{
 	right:0;
 }

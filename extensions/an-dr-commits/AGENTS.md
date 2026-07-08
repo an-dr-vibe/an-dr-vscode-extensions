@@ -143,6 +143,11 @@ Each CSS file corresponds 1:1 to its component. All get concatenated into `media
 
 ## HTML layout (the webview)
 
+`#initialLoadSplash` is a `#view` sibling shown by default (CSS) and hidden once
+`body.commitsLoaded` is added by `loadProcessing.ts` after the first successful
+`commitsLoadCommits()` render - covers first load, repo switch, and the prevState-restore
+fast path, since all three call through the same `render()` site.
+
 ```
 #view
 ├── #controls (41px, fixed top bar)

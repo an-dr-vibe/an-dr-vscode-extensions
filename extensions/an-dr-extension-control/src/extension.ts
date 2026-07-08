@@ -299,9 +299,39 @@ async function showRepoPath(config: vscode.WorkspaceConfiguration): Promise<void
 
 // ── Auto-operations ───────────────────────────────────────────────────────────
 
-async function autoWipCommit(root: string): Promise<void> {
+// Fixed poll cadence for the WIP quiet-period check. Kept independent of the
+// quiet-period threshold itself so a commit lands shortly after the repo goes
+// quiet, instead of waiting for the next multi-minute threshold tick.
+const WIP_CHECK_POLL_MS = 60_000;
+
+/** Resolves a `git status --porcelain` path entry, unwrapping rename arrows and quotes. */
+function parsePorcelainPath(line: string): string {
+    let filePath = line.slice(3);
+    const arrow = filePath.indexOf(' -> ');
+    if (arrow !== -1) { filePath = filePath.slice(arrow + 4); }
+    return filePath.trim().replace(/^"|"$/g, '');
+}
+
+async function autoWipCommit(root: string, quietMinutes: number): Promise<void> {
     const status = await exec('git status --porcelain', root);
     if (status.code !== 0 || !status.stdout) { return; }
+
+    // Newest mtime among changed files stands in for "how recently was this
+    // repo touched" — commit only once every changed file has been quiet for
+    // the configured threshold. Files that fail to stat (e.g. deleted) are
+    // skipped rather than blocking the commit indefinitely.
+    let newestMtime = 0;
+    for (const line of status.stdout.split('\n').filter(Boolean)) {
+        try {
+            const mtime = fs.statSync(path.join(root, parsePorcelainPath(line))).mtimeMs;
+            if (mtime > newestMtime) { newestMtime = mtime; }
+        } catch { /* deleted or inaccessible — doesn't block the quiet check */ }
+    }
+
+    if (newestMtime > 0 && Date.now() - newestMtime < quietMinutes * 60_000) {
+        return; // still being actively modified — skip this tick
+    }
+
     await exec('git add -A', root);
     const ts = new Date().toISOString().replace('T', ' ').slice(0, 16);
     const commit = await exec(`git commit -m "WIP [${ts}]"`, root);
@@ -341,8 +371,8 @@ function startAutoTimers(
         if (!root) { return; }
 
         if (cfg.get<boolean>('autoWipCommit', true)) {
-            const ms = cfg.get<number>('autoWipCommitIntervalMinutes', 30) * 60_000;
-            wipTimer = setInterval(() => { void autoWipCommit(root); }, ms);
+            const quietMinutes = cfg.get<number>('autoWipCommitIntervalMinutes', 30);
+            wipTimer = setInterval(() => { void autoWipCommit(root, quietMinutes); }, WIP_CHECK_POLL_MS);
         }
 
         if (cfg.get<boolean>('autoPush', true)) {

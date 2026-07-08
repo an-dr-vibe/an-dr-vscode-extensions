@@ -53,13 +53,13 @@
         "extensionControl.autoWipCommit": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically stage and commit all changes as a WIP commit on a timer."
+          "description": "Automatically stage and commit all changes as a WIP commit once the repo has been quiet."
         },
         "extensionControl.autoWipCommitIntervalMinutes": {
           "type": "number",
           "default": 30,
           "minimum": 1,
-          "description": "Interval in minutes between automatic WIP commits."
+          "description": "Minutes of inactivity required before an automatic WIP commit fires, based on the newest-modified changed file. Checked every minute; no commit happens while files are still being actively edited."
         },
         "extensionControl.autoPush": {
           "type": "boolean",

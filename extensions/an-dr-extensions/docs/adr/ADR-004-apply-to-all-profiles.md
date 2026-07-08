@@ -1,19 +1,19 @@
-# ADR-005: an-dr-extensions "Apply to All Profiles" toggle and badge
+# ADR-004: "Apply to All Profiles" toggle and badge
 
 ## Problem
 
-Following ADR-004 (profile switching), the user wants to apply an extension to all VS Code
+Following ADR-003 (profile switching), the user wants to apply an extension to all VS Code
 Profiles from the grid's context menu, with a visible indication on the card when an
 extension is already scoped that way.
 
 ## Decision
 
-- Unlike ADR-004's finding (no public API for profile membership), VS Code's own native
+- Unlike ADR-003's finding (no public API for profile membership), VS Code's own native
   extensions view already exposes this exact feature via a real command:
   `workbench.extensions.action.toggleApplyToAllProfiles`.
 - Current state (whether an extension already applies to all profiles) is read from the
   same install-state manifest (`extensions.json`, alongside every extension folder in the
-  install directory) already implicated by ADR-003's disabled-extension detection - each
+  install directory) already implicated by ADR-002's disabled-extension detection - each
   entry's `metadata.isApplicationScoped` boolean. This was confirmed against a real capture
   of this machine's own `extensions.json` (VS Code 1.127.0, 250 installed extensions) before
   writing the parser, per this repo's established practice - the field is present (as
@@ -44,7 +44,7 @@ extension is already scoped that way.
   quotes, for anything the implementation will actually depend on (exact signatures, argument
   shapes) - re-fetch and grep the raw file when the summary is going to become code.**
 - Because the fix resolves `location` via `vscode.extensions.getExtension(id)`, which only
-  returns enabled extensions (same public-API gap ADR-003 already worked around for
+  returns enabled extensions (same public-API gap ADR-002 already worked around for
   disabled-extension detection), the toggle is only offered for enabled extensions. The
   earlier "no install metadata" hiding heuristic (from the disproven dev-extension theory)
   was removed entirely - it wasn't the real constraint. What actually gates the menu item now:
@@ -65,7 +65,7 @@ extension is already scoped that way.
 ## Rationale
 
 Reuses the exact install-state manifest and reading conventions already established and
-verified in ADR-003, rather than introducing a new file format. The command argument is
+verified in ADR-002, rather than introducing a new file format. The command argument is
 built from data the public `vscode.extensions` API already exposes (the extension's own
 `extensionUri`), rather than reading or guessing at VS Code's internal representation.
 

@@ -283,7 +283,7 @@ ${sections}
           .map(cardEligibility);
         // Built-in (System) extensions cannot be uninstalled or scoped to all profiles;
         // disabled ones have no resolvable install location for the apply-to-all command
-        // (see ADR-005) - ineligible items are silently skipped rather than blocking the
+        // (see ADR-004) - ineligible items are silently skipped rather than blocking the
         // whole bulk action, matching how the single-item menu already hides these per-card.
         contextMenuBulkUninstallIds = targets.filter((t) => !t.isSystem).map((t) => t.id);
         contextMenuBulkApplyAllIds = targets.filter((t) => !t.isSystem && !t.isDisabled && !t.appliesToAll).map((t) => t.id);
@@ -296,7 +296,7 @@ ${sections}
       } else {
         // Built-in (System) extensions cannot be uninstalled or scoped to all profiles.
         // Disabled extensions aren't in vscode.extensions.all, so there's no public API to
-        // resolve the install location the toggle command requires - see ADR-005.
+        // resolve the install location the toggle command requires - see ADR-004.
         const { isSystem, isDisabled, appliesToAll } = cardEligibility(card);
         uninstallItem.style.display = isSystem ? 'none' : 'block';
         applyAllItem.style.display = (isSystem || isDisabled) ? 'none' : 'block';
@@ -356,7 +356,7 @@ ${sections}
     });
   }
 
-  // Lists the profiles found in storage.json (see ADR-010) - clicking one copies every
+  // Lists the profiles found in storage.json (see ADR-008) - clicking one copies every
   // target extension's shared install-state entry into that profile's own extensions.json.
   // No per-profile "already there" markers: unlike custom groups, membership across
   // profiles isn't mutually exclusive, and checking would mean reading every listed

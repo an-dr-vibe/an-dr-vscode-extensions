@@ -99,7 +99,7 @@ function Test-ExtDirty ([string]$ExtName) {
 # which means they belong only to the profile they were first discovered in - switching to
 # another profile hides them. Setting metadata.isApplicationScoped = true is the same flag
 # VS Code's own "Apply Extension to all Profiles" command sets, so these extensions show up
-# in every profile. See docs/adr/ADR-007-install-application-scoped-extensions.md.
+# in every profile. See docs/adr/ADR-001-install-application-scoped-extensions.md.
 function Set-ApplicationScopedExtensions ([string[]]$Ids) {
     $manifestPath = Join-Path $VscodeExtensions 'extensions.json'
     if (-not (Test-Path $manifestPath)) { return }

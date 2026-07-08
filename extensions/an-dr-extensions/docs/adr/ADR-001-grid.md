@@ -1,4 +1,4 @@
-# ADR-002: an-dr-extensions grid view
+# ADR-001: Grid view
 
 ## Problem
 

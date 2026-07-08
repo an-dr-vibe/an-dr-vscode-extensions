@@ -1,8 +1,8 @@
-# ADR-010: an-dr-extensions "Add to Profile" - target a specific non-default profile
+# ADR-008: "Add to Profile" - target a specific non-default profile
 
 ## Problem
 
-ADR-004/ADR-005 established that VS Code has no command to enable/disable an extension or
+ADR-003/ADR-004 established that VS Code has no command to enable/disable an extension or
 target a specific *other* profile for install - only "Apply to All Profiles" (all-or-current)
 and switching your own window's profile exist as real actions. The user asked whether a
 specific extension could be added to one chosen non-default profile directly, without
@@ -21,7 +21,7 @@ switching into it.
 - Real per-profile mechanism, read via `extensionsProfileScannerService.ts`: each profile
   has its **own** extension list, a small JSON array (`IStoredProfileExtension[]`) at
   `User/profiles/<location>/extensions.json`, entirely separate from the shared
-  install-state manifest ADR-005/007 already write to. Each entry is
+  install-state manifest ADR-004 (this extension) / root ADR-001 already write to. Each entry is
   `{identifier: {id, uuid}, version, location, relativeLocation, metadata}`.
   `relativeLocation` resolves against the *same shared* `~/.vscode/extensions/` directory
   the shared manifest uses - extensions are never physically duplicated per profile, only
@@ -34,7 +34,7 @@ switching into it.
   miss, which is exactly what happened during an earlier investigation this session) under
   a `userDataProfiles` key: `[{location, name, useDefaultFlags}]`. `location` is not always
   a flat id - on this machine one profile's location is the nested `builtin/agents`.
-- **Correction to ADR-006's addendum**: that entry dismissed an `agents` folder under
+- **Correction to ADR-005's addendum**: that entry dismissed an `agents` folder under
   `CachedProfilesData` as "leftover global-storage for an extension publisher, not an actual
   second profile." `storage.json` proves this wrong - `builtin/agents` is a real profile
   named "Agents." The dismissal was never written into a persisted ADR, only stated in
@@ -48,7 +48,7 @@ switching into it.
   reads the shared manifest and the target profile's file (or starts from `[]` if it
   doesn't exist yet), copies matched entries across (skipping ones already present or not
   found in the shared manifest), and writes once. Verified structurally correct against
-  copies of this machine's real files before running for real (same practice as ADR-007),
+  copies of this machine's real files before running for real (same practice as root ADR-001),
   since a mistake here has a larger blast radius than the shared manifest - a broken
   per-profile file risks that profile failing to load its extensions correctly.
 - **UI**: a new "Add to Profile ▸" context-menu entry, parallel to "Add to group ▸," listing
@@ -63,7 +63,7 @@ switching into it.
 
 ## Rationale
 
-Reuses the exact verified-schema, copy-fields-from-the-shared-manifest approach ADR-007
+Reuses the exact verified-schema, copy-fields-from-the-shared-manifest approach root ADR-001
 already established for the (differently-scoped) all-profiles case, rather than inventing a
 new format. Reading `storage.json` for names is read-only and used purely for display - the
 actual write path only needs `location`, which is already necessary regardless of naming.

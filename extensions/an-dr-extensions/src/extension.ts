@@ -11,13 +11,13 @@ const GROUP_BY_KEY = 'anDrExtensions.groupBy';
 const CUSTOM_GROUPS_SECTION = 'an-dr-extensions';
 const CUSTOM_GROUPS_KEY = 'customGroups';
 
-// Switching profiles restarts the extension host in place (ADR-006) - our own process is
+// Switching profiles restarts the extension host in place (ADR-005) - our own process is
 // torn down mid-`switchProfile()`, so nothing after that command's `await` in the OLD host
 // ever runs. context.globalState can't carry a signal across the switch either: it's always
 // StorageScope.PROFILE, even for application-scoped extensions (confirmed against VS Code's
 // own extensionStorage.ts), so a value written in the old profile is invisible in the new
 // one. A plain OS-temp-dir marker file, written just before triggering the switch and read
-// on the next activate(), sidesteps VS Code's profile-scoped storage entirely. See ADR-006.
+// on the next activate(), sidesteps VS Code's profile-scoped storage entirely. See ADR-005.
 const PROFILE_SWITCH_MARKER = path.join(os.tmpdir(), 'an-dr-extensions-pending-profile-switch');
 
 class GridState {
@@ -32,7 +32,7 @@ class GridState {
     public readonly pendingUninstalls = new Set<string>();
     // Undefined if the "walk up looking for a User directory" heuristic (see
     // computeUserDataRoot) doesn't find one - "Add to Profile" degrades to reporting an
-    // error instead of guessing at a path. See ADR-010.
+    // error instead of guessing at a path. See ADR-008.
     public readonly userDataRoot: vscode.Uri | undefined;
     private startupTimings: Map<string, StartupTiming> | undefined;
 
@@ -152,7 +152,7 @@ async function measureStartup(webview: vscode.Webview, state: GridState): Promis
 }
 
 // There is no public API to enumerate profiles, read the active one, or change profile
-// membership (see ADR-004), so this only opens VS Code's own native picker. The marker
+// membership (see ADR-003), so this only opens VS Code's own native picker. The marker
 // file is written before the switch, since actually switching restarts our extension host
 // and this same function's continuation may never resume in that case - see the
 // PROFILE_SWITCH_MARKER comment above and checkPendingProfileSwitch below.
@@ -239,7 +239,7 @@ function checkPendingProfileSwitch(state: GridState, activeWebviews: Set<vscode.
 }
 
 // Toggles the same "Apply Extension to all Profiles" state VS Code's own extensions view
-// context menu exposes (see ADR-005). The command's real handler (confirmed against VS
+// context menu exposes (see ADR-004). The command's real handler (confirmed against VS
 // Code's own source, not just the command id) is
 // `run(accessor, id: string, extensionArg: { id, version, location, galleryLink })` and
 // matches purely on `extensionArg.location` - passing only the id (as the native command id
@@ -344,7 +344,7 @@ async function bulkApplyToAllProfiles(ids: string[], webview: vscode.Webview, st
     }
 }
 
-// Writes directly into another profile's own extensions.json (see ADR-010) - there's no
+// Writes directly into another profile's own extensions.json (see ADR-008) - there's no
 // command for this (confirmed against the real workbench.extensions.installExtension
 // handler, which always installs into the current window's profile). Doesn't touch the
 // current profile or vscode.extensions.all at all, so there's nothing to re-render here;
@@ -493,7 +493,7 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         }),
         // Switching profiles restarts the extension host in place on local windows (no full
-        // window reload - see ADR-006), which tears down any open editor-tab grid panel.
+        // window reload - see ADR-005), which tears down any open editor-tab grid panel.
         // Without a serializer, VS Code doesn't recreate it; with one, it does, and
         // setupGridPanel reads fresh enabled/disabled state for the new profile.
         vscode.window.registerWebviewPanelSerializer(GRID_PANEL_VIEW_TYPE, {

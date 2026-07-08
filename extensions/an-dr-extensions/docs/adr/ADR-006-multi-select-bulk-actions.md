@@ -1,8 +1,8 @@
-# ADR-008: an-dr-extensions multi-select and bulk context-menu actions
+# ADR-006: Multi-select and bulk context-menu actions
 
 ## Problem
 
-Acting on one extension at a time via the context menu (ADR-003) doesn't scale once you're
+Acting on one extension at a time via the context menu (ADR-002) doesn't scale once you're
 managing hundreds of extensions - e.g. uninstalling a batch, or adding several to the same
 custom group, each took one right-click per extension.
 
@@ -32,7 +32,7 @@ custom group, each took one right-click per extension.
   filtered/category-hidden ones), so a range spanning a hidden card doesn't silently select
   something the user can't see.
 - **Selection is a client-side `Set`**, persisted through `vscode.setState()` alongside the
-  existing filter/scroll state (ADR-002/003) so it survives the full-document re-renders
+  existing filter/scroll state (ADR-001/002) so it survives the full-document re-renders
   this webview does on every state change, and cleared automatically after any bulk action
   completes.
 - **Right-click routing**: right-clicking a *checked* card opens a bulk-mode menu acting on
@@ -51,7 +51,7 @@ custom group, each took one right-click per extension.
   state to show) in favor of plain buttons that add every selected id to the clicked group.
 - **Ineligible items are silently filtered per action, not blocked entirely.** Uninstall and
   Apply to All Profiles already hide themselves per-card for System/disabled extensions
-  (ADR-005); in bulk mode the same eligibility check runs per selected card, and only the
+  (ADR-004); in bulk mode the same eligibility check runs per selected card, and only the
   eligible subset is sent to the extension host - e.g. selecting 5 extensions where 1 is
   System still uninstalls the other 4, rather than blocking the whole action or silently
   including the ineligible one.
@@ -79,7 +79,7 @@ since Ctrl-click already exists regardless of checkbox visibility.
 
 ## Refinement: custom groups become single-membership ("move", not "add")
 
-On request, custom groups (ADR-003) changed from "an extension can belong to any number of
+On request, custom groups (ADR-002) changed from "an extension can belong to any number of
 groups, toggled independently per group" to "an extension belongs to at most one group at a
 time." This actually *simplified* the bulk-vs-single distinction described above: since
 there's no per-group checkbox state to show either way now (a single extension has one

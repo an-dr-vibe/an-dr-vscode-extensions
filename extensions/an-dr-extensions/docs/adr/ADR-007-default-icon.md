@@ -1,4 +1,4 @@
-# ADR-009: an-dr-extensions default icon matches VS Code's native placeholder
+# ADR-007: Default icon matches VS Code's native placeholder
 
 ## Problem
 

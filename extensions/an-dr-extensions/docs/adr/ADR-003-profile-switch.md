@@ -1,9 +1,9 @@
-# ADR-004: an-dr-extensions profile switching command
+# ADR-003: Profile switching command
 
 ## Problem
 
 The user wanted to group extensions by VS Code Profile and add/remove extensions to/from
-profiles, similar to the existing "My Groups" custom-groups feature (ADR-003).
+profiles, similar to the existing "My Groups" custom-groups feature (ADR-002).
 
 ## Decision
 
@@ -11,7 +11,7 @@ profiles, similar to the existing "My Groups" custom-groups feature (ADR-003).
   internal profile storage. Investigation ([microsoft/vscode#226355](https://github.com/microsoft/vscode/issues/226355),
   closed *not planned*) confirmed there is no public extension API to enumerate profiles,
   read the active profile, or change profile membership programmatically — the same class
-  of gap ADR-003 hit for enable/disable. Unlike the enable/disable and Startup Time cases,
+  of gap ADR-002 hit for enable/disable. Unlike the enable/disable and Startup Time cases,
   there was also no second real profile on this machine to empirically capture an internal
   file format against, so writing a parser for undocumented per-profile storage was
   rejected outright rather than attempted blind.
@@ -42,7 +42,7 @@ undocumented internal profile storage, which could not even be inspected on this
 - Grouping extensions by real VS Code Profile, with add/remove actions: rejected — no
   public API, and the only path (reading/writing internal `profiles.json` /
   per-profile `extensions.json`) is exactly the class of fragile, undocumented approach
-  ADR-003 already rejected for enable/disable and disabled-extension detection, made worse
+  ADR-002 already rejected for enable/disable and disabled-extension detection, made worse
   here by having no second profile to verify the format against.
 - Reading internal files for display only, writing via the `code` CLI: rejected for the
   same unverifiable-format reason, plus requiring `code` on PATH and spawning a process per

@@ -31,7 +31,20 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 - `install.ps1` marks every linked `an-dr.*` extension as application-scoped
   (`metadata.isApplicationScoped = true` in `~/.vscode/extensions/extensions.json`) so they
   stay installed across every VS Code Profile, not just the one that first discovered them.
-  See `docs/adr/ADR-007-install-application-scoped-extensions.md`.
+  See `docs/adr/ADR-001-install-application-scoped-extensions.md`.
+
+## ADR organization
+
+- `docs/adr/` at the repo root holds only decisions that cut across more than one
+  extension (shared tooling like `install.ps1`, cross-cutting conventions). Its numbering
+  is its own sequence, independent of any extension's.
+- Every extension keeps its own decision history in `extensions/<name>/docs/adr/`,
+  numbered `ADR-001`, `ADR-002`, ... starting fresh for that extension. Titles and
+  filenames inside an extension's own `docs/adr/` don't repeat the extension's name — the
+  folder already provides that context.
+- A cross-reference to another extension's ADR (or to the root's) must name the scope
+  explicitly, e.g. "an-dr-extensions' ADR-004" or "root ADR-001", since the number alone
+  is only unique within one folder.
 
 ## Platform
 

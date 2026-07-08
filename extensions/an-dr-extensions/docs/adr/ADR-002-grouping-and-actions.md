@@ -1,8 +1,8 @@
-# ADR-003: an-dr-extensions grouping modes, context menu, custom groups, filter
+# ADR-002: Grouping modes, context menu, custom groups, filter
 
 ## Problem
 
-ADR-002 covered a basic grouped grid. The user now manages hundreds of extensions and
+ADR-001 covered a basic grouped grid. The user now manages hundreds of extensions and
 needs faster ways to slice and act on them: a filter box, more grouping dimensions
 (alphabetical, enabled/disabled, user-defined custom groups) selectable one at a time, and
 a right-click context menu with the same kind of actions the native Extensions panel offers
@@ -14,7 +14,7 @@ a right-click context menu with the same kind of actions the native Extensions p
   with modes: Category (default), Alphabetical (first letter of `displayName`),
   Enabled/Disabled, My Groups (custom), and None (flat list, formerly "Flat view"). Exactly
   one mode is active at a time.
-- The existing Categories visibility checklist (ADR-002) stays as a global filter — it
+- The existing Categories visibility checklist (ADR-001) stays as a global filter — it
   hides extensions in *every* grouping mode, not only when grouping-by-category. It is
   visually separate from the Group-by selector.
 - **Filter input**: a text box in the toolbar filters visible cards client-side by
@@ -91,15 +91,15 @@ a right-click context menu with the same kind of actions the native Extensions p
 - **Custom groups**: stored as a `an-dr-extensions.customGroups` setting —
   `{ [groupName: string]: string[] }` (extension IDs per group) — in `settings.json`, so it
   syncs via Settings Sync like other user preferences. This differs from the
-  hidden-category/grouping-mode state (ADR-002), which stays in `globalState`
+  hidden-category/grouping-mode state (ADR-001), which stays in `globalState`
   local-only; group membership is content the user curates and would reasonably want to
   carry across machines. Groups are created inline from the context menu's "Add to group ▸
   New group..." action; membership is toggled per extension from the same submenu.
 
-  **Superseded by ADR-008's single-group refinement**: membership is no longer an
+  **Superseded by ADR-006's single-group refinement**: membership is no longer an
   independent per-group toggle (an extension could originally belong to several groups at
   once) - "Add to group" is now "move to group," and each extension belongs to at most one
-  custom group. See ADR-008 for the updated design and rationale.
+  custom group. See ADR-006 for the updated design and rationale.
 
 ## Rationale
 

@@ -1,4 +1,4 @@
-# ADR-006: an-dr-extensions grid survives the extension-host restart on profile switch
+# ADR-005: Grid survives the extension-host restart on profile switch
 
 ## Problem
 
@@ -31,7 +31,7 @@ Profile changes, instead of showing stale data from before the switch.
   in `gridHtml.ts`) already survives this the same way it survives a normal window reload -
   no extra plumbing needed for that part.
 - Removed a dead `an-dr-extensions.switchProfile` command registration left over from
-  ADR-004's first draft (before the Switch Profile action became a toolbar button posting a
+  ADR-003's first draft (before the Switch Profile action became a toolbar button posting a
   message instead of a top-level command) - it was never contributed in `package.json` and
   was unreachable.
 

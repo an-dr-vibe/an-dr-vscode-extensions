@@ -58,9 +58,9 @@ interface ExtensionsJsonEntry {
 }
 
 // "Apply Extension to all Profiles" state lives in the same install-state manifest already
-// implicated in disabled-extension detection (ADR-003) - there is no public API to read or
+// implicated in disabled-extension detection (ADR-002) - there is no public API to read or
 // write it. Confirmed against a real capture of this machine's extensions.json (VS Code
-// 1.127.0): each entry has identifier.id and metadata.isApplicationScoped. See ADR-005.
+// 1.127.0): each entry has identifier.id and metadata.isApplicationScoped. See ADR-004.
 function readApplicationScopedIds(installRoot: vscode.Uri): Set<string> {
     try {
         const manifestPath = vscode.Uri.joinPath(installRoot, 'extensions.json').fsPath;
@@ -105,7 +105,7 @@ export interface ProfileDescriptor {
 
 // Custom (non-default) profiles are listed by VS Code itself in User/globalStorage/
 // storage.json under a "userDataProfiles" key - {location, name} per profile. There is no
-// public API for this (see ADR-010); confirmed against a real capture of this machine's own
+// public API for this (see ADR-008); confirmed against a real capture of this machine's own
 // storage.json (VS Code 1.127.0, two real profiles) before writing this parser, rather than
 // guessing the shape blind.
 export function readCustomProfiles(userDataRoot: vscode.Uri): ProfileDescriptor[] {
@@ -138,7 +138,7 @@ export interface AddToProfileResult {
 
 // Adds already-installed extensions to another profile's own extension list (a separate
 // per-profile extensions.json, distinct from the shared install-state manifest read above -
-// see ADR-010) so they load the next time that profile is used, without needing "Apply to
+// see ADR-008) so they load the next time that profile is used, without needing "Apply to
 // All Profiles". Confirmed via VS Code's own extensionsProfileScannerService.ts that a
 // profile's list is read on trust (no cross-check against the shared manifest) and resolves
 // relativeLocation against the same shared extensions install directory, so copying an

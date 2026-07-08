@@ -14,7 +14,7 @@ import { ExtensionState } from '../src/extensionState';
 import { CommitsView, standardiseCspSource } from '../src/commitsView';
 import { Logger } from '../src/logger';
 import { RepoChangeEvent, RepoManager } from '../src/repoManager';
-import { CodeReview, CommitOrdering, GitCommitStash, GitConfigLocation, GitFileStatus, CommitsViewGlobalState, CommitsViewWorkspaceState, GitPushBranchMode, GitResetMode, MergeActionOn, PullRequestConfig, PullRequestProvider, RebaseActionOn, RequestMessage, ResponseMessage, TagType } from '../src/types';
+import { CommitOrdering, GitCommitStash, GitConfigLocation, GitFileStatus, CommitsViewGlobalState, CommitsViewWorkspaceState, GitPushBranchMode, GitResetMode, MergeActionOn, PullRequestConfig, PullRequestProvider, RebaseActionOn, RequestMessage, ResponseMessage, TagType } from '../src/types';
 import * as utils from '../src/utils';
 import { EventEmitter } from '../src/utils/event';
 
@@ -983,18 +983,10 @@ describe('CommitsView', () => {
 				// Setup
 				const getCommitDetailsResolvedValue = { commitDetails: null, error: null };
 				const getAvatarImageResolvedValue = 'data:image/png;base64,YmluYXJ5LWltYWdlLWRhdGE=';
-				const getCodeReviewResolvedValue: CodeReview = {
-					id: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					lastActive: 1587559258000,
-					lastViewedFile: 'file1.txt',
-					remainingFiles: ['file2.txt', 'file3.txt']
-				};
 				const spyOnGetCommitDetails = jest.spyOn(dataSource, 'getCommitDetails');
 				const spyOnGetAvatarImage = jest.spyOn(avatarManager, 'getAvatarImage');
-				const spyOnGetCodeReview = jest.spyOn(extensionState, 'getCodeReview');
 				spyOnGetCommitDetails.mockResolvedValueOnce(getCommitDetailsResolvedValue);
 				spyOnGetAvatarImage.mockResolvedValueOnce(getAvatarImageResolvedValue);
-				spyOnGetCodeReview.mockReturnValueOnce(getCodeReviewResolvedValue);
 
 				// Run
 				onDidReceiveMessage({
@@ -1011,13 +1003,11 @@ describe('CommitsView', () => {
 				await waitForExpect(() => {
 					expect(spyOnGetCommitDetails).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', true);
 					expect(spyOnGetAvatarImage).toHaveBeenCalledWith('user@mhutchie.com');
-					expect(spyOnGetCodeReview).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
 					expect(messages).toStrictEqual([
 						{
 							command: 'commitDetails',
 							commitDetails: null,
 							avatar: getAvatarImageResolvedValue,
-							codeReview: getCodeReviewResolvedValue,
 							refresh: false,
 							error: null
 						}
@@ -1030,7 +1020,6 @@ describe('CommitsView', () => {
 				const getUncommittedDetailsResolvedValue = { commitDetails: null, error: null };
 				const spyOnGetUncommittedDetails = jest.spyOn(dataSource, 'getUncommittedDetails');
 				const spyOnGetAvatarImage = jest.spyOn(avatarManager, 'getAvatarImage');
-				const spyOnGetCodeReview = jest.spyOn(extensionState, 'getCodeReview');
 				spyOnGetUncommittedDetails.mockResolvedValueOnce(getUncommittedDetailsResolvedValue);
 
 				// Run
@@ -1048,13 +1037,11 @@ describe('CommitsView', () => {
 				await waitForExpect(() => {
 					expect(spyOnGetUncommittedDetails).toHaveBeenCalledWith('/path/to/repo');
 					expect(spyOnGetAvatarImage).not.toHaveBeenCalled();
-					expect(spyOnGetCodeReview).not.toHaveBeenCalled();
 					expect(messages).toStrictEqual([
 						{
 							command: 'commitDetails',
 							commitDetails: null,
 							avatar: null,
-							codeReview: null,
 							refresh: false,
 							error: null
 						}
@@ -1070,12 +1057,9 @@ describe('CommitsView', () => {
 					untrackedFilesHash: null
 				};
 				const getStashDetailsResolvedValue = { commitDetails: null, error: null };
-				const getCodeReviewResolvedValue = null;
 				const spyOnGetStashDetails = jest.spyOn(dataSource, 'getStashDetails');
 				const spyOnGetAvatarImage = jest.spyOn(avatarManager, 'getAvatarImage');
-				const spyOnGetCodeReview = jest.spyOn(extensionState, 'getCodeReview');
 				spyOnGetStashDetails.mockResolvedValueOnce(getStashDetailsResolvedValue);
-				spyOnGetCodeReview.mockReturnValueOnce(getCodeReviewResolvedValue);
 
 				// Run
 				onDidReceiveMessage({
@@ -1092,13 +1076,11 @@ describe('CommitsView', () => {
 				await waitForExpect(() => {
 					expect(spyOnGetStashDetails).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', stash);
 					expect(spyOnGetAvatarImage).not.toHaveBeenCalled();
-					expect(spyOnGetCodeReview).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
 					expect(messages).toStrictEqual([
 						{
 							command: 'commitDetails',
 							commitDetails: null,
 							avatar: null,
-							codeReview: getCodeReviewResolvedValue,
 							refresh: false,
 							error: null
 						}
@@ -1111,16 +1093,8 @@ describe('CommitsView', () => {
 			it('Should get the data for the Commit Details View (Comparison)', async () => {
 				// Setup
 				const getCommitComparisonResolvedValue = { fileChanges: [], error: null };
-				const getCodeReviewResolvedValue: CodeReview = {
-					id: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					lastActive: 1587559258000,
-					lastViewedFile: 'file1.txt',
-					remainingFiles: ['file2.txt', 'file3.txt']
-				};
 				const spyOnGetCommitComparison = jest.spyOn(dataSource, 'getCommitComparison');
-				const spyOnGetCodeReview = jest.spyOn(extensionState, 'getCodeReview');
 				spyOnGetCommitComparison.mockResolvedValueOnce(getCommitComparisonResolvedValue);
-				spyOnGetCodeReview.mockReturnValueOnce(getCodeReviewResolvedValue);
 
 				// Run
 				onDidReceiveMessage({
@@ -1136,14 +1110,12 @@ describe('CommitsView', () => {
 				// Assert
 				await waitForExpect(() => {
 					expect(spyOnGetCommitComparison).toHaveBeenCalledWith('/path/to/repo', 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
-					expect(spyOnGetCodeReview).toHaveBeenCalledWith('/path/to/repo', 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
 					expect(messages).toStrictEqual([
 						{
 							command: 'compareCommits',
 							commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 							compareWithHash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 							fileChanges: [],
-							codeReview: getCodeReviewResolvedValue,
 							refresh: false,
 							error: null
 						}
@@ -1155,7 +1127,6 @@ describe('CommitsView', () => {
 				// Setup
 				const getCommitComparisonResolvedValue = { fileChanges: [], error: null };
 				const spyOnGetCommitComparison = jest.spyOn(dataSource, 'getCommitComparison');
-				const spyOnGetCodeReview = jest.spyOn(extensionState, 'getCodeReview');
 				spyOnGetCommitComparison.mockResolvedValueOnce(getCommitComparisonResolvedValue);
 
 				// Run
@@ -1172,14 +1143,12 @@ describe('CommitsView', () => {
 				// Assert
 				await waitForExpect(() => {
 					expect(spyOnGetCommitComparison).toHaveBeenCalledWith('/path/to/repo', 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', utils.UNCOMMITTED);
-					expect(spyOnGetCodeReview).not.toHaveBeenCalled();
 					expect(messages).toStrictEqual([
 						{
 							command: 'compareCommits',
 							commitHash: utils.UNCOMMITTED,
 							compareWithHash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
 							fileChanges: [],
-							codeReview: null,
 							refresh: false,
 							error: null
 						}
@@ -2188,27 +2157,6 @@ describe('CommitsView', () => {
 			});
 		});
 
-		describe('endCodeReview', () => {
-			it('Should end a code review', async () => {
-				// Setup
-				const spyOnEndCodeReview = jest.spyOn(extensionState, 'endCodeReview');
-				spyOnEndCodeReview.mockResolvedValueOnce(null);
-
-				// Run
-				onDidReceiveMessage({
-					command: 'endCodeReview',
-					repo: '/path/to/repo',
-					id: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'
-				});
-
-				// Assert
-				await waitForExpect(() => {
-					expect(spyOnEndCodeReview).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
-					expect(messages).toHaveLength(0);
-				});
-			});
-		});
-
 		describe('exportRepoConfig', () => {
 			it('Should export the repository configuration', async () => {
 				// Setup
@@ -2515,6 +2463,7 @@ describe('CommitsView', () => {
 					remotes: ['origin', 'upstream'],
 					remoteHeadTargets: {},
 					repoInProgressState: null,
+					remoteUrls: {},
 					stashes: [],
 					error: null
 				};
@@ -2551,6 +2500,9 @@ describe('CommitsView', () => {
 							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
+							remoteHeadTargets: getRepoInfoResolvedValue.remoteHeadTargets,
+							repoInProgressState: getRepoInfoResolvedValue.repoInProgressState,
+							remoteUrls: getRepoInfoResolvedValue.remoteUrls,
 							stashes: getRepoInfoResolvedValue.stashes,
 							isRepo: true,
 							error: getRepoInfoResolvedValue.error
@@ -2571,6 +2523,7 @@ describe('CommitsView', () => {
 					remotes: ['origin', 'upstream'],
 					remoteHeadTargets: {},
 					repoInProgressState: null,
+					remoteUrls: {},
 					stashes: [],
 					error: null
 				};
@@ -2606,6 +2559,9 @@ describe('CommitsView', () => {
 							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
+							remoteHeadTargets: getRepoInfoResolvedValue.remoteHeadTargets,
+							repoInProgressState: getRepoInfoResolvedValue.repoInProgressState,
+							remoteUrls: getRepoInfoResolvedValue.remoteUrls,
 							stashes: getRepoInfoResolvedValue.stashes,
 							isRepo: true,
 							error: getRepoInfoResolvedValue.error
@@ -2626,6 +2582,7 @@ describe('CommitsView', () => {
 					remotes: ['origin', 'upstream'],
 					remoteHeadTargets: {},
 					repoInProgressState: null,
+					remoteUrls: {},
 					stashes: [],
 					error: 'error message'
 				};
@@ -2662,6 +2619,9 @@ describe('CommitsView', () => {
 							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
+							remoteHeadTargets: getRepoInfoResolvedValue.remoteHeadTargets,
+							repoInProgressState: getRepoInfoResolvedValue.repoInProgressState,
+							remoteUrls: getRepoInfoResolvedValue.remoteUrls,
 							stashes: getRepoInfoResolvedValue.stashes,
 							isRepo: true,
 							error: getRepoInfoResolvedValue.error
@@ -2682,6 +2642,7 @@ describe('CommitsView', () => {
 					remotes: ['origin', 'upstream'],
 					remoteHeadTargets: {},
 					repoInProgressState: null,
+					remoteUrls: {},
 					stashes: [],
 					error: 'error message'
 				};
@@ -2718,6 +2679,9 @@ describe('CommitsView', () => {
 							goneUpstreamBranches: getRepoInfoResolvedValue.goneUpstreamBranches,
 							head: getRepoInfoResolvedValue.head,
 							remotes: getRepoInfoResolvedValue.remotes,
+							remoteHeadTargets: getRepoInfoResolvedValue.remoteHeadTargets,
+							repoInProgressState: getRepoInfoResolvedValue.repoInProgressState,
+							remoteUrls: getRepoInfoResolvedValue.remoteUrls,
 							stashes: getRepoInfoResolvedValue.stashes,
 							isRepo: false,
 							error: null
@@ -3424,7 +3388,10 @@ describe('CommitsView', () => {
 				const globalViewState: CommitsViewGlobalState = {
 					alwaysAcceptCheckoutCommit: true,
 					issueLinkingConfig: null,
-					pushTagSkipRemoteCheck: false
+					pushTagSkipRemoteCheck: false,
+					fullDiffViewMode: 'sideBySide',
+					filesPanelWidth: 220,
+					filesPanelHidden: false
 				};
 				const setGlobalViewStateResolvedValue = null;
 				const spyOnSetGlobalViewState = jest.spyOn(extensionState, 'setGlobalViewState');
@@ -3522,48 +3489,6 @@ describe('CommitsView', () => {
 			});
 		});
 
-		describe('startCodeReview', () => {
-			it('Should start a code review', async () => {
-				// Setup
-				const startCodeReviewResolvedValue = {
-					codeReview: {
-						id: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-						lastActive: 1587559258000,
-						lastViewedFile: null,
-						remainingFiles: ['file1.txt', 'file2.txt', 'file3.txt']
-					},
-					error: null
-				};
-				const spyOnStartCodeReview = jest.spyOn(extensionState, 'startCodeReview');
-				spyOnStartCodeReview.mockResolvedValueOnce(startCodeReviewResolvedValue);
-
-				// Run
-				onDidReceiveMessage({
-					command: 'startCodeReview',
-					repo: '/path/to/repo',
-					id: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					files: ['file1.txt', 'file2.txt', 'file3.txt'],
-					lastViewedFile: null,
-					commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					compareWithHash: null
-				});
-
-				// Assert
-				await waitForExpect(() => {
-					expect(spyOnStartCodeReview).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', ['file1.txt', 'file2.txt', 'file3.txt'], null);
-					expect(messages).toStrictEqual([
-						{
-							command: 'startCodeReview',
-							codeReview: startCodeReviewResolvedValue.codeReview,
-							commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-							compareWithHash: null,
-							error: startCodeReviewResolvedValue.error
-						}
-					]);
-				});
-			});
-		});
-
 		describe('tagDetails', () => {
 			it('Should get a tag\'s details', async () => {
 				// Setup
@@ -3589,35 +3514,6 @@ describe('CommitsView', () => {
 							commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
 							details: null,
 							error: null
-						}
-					]);
-				});
-			});
-		});
-
-		describe('updateCodeReview', () => {
-			it('Should update a code review', async () => {
-				// Setup
-				const updateCodeReviewResolvedValue = null;
-				const spyOnUpdateCodeReview = jest.spyOn(extensionState, 'updateCodeReview');
-				spyOnUpdateCodeReview.mockResolvedValueOnce(updateCodeReviewResolvedValue);
-
-				// Run
-				onDidReceiveMessage({
-					command: 'updateCodeReview',
-					repo: '/path/to/repo',
-					id: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					remainingFiles: ['file2.txt', 'file3.txt'],
-					lastViewedFile: 'file1.txt'
-				});
-
-				// Assert
-				await waitForExpect(() => {
-					expect(spyOnUpdateCodeReview).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', ['file2.txt', 'file3.txt'], 'file1.txt');
-					expect(messages).toStrictEqual([
-						{
-							command: 'updateCodeReview',
-							error: updateCodeReviewResolvedValue
 						}
 					]);
 				});

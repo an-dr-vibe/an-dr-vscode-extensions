@@ -17,10 +17,9 @@ export function renderRepoSelector(currentRepo: string | null, repoPaths: string
 	if (repoPaths.length === 0) {
 		return `<div id="activityRepo">No Git repository</div>`;
 	}
-	if (repoPaths.length === 1) {
-		const name = esc(path.basename(repoPaths[0]));
-		return `<div id="activityRepo" title="${esc(repoPaths[0])}">${name}</div>`;
-	}
+	// Always render the same dropdown widget as the multi-repo case - matching the tab's
+	// Dropdown class, which stays fully rendered (and clickable/openable) with a single
+	// option, rather than swapping to a visually different plain element.
 	const selectedName = currentRepo !== null ? esc(path.basename(currentRepo)) : '';
 	const optionsHtml = repoPaths.map((p, i) => {
 		const name = esc(path.basename(p));

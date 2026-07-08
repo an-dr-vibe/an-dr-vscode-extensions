@@ -219,12 +219,9 @@ function commitsInitButtonHandlers(view: any) {
 		handledEvent(e);
 		view.showPushButtonContextMenu(e);
 	});
-	view.settingsBtnElem.title = 'Repository Settings · Double-click to Refresh';
+	view.settingsBtnElem.title = 'Repository Settings';
 	view.settingsBtnElem.innerHTML = ICONS.gear;
-	addSingleDblClick(view.settingsBtnElem,
-		() => view.settingsWidget.show(view.currentRepo),
-		() => view.refresh(true, true)
-	);
+	view.settingsBtnElem.addEventListener('click', () => view.settingsWidget.show(view.currentRepo));
 	view.settingsBtnElem.addEventListener('contextmenu', (e: MouseEvent) => {
 		handledEvent(e);
 		view.showSettingsButtonContextMenu(e);

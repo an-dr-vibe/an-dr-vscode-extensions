@@ -226,16 +226,14 @@ function commitsShowPullButtonContextMenu(view: any, event: MouseEvent) {
 }
 
 function commitsShowSettingsButtonContextMenu(view: any, event: MouseEvent) {
+	// Refresh dropped from this menu - it now has its own dedicated repoRefreshBtn, so
+	// duplicating it here (and on Settings' old double-click shortcut) just meant "Refresh"
+	// showed up two or three times across the toolbar's menus for the same action.
 	contextMenu.show([[
 		{
 			title: 'Repository Settings',
 			visible: true,
 			onClick: () => view.settingsWidget.show(view.currentRepo)
-		},
-		{
-			title: 'Refresh',
-			visible: true,
-			onClick: () => view.refresh(true, true)
 		}
 	]], false, null, event, view.viewElem);
 }

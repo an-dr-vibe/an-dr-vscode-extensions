@@ -7,7 +7,7 @@ import { MiniGraphData, renderMiniGraph } from './miniGraph';
 import { activityCss } from './css';
 import { activityScript } from './script';
 import { normalizePath } from './gitUtils';
-import { codicon, esc, renderActionsRow, renderRefreshButton, renderRepoSelector } from './ui';
+import { codicon, esc, renderActionsRow, renderOpenCommitsButton, renderRepoSelector } from './ui';
 
 type CpTreeFolder = {
 	folders: { [name: string]: CpTreeFolder };
@@ -177,12 +177,9 @@ export function renderHtml(
 ${renderHead(webview, extensionPath, nonce)}
 </head>
 <body class="activityChangesBody" style="--activity-graph-height:${graphHeight}px">
-<div id="activityTop">
-	<button id="activityOpenCommits" class="activityPrimaryBtn">${codicon('git-commit')}<span>Open Commits</span></button>
-</div>
 <div id="activityRepoRow">
 	${repoSelector}
-	${renderRefreshButton()}
+	${renderOpenCommitsButton()}
 </div>
 ${repo !== null ? renderActionsRow() : ''}
 <div id="activityContent">${renderContentHtml(changes, error)}</div>

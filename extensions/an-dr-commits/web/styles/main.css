@@ -1355,7 +1355,10 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 	font-weight:400;
 	outline-offset:-1px !important;
 	flex-shrink:1;
-	min-width:60px;
+	/* Fits at least 10 digits ("1234567890") of content - ch measures the "0" glyph
+	   width in the current font; +18px covers the padding (8px*2) and border (1px*2)
+	   this element already has, since both count toward width under border-box. */
+	min-width:calc(10ch + 18px);
 }
 #commitFilter:focus{
 	outline:1px solid var(--vscode-focusBorder);
@@ -1463,7 +1466,6 @@ body.searchPanelOpen #searchPanel{
 	flex:0 0 auto;
 	width:22px;
 	height:22px;
-	margin-left:4px;
 	border-radius:3px;
 	opacity:0.7;
 	cursor:pointer;

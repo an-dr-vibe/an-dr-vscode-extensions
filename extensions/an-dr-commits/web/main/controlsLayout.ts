@@ -11,6 +11,13 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 	const pullPushVisible = view.gitBranchHead !== null && view.gitBranchHead !== 'HEAD' && view.gitRemotes.length > 0;
 	return [
 		{
+			id: 'repoRefreshBtn',
+			elem: view.repoRefreshBtnElem,
+			visible: true,
+			title: 'Refresh',
+			onClick: () => view.refresh(true, true)
+		},
+		{
 			id: 'resetBtn',
 			elem: view.resetBtnElem,
 			visible: true,
@@ -31,12 +38,14 @@ function commitsGetTopBarButtons(view: any): CommitsTopBarButton[] {
 			title: repoInProgress ? view.getRepoInProgressActionTitle(GG.GitRepoInProgressAction.Abort) : 'Push · Double-click to Force Push (Right-Click for More Actions)',
 			onClick: () => view.pushCurrentBranchAction()
 		},
-		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings · Double-click to Refresh', onClick: () => view.settingsBtnElem.click() }
+		{ id: 'settingsBtn', elem: view.settingsBtnElem, visible: true, title: 'Repository Settings', onClick: () => view.settingsBtnElem.click() }
 	];
 }
 
 function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButton): ContextMenuAction[] {
-	if (button.id === 'resetBtn') {
+	if (button.id === 'repoRefreshBtn') {
+		return [{ title: 'Refresh', visible: true, onClick: () => view.refresh(true, true) }];
+	} else if (button.id === 'resetBtn') {
 		return [{ title: 'Reset to HEAD', visible: true, onClick: () => view.resetToHeadAction() }];
 	} else if (button.id === 'pullBtn') {
 		if (view.gitRepoInProgressState !== null) {
@@ -57,10 +66,7 @@ function commitsGetOverflowActionForButton(view: any, button: CommitsTopBarButto
 			];
 		}
 	} else if (button.id === 'settingsBtn') {
-		return [
-			{ title: 'Repository Settings', visible: true, onClick: () => view.settingsWidget.show(view.currentRepo) },
-			{ title: 'Refresh', visible: true, onClick: () => view.refresh(true, true) }
-		];
+		return [{ title: 'Repository Settings', visible: true, onClick: () => view.settingsWidget.show(view.currentRepo) }];
 	} else {
 		return [{ title: button.title, visible: true, onClick: button.onClick }];
 	}
@@ -93,7 +99,9 @@ function commitsUpdateControlsLayout(view: any) {
 
 	const applyLayout = () => {
 		let overflow = isOverflowing();
-		const hideOrder = ['settingsBtn', 'pushBtn', 'pullBtn', 'resetBtn'];
+		// repoRefreshBtn collapses first - it's the most redundant of the five (Settings'
+		// own double-click already refreshes), so it's the first to give up its spot.
+		const hideOrder = ['repoRefreshBtn', 'settingsBtn', 'pushBtn', 'pullBtn', 'resetBtn'];
 		for (let i = 0; i < hideOrder.length && overflow; i++) {
 			const button = buttons.find((item) => item.id === hideOrder[i]);
 			if (!button || !button.visible || button.elem.classList.contains('overflowHidden')) continue;

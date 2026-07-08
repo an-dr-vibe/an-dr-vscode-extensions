@@ -64,7 +64,6 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 						<div id="branchPanelControls">
 							<div id="branchPanelRepoHost">
 								<div id="repoDropdown" class="dropdown"></div>
-								<div id="repoRefreshBtn" title="Refresh"></div>
 							</div>
 						</div>
 					</div>
@@ -76,6 +75,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 							</div>
 							<input id="commitFilter" type="text" placeholder="Filter..." autocomplete="off" spellcheck="false"/>
 							<div id="controlsBtns">
+								<div id="repoRefreshBtn" title="Refresh"></div>
 								<div id="sendToReviewBtn" title="Send to Code Review"></div>
 								<div id="resetBtn"></div>
 								<div id="pullBtn"></div>

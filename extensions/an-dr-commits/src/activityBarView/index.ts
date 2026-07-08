@@ -11,7 +11,7 @@ import {
 	countChanges, getHeadInfo
 } from './gitUtils';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph, renderMiniGraphInner } from './miniGraph';
-import { renderContentHtml, renderHtml } from './html';
+import { renderContentHtml, renderHtml, renderLoadingHtml } from './html';
 import { RepoSelectionEvent } from './repoSelection';
 
 export { GitActivityChange, GitChangeCounts, getWorkingTreeChanges, countChanges, countWorkingTreeChanges } from './gitUtils';
@@ -221,6 +221,12 @@ export class ActivityBarView implements vscode.Disposable {
 				await this._view.webview.postMessage({ command: 'updateContent', contentHtml: renderContentHtml([], null), graphHtml: '', hasGraph: false });
 			}
 			return;
+		}
+
+		if (needsFullRender) {
+			// Shown synchronously, before the async git calls below, so there's no blank gap -
+			// replaced by the real content once it's ready, per _refreshPanel's own render path.
+			this._view.webview.html = renderLoadingHtml(this._view.webview, this.extensionPath);
 		}
 
 		const [result, miniGraph] = await Promise.all([

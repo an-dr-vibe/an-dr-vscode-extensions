@@ -2,6 +2,7 @@ export function activityCss() {
 	return `
 body.activityChangesBody{position:fixed;inset:0;margin:0;background:var(--vscode-sideBar-background,var(--vscode-editor-background));color:var(--vscode-sideBar-foreground,var(--vscode-editor-foreground));font-family:var(--vscode-font-family);font-size:13px;display:flex;flex-direction:column;overflow:hidden;}
 #activityTop{display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid rgba(128,128,128,0.22);box-sizing:border-box;}
+#activityLoading{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--vscode-descriptionForeground);}
 .activityPrimaryBtn{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;flex:1;border:1px solid var(--vscode-button-border,transparent);border-radius:3px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);font:inherit;font-weight:600;padding:5px 8px;cursor:pointer;}
 .activityPrimaryBtn:hover{background:var(--vscode-button-hoverBackground);}
 #activityRepo{padding:5px 10px;border-bottom:1px solid rgba(128,128,128,0.16);color:var(--vscode-descriptionForeground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}

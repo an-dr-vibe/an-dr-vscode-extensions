@@ -128,6 +128,36 @@ function renderFooter() {
 		`</div>`;
 }
 
+/** Shared <head> markup (CSP/stylesheet/nonce) for both the real panel and the loading splash. */
+function renderHead(webview: any, extensionPath: string, nonce: string): string {
+	const cssUri = webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, 'media', 'out.min.css')));
+	const cspSource = String(webview.cspSource).replace(/\/$/g, '');
+	return `<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; script-src 'nonce-${nonce}';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="${cssUri}">
+<style>${activityCss()}</style>`;
+}
+
+/**
+ * Renders a minimal loading splash - the same spinning codicon the tab already uses for
+ * its own per-region loading states (ICONS.loading in web/utils.ts), shown full-panel here.
+ * Used only while a full render is pending (first load / repo switch), never for routine
+ * data refreshes which patch the existing DOM in place instead.
+ */
+export function renderLoadingHtml(webview: any, extensionPath: string): string {
+	const nonce = Date.now().toString(36);
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${renderHead(webview, extensionPath, nonce)}
+</head>
+<body class="activityChangesBody">
+<div id="activityLoading">${codicon('loading', 'codicon-modifier-spin')}<span>Loading...</span></div>
+</body>
+</html>`;
+}
+
 export function renderHtml(
 	webview: any,
 	extensionPath: string,
@@ -139,18 +169,12 @@ export function renderHtml(
 	graphHeight: number = 120
 ): string {
 	const nonce = Date.now().toString(36);
-	const cssUri = webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, 'media', 'out.min.css')));
-	const cspSource = String(webview.cspSource).replace(/\/$/g, '');
 	const repoSelector = renderRepoSelector(repo, repoPaths);
 	const graphHtml = renderMiniGraph(miniGraph);
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; script-src 'nonce-${nonce}';">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="${cssUri}">
-<style>${activityCss()}</style>
+${renderHead(webview, extensionPath, nonce)}
 </head>
 <body class="activityChangesBody" style="--activity-graph-height:${graphHeight}px">
 <div id="activityTop">

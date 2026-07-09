@@ -288,6 +288,7 @@ export class SidebarView implements vscode.Disposable {
 				await this._refreshPanel();
 				return;
 			case 'refresh':
+				this._updateBadge();
 				await this._refreshPanel();
 				return;
 			case 'setGraphHeight':

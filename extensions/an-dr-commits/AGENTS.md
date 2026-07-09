@@ -19,20 +19,20 @@ A VS Code extension that renders a Git commit graph in a webview panel and lets 
 | Layer | Language | Location | Compiled to |
 |---|---|---|---|
 | Backend (Node.js) | TypeScript | `src/` | `out/` |
-| Frontend (browser) | TypeScript | `web/` | `media/out.min.js` + `media/out.min.css` |
+| Frontend (browser) | TypeScript | `web/` | Two bundles: `media/out.min.js`+`out.min.css` (tab) and `media/sidebar.min.js`+`sidebar.min.css` (sidebar) — see `.vscode/package-web.js` |
 
-They communicate **only** via VS Code's webview message API (`postMessage` / `onmessage`). No shared imports.
+They communicate **only** via VS Code's webview message API (`postMessage` / `onmessage`). No shared imports between `src/` and `web/`. Within each world, `src/views/common/` and `web/common/` hold code shared between the tab and sidebar views (see `docs/adr/ADR-003-shared-browser-module-and-sidebar-webview-bundle.md` and `ADR-004-views-reorganization-and-tabview-split.md`).
 
 ---
 
 ## Refactor Guardrails (Maintainability Mode)
 
 - **Behavior freeze:** do not change command IDs, settings keys, request/response command names, or persisted state keys during structural refactors.
-- **Compatibility-first extraction:** prefer moving code behind existing public entrypoints (`DataSource`, `RepoManager`, `CommitsView`) over changing call sites.
+- **Compatibility-first extraction:** prefer moving code behind existing public entrypoints (`DataSource`, `RepoManager`, `TabView`, `SidebarView`) over changing call sites.
 - **File/function size targets:** aim for `<= 350` lines per file and `<= 60` lines per function. If a larger unit is intentionally retained, add a brief in-file justification comment.
 - **Topic directories:** place extracted logic under topic folders:
-  - backend: `src/data-source/`, `src/repo-manager/`, `src/view/`, `src/types/`
-  - webview: `web/main/` (requires recursive packaging in `.vscode/package-web.js`)
+  - backend: `src/data-source/`, `src/repo-manager/`, `src/views/{tab,sidebar,common}/`, `src/types/`
+  - webview: `web/main/` (tab-only helpers), `web/common/` (shared by both webviews), `web/sidebar/` (sidebar-only) — all require recursive packaging in `.vscode/package-web.js`
 - **No cross-world coupling:** never import `web/*` from `src/*` or vice versa.
 
 ### Current hotspot audit list
@@ -40,7 +40,7 @@ They communicate **only** via VS Code's webview message API (`postMessage` / `on
 - `web/main.ts`
 - `src/dataSource.ts`
 - `src/repoManager.ts`
-- `src/commitsView.ts`
+- `src/views/tab/tabView.ts` (down from 1345 to ~850 lines after its ~70 message handlers moved into `src/views/tab/*Actions.ts` — see below)
 - `src/types/message-protocol.ts`
 
 ---
@@ -48,14 +48,14 @@ They communicate **only** via VS Code's webview message API (`postMessage` / `on
 ## Build
 
 ```bash
-npm run compile-web   # TypeScript → media/out.min.js + media/out.min.css
+npm run compile-web   # TypeScript → media/{out,sidebar}.min.js + media/{out,sidebar}.min.css
 npm run compile-src   # TypeScript → out/extension.js
 npm run compile       # both (clean first)
 ```
 
-Bundling scripts: `.vscode/package-web.js` (CSS + JS concatenation/minification), `.vscode/package-src.js`.
+Bundling scripts: `.vscode/package-web.js` (CSS + JS concatenation/minification into the tab bundle `out.min.*` and the sidebar bundle `sidebar.min.*`), `.vscode/package-src.js`.
 
-After any change to `web/` or `web/styles/`, run `npm run compile-web` and reload the extension window.
+After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm run compile-web` and reload the extension window.
 
 ---
 
@@ -64,15 +64,17 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | File | Purpose |
 |---|---|
 | `extension.ts` | Activation, registers all commands, wires up managers |
-| `commitsView.ts` | Creates/manages the webview panel; generates HTML; routes messages between webview and backend |
 | `dataSource.ts` | **All git commands** — spawns git, parses output. Key methods: `getCommits()`, `getBranches()`, `getRefs()`, `getLog()` |
 | `repoManager.ts` | Discovers `.git` repos in the workspace, tracks them |
 | `commands.ts` | Handlers for every Git action (checkout, merge, push, tag, etc.) |
 | `config.ts` | Reads VS Code settings into typed config objects |
 | `extensionState.ts` | Persists view state across sessions |
-| `types.ts` | Shared TypeScript interfaces for the backend |
+| `types.ts` | Public barrel re-exporting `types/*` — the shared TypeScript interfaces for the backend |
 | `avatarManager.ts` | Fetches and caches author avatars |
-| `activityBarView/` | Activity-bar webview: Open Commits action, repo selector, Reset/Fetch/Pull/Push/Force-Push actions (`gitUtils.getHeadInfo` resolves branch/remote/HEAD from the vscode.git API; Reset and Force Push use native `showQuickPick`/`showWarningMessage`, not a custom dialog), uncommitted changes panel, resizable mini graph (height persisted via `ExtensionState.{get,set}ActivityGraphHeight`), tag pills, and dirty-count badge |
+| `editorTabUtils.ts` | Detects duplicate/orphaned Commits editor tabs by matching VS Code `tabGroups` entries against the Commits view types |
+| `views/tab/` | The main-editor-tab webview, class `TabView` — see below |
+| `views/sidebar/` | The Activity Bar sidebar webview, class `SidebarView` — see below |
+| `views/common/` | Backend code shared between `views/tab/` and `views/sidebar/` — see below |
 | `statusBarItem.ts` | The status bar button that opens the graph |
 | `inlineBlame.ts` | Active editor inline blame + optional status bar current-commit display |
 | `diffDocProvider.ts` | Virtual document provider for diff views |
@@ -84,21 +86,43 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `data-source/parsers.ts` | DataSource stdout parsing helpers for branches/refs/log/status/stashes |
 | `repo-manager/workspaceUtils.ts` | Workspace folder / path inclusion utilities |
 | `repo-manager/externalRepoConfig.ts` | External repo config read/write/validate/apply/export helpers |
-| `view/webviewHtml.ts` | Webview HTML + CSP rendering helpers |
-| `types/*` | Grouped contract exports by concern; `types.ts` is the public barrel |
+| `types/*` | Grouped contract exports by concern; `types.ts` is the public barrel. `sidebar-state.ts`/`sidebar-protocol.ts` hold the sidebar's own initial-state and discriminated-union request/response types |
 
-### Activity Bar view (`src/activityBarView/`)
+### Tab view (`src/views/tab/`)
+
+`TabView` (`VIEW_TYPE = 'an-dr-commits'`) owns the webview panel lifecycle, HTML rendering, and message dispatch, but the ~70 message handlers themselves live in seven sibling `*Actions.ts` modules grouped by category — `respondToMessage`'s switch is a pure dispatch table delegating into these. Each module exports a small `*ActionContext` interface (a facade over exactly the `TabView` fields/methods that group's handlers need — usually just `dataSource` + `sendMessage`, occasionally more) built once in the `TabView` constructor and passed to every handler call in that group.
 
 | File | Purpose |
 |---|---|
-| `index.ts` | Activity Bar webview provider, Git API subscription, repository selection sync, commit actions |
-| `html.ts` | Activity Bar HTML shell and uncommitted-changes tree rendering |
-| `css.ts` | Activity Bar scoped CSS |
-| `script.ts` | Activity Bar webview script |
-| `gitUtils.ts` | Git API working-tree helpers |
-| `miniGraph.ts` | Current branch/upstream mini graph data and SVG/row rendering |
-| `repoSelection.ts` | Shared repository selection event contract |
-| `ui.ts` | Shared Activity Bar UI helpers for escaping, codicons, repo selector, refresh button, and tag pills |
+| `tabView.ts` | **Core class `TabView`** — panel lifecycle, HTML rendering, native-SCM-extension watcher, `respondToMessage` dispatch switch |
+| `webviewHtml.ts` | Tab webview HTML + CSP rendering (`renderCommitsWebviewHtml`) |
+| `repoLifecycleActions.ts` | `loadRepos`/`loadRepoInfo`/`loadCommits`/`loadConfig`/`rescanForRepos`/`setRepoState`/`exportRepoConfig`/`setGlobalViewState`/`setWorkspaceViewState`/`setColumnVisibility`/`repoInProgressAction` |
+| `branchRemoteActions.ts` | Branch and remote management (checkout/create/delete/rename/push/pull/fetch/merge/rebase/create-PR/…) |
+| `tagStashActions.ts` | Tag and stash management (add/delete/push tag; apply/pop/drop/push stash; branch-from-stash) |
+| `commitGraphActions.ts` | Per-commit actions (details, compare, checkout, cherry-pick, drop, reword, edit-author, squash, reset-to-commit/head, revert) and the sidebar batch-ref-action helpers |
+| `diffFileContentActions.ts` | Diff viewing and file-content/file-management (view/get diff, open file, copy path, create archive, add to `.gitignore`) |
+| `workingTreeActions.ts` | Working-tree changes (load/stage/unstage/commit/discard/clean-untracked) |
+| `miscActions.ts` | Everything else (user details, extension settings, external URL, error dialog, view-scm, fetch avatar, send-to-code-review) |
+| `fileIcons.ts` | Loads file-type icon SVGs from the `an-dr-file-icons` extension for the file tree |
+
+### Sidebar view (`src/views/sidebar/`)
+
+`SidebarView` sends raw-JSON `SidebarResponseUpdateContent`/`SidebarResponseUpdateGraph` payloads over the discriminated-union sidebar protocol (`types/sidebar-protocol.ts`); all HTML rendering happens client-side in `web/sidebar/` (mirrors how the tab already worked), not server-side.
+
+| File | Purpose |
+|---|---|
+| `sidebarView.ts` | **Core class `SidebarView`** (webview view type `an-dr-commits.activityView`) — Git API subscription, repository selection sync, message dispatch |
+| `html.ts` | Renders the static webview shell only (meta tags, `sidebarInitialState` JSON, `sidebar.min.js`/`sidebar.min.css` tags) — no server-rendered content HTML |
+| `gitUtils.ts` | Git API working-tree helpers (`getHeadInfo`, `getWorkingTreeChanges`, `countChanges`, …) |
+| `miniGraph.ts` | Fetches the current branch/upstream mini-graph's raw commit data (`fetchMiniGraph`); reachable-set computation and rendering both live client-side in `web/sidebar/miniGraph.ts` |
+| `ui.ts` | Server-rendered chrome only: `codicon`, refresh button, open-commits button, actions row |
+
+### Shared view code (`src/views/common/`)
+
+| File | Purpose |
+|---|---|
+| `repoSelection.ts` | `RepoSelectionEvent`/`RepoSelectionSource` — the cross-view repository-selection sync contract used by both `TabView` and `SidebarView` |
+| `webviewChrome.ts` | `standardiseCspSource`, `renderWebviewMetaTags`, `renderLoadingSplashHtml` — webview shell HTML shared between the tab and sidebar HTML renderers |
 
 ---
 
@@ -106,12 +130,11 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 
 | File | Purpose |
 |---|---|
-| `main.ts` | **Core UI class `CommitsView`** — owns all state, renders commit table + graph, handles all user interactions, sends/receives messages |
+| `main.ts` | **Core UI class `CommitsView`** (frontend-only; unrelated to the backend `TabView` class, which used to share this name before the backend-side rename) — owns all state, renders commit table + graph, handles all user interactions, sends/receives messages |
 | `branchPanel.ts` | Left sidebar: branch + tag list with checkboxes, folder grouping by `/`, resize handle, hide/show toggle. Class `BranchPanel`. |
 | `graph.ts` | SVG commit graph controller / rendering orchestration |
 | `aGraphModels.ts` | Graph constants, geometry types, and `Branch` / `Vertex` models |
 | `graphRebase.ts` | Rebase-guide lookup and path helpers for the graph |
-| `dropdown.ts` | Repo selector dropdown (top bar). Class `Dropdown`. |
 | `dialog.ts` | Modal dialogs for Git operations |
 | `customSelect.ts` | Dialog multi/single select widget used by `dialog.ts` |
 | `contextMenu.ts` | Right-click context menus on commits/refs |
@@ -120,14 +143,28 @@ After any change to `web/` or `web/styles/`, run `npm run compile-web` and reloa
 | `settingsWidgetDialogs.ts` | Settings widget issue-linking and pull-request dialog flows |
 | `changesPanel.ts` | Uncommitted-changes mode for the Files Panel: staged/unstaged sections, commit message textarea, stage/unstage/discard/commit actions — shown in `#filesPanel` when the uncommitted row is selected |
 | `textFormatter.ts` | Commit message formatting (issue links, etc.) |
-| `utils.ts` | Frontend globals: `ICONS` object, `escapeHtml`, `VSCODE_API`, helpers |
+| `utils.ts` | Frontend globals: `ICONS` object, `VSCODE_API`, table/graph/column-width constants. Cross-view helpers (`escapeHtml`, `codicon`, tag pills, `Dropdown`, …) moved to `web/common/`, see below |
 | `branchPanelRender.ts` | Branch panel tree building and HTML rendering helpers |
-| `main/*` | Extracted `main.ts` helper modules (committed column, controls layout, quick diff rendering, file tree rendering, full diff panel rendering, repo-state helpers, misc helpers) |
-| `global.d.ts` | Type declarations for globals shared across web files |
+| `main/*` | Extracted `main.ts` helper modules (committed column, controls layout, quick diff rendering, file tree rendering, full diff panel rendering, repo-state helpers, misc helpers) — tab-bundle only |
+| `common/*` | Browser-side code shared by both the tab bundle and the sidebar bundle (no `import`/`export`, global scope like everything else in `web/`): `htmlHelpers.ts` (`escapeHtml`, `unescapeHtml`, `codicon`), `refPills.ts` (`renderTagPill`, `renderTagOverflowPill`), `dropdown.ts` (`Dropdown` class — repo selector), `mathHelpers.ts` (`clamp`), `outsideClick.ts` (`addOutsideClickListener`), `uiHelpers.ts` (`alterClass`, `formatCommaSeparatedList`, `CLASS_SELECTED`), `graphConstants.ts` (`UNCOMMITTED`) |
+| `sidebar/*` | The sidebar bundle's own client-side code — see below |
+| `global.d.ts` | Type declarations for globals shared across web files; `acquireVsCodeApi<TMessage, TState>()` is generic so the tab and sidebar bundles can each type their own `VSCODE_API` |
+
+### Sidebar frontend (`web/sidebar/`)
+
+Compiles into the separate `sidebar.min.js`/`sidebar.min.css` bundle (see "Building web code" in the repo-root `AGENTS.md`). Client-side rendering ported from what used to be server-rendered HTML in `src/activityBarView/` (now `src/views/sidebar/`) — the sidebar now works the same way the tab always did: the backend sends raw JSON, the browser renders it.
+
+| File | Purpose |
+|---|---|
+| `main.ts` | **Core class `SidebarView`** (frontend-only; distinct from the backend `SidebarView` in `src/views/sidebar/sidebarView.ts`) — wires the repo dropdown, action buttons, changes-tree interactions, commit footer, mini-graph, resize handle. `sidebarBootstrap()` is the entry point (renamed from a plain `bootstrap()` to avoid colliding with `web/main.ts`'s own `bootstrap()` in the shared global scope — the tab bundle isn't loaded here, but naming stays collision-safe project-wide) |
+| `changesTree.ts` | Pure client-side rendering of the working-tree changes tree (staged/unstaged sections, folders, file rows) |
+| `miniGraph.ts` | Pure client-side mini-graph rendering, including the `Set`-based reachable-commit computation (ported from the old server-side `activityBarView/miniGraph.ts`) |
+| `styles/main.css` | Sidebar-only CSS, bundled into `sidebar.min.css` |
+| `global.d.ts` | Declares the `sidebarInitialState: GG.SidebarInitialState` global injected by `views/sidebar/html.ts` |
 
 ### Styles (`web/styles/`)
 
-Each CSS file corresponds 1:1 to its component. All get concatenated into `media/out.min.css`.
+Each CSS file corresponds 1:1 to its component. All get concatenated into `media/out.min.css` (the tab bundle only — `web/sidebar/styles/main.css` is separate and goes into `media/sidebar.min.css`, see above).
 
 | File | Styles for |
 |---|---|
@@ -171,22 +208,22 @@ fast path, since all three call through the same `render()` site.
 ## Key data flows
 
 ### Opening the graph
-`extension.ts:activate` → `CommitsView.createOrShow()` → `getHtmlForWebview()` injects `initialState` JSON → webview `main.ts` constructor reads it → calls `requestLoadRepoInfoAndCommits()`.
+`extension.ts:activate` → `TabView.createOrShow()` → `getHtmlForWebview()` injects `initialState` JSON → webview `main.ts` constructor reads it → calls `requestLoadRepoInfoAndCommits()`.
 
 ### Loading commits
-Webview sends `loadRepoInfo` / `loadCommits` messages → `commitsView.ts` receives → calls `dataSource.getRepoInfo()` + `dataSource.getCommits()` → sends back `loadRepoInfo` / `loadCommits` responses → webview `loadRepoInfo()` / `loadCommits()` update state → `render()`.
+Webview sends `loadRepoInfo` / `loadCommits` messages → `TabView.respondToMessage` receives → dispatches to `views/tab/repoLifecycleActions.ts`'s `handleLoadRepoInfo`/`handleLoadCommits` → these call `dataSource.getRepoInfo()` + `dataSource.getCommits()` → send back `loadRepoInfo` / `loadCommits` responses → webview `loadRepoInfo()` / `loadCommits()` update state → `render()`.
 
 ### Following Source Control selection
-`commitsView.ts` subscribes to the built-in Git extension API on startup. When a repository's `ui.selected` state changes in VS Code Source Control, Commits resolves the selected Git API repository back to a known Commits repo via `repoManager.getKnownRepo()`, sends `loadRepos` with `loadViewTo`, then triggers a refresh so the webview reloads the newly selected repository.
+`TabView` subscribes to the built-in Git extension API on startup (`setupNativeScmWatcher()`). When a repository's `ui.selected` state changes in VS Code Source Control, Commits resolves the selected Git API repository back to a known Commits repo via `repoManager.getKnownRepo()`, sends `loadRepos` with `loadViewTo`, then triggers a refresh so the webview reloads the newly selected repository. The tab and sidebar also sync repo selection with each other directly, independent of VS Code's own SCM selection — see `views/common/repoSelection.ts` and `TabView.configureRepoSelectionSync()`.
 
 ### Branch filter
 `BranchPanel.changeCallback` → `main.ts` sets `this.currentBranches` → `requestLoadCommits()` → backend `dataSource.getLog(repo, branches, ...)` → passes branch names directly as `git log <branch>` args. `null` means show all (`--branches --tags --remotes`). Tag names work as valid git refs.
 
 ### Git operations
-User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` → `sendMessage({command: 'someAction', ...})` → `commitsView.ts` → `commands.ts` runs git → response sent back to webview.
+User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` → `sendMessage({command: 'someAction', ...})` → `TabView.respondToMessage` dispatches to the matching `views/tab/*Actions.ts` handler → `commands.ts` (or `dataSource.ts` directly) runs git → response sent back to webview.
 
 ### Sending commit ranges to Code Review
-`web/main.ts` sends `sendToCodeReview` with `repo`, `from`, and `to`. `src/commitsView.ts` forwards all three values to `an-dr-code-review.setCommitRange`; Code Review uses the repository root to switch to the matching Git API repository before diffing the pinned commit range. Keep this repo argument when changing the contract so submodule and multi-root workspaces do not diff the wrong repository.
+`web/main.ts` sends `sendToCodeReview` with `repo`, `from`, and `to`. `TabView.respondToMessage` dispatches to `views/tab/miscActions.ts`'s `handleSendToCodeReview`, which forwards all three values to `an-dr-code-review.setCommitRange`; Code Review uses the repository root to switch to the matching Git API repository before diffing the pinned commit range. Keep this repo argument when changing the contract so submodule and multi-root workspaces do not diff the wrong repository.
 
 ---
 
@@ -194,19 +231,23 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 
 | Want to change… | Go to |
 |---|---|
-| Top toolbar button order / overflow | `web/main/controlsLayout.ts` + `src/view/webviewHtml.ts` |
+| Top toolbar button order / overflow | `web/main/controlsLayout.ts` + `src/views/tab/webviewHtml.ts` |
 | Quick diff rendering / switching | `web/main/diffPreview.ts` + `web/styles/main.css` |
 | Full diff bottom panel rendering | `web/main/fullDiffPanel.ts` + `web/styles/main.css` |
 | Git command execution | `src/dataSource.ts` |
-| Branch/tag sidebar UI | `web/branchPanel.ts` + `web/styles/branchPanel.css` |
+| Branch/tag sidebar UI (tab's left panel, not the Activity Bar sidebar) | `web/branchPanel.ts` + `web/styles/branchPanel.css` |
 | Remote URL display / edit in sidebar | `web/branchPanelRender.ts` + `web/main/contextMenus/sidebar.ts` + `web/main/actions/gitActions.ts` |
 | Commit table rendering | `web/main.ts` → `renderTable()` (~line 812) |
 | Commit graph (SVG) | `web/graph.ts` |
-| Context menu actions | `web/main.ts` (handlers) + `src/commands.ts` (execution) |
-| Webview HTML structure | `src/commitsView.ts` → `getHtmlForWebview()` |
+| Context menu actions | `web/main.ts` (handlers) + `src/commands.ts` / `src/views/tab/commitGraphActions.ts` (execution) |
+| Tab webview HTML structure | `src/views/tab/tabView.ts` → `getHtmlForWebview()` + `src/views/tab/webviewHtml.ts` |
+| Tab message handler for a specific request | `src/views/tab/tabView.ts`'s `respondToMessage` switch → follow the `case` to whichever `src/views/tab/*Actions.ts` module it delegates to |
+| Activity Bar sidebar webview (panel + interactions) | `src/views/sidebar/` (backend: shell HTML, Git API, message dispatch) + `web/sidebar/` (frontend: all rendering) |
 | Extension settings | `src/config.ts` + `package.json` `contributes.configuration` |
-| Message protocol | `src/types.ts` (backend) + `web/global.d.ts` (frontend) |
-| Webview icons | `web/utils.ts` → `ICONS` constant |
+| Message protocol (tab) | `src/types/message-protocol.ts` (backend) + `web/global.d.ts` (frontend) |
+| Message protocol (sidebar) | `src/types/sidebar-protocol.ts` + `src/types/sidebar-state.ts` (backend) + `web/sidebar/global.d.ts` (frontend) |
+| Code shared between tab and sidebar | `src/views/common/` (backend) + `web/common/` (frontend) |
+| Webview icons | `web/utils.ts` → `ICONS` constant (tab) / `web/common/htmlHelpers.ts` → `codicon()` (both) |
 | Status bar button | `src/statusBarItem.ts` |
 | Inline blame / current line commit display | `src/inlineBlame.ts` + `src/dataSource.ts` |
 | Repo discovery | `src/repoManager.ts` |
@@ -215,8 +256,9 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 
 ## Important conventions
 
-- **No shared code** between `src/` and `web/` — they are compiled independently.
-- Frontend globals (`ICONS`, `escapeHtml`, `VSCODE_API`, etc.) are defined in `web/utils.ts` and available to all other web files (concatenated, not module imports).
-- `BranchPanel` (`web/branchPanel.ts`) implements the same public interface as `Dropdown` — `setOptions`, `isSelected`, `selectOption`, `unselectOption`, `refresh`, `isOpen`, `close` — plus `setTags(tags)`. It is stored in `main.ts` as `this.branchDropdown: BranchPanel`.
-- Sidebar width is set dynamically via JS (`sidebar.style.width`, `content.style.marginLeft`). The CSS default `margin-left:200px` on `#content` is just a fallback.
+- **No shared code** between `src/` and `web/` — they are compiled independently. Within each of those two worlds, however, `src/views/common/` and `web/common/` are deliberately shared between the tab and sidebar views — see ADR-003/ADR-004.
+- Frontend globals (`ICONS`, `VSCODE_API`, etc. in `web/utils.ts`; `escapeHtml`/`codicon`/`Dropdown`/etc. in `web/common/`) are available to all other web files in the same bundle (concatenated, not module imports) — but the tab bundle and sidebar bundle are two separate concatenations, so a tab-only file (e.g. anything under `web/main/`) is not visible to sidebar code and vice versa.
+- `BranchPanel` (`web/branchPanel.ts`) implements the same public interface as `web/common/dropdown.ts`'s `Dropdown` — `setOptions`, `isSelected`, `selectOption`, `unselectOption`, `refresh`, `isOpen`, `close` — plus `setTags(tags)`. It is stored in `main.ts` as `this.branchDropdown: BranchPanel`.
+- Sidebar width is set dynamically via JS (`sidebar.style.width`, `content.style.marginLeft`). The CSS default `margin-left:200px` on `#content` is just a fallback. (This is the tab's left branch/tag panel, unrelated to the Activity Bar sidebar webview.)
 - `currentBranches` is persisted in extension state. `[SHOW_ALL_BRANCHES]` means no filter (git log sees `null`).
+- The frontend `web/main.ts` class `CommitsView` and the frontend `web/sidebar/main.ts` class `SidebarView` were **not** renamed by the `src/`-side `CommitsView`→`TabView` / `ActivityBarView`→`SidebarView` renames — `web/` classes are a separate, unrelated namespace from `src/` classes since the two worlds never share imports. Don't assume a name match implies the same class.

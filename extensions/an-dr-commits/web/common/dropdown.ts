@@ -9,7 +9,11 @@ interface DropdownOption {
 }
 
 /**
- * Implements the dropdown inputs used in the Commits View's top control bar.
+ * Implements a dropdown input - used in the Commits tab's top control bar, and (from a later
+ * increment) the sidebar's repo selector. Moved to web/common/ so both share the exact same
+ * implementation rather than the sidebar reimplementing dropdown behavior a second time (see
+ * ADR-003); single-select mode (multipleAllowed = false) is what the sidebar's repo selector
+ * uses.
  */
 class Dropdown {
 	private readonly showInfo: boolean;
@@ -68,27 +72,29 @@ class Dropdown {
 		alterClass(this.elem, 'multi', multipleAllowed);
 		this.elem.appendChild(this.menuElem);
 
-		document.addEventListener('click', (e) => {
-			if (!e.target) return;
-			if (e.target === this.currentValueElem) {
-				this.dropdownVisible = !this.dropdownVisible;
-				if (this.dropdownVisible) {
-					this.filterInput.value = '';
-					this.filter();
-				}
-				this.elem.classList.toggle('dropdownOpen');
-				if (this.dropdownVisible) this.filterInput.focus();
-			} else if (this.dropdownVisible) {
-				if ((<HTMLElement>e.target).closest('.dropdown') !== this.elem) {
-					this.close();
-				} else {
-					const option = <HTMLElement | null>(<HTMLElement>e.target).closest('.dropdownOption');
-					if (option !== null && option.parentNode === this.optionsElem && typeof option.dataset.id !== 'undefined') {
-						this.onOptionClick(parseInt(option.dataset.id!));
+		addOutsideClickListener(
+			(target) => target.closest('.dropdown') === this.elem,
+			(e, inside) => {
+				if (e.target === this.currentValueElem) {
+					this.dropdownVisible = !this.dropdownVisible;
+					if (this.dropdownVisible) {
+						this.filterInput.value = '';
+						this.filter();
+					}
+					this.elem.classList.toggle('dropdownOpen');
+					if (this.dropdownVisible) this.filterInput.focus();
+				} else if (this.dropdownVisible) {
+					if (!inside) {
+						this.close();
+					} else {
+						const option = <HTMLElement | null>(<HTMLElement>e.target).closest('.dropdownOption');
+						if (option !== null && option.parentNode === this.optionsElem && typeof option.dataset.id !== 'undefined') {
+							this.onOptionClick(parseInt(option.dataset.id!));
+						}
 					}
 				}
 			}
-		}, true);
+		);
 		document.addEventListener('contextmenu', () => this.close(), true);
 		this.filterInput.addEventListener('keyup', () => this.filter());
 	}
@@ -229,9 +235,9 @@ class Dropdown {
 		for (let i = 0; i < this.options.length; i++) {
 			const escapedName = escapeHtml(this.options[i].name);
 			html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '">' +
-				(this.multipleAllowed && this.optionsSelected[i] ? '<div class="dropdownOptionMultiSelected">' + ICONS.check + '</div>' : '') +
+				(this.multipleAllowed && this.optionsSelected[i] ? '<div class="dropdownOptionMultiSelected">' + codicon('check') + '</div>' : '') +
 				escapedName + (typeof this.options[i].hint === 'string' && this.options[i].hint !== '' ? '<span class="dropdownOptionHint">' + escapeHtml(this.options[i].hint!) + '</span>' : '') +
-				(this.showInfo ? '<div class="dropdownOptionInfo" title="' + escapeHtml(this.options[i].value) + '">' + ICONS.info + '</div>' : '') +
+				(this.showInfo ? '<div class="dropdownOptionInfo" title="' + escapeHtml(this.options[i].value) + '">' + codicon('info') + '</div>' : '') +
 				'</div>';
 		}
 		this.optionsElem.className = 'dropdownOptions' + (this.showInfo ? ' showInfo' : '');

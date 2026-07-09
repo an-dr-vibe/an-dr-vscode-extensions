@@ -1,18 +1,20 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { getConfig } from '../config';
-import { DataSource, GitWorkingTreeChange } from '../dataSource';
-import { ExtensionState } from '../extensionState';
-import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode } from '../types';
-import { UNCOMMITTED, viewDiff } from '../utils';
-import { Event } from '../utils/event';
+import { getConfig } from '../../config';
+import { DataSource, GitWorkingTreeChange } from '../../dataSource';
+import { ExtensionState } from '../../extensionState';
+import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode } from '../../types';
+import { UNCOMMITTED, viewDiff } from '../../utils';
+import { Event } from '../../utils/event';
 import {
-	ActivityBarMessage, GitChangeCounts, HeadInfo,
+	GitChangeCounts, HeadInfo,
 	countChanges, getHeadInfo
 } from './gitUtils';
-import { MINI_GRAPH_LIMIT, fetchMiniGraph, renderMiniGraphInner } from './miniGraph';
-import { renderContentHtml, renderHtml, renderLoadingHtml } from './html';
-import { RepoSelectionEvent } from './repoSelection';
+import { MINI_GRAPH_LIMIT, fetchMiniGraph } from './miniGraph';
+import { renderHtml, renderLoadingHtml } from './html';
+import { RepoSelectionEvent } from '../common/repoSelection';
+import { SidebarInitialState, SidebarMiniGraphInitialState } from '../../types/sidebar-state';
+import { SidebarRequestMessage, SidebarResponseMessage } from '../../types/sidebar-protocol';
 
 export { GitActivityChange, GitChangeCounts, getWorkingTreeChanges, countChanges, countWorkingTreeChanges } from './gitUtils';
 
@@ -28,7 +30,7 @@ function resetModeLabel(mode: GitResetMode): string {
  * Activity Bar webview that mirrors the Commits uncommitted-changes panel for
  * the active repository, while keeping the existing activity badge behavior.
  */
-export class ActivityBarView implements vscode.Disposable {
+export class SidebarView implements vscode.Disposable {
 	private readonly dataSource: DataSource;
 	private readonly extensionState: ExtensionState;
 	private readonly extensionPath: string;
@@ -44,7 +46,6 @@ export class ActivityBarView implements vscode.Disposable {
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _miniGraphLimit = MINI_GRAPH_LIMIT;
 	private _hasRenderedOnce = false;
-	private _hadMiniGraph = false;
 
 	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void) {
 		this.dataSource = dataSource;
@@ -72,7 +73,7 @@ export class ActivityBarView implements vscode.Disposable {
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.file(path.join(this.extensionPath, 'media'))]
 		};
-		webviewView.webview.onDidReceiveMessage((msg: ActivityBarMessage) => {
+		webviewView.webview.onDidReceiveMessage((msg: SidebarRequestMessage) => {
 			void this._handleMessage(msg);
 		});
 		this._updateBadge();
@@ -191,14 +192,38 @@ export class ActivityBarView implements vscode.Disposable {
 			: undefined;
 	}
 
+	private async _sendMessage(msg: SidebarResponseMessage) {
+		if (this._view === null) return;
+		await this._view.webview.postMessage(msg);
+	}
+
+	/**
+	 * Assembles the sidebar's client-side state contract (see ADR-003) from fetched data plus
+	 * live config - used for both the shell's initial render and the raw-data patch messages,
+	 * so both stay in sync by construction.
+	 */
+	private _buildInitialState(repo: string | null, repoPaths: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, miniGraph: SidebarMiniGraphInitialState | null, graphHeight: number): SidebarInitialState {
+		const config = getConfig();
+		return {
+			repo, repoPaths, changes, error, graphHeight, miniGraph,
+			enhancedAccessibility: config.enhancedAccessibility,
+			graphConfig: {
+				showTags: config.graph.showTagsInActivityBar,
+				colours: config.graph.colours,
+				grid: config.graph.grid,
+				uncommittedChangesStyle: config.graph.uncommittedChanges
+			}
+		};
+	}
+
 	/**
 	 * Refreshes the panel's data. By default this patches the existing DOM in place
 	 * (preserving scroll position, in-progress graph resize, and any typed-but-uncommitted
 	 * message) since most refreshes are triggered by routine file-watcher events while the
-	 * same repo stays open. A full page replace only happens when what's being shown
-	 * actually changes identity - the very first render, a repo switch, or the mini graph
-	 * appearing/disappearing (which changes the DOM structure a patch can't handle) - since
-	 * those are the only cases where resetting scroll/resize state is expected anyway.
+	 * same repo stays open. A full page replace only happens on the very first render or a
+	 * repo switch - the sidebar's own client-side rendering (web/sidebar/main.ts) now handles
+	 * the mini graph appearing/disappearing via a patch (show/hide, not a DOM structure change),
+	 * so that no longer needs a full replace the way the pre-port server-rendered HTML did.
 	 */
 	private async _refreshPanel() {
 		if (this._view === null) return;
@@ -213,12 +238,11 @@ export class ActivityBarView implements vscode.Disposable {
 
 		if (repo === null) {
 			this._changes = [];
-			this._hadMiniGraph = false;
 			if (needsFullRender) {
-				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, null, [], null, repoPaths, null, graphHeight);
+				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(null, repoPaths, [], null, null, graphHeight));
 				this._hasRenderedOnce = true;
 			} else {
-				await this._view.webview.postMessage({ command: 'updateContent', contentHtml: renderContentHtml([], null), graphHtml: '', hasGraph: false });
+				await this._sendMessage({ command: 'updateContent', repo: null, repoPaths, changes: [], error: null, miniGraph: null });
 			}
 			return;
 		}
@@ -235,86 +259,86 @@ export class ActivityBarView implements vscode.Disposable {
 		]);
 		if (seq !== this._refreshSeq) return;
 		this._changes = result.changes;
-		const hasGraph = miniGraph !== null && miniGraph.commits.length > 0;
 
-		if (needsFullRender || hasGraph !== this._hadMiniGraph) {
-			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, repo, result.changes, result.error, repoPaths, miniGraph, graphHeight);
+		if (needsFullRender) {
+			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(repo, repoPaths, result.changes, result.error, miniGraph, graphHeight));
 			this._hasRenderedOnce = true;
 		} else {
-			await this._view.webview.postMessage({
-				command: 'updateContent',
-				contentHtml: renderContentHtml(result.changes, result.error),
-				graphHtml: hasGraph ? renderMiniGraphInner(miniGraph!) : '',
-				graphMore: miniGraph?.moreAvailable ?? false,
-				hasGraph
-			});
+			await this._sendMessage({ command: 'updateContent', repo, repoPaths, changes: result.changes, error: result.error, miniGraph });
 		}
-		this._hadMiniGraph = hasGraph;
 	}
 
-	private async _handleMessage(msg: ActivityBarMessage) {
+	private async _handleMessage(msg: SidebarRequestMessage) {
 		const repo = this._currentRepo;
-		if (msg.command === 'openCommits') {
-			await vscode.commands.executeCommand('an-dr-commits.view');
-			return;
+		switch (msg.command) {
+			case 'openCommits':
+				await vscode.commands.executeCommand('an-dr-commits.view');
+				return;
+			case 'loadMoreGraph':
+				this._miniGraphLimit += MINI_GRAPH_LIMIT;
+				if (repo !== null && this._view !== null) {
+					const miniGraph = await fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
+					await this._sendMessage({ command: 'updateGraph', miniGraph });
+				}
+				return;
+			case 'selectRepo':
+				this._pinnedRepo = this._findApiRepoPath(msg.filePath) ?? msg.filePath;
+				this.extensionState.setLastActiveRepo(this._pinnedRepo);
+				this.emitRepoSelection({ repo: this._pinnedRepo, source: 'activity' });
+				await this._refreshPanel();
+				return;
+			case 'refresh':
+				await this._refreshPanel();
+				return;
+			case 'setGraphHeight':
+				await this.extensionState.setActivityGraphHeight(msg.height);
+				return;
 		}
-		if (msg.command === 'loadMoreGraph') {
-			this._miniGraphLimit += MINI_GRAPH_LIMIT;
-			if (repo !== null && this._view !== null) {
-				const miniGraph = await fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
-				await this._view.webview.postMessage({
-					command: 'updateGraph',
-					html: miniGraph ? renderMiniGraphInner(miniGraph) : '',
-					more: miniGraph?.moreAvailable ?? false
-				});
-			}
-			return;
-		}
-		if (msg.command === 'selectRepo' && msg.filePath) {
-			this._pinnedRepo = this._findApiRepoPath(msg.filePath) ?? msg.filePath;
-			this.extensionState.setLastActiveRepo(this._pinnedRepo);
-			this.emitRepoSelection({ repo: this._pinnedRepo, source: 'activity' });
-			await this._refreshPanel();
-			return;
-		}
-		if (msg.command === 'refresh') {
-			await this._refreshPanel();
-			return;
-		}
-		if (msg.command === 'setGraphHeight' && typeof msg.height === 'number') {
-			await this.extensionState.setActivityGraphHeight(msg.height);
-			return;
-		}
+
 		if (repo === null) return;
 
 		let error: ErrorInfo = null;
-		if (msg.command === 'stage' && msg.filePath) {
-			error = await this.dataSource.stageFiles(repo, [msg.filePath]);
-		} else if (msg.command === 'unstage' && msg.filePath) {
-			error = await this.dataSource.unstageFiles(repo, [msg.filePath]);
-		} else if (msg.command === 'stageAll') {
-			error = await this.dataSource.stageFiles(repo, this._changes.filter((c) => !c.staged).map((c) => c.path));
-		} else if (msg.command === 'unstageAll') {
-			error = await this.dataSource.unstageFiles(repo, this._changes.filter((c) => c.staged).map((c) => c.path));
-		} else if (msg.command === 'discard' && msg.filePath) {
-			error = await this.dataSource.discardFileChanges(repo, [msg.filePath], !!msg.isUntracked, !!msg.restoreToIndex);
-		} else if (msg.command === 'commit') {
-			error = await this._commit(repo, msg.message ?? '', !!msg.amend);
-		} else if (msg.command === 'openChanges' && msg.filePath) {
-			const change = this._changes.find((c) => c.path === msg.filePath);
-			if (change !== undefined && change.status !== 'U') {
-				error = await viewDiff(repo, UNCOMMITTED, UNCOMMITTED, change.oldPath || change.path, change.path, this._toGitFileStatus(change.status));
+		switch (msg.command) {
+			case 'stage':
+				error = await this.dataSource.stageFiles(repo, [msg.filePath]);
+				break;
+			case 'unstage':
+				error = await this.dataSource.unstageFiles(repo, [msg.filePath]);
+				break;
+			case 'stageAll':
+				error = await this.dataSource.stageFiles(repo, this._changes.filter((c) => !c.staged).map((c) => c.path));
+				break;
+			case 'unstageAll':
+				error = await this.dataSource.unstageFiles(repo, this._changes.filter((c) => c.staged).map((c) => c.path));
+				break;
+			case 'discard':
+				error = await this.dataSource.discardFileChanges(repo, [msg.filePath], msg.isUntracked, !!msg.restoreToIndex);
+				break;
+			case 'commit':
+				error = await this._commit(repo, msg.message, msg.amend);
+				break;
+			case 'openChanges': {
+				const change = this._changes.find((c) => c.path === msg.filePath);
+				if (change !== undefined && change.status !== 'U') {
+					error = await viewDiff(repo, UNCOMMITTED, UNCOMMITTED, change.oldPath || change.path, change.path, this._toGitFileStatus(change.status));
+				}
+				break;
 			}
-		} else if (msg.command === 'gitFetch') {
-			error = await this._gitFetch(repo);
-		} else if (msg.command === 'gitPull') {
-			error = await this._gitPull(repo);
-		} else if (msg.command === 'gitPush') {
-			error = await this._gitPush(repo, GitPushBranchMode.Normal);
-		} else if (msg.command === 'gitForcePush') {
-			error = await this._gitPush(repo, GitPushBranchMode.ForceWithLease);
-		} else if (msg.command === 'gitReset') {
-			error = await this._gitReset(repo);
+			case 'gitFetch':
+				error = await this._gitFetch(repo);
+				break;
+			case 'gitPull':
+				error = await this._gitPull(repo);
+				break;
+			case 'gitPush':
+				error = await this._gitPush(repo, GitPushBranchMode.Normal);
+				break;
+			case 'gitForcePush':
+				error = await this._gitPush(repo, GitPushBranchMode.ForceWithLease);
+				break;
+			case 'gitReset':
+				error = await this._gitReset(repo);
+				break;
 		}
 
 		if (error !== null) {

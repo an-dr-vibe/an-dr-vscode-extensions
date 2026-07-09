@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { CommitsViewGlobalState, CommitsViewInitialState, CommitsViewWorkspaceState } from '../types';
+import { CommitsViewGlobalState, CommitsViewInitialState, CommitsViewWorkspaceState } from '../../types';
+import { renderLoadingSplashHtml, renderWebviewMetaTags } from '../common/webviewChrome';
 
 export interface CommitsWebviewHtmlRenderResult {
 	readonly html: string;
@@ -32,9 +33,7 @@ export function renderCommitsWebviewHtml(options: CommitsWebviewHtmlRenderOption
 	const html = `<!DOCTYPE html>
 		<html lang="en">
 			<head>
-				<meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${standardiseCspSource(options.panel.webview.cspSource)} 'unsafe-inline'; font-src ${standardiseCspSource(options.panel.webview.cspSource)}; script-src 'nonce-${options.nonce}'; img-src data:;">
-				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				${renderWebviewMetaTags({ cspSource: options.panel.webview.cspSource, nonce: options.nonce, imgSrc: 'data:' })}
 				<link rel="stylesheet" type="text/css" href="${options.mediaCssUri}">
 				<title>${options.viewName}</title>
 				<style>body{${colorVars}} ${colorParams}</style>
@@ -57,7 +56,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 
 	if (numRepos > 0) {
 		return `<body>
-			<div id="initialLoadSplash"><span class="codicon codicon-loading codicon-modifier-spin"></span><span>Loading...</span></div>
+			${renderLoadingSplashHtml('initialLoadSplash')}
 			<div id="view" tabindex="-1">
 				<div id="topBar">
 					<div id="sidebarTop">
@@ -120,19 +119,4 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 			</body>`;
 	}
 	return '';
-}
-
-/**
- * Standardise the CSP Source provided by Visual Studio Code for use with the Webview.
- */
-export function standardiseCspSource(cspSource: string): string {
-	if (cspSource.startsWith('http://') || cspSource.startsWith('https://')) {
-		const pathIndex = cspSource.indexOf('/', 8), queryIndex = cspSource.indexOf('?', 8), fragmentIndex = cspSource.indexOf('#', 8);
-		let endOfAuthorityIndex = pathIndex;
-		if (queryIndex > -1 && (queryIndex < endOfAuthorityIndex || endOfAuthorityIndex === -1)) endOfAuthorityIndex = queryIndex;
-		if (fragmentIndex > -1 && (fragmentIndex < endOfAuthorityIndex || endOfAuthorityIndex === -1)) endOfAuthorityIndex = fragmentIndex;
-		return endOfAuthorityIndex > -1 ? cspSource.substring(0, endOfAuthorityIndex) : cspSource;
-	} else {
-		return cspSource;
-	}
 }

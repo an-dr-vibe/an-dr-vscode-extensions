@@ -9,14 +9,14 @@ import { DataSource } from './dataSource';
 import { DiffDocProvider } from './diffDocProvider';
 import { ExtensionState } from './extensionState';
 import { InlineBlameController } from './inlineBlame';
-import { CommitsView } from './commitsView';
+import { TabView } from './views/tab/tabView';
 import { onStartUp } from './life-cycle/startup';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
 import { StatusBarItem } from './statusBarItem';
-import { ActivityBarView } from './activityBarView';
-import { RepoSelectionEvent } from './activityBarView/repoSelection';
-import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from './tabUtils';
+import { SidebarView } from './views/sidebar/sidebarView';
+import { RepoSelectionEvent } from './views/common/repoSelection';
+import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from './editorTabUtils';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, findGit, getGitExecutableFromPaths, showErrorMessage, showInformationMessage } from './utils';
 import { EventEmitter } from './utils/event';
 
@@ -27,7 +27,7 @@ import { EventEmitter } from './utils/event';
 export async function activate(context: vscode.ExtensionContext) {
 	const logger = new Logger();
 	logger.log('Starting Commits ...');
-	const commitsTabViewTypes = new Set([CommitsView.VIEW_TYPE, 'mainThreadWebview-' + CommitsView.VIEW_TYPE]);
+	const commitsTabViewTypes = new Set([TabView.VIEW_TYPE, 'mainThreadWebview-' + TabView.VIEW_TYPE]);
 	const commitsTabLabel = 'Commits';
 	let orphanCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 	let suppressOrphanChecksUntil = 0;
@@ -68,18 +68,18 @@ export async function activate(context: vscode.ExtensionContext) {
 	const repoManager = new RepoManager(dataSource, extensionState, onDidChangeConfiguration, logger);
 	const statusBarItem = new StatusBarItem(repoManager.getNumRepos(), repoManager.onDidChangeRepos, onDidChangeConfiguration, logger);
 	const repoSelectionEmitter = new EventEmitter<RepoSelectionEvent>();
-	CommitsView.configureRepoSelectionSync(repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
-	const activityBarView = new ActivityBarView(context, dataSource, extensionState, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
+	TabView.configureRepoSelectionSync(repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
+	const sidebarView = new SidebarView(context, dataSource, extensionState, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
 	const inlineBlameController = new InlineBlameController(dataSource, repoManager, statusBarItem, onDidChangeConfiguration, logger);
 	const commandManager = new CommandManager(context, avatarManager, dataSource, extensionState, repoManager, gitExecutable, onDidChangeGitExecutable, logger);
 	const diffDocProvider = new DiffDocProvider(dataSource);
 
 	context.subscriptions.push(
-		vscode.window.registerWebviewPanelSerializer(CommitsView.VIEW_TYPE, {
+		vscode.window.registerWebviewPanelSerializer(TabView.VIEW_TYPE, {
 			async deserializeWebviewPanel(panel: vscode.WebviewPanel, _state: any) {
 				logger.logDebug('Deserializing Commits webview panel...');
 				delayOrphanChecks('webview serializer restore', 750);
-				CommitsView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
+				TabView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
 			}
 		}),
 		vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
@@ -107,7 +107,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		commandManager,
 		statusBarItem,
 		repoSelectionEmitter,
-		activityBarView,
+		sidebarView,
 		inlineBlameController,
 		repoManager,
 		avatarManager,
@@ -137,14 +137,14 @@ export async function activate(context: vscode.ExtensionContext) {
 			cancelPendingOrphanCheck();
 			orphanCheckTimeout = setTimeout(() => {
 				orphanCheckTimeout = null;
-				if (!CommitsView.currentPanel) return;
+				if (!TabView.currentPanel) return;
 				const remainingSuppressionMs = suppressOrphanChecksUntil - Date.now();
 				if (remainingSuppressionMs > 0) {
 					scheduleOrphanCheck();
 					return;
 				}
 				if (doesCommitsTabExist()) return;
-				CommitsView.recoverOrphanedPanelIfNeeded(logger);
+				TabView.recoverOrphanedPanelIfNeeded(logger);
 			}, 250);
 		};
 
@@ -170,7 +170,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			void closeDuplicateCommitsTabs();
 			try {
 				const hasCommitsTab = doesCommitsTabExist();
-				if (CommitsView.currentPanel && !hasCommitsTab) {
+				if (TabView.currentPanel && !hasCommitsTab) {
 					scheduleOrphanCheck();
 				} else if (hasCommitsTab) {
 					cancelPendingOrphanCheck();

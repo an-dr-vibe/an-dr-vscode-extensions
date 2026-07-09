@@ -1,9 +1,5 @@
 /* Constants */
-const VSCODE_API = acquireVsCodeApi();
-
-function codicon(name: string, extraClass: string = '') {
-	return '<span class="codicon codicon-' + name + (extraClass === '' ? '' : ' ' + extraClass) + '" aria-hidden="true"></span>';
-}
+const VSCODE_API = acquireVsCodeApi<GG.RequestMessage, WebViewState>();
 
 const ICONS = {
 	alert: codicon('warning'),
@@ -75,14 +71,8 @@ const GIT_SIGNATURE_STATUS_DESCRIPTIONS = {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const REF_INVALID_REGEX = /^[-\/].*|[\\" ><~^:?*[]|\.\.|\/\/|\/\.|@{|[.\/]$|\.lock$|^@$/g;
 
-const HTML_ESCAPES: { [key: string]: string } = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#x27;', '/': '&#x2F;' };
-const HTML_UNESCAPES: { [key: string]: string } = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': '\'', '&#x2F;': '/' };
-const HTML_ESCAPER_REGEX = /[&<>"'\/]/g;
-const HTML_UNESCAPER_REGEX = /&lt;|&gt;|&amp;|&quot;|&#x27;|&#x2F;/g;
-
 const ELLIPSIS = '&#8230;';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
-const UNCOMMITTED = '*';
 const SHOW_ALL_BRANCHES = '';
 
 const COLUMN_HIDDEN = -100;
@@ -103,7 +93,6 @@ const CLASS_REF_HEAD = 'head';
 const CLASS_REF_REMOTE = 'remote';
 const CLASS_REF_STASH = 'stash';
 const CLASS_REF_TAG = 'tag';
-const CLASS_SELECTED = 'selected';
 const CLASS_TAG_LABELS_RIGHT_ALIGNED = 'tagLabelsRightAligned';
 const CLASS_TRANSITION = 'transition';
 
@@ -239,41 +228,7 @@ function getSortedRepositoryPaths(repos: GG.GitRepoSet, order: GG.RepoDropdownOr
 }
 
 
-/* HTML Escape / Unescape */
-
-/**
- * Escape HTML in the specified string.
- * @param str The string to escape.
- * @returns The escaped string.
- */
-function escapeHtml(str: string) {
-	return str.replace(HTML_ESCAPER_REGEX, (match) => HTML_ESCAPES[match]);
-}
-
-/**
- * Unescape HTML in the specified string.
- * @param str The string to unescape.
- * @returns The unescaped string.
- */
-function unescapeHtml(str: string) {
-	return str.replace(HTML_UNESCAPER_REGEX, (match) => HTML_UNESCAPES[match]);
-}
-
-
 /* Formatters */
-
-/**
- * Format an array of strings as a comma separated list.
- * @param items The array of strings.
- * @returns A formatted comma separated string (e.g. "A, B & C").
- */
-function formatCommaSeparatedList(items: string[]) {
-	let str = '';
-	for (let i = 0; i < items.length; i++) {
-		str += (i > 0 ? (i < items.length - 1 ? ', ' : ' & ') : '') + items[i];
-	}
-	return str;
-}
 
 /**
  * Format a date (short).
@@ -390,25 +345,6 @@ function insertBeforeFirstChildWithClass(newChild: HTMLElement, parent: HTMLElem
 		}
 	}
 	parent.insertBefore(newChild, referenceNode);
-}
-
-/**
- * Alter an HTML Element such that it contains, or doesn't contain the specified class name.
- * @param elem The HTML Element to alter.
- * @param className The class name.
- * @param state TRUE => Ensure the HTML Element has the class name, FALSE => Ensure the HTML Element doesn't have the class name
- * @returns TRUE => The HTML Element was altered, FALSE => No change was required.
- */
-function alterClass(elem: HTMLElement, className: string, state: boolean) {
-	if (elem.classList.contains(className) !== state) {
-		if (state) {
-			elem.classList.add(className);
-		} else {
-			elem.classList.remove(className);
-		}
-		return true;
-	}
-	return false;
 }
 
 /**

@@ -15,10 +15,8 @@ function commitsMakeCommitDetailsViewResizable(view: any) {
 		if (prevY < 0) return;
 		let delta = (<MouseEvent>e).pageY - prevY, isDocked = view.isCommitDetailsViewDocked(), windowHeight = window.innerHeight;
 		prevY = (<MouseEvent>e).pageY;
-		let height = view.gitRepos[view.currentRepo].commitDetailsViewHeight + (isDocked ? -delta : delta);
-		if (height < 100) height = 100;
-		else if (height > 600) height = 600;
-		if (height > windowHeight - 40) height = Math.max(windowHeight - 40, 100);
+		const effectiveMaxHeight = clamp(windowHeight - 40, 100, 600);
+		const height = clamp(view.gitRepos[view.currentRepo].commitDetailsViewHeight + (isDocked ? -delta : delta), 100, effectiveMaxHeight);
 
 		if (view.gitRepos[view.currentRepo].commitDetailsViewHeight !== height) {
 			view.gitRepos[view.currentRepo].commitDetailsViewHeight = height;
@@ -46,9 +44,7 @@ function commitsMakeCommitDetailsViewDividerDraggable(view: any) {
 
 	const processDraggingCommitDetailsViewDivider: EventListener = (e) => {
 		if (minX < 0) return;
-		let percent = ((<MouseEvent>e).clientX - minX) / width;
-		if (percent < 0.2) percent = 0.2;
-		else if (percent > 0.8) percent = 0.8;
+		const percent = clamp(((<MouseEvent>e).clientX - minX) / width, 0.2, 0.8);
 
 		if (view.gitRepos[view.currentRepo].commitDetailsViewDivider !== percent) {
 			view.gitRepos[view.currentRepo].commitDetailsViewDivider = percent;

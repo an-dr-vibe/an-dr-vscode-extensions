@@ -5,7 +5,7 @@ import { getConfig } from './config';
 import { DataSource } from './dataSource';
 import { DiffDocProvider, decodeDiffDocUri } from './diffDocProvider';
 import { ExtensionState } from './extensionState';
-import { CommitsView } from './commitsView';
+import { TabView } from './views/tab/tabView';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, VsCodeVersionRequirement, copyToClipboard, doesVersionMeetRequirement, getExtensionVersion, getPathFromUri, getRepoName, getSortedRepositoryPaths, isPathInWorkspace, openFile, resolveToSymbolicPath, showErrorMessage, showInformationMessage } from './utils';
@@ -131,7 +131,7 @@ export class CommandManager extends Disposable {
 			loadRepo = await this.repoManager.resolveRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri), true);
 		}
 
-		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);
+		TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);
 	}
 
 	private async viewFromStatusBar(arg?: any) {
@@ -149,7 +149,7 @@ export class CommandManager extends Disposable {
 			loadRepo = await this.repoManager.resolveRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri), true);
 		}
 
-		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);
+		TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadRepo !== null ? { repo: loadRepo } : null);
 	}
 
 	private async revealCommitInGraph(arg: any) {
@@ -166,7 +166,7 @@ export class CommandManager extends Disposable {
 			return;
 		}
 
-		CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+		TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 			repo: loadRepo,
 			commitDetails: {
 				commitHash: arg.commitHash,
@@ -252,7 +252,7 @@ export class CommandManager extends Disposable {
 	private async fetch() {
 		const selectedRepo = await this.getSelectedSourceControlRepo();
 		if (selectedRepo !== null) {
-			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: selectedRepo,
 				runCommandOnLoad: 'fetch'
 			});
@@ -282,7 +282,7 @@ export class CommandManager extends Disposable {
 				canPickMany: false
 			}).then((item) => {
 				if (item && item.description) {
-					CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+					TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 						repo: item.description,
 						runCommandOnLoad: 'fetch'
 					});
@@ -291,12 +291,12 @@ export class CommandManager extends Disposable {
 				showErrorMessage('An unexpected error occurred while running the command "Fetch from Remote(s)".');
 			});
 		} else if (repoPaths.length === 1) {
-			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: repoPaths[0],
 				runCommandOnLoad: 'fetch'
 			});
 		} else {
-			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);
+			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);
 		}
 	}
 
@@ -320,7 +320,7 @@ export class CommandManager extends Disposable {
 	private async openViewWithCommand(command: 'pull' | 'push', actionLabel: string) {
 		const selectedRepo = await this.getSelectedSourceControlRepo();
 		if (selectedRepo !== null) {
-			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: selectedRepo,
 				runCommandOnLoad: command
 			});
@@ -347,7 +347,7 @@ export class CommandManager extends Disposable {
 				canPickMany: false
 			}).then((item) => {
 				if (item && item.description) {
-					CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+					TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 						repo: item.description,
 						runCommandOnLoad: command
 					});
@@ -356,12 +356,12 @@ export class CommandManager extends Disposable {
 				showErrorMessage('An unexpected error occurred while running the command "' + actionLabel + '".');
 			});
 		} else if (repoPaths.length === 1) {
-			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
+			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: repoPaths[0],
 				runCommandOnLoad: command
 			});
 		} else {
-			CommitsView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);
+			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, null);
 		}
 	}
 

@@ -1,7 +1,7 @@
 import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 
-import { ActivityBarView, countChanges, getWorkingTreeChanges } from '../src/activityBarView';
+import { SidebarView, countChanges, getWorkingTreeChanges } from '../src/views/sidebar/sidebarView';
 
 function mockRepo(root: string, workingTreeChanges: any[] = [], indexChanges: any[] = [], mergeChanges: any[] = []) {
 	return {
@@ -47,7 +47,7 @@ async function flushPromises() {
 	await Promise.resolve();
 }
 
-describe('ActivityBarView', () => {
+describe('SidebarView', () => {
 	it('Should collect deduped uncommitted files for badge counts', () => {
 		const repo = mockRepo('/repo', [
 			gitChange('/repo/src/modified.ts', 5),
@@ -72,7 +72,7 @@ describe('ActivityBarView', () => {
 		const repo = mockRepo('/repo');
 		mockGitApi(repo);
 		const dataSource = mockDataSource([]);
-		const view = new ActivityBarView(vscode.mocks.extensionContext as any, dataSource as any);
+		const view = new SidebarView(vscode.mocks.extensionContext as any, dataSource as any);
 		const webviewView = vscode.createWebviewView();
 
 		vscode.mocks.webviewViewProviders[0].resolveWebviewView(webviewView);
@@ -98,7 +98,7 @@ describe('ActivityBarView', () => {
 			{ path: 'src/modified.ts', status: 'M', staged: false, additions: 8, deletions: 2 },
 			{ path: 'src/new.ts', status: 'U', staged: false, additions: null, deletions: null }
 		]);
-		const view = new ActivityBarView(vscode.mocks.extensionContext as any, dataSource as any);
+		const view = new SidebarView(vscode.mocks.extensionContext as any, dataSource as any);
 		const webviewView = vscode.createWebviewView();
 
 		vscode.mocks.webviewViewProviders[0].resolveWebviewView(webviewView);

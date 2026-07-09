@@ -120,8 +120,7 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 	}
 	for (j = 0; j < commit.tags.length; j++) {
 		if (selectedTags.size > 0 && !selectedTags.has(commit.tags[j].name)) continue;
-		refName = escapeHtml(commit.tags[j].name);
-		tagBadges.push({ type: 'tag', html: '<span class="gitRef tag" data-name="' + refName + '" data-tagtype="' + (commit.tags[j].annotated ? 'annotated' : 'lightweight') + '" data-drag-ref-type="tag" data-drag-ref-name="' + refName + '" draggable="true" title="Tag: ' + refName + '">' + ICONS.tag + '<span class="gitRefName" data-fullref="' + refName + '">' + refName + '</span></span>' });
+		tagBadges.push({ type: 'tag', html: renderTagPill(commit.tags[j].name, { tagType: commit.tags[j].annotated ? 'annotated' : 'lightweight', draggable: true }) });
 	}
 	if (commit.stash !== null) {
 		refName = escapeHtml(commit.stash.selector);

@@ -10,4 +10,3 @@ export interface RepoSelectionEvent {
 	readonly repo: string;
 	readonly source: RepoSelectionSource;
 }
-

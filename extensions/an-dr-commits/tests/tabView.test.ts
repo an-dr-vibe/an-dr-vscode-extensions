@@ -11,7 +11,7 @@ import { ConfigurationChangeEvent } from 'vscode';
 import { AvatarEvent, AvatarManager } from '../src/avatarManager';
 import { DataSource } from '../src/dataSource';
 import { ExtensionState } from '../src/extensionState';
-import { CommitsView, standardiseCspSource } from '../src/commitsView';
+import { TabView, standardiseCspSource } from '../src/views/tab/tabView';
 import { Logger } from '../src/logger';
 import { RepoChangeEvent, RepoManager } from '../src/repoManager';
 import { CommitOrdering, GitCommitStash, GitConfigLocation, GitFileStatus, CommitsViewGlobalState, CommitsViewWorkspaceState, GitPushBranchMode, GitResetMode, MergeActionOn, PullRequestConfig, PullRequestProvider, RebaseActionOn, RequestMessage, ResponseMessage, TagType } from '../src/types';
@@ -21,7 +21,7 @@ import { EventEmitter } from '../src/utils/event';
 import { waitForExpect } from './helpers/expectations';
 import { mockRepoState } from './helpers/utils';
 
-describe('CommitsView', () => {
+describe('TabView', () => {
 	let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 	let onDidChangeGitExecutable: EventEmitter<utils.GitExecutable>;
 	let onDidChangeRepos: EventEmitter<RepoChangeEvent>;
@@ -79,8 +79,8 @@ describe('CommitsView', () => {
 	});
 
 	afterEach(() => {
-		if (CommitsView.currentPanel) {
-			CommitsView.currentPanel.dispose();
+		if (TabView.currentPanel) {
+			TabView.currentPanel.dispose();
 		}
 	});
 
@@ -95,7 +95,7 @@ describe('CommitsView', () => {
 			};
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith('an-dr-commits', 'Commits', vscode.ViewColumn.Two, {
@@ -108,7 +108,7 @@ describe('CommitsView', () => {
 
 		it('Should pin the Commits tab when constructing a new WebviewPanel', () => {
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.action.keepEditor');
@@ -123,7 +123,7 @@ describe('CommitsView', () => {
 			panel.webview.options = {} as any;
 
 			// Run
-			CommitsView.revive(panel, '/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger);
+			TabView.revive(panel, '/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger);
 
 			// Assert
 			expect(panel.webview.options).toStrictEqual({
@@ -135,10 +135,10 @@ describe('CommitsView', () => {
 
 		it('Should reveal the existing WebviewPanel (when one exists)', () => {
 			// Setup
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -148,12 +148,12 @@ describe('CommitsView', () => {
 
 		it('Should reveal the existing WebviewPanel (when one exists, but it isn\'t visible)', () => {
 			// Setup
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			mockedWebviewPanel.mocks.panel.setVisibility(false);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
 
 			// Assert
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
@@ -163,10 +163,10 @@ describe('CommitsView', () => {
 
 		it('Should reveal the existing WebviewPanel (when one exists), and send loadViewTo', () => {
 			// Setup
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -186,7 +186,7 @@ describe('CommitsView', () => {
 
 		it('Should construct a new WebviewPanel, providing loadViewTo', () => {
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, { repo: '/path/to/repo' });
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -199,7 +199,7 @@ describe('CommitsView', () => {
 			vscode.window.activeTextEditor = undefined;
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith('an-dr-commits', 'Commits', vscode.ViewColumn.One, {
@@ -215,7 +215,7 @@ describe('CommitsView', () => {
 			vscode.mockExtensionSettingReturnValue('retainContextWhenHidden', true);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith('an-dr-commits', 'Commits', vscode.ViewColumn.One, {
@@ -231,7 +231,7 @@ describe('CommitsView', () => {
 			vscode.mockExtensionSettingReturnValue('retainContextWhenHidden', false);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith('an-dr-commits', 'Commits', vscode.ViewColumn.One, {
@@ -247,7 +247,7 @@ describe('CommitsView', () => {
 			vscode.mockExtensionSettingReturnValue('tabIconColourTheme', 'colour');
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -259,7 +259,7 @@ describe('CommitsView', () => {
 			vscode.mockExtensionSettingReturnValue('tabIconColourTheme', 'grey');
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -270,69 +270,69 @@ describe('CommitsView', () => {
 		});
 
 		describe('WebviewPanel.onDidDispose', () => {
-			it('Should dispose the CommitsView when the WebviewPanel is disposed', () => {
+			it('Should dispose the TabViewwhen the WebviewPanel is disposed', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 				mockedWebviewPanel.mocks.panel.onDidDispose();
 
 				// Asset
-				expect(CommitsView.currentPanel).toBeUndefined();
+				expect(TabView.currentPanel).toBeUndefined();
 			});
 		});
 
 		describe('WebviewPanel.onDidChangeViewState', () => {
 			it('Should transition from visible to not-visible correctly', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-				const spyOnRepoFileWatcherStop = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'stop');
+				const spyOnRepoFileWatcherStop = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'stop');
 
 				// Run
 				mockedWebviewPanel.mocks.panel.setVisibility(false);
 
 				// Assert
-				expect(CommitsView.currentPanel!['currentRepo']).toBeNull();
+				expect(TabView.currentPanel!['currentRepo']).toBeNull();
 				expect(spyOnRepoFileWatcherStop).toHaveBeenCalledTimes(1);
-				expect(CommitsView.currentPanel!['isPanelVisible']).toBe(false);
+				expect(TabView.currentPanel!['isPanelVisible']).toBe(false);
 			});
 
 			it('Should transition from not-visible to visible correctly', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 				mockedWebviewPanel.mocks.panel.setVisibility(false);
-				CommitsView.currentPanel!['panel']['webview'].html = '';
+				TabView.currentPanel!['panel']['webview'].html = '';
 
 				// Run
 				mockedWebviewPanel.mocks.panel.setVisibility(true);
 
 				// Assert
 				expect(mockedWebviewPanel.panel.webview.html).not.toBe('');
-				expect(CommitsView.currentPanel!['isPanelVisible']).toBe(true);
+				expect(TabView.currentPanel!['isPanelVisible']).toBe(true);
 			});
 
 			it('Should ignore events if they have no effect', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-				CommitsView.currentPanel!['panel']['webview'].html = '';
+				TabView.currentPanel!['panel']['webview'].html = '';
 
 				// Run
 				mockedWebviewPanel.mocks.panel.setVisibility(true);
 
 				// Assert
 				expect(mockedWebviewPanel.panel.webview.html).toBe('');
-				expect(CommitsView.currentPanel!['isPanelVisible']).toBe(true);
+				expect(TabView.currentPanel!['isPanelVisible']).toBe(true);
 			});
 		});
 
 		describe('RepoManager.onDidChangeRepos', () => {
 			it('Should send the updated repositories to the front-end when the view is already loaded', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
 				onDidChangeRepos.emit({
@@ -357,7 +357,7 @@ describe('CommitsView', () => {
 
 			it('Should send the updated repositories to the front-end when the view is already loaded (with loadViewTo)', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
 				onDidChangeRepos.emit({
@@ -384,7 +384,7 @@ describe('CommitsView', () => {
 
 			it('Shouldn\'t send the updated repositories to the front-end when the view is not visible', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 				mockedWebviewPanel.mocks.panel.setVisibility(false);
 
@@ -401,7 +401,7 @@ describe('CommitsView', () => {
 
 			it('Should transition to no repositories correctly', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				spyOnGetRepos.mockReturnValueOnce({});
 
 				// Run
@@ -420,7 +420,7 @@ describe('CommitsView', () => {
 			it('Should transition from no repositories correctly', () => {
 				// Setup
 				spyOnGetRepos.mockReturnValueOnce({});
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
 				onDidChangeRepos.emit({
@@ -441,7 +441,7 @@ describe('CommitsView', () => {
 		describe('AvatarManager.onAvatar', () => {
 			it('Should send the avatar', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
 				onAvatar.emit({
@@ -464,10 +464,10 @@ describe('CommitsView', () => {
 		describe('RepoFileWatcher.repoChangeCallback', () => {
 			it('Should refresh the view when it\'s visible', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
-				CommitsView.currentPanel!['repoFileWatcher']['repoChangeCallback']();
+				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']();
 
 				// Assert
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -480,12 +480,12 @@ describe('CommitsView', () => {
 
 			it('Shouldn\'t refresh the view when it isn\'t visible', () => {
 				// Setup
-				CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 				mockedWebviewPanel.mocks.panel.setVisibility(false);
 
 				// Run
-				CommitsView.currentPanel!['repoFileWatcher']['repoChangeCallback']();
+				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']();
 
 				// Assert
 				expect(mockedWebviewPanel.mocks.messages).toHaveLength(0);
@@ -500,14 +500,14 @@ describe('CommitsView', () => {
 		let spyOnRepoFileWatcherMute: jest.SpyInstance;
 		let spyOnRepoFileWatcherUnmute: jest.SpyInstance;
 		beforeEach(() => {
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 
 			onDidReceiveMessage = mockedWebviewPanel.mocks.panel.webview.onDidReceiveMessage;
 			messages = mockedWebviewPanel.mocks.messages;
 
-			spyOnRepoFileWatcherMute = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'mute');
-			spyOnRepoFileWatcherUnmute = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'unmute');
+			spyOnRepoFileWatcherMute = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'mute');
+			spyOnRepoFileWatcherUnmute = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'unmute');
 		});
 
 		afterEach(() => {
@@ -1778,7 +1778,7 @@ describe('CommitsView', () => {
 				const rewordCommitResolvedValue = null;
 				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
 				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
-				const spyOnScheduleReopen = jest.spyOn<any, any>(CommitsView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				const spyOnScheduleReopen = jest.spyOn<any, any>(TabView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
 				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce(promptForRewordCommitMessageResolvedValue);
 				spyOnRewordCommit.mockResolvedValueOnce(rewordCommitResolvedValue);
 
@@ -1829,7 +1829,7 @@ describe('CommitsView', () => {
 				// Setup
 				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
 				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
-				const spyOnScheduleReopen = jest.spyOn<any, any>(CommitsView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				const spyOnScheduleReopen = jest.spyOn<any, any>(TabView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
 				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce({ message: null, error: null });
 
 				// Run
@@ -1860,7 +1860,7 @@ describe('CommitsView', () => {
 				const squashCommitsResolvedValue = null;
 				const spyOnPromptForSquashCommitMessage = jest.spyOn(dataSource, 'promptForSquashCommitMessage');
 				const spyOnSquashCommits = jest.spyOn(dataSource, 'squashCommits');
-				const spyOnScheduleReopen = jest.spyOn<any, any>(CommitsView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				const spyOnScheduleReopen = jest.spyOn<any, any>(TabView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
 				spyOnPromptForSquashCommitMessage.mockResolvedValueOnce(promptForSquashCommitMessageResolvedValue);
 				spyOnSquashCommits.mockResolvedValueOnce(squashCommitsResolvedValue);
 
@@ -2324,7 +2324,7 @@ describe('CommitsView', () => {
 							error: getCommitsResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['loadCommitsRefreshId']).toBe(2);
+					expect(TabView.currentPanel!['loadCommitsRefreshId']).toBe(2);
 				});
 			});
 
@@ -2365,7 +2365,7 @@ describe('CommitsView', () => {
 							error: getCommitsResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['loadCommitsRefreshId']).toBe(2);
+					expect(TabView.currentPanel!['loadCommitsRefreshId']).toBe(2);
 				});
 			});
 
@@ -2406,7 +2406,7 @@ describe('CommitsView', () => {
 							error: getCommitsResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['loadCommitsRefreshId']).toBe(2);
+					expect(TabView.currentPanel!['loadCommitsRefreshId']).toBe(2);
 				});
 			});
 
@@ -2447,7 +2447,7 @@ describe('CommitsView', () => {
 							error: getCommitsResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['loadCommitsRefreshId']).toBe(2);
+					expect(TabView.currentPanel!['loadCommitsRefreshId']).toBe(2);
 				});
 			});
 		});
@@ -2470,7 +2470,7 @@ describe('CommitsView', () => {
 				const spyOnGetRepoInfo = jest.spyOn(dataSource, 'getRepoInfo');
 				const spyOnRepoRoot = jest.spyOn(dataSource, 'repoRoot');
 				const spyOnSetLastActiveRepo = jest.spyOn(extensionState, 'setLastActiveRepo');
-				const spyOnRepoFileWatcherStart = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'start');
+				const spyOnRepoFileWatcherStart = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'start');
 				spyOnGetRepoInfo.mockResolvedValueOnce(getRepoInfoResolvedValue);
 				spyOnSetLastActiveRepo.mockImplementationOnce(() => { });
 				spyOnRepoFileWatcherStart.mockImplementationOnce(() => { });
@@ -2508,8 +2508,8 @@ describe('CommitsView', () => {
 							error: getRepoInfoResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['currentRepo']).toBe('/path/to/repo');
-					expect(CommitsView.currentPanel!['loadRepoInfoRefreshId']).toBe(0);
+					expect(TabView.currentPanel!['currentRepo']).toBe('/path/to/repo');
+					expect(TabView.currentPanel!['loadRepoInfoRefreshId']).toBe(0);
 				});
 			});
 
@@ -2530,9 +2530,9 @@ describe('CommitsView', () => {
 				const spyOnGetRepoInfo = jest.spyOn(dataSource, 'getRepoInfo');
 				const spyOnRepoRoot = jest.spyOn(dataSource, 'repoRoot');
 				const spyOnSetLastActiveRepo = jest.spyOn(extensionState, 'setLastActiveRepo');
-				const spyOnRepoFileWatcherStart = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'start');
+				const spyOnRepoFileWatcherStart = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'start');
 				spyOnGetRepoInfo.mockResolvedValueOnce(getRepoInfoResolvedValue);
-				CommitsView.currentPanel!['currentRepo'] = '/path/to/repo';
+				TabView.currentPanel!['currentRepo'] = '/path/to/repo';
 
 				// Run
 				onDidReceiveMessage({
@@ -2567,8 +2567,8 @@ describe('CommitsView', () => {
 							error: getRepoInfoResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['currentRepo']).toBe('/path/to/repo');
-					expect(CommitsView.currentPanel!['loadRepoInfoRefreshId']).toBe(1);
+					expect(TabView.currentPanel!['currentRepo']).toBe('/path/to/repo');
+					expect(TabView.currentPanel!['loadRepoInfoRefreshId']).toBe(1);
 				});
 			});
 
@@ -2589,10 +2589,10 @@ describe('CommitsView', () => {
 				const spyOnGetRepoInfo = jest.spyOn(dataSource, 'getRepoInfo');
 				const spyOnRepoRoot = jest.spyOn(dataSource, 'repoRoot');
 				const spyOnSetLastActiveRepo = jest.spyOn(extensionState, 'setLastActiveRepo');
-				const spyOnRepoFileWatcherStart = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'start');
+				const spyOnRepoFileWatcherStart = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'start');
 				spyOnGetRepoInfo.mockResolvedValueOnce(getRepoInfoResolvedValue);
 				spyOnRepoRoot.mockResolvedValueOnce('/path/to/repo');
-				CommitsView.currentPanel!['currentRepo'] = '/path/to/repo';
+				TabView.currentPanel!['currentRepo'] = '/path/to/repo';
 
 				// Run
 				onDidReceiveMessage({
@@ -2627,8 +2627,8 @@ describe('CommitsView', () => {
 							error: getRepoInfoResolvedValue.error
 						}
 					]);
-					expect(CommitsView.currentPanel!['currentRepo']).toBe('/path/to/repo');
-					expect(CommitsView.currentPanel!['loadRepoInfoRefreshId']).toBe(2);
+					expect(TabView.currentPanel!['currentRepo']).toBe('/path/to/repo');
+					expect(TabView.currentPanel!['loadRepoInfoRefreshId']).toBe(2);
 				});
 			});
 
@@ -2649,10 +2649,10 @@ describe('CommitsView', () => {
 				const spyOnGetRepoInfo = jest.spyOn(dataSource, 'getRepoInfo');
 				const spyOnRepoRoot = jest.spyOn(dataSource, 'repoRoot');
 				const spyOnSetLastActiveRepo = jest.spyOn(extensionState, 'setLastActiveRepo');
-				const spyOnRepoFileWatcherStart = jest.spyOn(CommitsView.currentPanel!['repoFileWatcher'], 'start');
+				const spyOnRepoFileWatcherStart = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'start');
 				spyOnGetRepoInfo.mockResolvedValueOnce(getRepoInfoResolvedValue);
 				spyOnRepoRoot.mockResolvedValue(null);
-				CommitsView.currentPanel!['currentRepo'] = '/path/to/repo';
+				TabView.currentPanel!['currentRepo'] = '/path/to/repo';
 
 				// Run
 				onDidReceiveMessage({
@@ -2687,8 +2687,8 @@ describe('CommitsView', () => {
 							error: null
 						}
 					]);
-					expect(CommitsView.currentPanel!['currentRepo']).toBe('/path/to/repo');
-					expect(CommitsView.currentPanel!['loadRepoInfoRefreshId']).toBe(3);
+					expect(TabView.currentPanel!['currentRepo']).toBe('/path/to/repo');
+					expect(TabView.currentPanel!['loadRepoInfoRefreshId']).toBe(3);
 				});
 			});
 		});
@@ -3635,7 +3635,7 @@ describe('CommitsView', () => {
 
 	describe('sendMessage', () => {
 		beforeEach(() => {
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 			spyOnLog.mockReset();
 			spyOnLogError.mockReset();
 		});
@@ -3662,7 +3662,7 @@ describe('CommitsView', () => {
 			});
 		});
 
-		it('Should log an error message when Webview.postMessage rejects, and the CommitsView hasn\'t been disposed', async () => {
+		it('Should log an error message when Webview.postMessage rejects, and the TabViewhasn\'t been disposed', async () => {
 			// Setup
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			jest.spyOn(utils, 'viewScm').mockResolvedValueOnce(null);
@@ -3684,12 +3684,12 @@ describe('CommitsView', () => {
 			});
 		});
 
-		it('Should log an information message when Webview.postMessage rejects, and the CommitsView has been disposed', async () => {
+		it('Should log an information message when Webview.postMessage rejects, and the TabViewhas been disposed', async () => {
 			// Setup
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			jest.spyOn(utils, 'viewScm').mockResolvedValueOnce(null);
 			jest.spyOn(mockedWebviewPanel.panel.webview, 'postMessage').mockImplementationOnce(() => {
-				CommitsView.currentPanel!.dispose();
+				TabView.currentPanel!.dispose();
 				return Promise.reject();
 			});
 
@@ -3716,7 +3716,7 @@ describe('CommitsView', () => {
 			jest.spyOn(mockedWebviewPanel.panel.webview, 'postMessage').mockResolvedValueOnce(true);
 
 			// Run
-			CommitsView.currentPanel!.dispose();
+			TabView.currentPanel!.dispose();
 			mockedWebviewPanel.mocks.panel.webview.onDidReceiveMessage({
 				command: 'viewScm'
 			});
@@ -3757,7 +3757,7 @@ describe('CommitsView', () => {
 			jest.spyOn(repoManager, 'getKnownRepo').mockResolvedValue('/path/to/repo');
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			repo.ui.selected = true;
 			uiOnDidChange.emit();
@@ -3803,7 +3803,7 @@ describe('CommitsView', () => {
 			jest.spyOn(repoManager, 'getKnownRepo').mockResolvedValue(null);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
 			mockedWebviewPanel.mocks.messages.length = 0;
 			repo.ui.selected = true;
@@ -3834,7 +3834,7 @@ describe('CommitsView', () => {
 			spyOnIsGitExecutableUnknown.mockReturnValueOnce(true);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -3847,7 +3847,7 @@ describe('CommitsView', () => {
 			spyOnGetRepos.mockResolvedValueOnce({});
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -3862,7 +3862,7 @@ describe('CommitsView', () => {
 			vscode.mockExtensionSettingReturnValue('repository.commits.fetchAvatars', false);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -3878,7 +3878,7 @@ describe('CommitsView', () => {
 			vscode.mockExtensionSettingReturnValue('repository.commits.fetchAvatars', true);
 
 			// Run
-			CommitsView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);

@@ -1,6 +1,6 @@
-import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from '../src/tabUtils';
+import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from '../src/editorTabUtils';
 
-describe('tabUtils', () => {
+describe('editorTabUtils', () => {
 	const viewTypes = new Set(['an-dr-commits', 'mainThreadWebview-an-dr-commits']);
 
 	it('Matches Commits tabs by view type', () => {

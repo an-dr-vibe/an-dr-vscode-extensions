@@ -9,7 +9,7 @@ class CustomSelect {
 	private elem: HTMLElement | null;
 	private currentElem: HTMLElement | null;
 	private optionsElem: HTMLElement | null = null;
-	private clickHandler: ((e: MouseEvent) => void) | null;
+	private removeClickListener: (() => void) | null;
 
 	constructor(data: DialogSelectInput, containerId: string, tabIndex: number, dialogElem: HTMLElement) {
 		this.data = data;
@@ -27,27 +27,27 @@ class CustomSelect {
 		this.currentElem = currentElem;
 		container.appendChild(currentElem);
 
-		this.clickHandler = (e: MouseEvent) => {
-			if (!e.target) return;
-			const targetElem = <HTMLElement>e.target;
-			if (targetElem.closest('.customSelectContainer') !== this.elem && (this.optionsElem === null || targetElem.closest('.customSelectOptions') !== this.optionsElem)) {
-				this.render(false);
-				return;
-			}
-
-			if (targetElem.className === 'customSelectCurrent') {
-				this.render(!this.open);
-			} else if (this.open) {
-				const optionElem = <HTMLElement | null>targetElem.closest('.customSelectOption');
-				if (optionElem !== null) {
-					const selectedOptionIndex = parseInt(optionElem.dataset.index!);
-					this.setItemSelectedState(selectedOptionIndex, data.multiple ? !this.selected[selectedOptionIndex] : true);
-					if (!this.data.multiple) this.render(false);
-					if (this.currentElem !== null) this.currentElem.focus();
+		this.removeClickListener = addOutsideClickListener(
+			(target) => target.closest('.customSelectContainer') === this.elem || (this.optionsElem !== null && target.closest('.customSelectOptions') === this.optionsElem),
+			(e, inside) => {
+				if (!inside) {
+					this.render(false);
+					return;
+				}
+				const targetElem = <HTMLElement>e.target;
+				if (targetElem.className === 'customSelectCurrent') {
+					this.render(!this.open);
+				} else if (this.open) {
+					const optionElem = <HTMLElement | null>targetElem.closest('.customSelectOption');
+					if (optionElem !== null) {
+						const selectedOptionIndex = parseInt(optionElem.dataset.index!);
+						this.setItemSelectedState(selectedOptionIndex, data.multiple ? !this.selected[selectedOptionIndex] : true);
+						if (!this.data.multiple) this.render(false);
+						if (this.currentElem !== null) this.currentElem.focus();
+					}
 				}
 			}
-		};
-		document.addEventListener('click', this.clickHandler, true);
+		);
 
 		currentElem.addEventListener('keydown', (e) => {
 			if (this.open && e.key === 'Tab') {
@@ -106,9 +106,9 @@ class CustomSelect {
 			this.optionsElem.remove();
 			this.optionsElem = null;
 		}
-		if (this.clickHandler !== null) {
-			document.removeEventListener('click', this.clickHandler, true);
-			this.clickHandler = null;
+		if (this.removeClickListener !== null) {
+			this.removeClickListener();
+			this.removeClickListener = null;
 		}
 	}
 

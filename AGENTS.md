@@ -58,15 +58,29 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 ## Building web code in an-dr-commits
 
 `an-dr-commits` has a two-step web build: TypeScript compiles to individual JS files in
-`media/`, then `package-web.js` concatenates and uglifies them into `media/out.min.js`
-(deleting the individual files). The webview loads **only** `out.min.js`.
+`media/`, then `package-web.js` concatenates and uglifies them into **two** bundles
+(deleting the individual files afterwards):
+- `media/out.min.js` / `out.min.css` — the tab webview (`web/main.ts` + `web/*`), loaded by
+  `TabView` (`src/views/tab/`).
+- `media/sidebar.min.js` / `sidebar.min.css` — the sidebar webview (`web/sidebar/main.ts` +
+  `web/sidebar/*`), loaded by `SidebarView` (`src/views/sidebar/`).
+
+Both bundles include everything under `web/common/` (shared browser-side helpers with no
+`import`/`export` — see `extensions/an-dr-commits/docs/adr/ADR-003-shared-browser-module-and-sidebar-webview-bundle.md`),
+so a file placed there must compile standalone in both bundles' concatenated global scope.
+Each webview loads **only** its own bundle.
 
 - **Always use `npm run compile-web`** (or the full `npm run compile`) after editing
   anything under `web/`. Running bare `tsc -p web/tsconfig.json` produces individual JS
-  files that the webview never loads — changes will appear to have no effect.
+  files that neither webview loads — changes will appear to have no effect.
 - For a readable bundle during debugging, use `npm run compile-web-debug`.
 - `install.ps1` runs `npm run compile` and is already correct; this applies to manual
   dev iteration only.
+
+`src/views/tab/`'s message-handling switch (`TabView.respondToMessage`) delegates to seven
+`views/tab/*Actions.ts` modules grouped by message category (repo lifecycle, branch/remote,
+tag/stash, commit-graph, diff/file-content, working-tree, misc) rather than inlining ~70
+case bodies in one class — see `extensions/an-dr-commits/docs/adr/ADR-004-views-reorganization-and-tabview-split.md`.
 
 ## Adding a new extension
 

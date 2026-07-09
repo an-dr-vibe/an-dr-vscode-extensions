@@ -4,7 +4,7 @@ import { Logger } from './logger';
 import { RepoChangeEvent } from './repoManager';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
-import { countChanges, GitChangeCounts } from './activityBarView';
+import { countChanges, GitChangeCounts } from './views/sidebar/sidebarView';
 
 /**
  * Manages the Commits Status Bar Item — a single button that opens the Commits View.

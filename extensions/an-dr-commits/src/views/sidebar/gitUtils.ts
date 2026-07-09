@@ -15,16 +15,6 @@ export interface GitActivityChange {
 	readonly deleted: boolean;
 }
 
-export interface ActivityBarMessage {
-	readonly command: string;
-	readonly filePath?: string;
-	readonly message?: string;
-	readonly amend?: boolean;
-	readonly isUntracked?: boolean;
-	readonly restoreToIndex?: boolean;
-	readonly height?: number;
-}
-
 export function normalizePath(filePath: string) {
 	return filePath.replace(/\\/g, '/');
 }

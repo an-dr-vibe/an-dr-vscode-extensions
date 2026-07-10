@@ -7,6 +7,7 @@ import * as os from 'os';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ExecResult { stdout: string; stderr: string; code: number; }
+interface FetchCompareResult { code: number; stderr: string; behind?: string; ahead?: string; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ let outputChannel: vscode.OutputChannel | undefined;
 
 function getOutputChannel(): vscode.OutputChannel {
     if (!outputChannel) {
-        outputChannel = vscode.window.createOutputChannel('Extension Control');
+        outputChannel = vscode.window.createOutputChannel('Sync');
     }
     return outputChannel;
 }
@@ -75,7 +76,7 @@ function isRepoRoot(dir: string): boolean {
 
 /**
  * Find the extensions repo root by:
- *  1. User config override (extensionControl.repoPath)
+ *  1. User config override (sync.repoPath)
  *  2. Resolve NTFS junction / symlink from ~/.vscode/extensions/an-dr-*
  *  3. Well-known fallback: ~/.vscode-an-dr
  */
@@ -118,13 +119,13 @@ function requireRepo(config: vscode.WorkspaceConfiguration): string | undefined 
     const root = findRepoRoot(config);
     if (!root) {
         vscode.window.showErrorMessage(
-            'Extension Control: repo not found. Set extensionControl.repoPath in settings.',
+            'Sync: repo not found. Set sync.repoPath in settings.',
             'Open Settings'
         ).then(choice => {
             if (choice === 'Open Settings') {
                 vscode.commands.executeCommand(
                     'workbench.action.openSettings',
-                    'extensionControl.repoPath'
+                    'sync.repoPath'
                 );
             }
         });
@@ -139,7 +140,7 @@ async function pullAndReload(config: vscode.WorkspaceConfiguration): Promise<voi
     if (!root) { return; }
 
     await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'Extension Control', cancellable: false },
+        { location: vscode.ProgressLocation.Notification, title: 'Sync', cancellable: false },
         async progress => {
             // Stash uncommitted changes if any
             const status = await exec('git status --porcelain', root);
@@ -181,13 +182,13 @@ async function pullAndReload(config: vscode.WorkspaceConfiguration): Promise<voi
                 }
             }
 
-            progress.report({ message: 'Rebuilding extensions… (see Extension Control output)' });
+            progress.report({ message: 'Rebuilding extensions… (see Sync output)' });
             const installScript = path.join(root, 'install.ps1');
             const build = await execWithOutput(`pwsh -File "${installScript}"`, root, 180_000);
 
             if (build.code !== 0) {
                 vscode.window.showErrorMessage(
-                    `Extension Control: build failed.\n${build.stderr || build.stdout}`
+                    `Sync: build failed.\n${build.stderr || build.stdout}`
                 );
                 return;
             }
@@ -232,38 +233,46 @@ async function forceRebuild(config: vscode.WorkspaceConfiguration): Promise<void
     term.sendText(`pwsh -File "${installScript}" -Force`);
 }
 
+/** Runs `git fetch` and compares against upstream. Never throws. */
+async function fetchAndCompare(root: string): Promise<FetchCompareResult> {
+    const fetch = await exec('git fetch', root);
+    if (fetch.code !== 0) {
+        return { code: fetch.code, stderr: fetch.stderr };
+    }
+
+    const status = await exec('git status -b --short', root);
+    const behind = status.stdout.match(/behind (\d+)/);
+    const ahead = status.stdout.match(/ahead (\d+)/);
+    return { code: 0, stderr: '', behind: behind?.[1], ahead: ahead?.[1] };
+}
+
 async function checkUpdates(config: vscode.WorkspaceConfiguration): Promise<void> {
     const root = requireRepo(config);
     if (!root) { return; }
 
     await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'Extension Control', cancellable: false },
+        { location: vscode.ProgressLocation.Notification, title: 'Sync', cancellable: false },
         async progress => {
             progress.report({ message: 'Fetching remote…' });
-            const fetch = await exec('git fetch', root);
+            const result = await fetchAndCompare(root);
 
-            if (fetch.code !== 0) {
-                vscode.window.showErrorMessage(`git fetch failed:\n${fetch.stderr}`);
+            if (result.code !== 0) {
+                vscode.window.showErrorMessage(`git fetch failed:\n${result.stderr}`);
                 return;
             }
 
-            const status = await exec('git status -b --short', root);
-            const behind = status.stdout.match(/behind (\d+)/);
-            const ahead  = status.stdout.match(/ahead (\d+)/);
-
-            if (behind) {
-                const n = behind[1];
+            if (result.behind) {
                 const choice = await vscode.window.showInformationMessage(
-                    `${n} new commit(s) available. Pull and reload?`,
+                    `${result.behind} new commit(s) available. Pull and reload?`,
                     'Pull & Reload',
                     'Later'
                 );
                 if (choice === 'Pull & Reload') {
                     await pullAndReload(config);
                 }
-            } else if (ahead) {
+            } else if (result.ahead) {
                 vscode.window.showInformationMessage(
-                    `Extensions repo is ${ahead[1]} commit(s) ahead of remote.`
+                    `Extensions repo is ${result.ahead} commit(s) ahead of remote.`
                 );
             } else {
                 vscode.window.showInformationMessage('Extensions are up to date.');
@@ -284,13 +293,13 @@ async function showRepoPath(config: vscode.WorkspaceConfiguration): Promise<void
         if (choice === 'Copy Path') { await vscode.env.clipboard.writeText(root); }
     } else {
         vscode.window.showWarningMessage(
-            'Extensions repo not found. Set extensionControl.repoPath.',
+            'Extensions repo not found. Set sync.repoPath.',
             'Open Settings'
         ).then(c => {
             if (c === 'Open Settings') {
                 vscode.commands.executeCommand(
                     'workbench.action.openSettings',
-                    'extensionControl.repoPath'
+                    'sync.repoPath'
                 );
             }
         });
@@ -303,6 +312,13 @@ async function showRepoPath(config: vscode.WorkspaceConfiguration): Promise<void
 // quiet-period threshold itself so a commit lands shortly after the repo goes
 // quiet, instead of waiting for the next multi-minute threshold tick.
 const WIP_CHECK_POLL_MS = 60_000;
+
+// Delay before the startup update check fires, so it doesn't compete with
+// other extensions activating and doesn't pop a notification the instant the
+// window appears.
+const STARTUP_CHECK_DELAY_MS = 5_000;
+
+const LAST_UPDATE_CHECK_KEY = 'sync.lastUpdateCheckAt';
 
 /** Resolves a `git status --porcelain` path entry, unwrapping rename arrows and quotes. */
 function parsePorcelainPath(line: string): string {
@@ -337,7 +353,7 @@ async function autoWipCommit(root: string, quietMinutes: number): Promise<void> 
     const commit = await exec(`git commit -m "WIP [${ts}]"`, root);
     if (commit.code !== 0) {
         vscode.window.showErrorMessage(
-            `Extension Control: WIP commit failed.\n${commit.stderr || commit.stdout}`
+            `Sync: WIP commit failed.\n${commit.stderr || commit.stdout}`
         );
     }
 }
@@ -348,8 +364,49 @@ async function autoPush(root: string): Promise<void> {
     const push = await exec('git push', root);
     if (push.code !== 0) {
         vscode.window.showErrorMessage(
-            `Extension Control: auto-push failed.\n${push.stderr || push.stdout}`
+            `Sync: auto-push failed.\n${push.stderr || push.stdout}`
         );
+    }
+}
+
+/**
+ * Mirrors `checkUpdates`, but silent unless there's something to act on, and
+ * throttled via globalState — each VS Code window activates this extension
+ * independently, so without throttling a multi-window session (or repeated
+ * reloads) would re-fetch, and potentially re-prompt, once per window/reload.
+ * A failed fetch does not update the timestamp, so the next launch retries
+ * instead of waiting out the throttle window on a transient failure (e.g. no
+ * network). If no repo root can be resolved, this exits silently rather than
+ * showing the "repo not found" error the manual commands show — an
+ * unconfigured/undetected repo shouldn't nag on every launch.
+ */
+async function autoCheckUpdatesOnStartup(
+    context: vscode.ExtensionContext,
+    config: vscode.WorkspaceConfiguration
+): Promise<void> {
+    if (!config.get<boolean>('checkUpdatesOnStartup', true)) { return; }
+
+    const throttleHours = config.get<number>('checkUpdatesOnStartupThrottleHours', 4);
+    const lastCheck = context.globalState.get<number>(LAST_UPDATE_CHECK_KEY, 0);
+    if (throttleHours > 0 && Date.now() - lastCheck < throttleHours * 3_600_000) { return; }
+
+    const root = findRepoRoot(config);
+    if (!root) { return; }
+
+    const result = await fetchAndCompare(root);
+    if (result.code !== 0) { return; }
+
+    await context.globalState.update(LAST_UPDATE_CHECK_KEY, Date.now());
+
+    if (result.behind) {
+        const choice = await vscode.window.showInformationMessage(
+            `${result.behind} new commit(s) available. Pull and reload?`,
+            'Pull & Reload',
+            'Later'
+        );
+        if (choice === 'Pull & Reload') {
+            await pullAndReload(config);
+        }
     }
 }
 
@@ -385,7 +442,7 @@ function startAutoTimers(
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('extensionControl')) { restart(); }
+            if (e.affectsConfiguration('sync')) { restart(); }
         }),
         { dispose: () => { clearInterval(wipTimer); clearInterval(pushTimer); } }
     );
@@ -395,15 +452,15 @@ function startAutoTimers(
 
 export function activate(context: vscode.ExtensionContext): void {
     const cfg = (): vscode.WorkspaceConfiguration =>
-        vscode.workspace.getConfiguration('extensionControl');
+        vscode.workspace.getConfiguration('sync');
 
     const cmds: Array<[string, () => Promise<void>]> = [
-        ['an-dr-extension-control.pullAndReload', () => pullAndReload(cfg())],
-        ['an-dr-extension-control.openRepo',      () => openRepo(cfg())],
-        ['an-dr-extension-control.rebuild',       () => rebuild(cfg())],
-        ['an-dr-extension-control.forceRebuild',  () => forceRebuild(cfg())],
-        ['an-dr-extension-control.checkUpdates',  () => checkUpdates(cfg())],
-        ['an-dr-extension-control.showRepoPath',  () => showRepoPath(cfg())],
+        ['an-dr-sync.pullAndReload', () => pullAndReload(cfg())],
+        ['an-dr-sync.openRepo',      () => openRepo(cfg())],
+        ['an-dr-sync.rebuild',       () => rebuild(cfg())],
+        ['an-dr-sync.forceRebuild',  () => forceRebuild(cfg())],
+        ['an-dr-sync.checkUpdates',  () => checkUpdates(cfg())],
+        ['an-dr-sync.showRepoPath',  () => showRepoPath(cfg())],
     ];
 
     for (const [id, fn] of cmds) {
@@ -411,13 +468,18 @@ export function activate(context: vscode.ExtensionContext): void {
             vscode.commands.registerCommand(id, () =>
                 fn().catch((e: unknown) => {
                     const msg = e instanceof Error ? e.message : String(e);
-                    vscode.window.showErrorMessage(`Extension Control: ${msg}`);
+                    vscode.window.showErrorMessage(`Sync: ${msg}`);
                 })
             )
         );
     }
 
     startAutoTimers(context, cfg);
+
+    const startupCheckTimer = setTimeout(() => {
+        void autoCheckUpdatesOnStartup(context, cfg());
+    }, STARTUP_CHECK_DELAY_MS);
+    context.subscriptions.push({ dispose: () => clearTimeout(startupCheckTimer) });
 }
 
 export function deactivate(): void {}

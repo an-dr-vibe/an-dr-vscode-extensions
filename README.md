@@ -104,26 +104,32 @@ Status bar item showing the current cursor position and selection info, with qui
 
 ---
 
-### an-dr: Extension Control
+### an-dr: Sync
 
-Manages the extensions repo from inside VS Code — pull updates, rebuild, and reload without touching a terminal.
+Manages the extensions repo from inside VS Code — pull updates, rebuild, and reload without touching a terminal. Checks for updates shortly after VS Code starts and offers to pull and reload if any are found.
 
 Auto-detects the repo root by resolving the NTFS junction / symlink from `~/.vscode/extensions/an-dr-*` back to the source. Falls back to `~/.vscode-an-dr`.
 
 **Commands** (Ctrl+Shift+P → `an-dr`):
 
-- `Extension Control: Pull & Reload` — `git pull`, rebuild all extensions, offer window reload
-- `Extension Control: Check for Updates` — `git fetch` and report commits behind; offers Pull & Reload
-- `Extension Control: Rebuild All Extensions` — Run `install.ps1` in a terminal (npm install + tsc + re-link)
-- `Extension Control: Reinstall All Extensions in Remote/Container` — package each extension as a `.vsix` and install it into the current remote/container via `code --install-extension` (useful when connected via Dev Containers or Remote SSH)
-- `Extension Control: Open Repo in New Window` — Open the repo folder as a workspace in a new VS Code window
-- `Extension Control: Show Repo Path` — Display the detected repo path; copy or open from the notification
+- `Sync: Pull & Reload` — `git pull`, rebuild all extensions, offer window reload
+- `Sync: Check for Updates` — `git fetch` and report commits behind; offers Pull & Reload
+- `Sync: Rebuild All Extensions` — Run `install.ps1` in a terminal (npm install + tsc + re-link)
+- `Sync: Force Rebuild All Extensions` — Run `install.ps1 -Force` in a terminal (bypasses the up-to-date skip check; rebuilds every extension)
+- `Sync: Open Repo in New Window` — Open the repo folder as a workspace in a new VS Code window
+- `Sync: Show Repo Path` — Display the detected repo path; copy or open from the notification
 
-**Config** (`extensionControl.*`):
+**Config** (`sync.*`):
 
 |Setting|Default|Description|
 |-------|-------|-----------|
 |`repoPath`|`""`|Override auto-detected repo root path.|
+|`checkUpdatesOnStartup`|`true`|Check for updates ~5s after startup and offer to pull and reload. Silent when already up to date.|
+|`checkUpdatesOnStartupThrottleHours`|`4`|Minimum hours between automatic startup checks (per machine). `0` checks every launch.|
+|`autoWipCommit`|`true`|Automatically stage and commit all changes as a WIP commit once the repo has been quiet.|
+|`autoWipCommitIntervalMinutes`|`30`|Minutes of inactivity required before an automatic WIP commit fires. Checked every minute; no commit while files are still being actively edited.|
+|`autoPush`|`true`|Automatically push unpushed commits on a timer.|
+|`autoPushIntervalMinutes`|`30`|Interval in minutes between automatic pushes.|
 
 ---
 

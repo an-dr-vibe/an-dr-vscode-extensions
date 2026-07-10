@@ -1,72 +1,83 @@
 {
-  "name": "an-dr-extension-control",
-  "displayName": "an-dr: Extension Control",
-  "description": "Commands to update, rebuild, and manage the an-dr VSCode extensions repo. Auto-detects repo location via junction/symlink resolution.",
+  "name": "an-dr-sync",
+  "displayName": "an-dr: Sync",
+  "description": "Keeps the an-dr VSCode extensions repo in sync: checks for updates on startup and on demand, pulls, rebuilds, and reloads. Auto-detects repo location via junction/symlink resolution.",
   "version": "0.1.0",
   "publisher": "an-dr",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
-  "keywords": ["extensions", "update", "reload", "development"],
+  "keywords": ["extensions", "update", "sync", "reload", "development"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "an-dr-extension-control.pullAndReload",
-        "title": "Extension Control: Pull & Reload",
+        "command": "an-dr-sync.pullAndReload",
+        "title": "Sync: Pull & Reload",
         "category": "an-dr"
       },
       {
-        "command": "an-dr-extension-control.openRepo",
-        "title": "Extension Control: Open Repo in New Window",
+        "command": "an-dr-sync.openRepo",
+        "title": "Sync: Open Repo in New Window",
         "category": "an-dr"
       },
       {
-        "command": "an-dr-extension-control.rebuild",
-        "title": "Extension Control: Rebuild All Extensions",
+        "command": "an-dr-sync.rebuild",
+        "title": "Sync: Rebuild All Extensions",
         "category": "an-dr"
       },
       {
-        "command": "an-dr-extension-control.forceRebuild",
-        "title": "Extension Control: Force Rebuild All Extensions",
+        "command": "an-dr-sync.forceRebuild",
+        "title": "Sync: Force Rebuild All Extensions",
         "category": "an-dr"
       },
       {
-        "command": "an-dr-extension-control.checkUpdates",
-        "title": "Extension Control: Check for Updates",
+        "command": "an-dr-sync.checkUpdates",
+        "title": "Sync: Check for Updates",
         "category": "an-dr"
       },
       {
-        "command": "an-dr-extension-control.showRepoPath",
-        "title": "Extension Control: Show Repo Path",
+        "command": "an-dr-sync.showRepoPath",
+        "title": "Sync: Show Repo Path",
         "category": "an-dr"
       }
     ],
     "configuration": {
-      "title": "an-dr: Extension Control",
+      "title": "an-dr: Sync",
       "properties": {
-        "extensionControl.repoPath": {
+        "sync.repoPath": {
           "type": "string",
           "default": "",
           "description": "Absolute path to the extensions repo root. Leave empty to auto-detect via symlink/junction resolution from ~/.vscode/extensions."
         },
-        "extensionControl.autoWipCommit": {
+        "sync.checkUpdatesOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Shortly after VS Code starts, check for repo updates and offer to pull and reload if any are found. Stays silent when already up to date."
+        },
+        "sync.checkUpdatesOnStartupThrottleHours": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "description": "Minimum hours between automatic startup update checks (tracked per machine). 0 checks on every launch."
+        },
+        "sync.autoWipCommit": {
           "type": "boolean",
           "default": true,
           "description": "Automatically stage and commit all changes as a WIP commit once the repo has been quiet."
         },
-        "extensionControl.autoWipCommitIntervalMinutes": {
+        "sync.autoWipCommitIntervalMinutes": {
           "type": "number",
           "default": 30,
           "minimum": 1,
           "description": "Minutes of inactivity required before an automatic WIP commit fires, based on the newest-modified changed file. Checked every minute; no commit happens while files are still being actively edited."
         },
-        "extensionControl.autoPush": {
+        "sync.autoPush": {
           "type": "boolean",
           "default": true,
           "description": "Automatically push unpushed commits on a timer."
         },
-        "extensionControl.autoPushIntervalMinutes": {
+        "sync.autoPushIntervalMinutes": {
           "type": "number",
           "default": 30,
           "minimum": 1,

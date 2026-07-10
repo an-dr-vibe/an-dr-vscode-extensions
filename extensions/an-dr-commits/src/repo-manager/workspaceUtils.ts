@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { getPathFromUri, pathWithTrailingSlash } from '../utils';
+import { getPathFromUri, normalisePathCaseForComparison, pathWithTrailingSlash } from '../utils';
 
 export interface WorkspaceFolderInfoForRepoInclusionMapping {
 	readonly workspaceFolders: readonly vscode.WorkspaceFolder[];
@@ -9,12 +9,17 @@ export interface WorkspaceFolderInfoForRepoInclusionMapping {
 }
 
 /**
- * Gets the current workspace folders, and generates information required to identify whether a repository is within any of the workspace folders.
+ * Gets the current workspace folders, and generates information required to identify whether a
+ * repository is within any of the workspace folders. `rootsExact`/`rootsFolder` are case-
+ * normalised for comparison (see `normalisePathCaseForComparison`) - callers must normalise the
+ * repository path they compare against these the same way, since repo paths (sourced from
+ * elsewhere, e.g. externally-added repos) don't always agree in casing with VS Code's own
+ * `workspaceFolders` on Windows.
  */
 export function getWorkspaceFolderInfoForRepoInclusionMapping(): WorkspaceFolderInfoForRepoInclusionMapping {
 	let rootsExact: string[] = [], rootsFolder: string[] = [], workspaceFolders = vscode.workspace.workspaceFolders || [], path;
 	for (let i = 0; i < workspaceFolders.length; i++) {
-		path = getPathFromUri(workspaceFolders[i].uri);
+		path = normalisePathCaseForComparison(getPathFromUri(workspaceFolders[i].uri));
 		rootsExact.push(path);
 		rootsFolder.push(pathWithTrailingSlash(path));
 	}

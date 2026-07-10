@@ -3,12 +3,13 @@ import * as vscode from 'vscode';
 import { getConfig } from '../../config';
 import { DataSource, GitWorkingTreeChange } from '../../dataSource';
 import { ExtensionState } from '../../extensionState';
+import { RepoManager } from '../../repoManager';
 import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode } from '../../types';
-import { UNCOMMITTED, viewDiff } from '../../utils';
+import { UNCOMMITTED, getSortedRepositoryPaths, viewDiff } from '../../utils';
 import { Event } from '../../utils/event';
 import {
 	GitChangeCounts, HeadInfo,
-	countChanges, getHeadInfo
+	countChanges, getHeadInfo, getRepoRoot
 } from './gitUtils';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph } from './miniGraph';
 import { renderHtml, renderLoadingHtml } from './html';
@@ -33,10 +34,11 @@ function resetModeLabel(mode: GitResetMode): string {
 export class SidebarView implements vscode.Disposable {
 	private readonly dataSource: DataSource;
 	private readonly extensionState: ExtensionState;
+	private readonly repoManager: RepoManager;
 	private readonly extensionPath: string;
 	private readonly emitRepoSelection: (event: RepoSelectionEvent) => void;
 	private readonly _disposables: vscode.Disposable[] = [];
-	private readonly _fileWatchers: vscode.Disposable[] = [];
+	private readonly _fileWatchers = new Map<string, vscode.Disposable>();
 	private _api: any = null;
 	private _view: any = null;
 	private _currentRepo: string | null = null;
@@ -47,9 +49,10 @@ export class SidebarView implements vscode.Disposable {
 	private _miniGraphLimit = MINI_GRAPH_LIMIT;
 	private _hasRenderedOnce = false;
 
-	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void) {
+	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void) {
 		this.dataSource = dataSource;
 		this.extensionState = extensionState;
+		this.repoManager = repoManager;
 		this.extensionPath = context.extensionPath;
 		this.emitRepoSelection = emitRepoSelection;
 		this._pinnedRepo = extensionState.getLastActiveRepo();
@@ -64,6 +67,11 @@ export class SidebarView implements vscode.Disposable {
 			if (event.source === 'activity') return;
 			this._pinRepoFromSharedSelection(event.repo);
 		}));
+		this._disposables.push(repoManager.onDidChangeRepos(() => {
+			this._syncRepoWatchers();
+			this._scheduleRefresh();
+		}));
+		this._syncRepoWatchers();
 		this._subscribeToGitApi();
 	}
 
@@ -90,14 +98,40 @@ export class SidebarView implements vscode.Disposable {
 	}
 
 	private _watchRepo(repoPath: string) {
+		if (this._fileWatchers.has(repoPath)) return;
 		const watcher = vscode.workspace.createFileSystemWatcher(repoPath + '/.git/**');
 		const onEvent = () => this._scheduleRefresh();
 		watcher.onDidCreate(onEvent);
 		watcher.onDidChange(onEvent);
 		watcher.onDidDelete(onEvent);
-		this._fileWatchers.push(watcher);
+		this._fileWatchers.set(repoPath, watcher);
 	}
 
+	/**
+	 * Keeps the `.git/**` file watchers in sync with RepoManager's known repos (the sidebar's
+	 * repo source of truth, see ADR-005's follow-up) - added when a repo is discovered, disposed
+	 * when it's removed. Idempotent, so it's safe to call on every `onDidChangeRepos` event.
+	 */
+	private _syncRepoWatchers() {
+		const knownPaths = new Set(Object.keys(this.repoManager.getRepos()));
+		for (const [repoPath, watcher] of this._fileWatchers) {
+			if (!knownPaths.has(repoPath)) {
+				watcher.dispose();
+				this._fileWatchers.delete(repoPath);
+			}
+		}
+		for (const repoPath of knownPaths) {
+			this._watchRepo(repoPath);
+		}
+	}
+
+	/**
+	 * Keeps `this._api` pointed at the native VS Code Git extension - still needed for head/
+	 * branch/remote resolution (Pull/Push/Reset) and the mini graph on the active repo, and as a
+	 * fast-path live-refresh signal. Repo *enumeration* and watching no longer depend on it (see
+	 * `_getRepoPaths`/`_syncRepoWatchers`) - RepoManager can know about repos this API hasn't
+	 * opened.
+	 */
 	private _subscribeToGitApi() {
 		const gitExt = vscode.extensions.getExtension('vscode.git');
 		if (!gitExt) { return; }
@@ -111,14 +145,10 @@ export class SidebarView implements vscode.Disposable {
 
 			for (const repo of api.repositories) {
 				this._disposables.push(repo.state.onDidChange(update));
-				const repoPath = repo.rootUri?.fsPath as string | undefined;
-				if (repoPath) this._watchRepo(repoPath);
 			}
 			this._disposables.push(
 				api.onDidOpenRepository((r: any) => {
 					this._disposables.push(r.state.onDidChange(update));
-					const repoPath = r.rootUri?.fsPath as string | undefined;
-					if (repoPath) this._watchRepo(repoPath);
 					update();
 				}),
 				vscode.window.onDidChangeActiveTextEditor(update)
@@ -133,26 +163,31 @@ export class SidebarView implements vscode.Disposable {
 		}
 	}
 
+	/**
+	 * Resolves which repo is active: the pinned repo if still known, else whichever known repo
+	 * contains the active editor's file, else the first repo in dropdown order (starred repos
+	 * first, then the configured `repositoryDropdownOrder`) - mirrors the tab's own default-repo
+	 * fallback (`web/main/loadProcessing.ts`). Sourced entirely from RepoManager (see
+	 * `_getRepoPaths`) rather than the native VS Code Git API, so this resolves correctly even
+	 * for repos that API hasn't opened.
+	 */
 	private _resolveActiveRepoPath(): string | null {
-		if (this._api === null || this._api.repositories.length === 0) return null;
+		const repos = this.repoManager.getRepos();
+		if (Object.keys(repos).length === 0) return null;
 		if (this._pinnedRepo !== null) {
-			const still = this._findApiRepoPath(this._pinnedRepo);
-			if (still !== null) return still;
+			const known = this.repoManager.findKnownRepoPath(this._pinnedRepo);
+			if (known !== null) return known;
 			this._pinnedRepo = null;
 		}
 		const activeUri = vscode.window.activeTextEditor?.document.uri;
-		let repo = activeUri && typeof this._api.getRepository === 'function'
-			? this._api.getRepository(activeUri)
-			: null;
-		if (!repo) repo = this._api.repositories[0];
-		return (repo?.rootUri?.fsPath as string | undefined) ?? null;
+		const fileRepo = activeUri ? this.repoManager.getRepoContainingFile(activeUri.fsPath) : null;
+		if (fileRepo !== null) return fileRepo;
+		return getSortedRepositoryPaths(repos, getConfig().repoDropdownOrder)[0];
 	}
 
+	/** The sidebar's repo dropdown source of truth - RepoManager's own workspace-wide discovery (see ADR-005's follow-up), not the native VS Code Git API's (narrower) auto-detected repo list. */
 	private _getRepoPaths(): string[] {
-		if (this._api === null) return [];
-		return (this._api.repositories as any[])
-			.map((r) => r.rootUri?.fsPath as string | undefined)
-			.filter((p): p is string => typeof p === 'string');
+		return Object.keys(this.repoManager.getRepos());
 	}
 
 	private _pathsEqual(a: string, b: string) {
@@ -161,30 +196,36 @@ export class SidebarView implements vscode.Disposable {
 		return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 	}
 
-	private _findApiRepoPath(repoPath: string): string | null {
-		if (this._api === null) return null;
-		const repo = (this._api.repositories as any[]).find((r) => {
-			const candidate = r.rootUri?.fsPath as string | undefined;
-			return typeof candidate === 'string' && this._pathsEqual(candidate, repoPath);
-		});
-		return (repo?.rootUri?.fsPath as string | undefined) ?? null;
-	}
-
 	private _pinRepoFromSharedSelection(repoPath: string) {
-		const selected = this._findApiRepoPath(repoPath) ?? repoPath;
+		const selected = this.repoManager.findKnownRepoPath(repoPath) ?? repoPath;
 		if (this._pinnedRepo !== null && this._pathsEqual(this._pinnedRepo, selected)) return;
 		this._pinnedRepo = selected;
 		this.extensionState.setLastActiveRepo(selected);
+		this._updateBadge();
 		void this._refreshPanel();
 	}
 
+	/**
+	 * Badge reflects only the currently selected repository's changes - not every repository in
+	 * the workspace summed together - matching what the sidebar's own changes tree shows.
+	 * Prefers the native Git extension's live state (instant, no git spawn); if the active repo
+	 * isn't tracked there (RepoManager can know about repos that API hasn't opened), falls back
+	 * to this view's own last-fetched working tree changes for that same repo.
+	 */
 	private _updateBadge() {
-		if (this._api === null || this._view === null) return;
+		if (this._view === null) return;
+		const activePath = this._resolveActiveRepoPath();
+		const activeApiRepo = activePath !== null && this._api !== null
+			? (this._api.repositories as any[]).find((r) => this._pathsEqual(getRepoRoot(r), activePath))
+			: undefined;
 		let counts: GitChangeCounts = { modified: 0, deleted: 0 };
-		for (const repo of this._api.repositories) {
-			const c = countChanges(repo);
-			counts.modified += c.modified;
-			counts.deleted += c.deleted;
+		if (activeApiRepo) {
+			counts = countChanges(activeApiRepo);
+		} else if (activePath !== null && activePath === this._currentRepo) {
+			counts = {
+				modified: this._changes.filter((c) => c.status !== 'D').length,
+				deleted: this._changes.filter((c) => c.status === 'D').length
+			};
 		}
 		const total = counts.modified + counts.deleted;
 		this._view.badge = total > 0
@@ -202,10 +243,10 @@ export class SidebarView implements vscode.Disposable {
 	 * live config - used for both the shell's initial render and the raw-data patch messages,
 	 * so both stay in sync by construction.
 	 */
-	private _buildInitialState(repo: string | null, repoPaths: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, miniGraph: SidebarMiniGraphInitialState | null, graphHeight: number): SidebarInitialState {
+	private _buildInitialState(repo: string | null, repoPaths: string[], starredRepos: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, miniGraph: SidebarMiniGraphInitialState | null, graphHeight: number): SidebarInitialState {
 		const config = getConfig();
 		return {
-			repo, repoPaths, changes, error, graphHeight, miniGraph,
+			repo, repoPaths, starredRepos, changes, error, graphHeight, miniGraph,
 			enhancedAccessibility: config.enhancedAccessibility,
 			graphConfig: {
 				showTags: config.graph.showTagsInActivityBar,
@@ -229,6 +270,7 @@ export class SidebarView implements vscode.Disposable {
 		if (this._view === null) return;
 		const seq = ++this._refreshSeq;
 		const repoPaths = this._getRepoPaths();
+		const starredRepos = repoPaths.filter((p) => this.repoManager.isRepoStarred(p));
 		const repo = this._resolveActiveRepoPath();
 		const repoChanged = repo !== this._currentRepo;
 		if (repoChanged) this._miniGraphLimit = MINI_GRAPH_LIMIT;
@@ -239,10 +281,10 @@ export class SidebarView implements vscode.Disposable {
 		if (repo === null) {
 			this._changes = [];
 			if (needsFullRender) {
-				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(null, repoPaths, [], null, null, graphHeight));
+				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(null, repoPaths, starredRepos, [], null, null, graphHeight));
 				this._hasRenderedOnce = true;
 			} else {
-				await this._sendMessage({ command: 'updateContent', repo: null, repoPaths, changes: [], error: null, miniGraph: null });
+				await this._sendMessage({ command: 'updateContent', repo: null, repoPaths, starredRepos, changes: [], error: null, miniGraph: null });
 			}
 			return;
 		}
@@ -261,10 +303,10 @@ export class SidebarView implements vscode.Disposable {
 		this._changes = result.changes;
 
 		if (needsFullRender) {
-			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(repo, repoPaths, result.changes, result.error, miniGraph, graphHeight));
+			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(repo, repoPaths, starredRepos, result.changes, result.error, miniGraph, graphHeight));
 			this._hasRenderedOnce = true;
 		} else {
-			await this._sendMessage({ command: 'updateContent', repo, repoPaths, changes: result.changes, error: result.error, miniGraph });
+			await this._sendMessage({ command: 'updateContent', repo, repoPaths, starredRepos, changes: result.changes, error: result.error, miniGraph });
 		}
 	}
 
@@ -282,9 +324,14 @@ export class SidebarView implements vscode.Disposable {
 				}
 				return;
 			case 'selectRepo':
-				this._pinnedRepo = this._findApiRepoPath(msg.filePath) ?? msg.filePath;
+				this._pinnedRepo = this.repoManager.findKnownRepoPath(msg.filePath) ?? msg.filePath;
 				this.extensionState.setLastActiveRepo(this._pinnedRepo);
 				this.emitRepoSelection({ repo: this._pinnedRepo, source: 'activity' });
+				this._updateBadge();
+				await this._refreshPanel();
+				return;
+			case 'setRepoStarred':
+				this.repoManager.setRepoStarred(msg.filePath, msg.starred);
 				await this._refreshPanel();
 				return;
 			case 'refresh':
@@ -429,7 +476,7 @@ export class SidebarView implements vscode.Disposable {
 
 	dispose() {
 		this._disposables.forEach(d => d.dispose());
-		this._fileWatchers.forEach(d => d.dispose());
+		this._fileWatchers.forEach((watcher) => watcher.dispose());
 		if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
 	}
 }

@@ -320,6 +320,7 @@ class CommitsView {
 	private saveColumnWidths(columnWidths: GG.ColumnWidth[]) { commitsSaveColumnWidths(this, columnWidths); }
 	private saveExpandedCommitLoading(index: number, commitHash: string, commitElem: HTMLElement, compareWithHash: string | null, compareWithElem: HTMLElement | null) { commitsSaveExpandedCommitLoading(this, index, commitHash, commitElem, compareWithHash, compareWithElem); }
 	public saveRepoStateValue<K extends keyof GG.GitRepoState>(repo: string, key: K, value: GG.GitRepoState[K]) { commitsSaveRepoStateValue(this, repo, key, value); }
+	public toggleRepoStarred(repo: string) { commitsToggleRepoStarred(this, repo); }
 
 
 	/* Renderers */

@@ -209,8 +209,9 @@ function getRepoName(path: string) {
  */
 function getSortedRepositoryPaths(repos: GG.GitRepoSet, order: GG.RepoDropdownOrder): ReadonlyArray<string> {
 	const repoPaths = Object.keys(repos);
+	let ordered: string[];
 	if (order === GG.RepoDropdownOrder.WorkspaceFullPath) {
-		return repoPaths.sort((a, b) => repos[a].workspaceFolderIndex === repos[b].workspaceFolderIndex
+		ordered = repoPaths.sort((a, b) => repos[a].workspaceFolderIndex === repos[b].workspaceFolderIndex
 			? a.localeCompare(b)
 			: repos[a].workspaceFolderIndex === null
 				? 1
@@ -219,12 +220,14 @@ function getSortedRepositoryPaths(repos: GG.GitRepoSet, order: GG.RepoDropdownOr
 					: repos[a].workspaceFolderIndex! - repos[b].workspaceFolderIndex!
 		);
 	} else if (order === GG.RepoDropdownOrder.FullPath) {
-		return repoPaths.sort((a, b) => a.localeCompare(b));
+		ordered = repoPaths.sort((a, b) => a.localeCompare(b));
 	} else {
-		return repoPaths.map((path) => ({ name: repos[path].name || getRepoName(path), path: path }))
+		ordered = repoPaths.map((path) => ({ name: repos[path].name || getRepoName(path), path: path }))
 			.sort((a, b) => a.name !== b.name ? a.name.localeCompare(b.name) : a.path.localeCompare(b.path))
 			.map((x) => x.path);
 	}
+	// Starred repos are always shown first, preserving the order computed above within each group.
+	return ordered.sort((a, b) => (repos[b].starred ? 1 : 0) - (repos[a].starred ? 1 : 0));
 }
 
 

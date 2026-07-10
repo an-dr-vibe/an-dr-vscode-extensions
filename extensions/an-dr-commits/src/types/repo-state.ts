@@ -65,6 +65,7 @@ export interface GitRepoState {
 	showRemoteBranchesV2: BooleanOverride;
 	showStashes: BooleanOverride;
 	showTags: BooleanOverride;
+	starred: boolean;
 	workspaceFolderIndex: number | null;
 }
 

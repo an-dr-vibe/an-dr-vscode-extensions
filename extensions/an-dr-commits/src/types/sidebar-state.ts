@@ -33,6 +33,7 @@ export interface SidebarGraphConfig {
 export interface SidebarInitialState {
 	readonly repo: string | null;
 	readonly repoPaths: ReadonlyArray<string>;
+	readonly starredRepos: ReadonlyArray<string>;
 	readonly changes: ReadonlyArray<GitWorkingTreeChangeMsg>;
 	readonly error: ErrorInfo;
 	readonly graphHeight: number;

@@ -78,7 +78,7 @@ function getRepoDropdownOptions(repos: Readonly<GG.GitRepoSet>) {
 			if (hintComps.length > keepDirs) hintComps.splice(keepDirs, hintComps.length - keepDirs, '...');
 			hint = (distinctNames[i] !== paths[i] ? '.../' : '') + hintComps.join('/');
 		}
-		options.push({ name: names[i], value: repoPaths[i], hint: hint });
+		options.push({ name: names[i], value: repoPaths[i], hint: hint, isStarred: repos[repoPaths[i]].starred });
 	}
 	return options;
 }

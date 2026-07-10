@@ -23,6 +23,8 @@ function commitsInitDomElements(view: any) {
 function commitsInitDropdowns(view: any) {
 	view.repoDropdown = new Dropdown('repoDropdown', true, false, 'Repos', (values: string[]) => {
 		view.loadRepo(values[0]);
+	}, (repo: string) => {
+		view.toggleRepoStarred(repo);
 	});
 	view.filesPanel = new FilesPanel(() => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); commitsAutoHideBranchPanel(view); });
 	view.filesPanel.getContentElem().addEventListener('click', (e: MouseEvent) => commitsHandleFilesPanelClick(view, e));

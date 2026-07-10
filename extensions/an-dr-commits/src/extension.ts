@@ -69,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const statusBarItem = new StatusBarItem(repoManager.getNumRepos(), repoManager.onDidChangeRepos, onDidChangeConfiguration, logger);
 	const repoSelectionEmitter = new EventEmitter<RepoSelectionEvent>();
 	TabView.configureRepoSelectionSync(repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
-	const sidebarView = new SidebarView(context, dataSource, extensionState, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
+	const sidebarView = new SidebarView(context, dataSource, extensionState, repoManager, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
 	const inlineBlameController = new InlineBlameController(dataSource, repoManager, statusBarItem, onDidChangeConfiguration, logger);
 	const commandManager = new CommandManager(context, avatarManager, dataSource, extensionState, repoManager, gitExecutable, onDidChangeGitExecutable, logger);
 	const diffDocProvider = new DiffDocProvider(dataSource);

@@ -4,7 +4,7 @@ import { ExtensionState } from '../../extensionState';
 import { Logger } from '../../logger';
 import { RepoFileWatcher } from '../../repoFileWatcher';
 import { RepoManager } from '../../repoManager';
-import { ErrorInfo, GitRepoSet, LoadCommitsViewTo, RequestExportRepoConfig, RequestLoadCommits, RequestLoadConfig, RequestLoadRepoInfo, RequestLoadRepos, RequestRepoInProgressAction, RequestRescanForRepos, RequestSetColumnVisibility, RequestSetGlobalViewState, RequestSetRepoState, RequestSetWorkspaceViewState, ResponseMessage } from '../../types';
+import { ErrorInfo, GitRepoSet, LoadCommitsViewTo, RequestExportRepoConfig, RequestLoadCommits, RequestLoadConfig, RequestLoadRepoInfo, RequestLoadRepos, RequestRepoInProgressAction, RequestRescanForRepos, RequestSetColumnVisibility, RequestSetGlobalViewState, RequestSetRepoState, RequestSetRepoStarred, RequestSetWorkspaceViewState, ResponseMessage } from '../../types';
 import { showErrorMessage } from '../../utils';
 
 /**
@@ -93,6 +93,10 @@ export async function handleRescanForRepos(ctx: RepoLifecycleActionContext, _msg
 
 export function handleSetRepoState(ctx: RepoLifecycleActionContext, msg: RequestSetRepoState): void {
 	ctx.repoManager.setRepoState(msg.repo, msg.state);
+}
+
+export function handleSetRepoStarred(ctx: RepoLifecycleActionContext, msg: RequestSetRepoStarred): void {
+	ctx.repoManager.setRepoStarred(msg.repo, msg.starred);
 }
 
 export async function handleExportRepoConfig(ctx: RepoLifecycleActionContext, msg: RequestExportRepoConfig): Promise<void> {

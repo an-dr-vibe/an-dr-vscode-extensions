@@ -111,7 +111,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 
 | File | Purpose |
 |---|---|
-| `sidebarView.ts` | **Core class `SidebarView`** (webview view type `an-dr-commits.activityView`) — Git API subscription, repository selection sync, message dispatch |
+| `sidebarView.ts` | **Core class `SidebarView`** (webview view type `an-dr-commits.activityView`) — repository selection sync, message dispatch. Its repo dropdown list, active-repo resolution, and file watching are sourced from `RepoManager` (not the native VS Code Git API — see ADR-006), including starred-repo sync (ADR-005). The native Git API (`this._api`) is still used for branch/remote resolution (Pull/Push/Reset), the mini graph, and as a fast path for the activity badge. The badge (`_updateBadge()`) reflects only the currently selected repo's changes, not every repo in the workspace summed together. |
 | `html.ts` | Renders the static webview shell only (meta tags, `sidebarInitialState` JSON, `sidebar.min.js`/`sidebar.min.css` tags) — no server-rendered content HTML |
 | `gitUtils.ts` | Git API working-tree helpers (`getHeadInfo`, `getWorkingTreeChanges`, `countChanges`, …) |
 | `miniGraph.ts` | Fetches the current branch/upstream mini-graph's raw commit data (`fetchMiniGraph`); reachable-set computation and rendering both live client-side in `web/sidebar/miniGraph.ts` |

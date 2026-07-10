@@ -336,3 +336,15 @@ function commitsSaveRepoStateValue(view: any, repo: string, key: keyof GG.GitRep
 		view.saveRepoState();
 	}
 }
+
+/**
+ * Toggles whether a repo is starred, for any repo in the dropdown (not just the currently open
+ * one, unlike `saveRepoStateValue`) - sent as its own request so the backend can broadcast the
+ * change to the sidebar too (see ADR-005).
+ */
+function commitsToggleRepoStarred(view: any, repo: string) {
+	const starred = !view.gitRepos[repo].starred;
+	view.gitRepos[repo].starred = starred;
+	sendMessage({ command: 'setRepoStarred', repo: repo, starred: starred });
+	view.renderRepoDropdownOptions();
+}

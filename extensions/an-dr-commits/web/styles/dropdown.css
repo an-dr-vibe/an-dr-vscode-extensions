@@ -61,15 +61,12 @@
 
 .dropdownOption{
 	position:relative;
-	padding:4px 10px;
+	padding:4px 10px 4px 30px;
 	-webkit-user-select:none;
 	user-select:none;
 	text-overflow:ellipsis;
 	white-space:nowrap;
 	overflow:hidden;
-}
-.dropdown.multi .dropdownOption{
-	padding-left:30px;
 }
 .dropdownOptions.showInfo .dropdownOption{
 	padding-right:30px;
@@ -113,9 +110,32 @@ body.vscode-high-contrast .dropdownOption:hover{
 	opacity:0.7;
 }
 
+.dropdownOptionStar{
+	position:absolute;
+	width:14px;
+	height:16px;
+	top:6px;
+	left:10px;
+	cursor:pointer;
+}
+.dropdownOptionStar .codicon{
+	color:var(--vscode-menu-foreground);
+	opacity:0.35;
+}
+.dropdownOptionStar.starred .codicon{
+	color:var(--vscode-terminal-ansiYellow, #e2b93d);
+	opacity:1;
+}
+.dropdownOptionStar:hover .codicon{
+	opacity:0.85;
+}
+
 .dropdownOption:hover .codicon{
 	color:var(--vscode-menu-selectionForeground, var(--vscode-menu-foreground));
 	opacity:0.85;
+}
+.dropdownOption:hover .dropdownOptionStar.starred .codicon{
+	color:var(--vscode-terminal-ansiYellow, #e2b93d);
 }
 
 .dropdown.dropdownOpen .dropdownCurrentValue{

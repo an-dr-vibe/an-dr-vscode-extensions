@@ -703,6 +703,11 @@ export interface RequestSetRepoState extends RepoRequest {
 	readonly state: GitRepoState;
 }
 
+export interface RequestSetRepoStarred extends RepoRequest {
+	readonly command: 'setRepoStarred';
+	readonly starred: boolean;
+}
+
 export interface RequestSetWorkspaceViewState extends BaseMessage {
 	readonly command: 'setWorkspaceViewState';
 	readonly state: CommitsViewWorkspaceState;
@@ -987,6 +992,7 @@ export type RequestMessage =
 	| RequestSetColumnVisibility
 	| RequestSetGlobalViewState
 	| RequestSetRepoState
+	| RequestSetRepoStarred
 	| RequestSetRemoteDefaultBranch
 	| RequestSetWorkspaceViewState
 	| RequestShowErrorDialog

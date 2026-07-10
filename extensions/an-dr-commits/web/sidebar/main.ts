@@ -53,6 +53,7 @@ function sidebarBasename(path: string): string {
 class SidebarView {
 	private repo: string | null;
 	private repoPaths: ReadonlyArray<string>;
+	private starredRepos: ReadonlyArray<string>;
 	private changes: ReadonlyArray<GG.GitWorkingTreeChangeMsg>;
 	private error: GG.ErrorInfo;
 	private graphHeight: number;
@@ -66,6 +67,7 @@ class SidebarView {
 	constructor(state: GG.SidebarInitialState) {
 		this.repo = state.repo;
 		this.repoPaths = state.repoPaths;
+		this.starredRepos = state.starredRepos;
 		this.changes = state.changes;
 		this.error = state.error;
 		this.graphHeight = state.graphHeight;
@@ -75,6 +77,8 @@ class SidebarView {
 
 		this.repoDropdown = new Dropdown('activityRepoDropdown', true, false, 'Repos', (values) => {
 			this.selectRepo(values[0]);
+		}, (repoPath) => {
+			this.toggleRepoStarred(repoPath);
 		});
 
 		this.renderRepoSelector();
@@ -227,9 +231,17 @@ class SidebarView {
 		if (noRepoElem !== null) noRepoElem.style.display = hasRepos ? 'none' : '';
 		if (dropdownElem !== null) dropdownElem.style.display = hasRepos ? '' : 'none';
 		if (hasRepos) {
-			const options: DropdownOption[] = this.repoPaths.map((repoPath) => ({ name: sidebarBasename(repoPath), value: repoPath }));
+			// Starred repos are shown first, preserving the existing (native VS Code Git API) order
+			// within each group - Array.prototype.sort is stable, so this is a safe partition.
+			const sortedPaths = this.repoPaths.slice().sort((a, b) => (this.starredRepos.includes(b) ? 1 : 0) - (this.starredRepos.includes(a) ? 1 : 0));
+			const options: DropdownOption[] = sortedPaths.map((repoPath) => ({ name: sidebarBasename(repoPath), value: repoPath, isStarred: this.starredRepos.includes(repoPath) }));
 			this.repoDropdown.setOptions(options, this.repo !== null ? [this.repo] : []);
 		}
+	}
+
+	/** Toggles whether a repo is starred - broadcast to the tab's own repo dropdown too, see ADR-005. */
+	private toggleRepoStarred(repoPath: string) {
+		sidebarSendMessage({ command: 'setRepoStarred', filePath: repoPath, starred: !this.starredRepos.includes(repoPath) });
 	}
 
 	/** Shows #activityActionsRow only once a repository is selected, matching the pre-port behavior. */
@@ -336,6 +348,7 @@ class SidebarView {
 	public applyDataUpdate(data: GG.SidebarResponseUpdateContent) {
 		this.repo = data.repo;
 		this.repoPaths = data.repoPaths;
+		this.starredRepos = data.starredRepos;
 		this.changes = data.changes;
 		this.error = data.error;
 		this.miniGraph = data.miniGraph;

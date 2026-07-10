@@ -9,7 +9,7 @@ import { Logger } from './logger';
 import { applyExternalConfigFile, generateExternalConfigFile, readExternalConfigFile, validateExternalConfigFile, writeExternalConfigFile } from './repo-manager/externalRepoConfig';
 import { doesPathExist, getWorkspaceFolderInfoForRepoInclusionMapping, isDirectory } from './repo-manager/workspaceUtils';
 import { ErrorInfo, GitRepoSet, GitRepoState } from './types';
-import { evalPromises, getPathFromStr, getPathFromUri, getRepoName, isPathInWorkspace, pathWithTrailingSlash, realpath, showErrorMessage, showInformationMessage } from './utils';
+import { evalPromises, getPathFromStr, getPathFromUri, getRepoName, isPathInWorkspace, normalisePathCaseForComparison, pathWithTrailingSlash, realpath, showErrorMessage, showInformationMessage } from './utils';
 import { BufferedQueue } from './utils/bufferedQueue';
 import { Disposable, toDisposable } from './utils/disposable';
 import { Event, EventEmitter } from './utils/event';
@@ -178,8 +178,10 @@ export class RepoManager extends Disposable {
 		const workspaceFolderInfo = getWorkspaceFolderInfoForRepoInclusionMapping();
 		const rootsExact = workspaceFolderInfo.rootsExact, rootsFolder = workspaceFolderInfo.rootsFolder, repoPaths = Object.keys(this.repos);
 		for (let i = 0; i < repoPaths.length; i++) {
-			const repoPathFolder = pathWithTrailingSlash(repoPaths[i]);
-			if (rootsExact.indexOf(repoPaths[i]) === -1 && !rootsFolder.find(root => repoPaths[i].startsWith(root)) && !rootsExact.find(root => root.startsWith(repoPathFolder))) {
+			// rootsExact/rootsFolder are already case-normalised (see getWorkspaceFolderInfoForRepoInclusionMapping) - normalise this side too, so a repo isn't wrongly treated as outside the workspace purely due to a casing difference (e.g. externally/script-added repos on Windows).
+			const comparablePath = normalisePathCaseForComparison(repoPaths[i]);
+			const repoPathFolder = pathWithTrailingSlash(comparablePath);
+			if (rootsExact.indexOf(comparablePath) === -1 && !rootsFolder.find(root => comparablePath.startsWith(root)) && !rootsExact.find(root => root.startsWith(repoPathFolder))) {
 				this.removeRepo(repoPaths[i]);
 			}
 		}
@@ -444,14 +446,16 @@ export class RepoManager extends Disposable {
 		const repoPaths = repo !== null && this.isKnownRepo(repo) ? [repo] : Object.keys(this.repos);
 		let changes = false, rootIndex: number, workspaceFolderIndex: number | null;
 		for (let i = 0; i < repoPaths.length; i++) {
-			rootIndex = rootsExact.indexOf(repoPaths[i]);
+			// rootsExact/rootsFolder are already case-normalised (see getWorkspaceFolderInfoForRepoInclusionMapping) - normalise this side too, matching removeReposNotInWorkspace.
+			const comparablePath = normalisePathCaseForComparison(repoPaths[i]);
+			rootIndex = rootsExact.indexOf(comparablePath);
 			if (rootIndex === -1) {
 				// Find a workspace folder that contains the repository
-				rootIndex = rootsFolder.findIndex((root) => repoPaths[i].startsWith(root));
+				rootIndex = rootsFolder.findIndex((root) => comparablePath.startsWith(root));
 			}
 			if (rootIndex === -1) {
 				// Find a workspace folder that is contained within the repository
-				const repoPathFolder = pathWithTrailingSlash(repoPaths[i]);
+				const repoPathFolder = pathWithTrailingSlash(comparablePath);
 				rootIndex = rootsExact.findIndex((root) => root.startsWith(repoPathFolder));
 			}
 			workspaceFolderIndex = rootIndex > -1 ? workspaceFolders[rootIndex].index : null;
@@ -471,6 +475,45 @@ export class RepoManager extends Disposable {
 	public setRepoState(repo: string, state: GitRepoState) {
 		this.repos[repo] = state;
 		this.extensionState.saveRepos(this.repos);
+	}
+
+	/**
+	 * Set whether a known repository is starred, and notify subscribers (e.g. the tab and
+	 * sidebar views) so both reflect the change immediately, regardless of which one made it.
+	 * @param repo The path of the repository (see `findKnownRepoPath` for path resolution).
+	 * @param starred TRUE => Starred, FALSE => Not starred.
+	 */
+	public setRepoStarred(repo: string, starred: boolean) {
+		const key = this.findKnownRepoPath(repo);
+		if (key === null) return;
+		this.repos[key] = Object.assign({}, this.repos[key], { starred });
+		this.extensionState.saveRepos(this.repos);
+		this.sendRepos();
+	}
+
+	/**
+	 * Check whether a known repository is starred.
+	 * @param repo The path of the repository (see `findKnownRepoPath` for path resolution).
+	 * @returns TRUE => Starred, FALSE => Not starred (or repository is unknown).
+	 */
+	public isRepoStarred(repo: string) {
+		const key = this.findKnownRepoPath(repo);
+		return key !== null && this.repos[key].starred;
+	}
+
+	/**
+	 * Resolve a repository path to the exact key it is stored under, tolerating the
+	 * case-insensitive path comparison Windows requires (paths reported by other sources, e.g.
+	 * the sidebar's own VS Code Git API-sourced repo list, may not match this RepoManager's key
+	 * casing exactly).
+	 * @param repo The path of the repository.
+	 * @returns The known repository key, or NULL if the repository isn't known.
+	 */
+	public findKnownRepoPath(repo: string): string | null {
+		if (this.isKnownRepo(repo)) return repo;
+		if (process.platform !== 'win32') return null;
+		const target = normalisePathCaseForComparison(repo);
+		return Object.keys(this.repos).find((p) => normalisePathCaseForComparison(p) === target) ?? null;
 	}
 
 	/**

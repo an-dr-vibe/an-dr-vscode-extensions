@@ -44,6 +44,17 @@ export function pathWithTrailingSlash(path: string) {
 }
 
 /**
+ * Normalise a path's case for comparison purposes only (never for display/storage) - Windows
+ * filesystems are case-insensitive, but paths sourced from different places (VS Code's
+ * `workspaceFolders`, external scripts, etc.) don't always agree on casing.
+ * @param path The path.
+ * @returns The path, lower-cased on win32, unchanged elsewhere.
+ */
+export function normalisePathCaseForComparison(path: string) {
+	return process.platform === 'win32' ? path.toLowerCase() : path;
+}
+
+/**
  * Check whether a path is within the current Visual Studio Code Workspace.
  * @param path The path to check.
  * @returns TRUE => Path is in workspace, FALSE => Path isn't in workspace.
@@ -227,8 +238,9 @@ export function getRepoName(path: string) {
  */
 export function getSortedRepositoryPaths(repos: GitRepoSet, order: RepoDropdownOrder): ReadonlyArray<string> {
 	const repoPaths = Object.keys(repos);
+	let ordered: string[];
 	if (order === RepoDropdownOrder.WorkspaceFullPath) {
-		return repoPaths.sort((a, b) => repos[a].workspaceFolderIndex === repos[b].workspaceFolderIndex
+		ordered = repoPaths.sort((a, b) => repos[a].workspaceFolderIndex === repos[b].workspaceFolderIndex
 			? a.localeCompare(b)
 			: repos[a].workspaceFolderIndex === null
 				? 1
@@ -237,12 +249,14 @@ export function getSortedRepositoryPaths(repos: GitRepoSet, order: RepoDropdownO
 					: repos[a].workspaceFolderIndex! - repos[b].workspaceFolderIndex!
 		);
 	} else if (order === RepoDropdownOrder.FullPath) {
-		return repoPaths.sort((a, b) => a.localeCompare(b));
+		ordered = repoPaths.sort((a, b) => a.localeCompare(b));
 	} else {
-		return repoPaths.map((path) => ({ name: repos[path].name || getRepoName(path), path: path }))
+		ordered = repoPaths.map((path) => ({ name: repos[path].name || getRepoName(path), path: path }))
 			.sort((a, b) => a.name !== b.name ? a.name.localeCompare(b.name) : a.path.localeCompare(b.path))
 			.map((x) => x.path);
 	}
+	// Starred repos are always shown first, preserving the order computed above within each group.
+	return ordered.sort((a, b) => (repos[b].starred ? 1 : 0) - (repos[a].starred ? 1 : 0));
 }
 
 

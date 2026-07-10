@@ -26,6 +26,12 @@ export interface SidebarRequestSelectRepo extends BaseMessage {
 	readonly filePath: string;
 }
 
+export interface SidebarRequestSetRepoStarred extends BaseMessage {
+	readonly command: 'setRepoStarred';
+	readonly filePath: string;
+	readonly starred: boolean;
+}
+
 export interface SidebarRequestRefresh extends BaseMessage {
 	readonly command: 'refresh';
 }
@@ -96,6 +102,7 @@ export type SidebarRequestMessage =
 	| SidebarRequestOpenCommits
 	| SidebarRequestLoadMoreGraph
 	| SidebarRequestSelectRepo
+	| SidebarRequestSetRepoStarred
 	| SidebarRequestRefresh
 	| SidebarRequestSetGraphHeight
 	| SidebarRequestStage
@@ -117,6 +124,7 @@ export interface SidebarResponseUpdateContent extends BaseMessage {
 	readonly command: 'updateContent';
 	readonly repo: string | null;
 	readonly repoPaths: ReadonlyArray<string>;
+	readonly starredRepos: ReadonlyArray<string>;
 	readonly changes: ReadonlyArray<GitWorkingTreeChangeMsg>;
 	readonly error: ErrorInfo;
 	readonly miniGraph: SidebarMiniGraphInitialState | null;

@@ -14,7 +14,7 @@ import { Event } from '../../utils/event';
 import { renderCommitsWebviewHtml } from './webviewHtml';
 import { getMatchingTabs, isMatchingWebviewTab } from '../../editorTabUtils';
 import { RepoSelectionEvent } from '../common/repoSelection';
-import { RepoLifecycleActionContext, handleExportRepoConfig, handleLoadCommits, handleLoadConfig, handleLoadRepoInfo, handleLoadRepos, handleRepoInProgressAction, handleRescanForRepos, handleSetColumnVisibility, handleSetGlobalViewState, handleSetRepoState, handleSetWorkspaceViewState } from './repoLifecycleActions';
+import { RepoLifecycleActionContext, handleExportRepoConfig, handleLoadCommits, handleLoadConfig, handleLoadRepoInfo, handleLoadRepos, handleRepoInProgressAction, handleRescanForRepos, handleSetColumnVisibility, handleSetGlobalViewState, handleSetRepoState, handleSetRepoStarred, handleSetWorkspaceViewState } from './repoLifecycleActions';
 import { BranchRemoteActionContext, handleAddRemote, handleCheckoutBranch, handleCleanupLocalBranches, handleCreateBranch, handleCreatePullRequest, handleDeleteBranch, handleDeleteRemote, handleDeleteRemoteBranch, handleEditRemote, handleFetch, handleFetchIntoLocalBranch, handleMerge, handlePruneRemote, handlePullBranch, handlePullBranchWithStash, handlePushBranch, handleRebase, handleRenameBranch, handleSetBranchUpstream, handleSetRemoteDefaultBranch, handleUnsetBranchUpstream } from './branchRemoteActions';
 import { TagStashActionContext, handleAddTag, handleApplyStash, handleBranchFromStash, handleDeleteTag, handleDropStash, handlePopStash, handlePushStash, handlePushTag, handleResolveSidebarTagContext, handleTagDetails } from './tagStashActions';
 import { CommitGraphActionContext, handleCheckoutCommit, handleCherrypickCommit, handleCommitDetails, handleCompareCommits, handleDropCommit, handleEditCommitAuthor, handleResetToCommit, handleResetToHead, handleRevertCommit, handleRewordCommit, handleSidebarBatchRefAction, handleSquashCommits } from './commitGraphActions';
@@ -516,6 +516,9 @@ export class TabView extends Disposable {
 				break;
 			case 'setRepoState':
 				handleSetRepoState(this.repoLifecycleCtx, msg);
+				break;
+			case 'setRepoStarred':
+				handleSetRepoStarred(this.repoLifecycleCtx, msg);
 				break;
 			case 'setWorkspaceViewState':
 				await handleSetWorkspaceViewState(this.repoLifecycleCtx, msg);

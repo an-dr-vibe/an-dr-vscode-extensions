@@ -133,7 +133,7 @@ A summary of the Commits extension settings are:
         * **Commits**: Enables commit signing with GPG or X.509.
         * **Tags**: Enables tag signing with GPG or X.509.
     * **Use Mailmap**: Respect [.mailmap](https://git-scm.com/docs/git-check-mailmap#_mapping_authors) files when displaying author & committer names and email addresses.
-* **Repository Dropdown Order**: Specifies the order that repositories are sorted in the repository dropdown on the Commits View (only visible when more than one repository exists in the current Visual Studio Code Workspace).
+* **Repository Dropdown Order**: Specifies the order that repositories are sorted in the repository dropdown on the Commits View (only visible when more than one repository exists in the current Visual Studio Code Workspace). Starred repositories (click the star icon on a repository's row in either the tab's or the Activity Bar sidebar's repository dropdown) are always shown first, ahead of this ordering; starring is local to this machine and workspace.
 * **Retain Context When Hidden**: Specifies if the Commits view Visual Studio Code context is kept when the panel is no longer visible (e.g. moved to background tab). Enabling this setting will make Commits load significantly faster when switching back to the Commits tab, however has a higher memory overhead.
 * **Show Status Bar Item**: Show a Status Bar Item that opens the Commits View when clicked.
 * **Source Code Provider Integration Location**: Specifies where the "View Commits" action appears on the title of SCM Providers.

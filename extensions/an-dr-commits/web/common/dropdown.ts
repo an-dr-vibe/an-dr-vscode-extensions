@@ -6,19 +6,22 @@ interface DropdownOption {
 	readonly isCurrent?: boolean;
 	readonly isRemoteDefault?: boolean;
 	readonly remoteDefaultHint?: string;
+	readonly isStarred?: boolean;
 }
 
 /**
- * Implements a dropdown input - used in the Commits tab's top control bar, and (from a later
- * increment) the sidebar's repo selector. Moved to web/common/ so both share the exact same
- * implementation rather than the sidebar reimplementing dropdown behavior a second time (see
- * ADR-003); single-select mode (multipleAllowed = false) is what the sidebar's repo selector
- * uses.
+ * Implements a dropdown input - used in the Commits tab's top control bar, and the sidebar's
+ * repo selector. Moved to web/common/ so both share the exact same implementation rather than
+ * the sidebar reimplementing dropdown behavior a second time (see ADR-003); single-select mode
+ * (multipleAllowed = false) is what the sidebar's repo selector uses. Both current usages are
+ * repo dropdowns, so a star icon (toggle via `starToggleCallback`, independent of row selection)
+ * is always rendered on the left of each row - see ADR-005.
  */
 class Dropdown {
 	private readonly showInfo: boolean;
 	private readonly multipleAllowed: boolean;
 	private readonly changeCallback: (values: string[]) => void;
+	private readonly starToggleCallback: (value: string) => void;
 
 	private options: ReadonlyArray<DropdownOption> = [];
 	private optionsSelected: boolean[] = [];
@@ -41,12 +44,14 @@ class Dropdown {
 	 * @param multipleAllowed Can multiple items be selected.
 	 * @param dropdownType The type of content the dropdown is being used for.
 	 * @param changeCallback A callback to be invoked when the selected item(s) of the dropdown changes.
+	 * @param starToggleCallback A callback to be invoked when an option's star icon is clicked, with that option's value. Does not change the selection.
 	 * @returns The Dropdown instance.
 	 */
-	constructor(id: string, showInfo: boolean, multipleAllowed: boolean, dropdownType: string, changeCallback: (values: string[]) => void) {
+	constructor(id: string, showInfo: boolean, multipleAllowed: boolean, dropdownType: string, changeCallback: (values: string[]) => void, starToggleCallback: (value: string) => void) {
 		this.showInfo = showInfo;
 		this.multipleAllowed = multipleAllowed;
 		this.changeCallback = changeCallback;
+		this.starToggleCallback = starToggleCallback;
 		this.elem = document.getElementById(id)!;
 
 		this.menuElem = document.createElement('div');
@@ -89,7 +94,12 @@ class Dropdown {
 					} else {
 						const option = <HTMLElement | null>(<HTMLElement>e.target).closest('.dropdownOption');
 						if (option !== null && option.parentNode === this.optionsElem && typeof option.dataset.id !== 'undefined') {
-							this.onOptionClick(parseInt(option.dataset.id!));
+							const star = <HTMLElement | null>(<HTMLElement>e.target).closest('.dropdownOptionStar');
+							if (star !== null && star.parentNode === option) {
+								this.starToggleCallback(this.options[parseInt(option.dataset.id!)].value);
+							} else {
+								this.onOptionClick(parseInt(option.dataset.id!));
+							}
 						}
 					}
 				}
@@ -234,7 +244,9 @@ class Dropdown {
 		let html = '';
 		for (let i = 0; i < this.options.length; i++) {
 			const escapedName = escapeHtml(this.options[i].name);
+			const isStarred = !!this.options[i].isStarred;
 			html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '">' +
+				'<div class="dropdownOptionStar' + (isStarred ? ' starred' : '') + '" title="' + (isStarred ? 'Remove from Favorites' : 'Add to Favorites') + '">' + codicon(isStarred ? 'star-full' : 'star-empty') + '</div>' +
 				(this.multipleAllowed && this.optionsSelected[i] ? '<div class="dropdownOptionMultiSelected">' + codicon('check') + '</div>' : '') +
 				escapedName + (typeof this.options[i].hint === 'string' && this.options[i].hint !== '' ? '<span class="dropdownOptionHint">' + escapeHtml(this.options[i].hint!) + '</span>' : '') +
 				(this.showInfo ? '<div class="dropdownOptionInfo" title="' + escapeHtml(this.options[i].value) + '">' + codicon('info') + '</div>' : '') +

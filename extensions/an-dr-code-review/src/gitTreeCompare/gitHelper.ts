@@ -130,6 +130,12 @@ export interface IDiffStatus {
 
     /** True if this was or is a submodule */
     isSubmodule: boolean
+
+    /** Lines added, or null if not known (untracked files) or not countable (binary files) */
+    insertions: number | null
+
+    /** Lines removed, or null if not known (untracked files) or not countable (binary files) */
+    deletions: number | null
 }
 
 const MODE_REGULAR_FILE = '100644';
@@ -140,6 +146,8 @@ class DiffStatus implements IDiffStatus {
     readonly srcAbsPath: string;
     readonly dstAbsPath: string;
     readonly isSubmodule: boolean;
+    insertions: number | null = null;
+    deletions: number | null = null;
 
     constructor(repoRoot: string, public status: StatusCode, srcRelPath: string, dstRelPath: string | undefined, srcMode: string, dstMode: string) {
         this.srcAbsPath = path.join(repoRoot, srcRelPath);
@@ -194,6 +202,69 @@ function parseDiffIndexOutput(repoRoot: string, out: string): IDiffStatus[] {
     return entries;
 }
 
+interface NumStat {
+    insertions: number | null;
+    deletions: number | null;
+}
+
+/**
+ * Parses `--numstat -z` output (shared by diff/diff-index/diff-tree - the format is identical
+ * regardless of which of those emits it) into a lookup by repo-root-relative path. A record is
+ * normally `insertions TAB deletions TAB path NUL`; for renames/copies the path field is empty
+ * and is instead followed by two separately NUL-terminated paths (old, new) - keyed here by the
+ * new path, since that's what IDiffStatus entries are merged against (dstAbsPath). `-` in the
+ * insertions/deletions field (binary files) is left as null rather than parsed as a number.
+ */
+function parseNumStatOutput(output: string[]): Map<string, NumStat> {
+    const stats = new Map<string, NumStat>();
+    let i = 0;
+    while (i < output.length && output[i] !== '') {
+        const fields = output[i].split('\t');
+        if (fields.length !== 3) break;
+        const insertions = fields[0] === '-' ? null : parseInt(fields[0], 10);
+        const deletions = fields[1] === '-' ? null : parseInt(fields[1], 10);
+        if (fields[2] !== '') {
+            stats.set(fields[2], { insertions, deletions });
+            i += 1;
+        } else {
+            stats.set(output[i + 2], { insertions, deletions });
+            i += 3;
+        }
+    }
+    return stats;
+}
+
+/**
+ * Fetches `--numstat` for the same comparison `statuses` was already built from (identical args,
+ * with `--numstat` substituted for the raw/default format) and merges insertions/deletions into
+ * each entry in place, matched by repo-root-relative dstAbsPath. Untracked entries (status 'U')
+ * are left at their default null/null - numstat only covers tracked-file diffs, and there's
+ * nothing to diff an untracked file against (matches an-dr-commits' own precedent for the same
+ * case). Fetch failures are swallowed - the stats are a bonus, not worth failing the whole tree
+ * refresh over.
+ */
+async function applyNumStats(repo: Repository, repoRoot: string, numStatArgs: string[], statuses: IDiffStatus[]): Promise<void> {
+    const numStatResult = await repo.exec(numStatArgs).catch(() => null);
+    if (!numStatResult) {
+        return;
+    }
+    const numStats = parseNumStatOutput(numStatResult.stdout.split('\0'));
+    for (const status of statuses) {
+        if (status.status === 'U') {
+            continue;
+        }
+        // git's own output (both the numStats keys and, on Windows, path.relative's separators)
+        // needs forward slashes here - normalizePath (imported above) only fixes drive-letter
+        // casing, not separators, so it isn't enough on its own for this lookup.
+        const relPath = path.relative(repoRoot, status.dstAbsPath).replace(/\\/g, '/');
+        const stat = numStats.get(relPath);
+        if (stat) {
+            status.insertions = stat.insertions;
+            status.deletions = stat.deletions;
+        }
+    }
+}
+
 export async function diffIndex(repo: Repository, ref: string, refreshIndex: boolean, findRenames: boolean, renameThreshold: number, omitUntrackedFiles: boolean, omitUnstagedChanges: boolean): Promise<IDiffStatus[]> {
     if (refreshIndex) {
         // avoid superfluous diff entries if files only got touched
@@ -208,13 +279,10 @@ export async function diffIndex(repo: Repository, ref: string, refreshIndex: boo
     // exceptions can happen with newly initialized repos without commits, or when git is busy
     const repoRoot = normalizePath(repo.root);
     const renamesFlag = findRenames ? `--find-renames=${renameThreshold}%`  : '--no-renames';
-    const diffIndexArgs = ['diff-index', '-z', renamesFlag];
-    if (omitUnstagedChanges) {
-        diffIndexArgs.push('--cached');
-    }
-    diffIndexArgs.push(ref, '--');
+    const cachedFlag: string[] = omitUnstagedChanges ? ['--cached'] : [];
+    const diffIndexArgs = ['diff-index', '-z', renamesFlag, ...cachedFlag, ref, '--'];
     let diffIndexResult = await repo.exec(diffIndexArgs);
-    
+
     let untrackedStatuses: IDiffStatus[] = [];
     if (!omitUntrackedFiles) {
         let untrackedResult = await repo.exec(['ls-files', '-z', '--others', '--exclude-standard']);
@@ -234,6 +302,10 @@ export async function diffIndex(repo: Repository, ref: string, refreshIndex: boo
 
     const statuses = filteredDiffIndexStatuses.concat(untrackedStatuses);
     statuses.sort((s1, s2) => s1.dstAbsPath.localeCompare(s2.dstAbsPath))
+
+    const numStatArgs = ['diff-index', '--numstat', '-z', renamesFlag, ...cachedFlag, ref, '--'];
+    await applyNumStats(repo, repoRoot, numStatArgs, statuses);
+
     return statuses;
 }
 
@@ -255,5 +327,10 @@ export async function diffCommits(repo: Repository, from: string, to: string, fi
     const repoRoot = normalizePath(repo.root);
     const renamesFlag = findRenames ? `--find-renames=${renameThreshold}%` : '--no-renames';
     const result = await repo.exec(['diff-tree', '-r', '-z', renamesFlag, from, to, '--']);
-    return parseDiffIndexOutput(repoRoot, result.stdout);
+    const statuses = parseDiffIndexOutput(repoRoot, result.stdout);
+
+    const numStatArgs = ['diff-tree', '-r', '--numstat', '-z', renamesFlag, from, to, '--'];
+    await applyNumStats(repo, repoRoot, numStatArgs, statuses);
+
+    return statuses;
 }

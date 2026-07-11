@@ -47,7 +47,9 @@ class FileElement implements IDiffStatus {
         public dstAbsPath: string,
         public dstRelPath: string,
         public status: StatusCode,
-        public isSubmodule: boolean) {}
+        public isSubmodule: boolean,
+        public insertions: number | null,
+        public deletions: number | null) {}
 
     get label(): string {
         return path.basename(this.dstAbsPath)
@@ -1117,7 +1119,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
                 for (const file of fileEntries) {
                     if (this.matchesFilter(file.dstAbsPath, relPathBase)) {
                         const dstRelPath = path.relative(relPathBase, file.dstAbsPath);
-                        entries.push(new FileElement(file.srcAbsPath, file.dstAbsPath, dstRelPath, file.status, file.isSubmodule));
+                        entries.push(new FileElement(file.srcAbsPath, file.dstAbsPath, dstRelPath, file.status, file.isSubmodule, file.insertions, file.deletions));
                     }
                 }
             }
@@ -1180,7 +1182,7 @@ export class GitTreeCompareProvider implements TreeDataProvider<Element>, Dispos
             for (const file of fileEntries) {
                 if (this.matchesFilter(file.dstAbsPath, relPathBase)) {
                     const dstRelPath = path.relative(relPathBase, file.dstAbsPath);
-                    entries.push(new FileElement(file.srcAbsPath, file.dstAbsPath, dstRelPath, file.status, file.isSubmodule));
+                    entries.push(new FileElement(file.srcAbsPath, file.dstAbsPath, dstRelPath, file.status, file.isSubmodule, file.insertions, file.deletions));
                 }
             }
         }
@@ -1741,6 +1743,13 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
             item.tooltip = `${element.srcAbsPath} → ${item.tooltip}`;
         }
         const descriptionParts: string[] = [element.status];
+        // Matches an-dr-commits' own file tree: suppressed for Added/Untracked/Deleted, where the
+        // stat would just restate "the whole file" rather than say anything about the change
+        // itself, and naturally absent for binary files (insertions/deletions are null there).
+        if (element.status !== 'A' && element.status !== 'U' && element.status !== 'D'
+            && element.insertions !== null && element.deletions !== null) {
+            descriptionParts.push(`+${element.insertions} -${element.deletions}`);
+        }
         if (element.commentCount > 0) {
             descriptionParts.push(element.commentCount >= 10 ? '+' : String(element.commentCount));
         }

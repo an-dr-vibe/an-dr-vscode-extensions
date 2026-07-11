@@ -26,6 +26,18 @@ export interface SidebarGraphConfig {
 }
 
 /**
+ * The mini graph's own load state, kept separate from the rest of the sidebar's data so the
+ * graph's always-present container (#activityGraph) can show a spinner/error/empty message
+ * independently of whether the repo selector or changes tree are ready - see the "graph state"
+ * ADR. `data: null` under `ready` covers the valid-but-nothing-to-draw case (no branch checked
+ * out yet, or a repo with zero commits), distinct from `error` (the fetch itself failed).
+ */
+export type SidebarGraphState =
+	| { readonly status: 'loading' }
+	| { readonly status: 'error'; readonly message: string }
+	| { readonly status: 'ready'; readonly data: SidebarMiniGraphInitialState | null };
+
+/**
  * Initial data injected into the sidebar webview on first render - the sidebar's counterpart
  * to CommitsViewInitialState (view-state.ts), scoped to what the sidebar actually needs.
  * Extended incrementally as the sidebar's client-side rendering is built out (see ADR-003).
@@ -38,6 +50,6 @@ export interface SidebarInitialState {
 	readonly error: ErrorInfo;
 	readonly graphHeight: number;
 	readonly enhancedAccessibility: boolean;
-	readonly miniGraph: SidebarMiniGraphInitialState | null;
+	readonly graph: SidebarGraphState;
 	readonly graphConfig: SidebarGraphConfig;
 }

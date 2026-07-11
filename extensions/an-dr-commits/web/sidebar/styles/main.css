@@ -92,8 +92,20 @@ body.activityChangesBody{
 #activityGraph{
 	flex:0 0 auto;
 	overflow-y:auto;
-	max-height:var(--activity-graph-height);
+	height:var(--activity-graph-height);
 	position:relative;
+}
+#activityGraphMessage{
+	height:100%;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	gap:8px;
+	text-align:center;
+	box-sizing:border-box;
+}
+#activityGraphMessage.cpError,#activityGraphMessage.cpPlaceholder{
+	padding:8px;
 }
 #activityGraphResizeHandle{
 	flex:0 0 auto;

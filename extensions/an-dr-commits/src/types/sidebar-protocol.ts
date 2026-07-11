@@ -1,6 +1,6 @@
 import { BaseMessage, ErrorInfo } from './base';
 import { GitWorkingTreeChangeMsg } from './message-protocol';
-import { SidebarMiniGraphInitialState } from './sidebar-state';
+import { SidebarGraphState } from './sidebar-state';
 
 /**
  * The sidebar's webview <-> backend message protocol - one discriminated-union type per
@@ -127,12 +127,17 @@ export interface SidebarResponseUpdateContent extends BaseMessage {
 	readonly starredRepos: ReadonlyArray<string>;
 	readonly changes: ReadonlyArray<GitWorkingTreeChangeMsg>;
 	readonly error: ErrorInfo;
-	readonly miniGraph: SidebarMiniGraphInitialState | null;
 }
 
+/**
+ * Carries the mini graph's own load state, sent independently of `updateContent` (fired once the
+ * graph fetch settles, whether or not it was the same refresh cycle that produced the last
+ * `updateContent`) so the graph's readiness never blocks or is blocked by the rest of the panel -
+ * see SidebarGraphState.
+ */
 export interface SidebarResponseUpdateGraph extends BaseMessage {
 	readonly command: 'updateGraph';
-	readonly miniGraph: SidebarMiniGraphInitialState | null;
+	readonly graph: SidebarGraphState;
 }
 
 export type SidebarResponseMessage = SidebarResponseUpdateContent | SidebarResponseUpdateGraph;

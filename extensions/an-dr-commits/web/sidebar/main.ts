@@ -58,7 +58,7 @@ class SidebarView {
 	private error: GG.ErrorInfo;
 	private graphHeight: number;
 	private readonly enhancedAccessibility: boolean;
-	private miniGraph: GG.SidebarMiniGraphInitialState | null;
+	private graph: GG.SidebarGraphState;
 	private readonly graphConfig: GG.SidebarGraphConfig;
 	private graphLoading: boolean = false;
 
@@ -72,7 +72,7 @@ class SidebarView {
 		this.error = state.error;
 		this.graphHeight = state.graphHeight;
 		this.enhancedAccessibility = state.enhancedAccessibility;
-		this.miniGraph = state.miniGraph;
+		this.graph = state.graph;
 		this.graphConfig = state.graphConfig;
 
 		this.repoDropdown = new Dropdown('activityRepoDropdown', true, false, 'Repos', (values) => {
@@ -266,27 +266,44 @@ class SidebarView {
 	}
 
 	/**
-	 * Renders (or hides) #activityGraph and #activityGraphResizeHandle from the current mini
-	 * graph state, preserving scroll position across in-place updates (same technique as
-	 * renderChangesTree - script.ts additionally replaced just the #miniGraph child rather than
-	 * all of #activityGraph's innerHTML, but since #miniGraph is #activityGraph's only content
-	 * either way, both produce the same DOM; the scrollTop save/restore is what actually matters
-	 * for scroll continuity, and both approaches need it).
+	 * Renders (or hides) #activityGraph and #activityGraphResizeHandle from the current graph
+	 * load state. Hidden only when no repo is selected - there's nothing meaningful to show then.
+	 * Otherwise the container always stays visible at its resizable height, showing a spinner
+	 * while loading, an error message if the fetch failed, a muted note when there's genuinely
+	 * nothing to draw (no branch checked out, or zero commits), or the graph itself once ready -
+	 * see SidebarGraphState. Preserves scroll position across in-place updates in the ready-with-
+	 * data case (same technique as renderChangesTree - script.ts additionally replaced just the
+	 * #miniGraph child rather than all of #activityGraph's innerHTML, but since #miniGraph is
+	 * #activityGraph's only content either way, both produce the same DOM; the scrollTop
+	 * save/restore is what actually matters for scroll continuity, and both approaches need it).
 	 */
 	private renderMiniGraph() {
 		document.body.style.setProperty('--activity-graph-height', this.graphHeight + 'px');
 
 		const graphElem = document.getElementById('activityGraph');
 		const handleElem = document.getElementById('activityGraphResizeHandle');
-		const hasGraph = this.miniGraph !== null && this.miniGraph.commits.length > 0;
+		const visible = this.repo !== null;
 
-		if (graphElem !== null) graphElem.style.display = hasGraph ? '' : 'none';
-		if (handleElem !== null) handleElem.style.display = hasGraph ? '' : 'none';
-		if (graphElem !== null && hasGraph) {
+		if (graphElem !== null) graphElem.style.display = visible ? '' : 'none';
+		if (handleElem !== null) handleElem.style.display = visible ? '' : 'none';
+		if (graphElem === null || !visible) return;
+
+		const graph = this.graph;
+		if (graph.status === 'ready' && graph.data !== null && graph.data.commits.length > 0) {
 			const scrollTop = graphElem.scrollTop;
-			graphElem.innerHTML = sidebarRenderMiniGraphInner(this.miniGraph!, this.graphConfig);
-			graphElem.dataset.more = this.miniGraph!.moreAvailable ? 'true' : 'false';
+			graphElem.innerHTML = sidebarRenderMiniGraphInner(graph.data, this.graphConfig);
+			graphElem.dataset.more = graph.data.moreAvailable ? 'true' : 'false';
 			requestAnimationFrame(() => { graphElem.scrollTop = scrollTop; });
+			return;
+		}
+
+		graphElem.dataset.more = 'false';
+		if (graph.status === 'loading') {
+			graphElem.innerHTML = `<div id="activityGraphMessage">${codicon('loading', 'codicon-modifier-spin')}<span>Loading...</span></div>`;
+		} else if (graph.status === 'error') {
+			graphElem.innerHTML = `<div id="activityGraphMessage" class="cpError">${escapeHtml(graph.message)}</div>`;
+		} else {
+			graphElem.innerHTML = `<div id="activityGraphMessage" class="cpPlaceholder">No commits yet</div>`;
 		}
 	}
 
@@ -344,14 +361,19 @@ class SidebarView {
 		});
 	}
 
-	/** Applies a fresh data snapshot pushed from the back-end (the 'updateContent' message) and re-renders everything it affects. */
+	/**
+	 * Applies a fresh data snapshot pushed from the back-end (the 'updateContent' message) and
+	 * re-renders everything it affects. Doesn't touch graph state - the graph settles on its own
+	 * schedule and arrives separately via 'updateGraph' (see SidebarView._refreshPanel) - but still
+	 * re-renders the graph container, since its visibility depends on `repo` too (hidden when no
+	 * repo is selected).
+	 */
 	public applyDataUpdate(data: GG.SidebarResponseUpdateContent) {
 		this.repo = data.repo;
 		this.repoPaths = data.repoPaths;
 		this.starredRepos = data.starredRepos;
 		this.changes = data.changes;
 		this.error = data.error;
-		this.miniGraph = data.miniGraph;
 
 		this.renderRepoSelector();
 		this.updateActionsRowVisibility();
@@ -359,9 +381,9 @@ class SidebarView {
 		this.renderMiniGraph();
 	}
 
-	/** Applies a mini graph page pushed in response to 'loadMoreGraph' (the 'updateGraph' message). */
-	public applyGraphUpdate(miniGraph: GG.SidebarMiniGraphInitialState | null) {
-		this.miniGraph = miniGraph;
+	/** Applies the graph's current load state, pushed independently of 'updateContent' - both the initial post-shell fetch and 'loadMoreGraph' pagination arrive this way. */
+	public applyGraphUpdate(graph: GG.SidebarGraphState) {
+		this.graph = graph;
 		this.graphLoading = false;
 		this.renderMiniGraph();
 	}
@@ -379,7 +401,7 @@ function sidebarRegisterMessageHandler(view: SidebarView) {
 				view.applyDataUpdate(msg);
 				break;
 			case 'updateGraph':
-				view.applyGraphUpdate(msg.miniGraph);
+				view.applyGraphUpdate(msg.graph);
 				break;
 		}
 	});

@@ -14,7 +14,7 @@ import {
 import { MINI_GRAPH_LIMIT, fetchMiniGraph } from './miniGraph';
 import { renderHtml, renderLoadingHtml } from './html';
 import { RepoSelectionEvent } from '../common/repoSelection';
-import { SidebarInitialState, SidebarMiniGraphInitialState } from '../../types/sidebar-state';
+import { SidebarGraphState, SidebarInitialState } from '../../types/sidebar-state';
 import { SidebarRequestMessage, SidebarResponseMessage } from '../../types/sidebar-protocol';
 
 export { GitActivityChange, GitChangeCounts, getWorkingTreeChanges, countChanges, countWorkingTreeChanges } from './gitUtils';
@@ -243,10 +243,10 @@ export class SidebarView implements vscode.Disposable {
 	 * live config - used for both the shell's initial render and the raw-data patch messages,
 	 * so both stay in sync by construction.
 	 */
-	private _buildInitialState(repo: string | null, repoPaths: string[], starredRepos: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, miniGraph: SidebarMiniGraphInitialState | null, graphHeight: number): SidebarInitialState {
+	private _buildInitialState(repo: string | null, repoPaths: string[], starredRepos: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, graph: SidebarGraphState, graphHeight: number): SidebarInitialState {
 		const config = getConfig();
 		return {
-			repo, repoPaths, starredRepos, changes, error, graphHeight, miniGraph,
+			repo, repoPaths, starredRepos, changes, error, graphHeight, graph,
 			enhancedAccessibility: config.enhancedAccessibility,
 			graphConfig: {
 				showTags: config.graph.showTagsInActivityBar,
@@ -265,6 +265,12 @@ export class SidebarView implements vscode.Disposable {
 	 * repo switch - the sidebar's own client-side rendering (web/sidebar/main.ts) now handles
 	 * the mini graph appearing/disappearing via a patch (show/hide, not a DOM structure change),
 	 * so that no longer needs a full replace the way the pre-port server-rendered HTML did.
+	 *
+	 * The graph fetch is deliberately not awaited together with the changes fetch: it settles on
+	 * its own schedule and is always pushed via its own 'updateGraph' message (never bundled into
+	 * 'updateContent'), so a slow or failing graph fetch never delays the repo selector / changes
+	 * tree, and the graph's own always-present container can show its own loading/error state
+	 * (SidebarGraphState) in the meantime - see ADR-007.
 	 */
 	private async _refreshPanel() {
 		if (this._view === null) return;
@@ -281,10 +287,10 @@ export class SidebarView implements vscode.Disposable {
 		if (repo === null) {
 			this._changes = [];
 			if (needsFullRender) {
-				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(null, repoPaths, starredRepos, [], null, null, graphHeight));
+				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(null, repoPaths, starredRepos, [], null, { status: 'ready', data: null }, graphHeight));
 				this._hasRenderedOnce = true;
 			} else {
-				await this._sendMessage({ command: 'updateContent', repo: null, repoPaths, starredRepos, changes: [], error: null, miniGraph: null });
+				await this._sendMessage({ command: 'updateContent', repo: null, repoPaths, starredRepos, changes: [], error: null });
 			}
 			return;
 		}
@@ -295,19 +301,22 @@ export class SidebarView implements vscode.Disposable {
 			this._view.webview.html = renderLoadingHtml(this._view.webview, this.extensionPath);
 		}
 
-		const [result, miniGraph] = await Promise.all([
-			this.dataSource.getWorkingTreeChanges(repo),
-			fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit)
-		]);
+		const graphPromise = fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
+
+		const result = await this.dataSource.getWorkingTreeChanges(repo);
 		if (seq !== this._refreshSeq) return;
 		this._changes = result.changes;
 
 		if (needsFullRender) {
-			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(repo, repoPaths, starredRepos, result.changes, result.error, miniGraph, graphHeight));
+			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(repo, repoPaths, starredRepos, result.changes, result.error, { status: 'loading' }, graphHeight));
 			this._hasRenderedOnce = true;
 		} else {
-			await this._sendMessage({ command: 'updateContent', repo, repoPaths, starredRepos, changes: result.changes, error: result.error, miniGraph });
+			await this._sendMessage({ command: 'updateContent', repo, repoPaths, starredRepos, changes: result.changes, error: result.error });
 		}
+
+		const graph = await graphPromise;
+		if (seq !== this._refreshSeq) return;
+		await this._sendMessage({ command: 'updateGraph', graph });
 	}
 
 	private async _handleMessage(msg: SidebarRequestMessage) {
@@ -319,8 +328,8 @@ export class SidebarView implements vscode.Disposable {
 			case 'loadMoreGraph':
 				this._miniGraphLimit += MINI_GRAPH_LIMIT;
 				if (repo !== null && this._view !== null) {
-					const miniGraph = await fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
-					await this._sendMessage({ command: 'updateGraph', miniGraph });
+					const graph = await fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
+					await this._sendMessage({ command: 'updateGraph', graph });
 				}
 				return;
 			case 'selectRepo':

@@ -13,5 +13,5 @@ re-exports every file here as one public barrel — always import from `'../type
 | `view-state.ts` | Tab view-state types (`CommitsViewGlobalState`, `CommitsViewWorkspaceState`, `LoadCommitsViewTo`, `GitRepoInProgressState[Type]`) — the `CommitsView` prefix is independent of the `TabView` class name in `../views/tab/` |
 | `message-protocol.ts` | The tab's full `Request*`/`Response*` discriminated union (~70 message pairs) plus the `RequestMessage`/`ResponseMessage` union types |
 | `protocol.ts` | Re-exports `message-protocol.ts` — kept as a separate file so the barrel's import list reads `./protocol` rather than the longer name |
-| `sidebar-state.ts` | The sidebar's initial-state types (`SidebarInitialState`, `SidebarMiniGraphInitialState`, `SidebarGraphConfig`) |
+| `sidebar-state.ts` | The sidebar's initial-state types (`SidebarInitialState`, `SidebarGraphState`, `SidebarMiniGraphInitialState`, `SidebarGraphConfig`) |
 | `sidebar-protocol.ts` | The sidebar's own `Request*`/`Response*` discriminated union, independent of the tab's protocol |

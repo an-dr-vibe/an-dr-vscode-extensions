@@ -112,8 +112,9 @@ class SidebarView {
 
 	/**
 	 * Delegated click handler for the changes tree: section collapse/expand, folder
-	 * collapse/expand, per-file stage/unstage/discard buttons, and clicking a file row to view
-	 * its diff. Ported from script.ts's single root-level click listener.
+	 * collapse/expand, per-file stage/unstage/discard buttons, and clicking a file row to view its
+	 * diff (or, for an untracked file, open it directly - handled server-side by viewDiff's own
+	 * GitFileStatus.Untracked fallback). Ported from script.ts's single root-level click listener.
 	 */
 	private wireChangesTreeInteractions() {
 		const root = document.body;
@@ -154,7 +155,7 @@ class SidebarView {
 			}
 
 			const fileRow = target.closest<HTMLElement>('.cpFile');
-			if (fileRow !== null && fileRow.dataset.status !== 'U' && fileRow.dataset.path) {
+			if (fileRow !== null && fileRow.dataset.path) {
 				sidebarSendMessage({ command: 'openChanges', filePath: fileRow.dataset.path });
 			}
 		});

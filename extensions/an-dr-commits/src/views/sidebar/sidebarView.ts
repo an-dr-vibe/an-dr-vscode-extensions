@@ -376,7 +376,9 @@ export class SidebarView implements vscode.Disposable {
 				break;
 			case 'openChanges': {
 				const change = this._changes.find((c) => c.path === msg.filePath);
-				if (change !== undefined && change.status !== 'U') {
+				if (change !== undefined) {
+					// viewDiff falls back to opening the file directly for GitFileStatus.Untracked,
+					// since there's nothing to diff against - no need to special-case it here too.
 					error = await viewDiff(repo, UNCOMMITTED, UNCOMMITTED, change.oldPath || change.path, change.path, this._toGitFileStatus(change.status));
 				}
 				break;

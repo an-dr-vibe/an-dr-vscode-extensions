@@ -560,7 +560,15 @@ export class RepoManager extends Disposable {
 	private searchDirectoryForRepos(directory: string, maxDepth: number) {
 		return new Promise<boolean>(resolve => {
 			if (this.isDirectoryWithinRepos(directory) && this.isKnownRepo(directory)) {
-				resolve(false);
+				// Already known - don't re-add it (addRepo would reset its state to
+				// DEFAULT_REPO_STATE), but still search inside it for new nested
+				// (non-submodule) repos, since maxDepth may have increased since it
+				// was first discovered.
+				if (maxDepth > 0) {
+					this.searchSubdirectoriesForRepos(directory, maxDepth - 1).then(resolve);
+				} else {
+					resolve(false);
+				}
 				return;
 			}
 
@@ -568,41 +576,41 @@ export class RepoManager extends Disposable {
 				if (root !== null) {
 					const addedRepo = await this.addRepo(root);
 					if (maxDepth > 0) {
-						fs.readdir(directory, async (err, dirContents) => {
-							if (err) {
-								resolve(addedRepo);
-							} else {
-								let dirs = [];
-								for (let i = 0; i < dirContents.length; i++) {
-									if (dirContents[i] !== '.git' && await isDirectory(directory + '/' + dirContents[i])) {
-										dirs.push(directory + '/' + dirContents[i]);
-									}
-								}
-								const nestedRepoAdded = (await evalPromises(dirs, 2, dir => this.searchDirectoryForRepos(dir, maxDepth - 1))).indexOf(true) > -1;
-								resolve(addedRepo || nestedRepoAdded);
-							}
-						});
+						const nestedRepoAdded = await this.searchSubdirectoriesForRepos(directory, maxDepth - 1);
+						resolve(addedRepo || nestedRepoAdded);
 					} else {
 						resolve(addedRepo);
 					}
 				} else if (maxDepth > 0) {
-					fs.readdir(directory, async (err, dirContents) => {
-						if (err) {
-							resolve(false);
-						} else {
-							let dirs = [];
-							for (let i = 0; i < dirContents.length; i++) {
-								if (dirContents[i] !== '.git' && await isDirectory(directory + '/' + dirContents[i])) {
-									dirs.push(directory + '/' + dirContents[i]);
-								}
-							}
-							resolve((await evalPromises(dirs, 2, dir => this.searchDirectoryForRepos(dir, maxDepth - 1))).indexOf(true) > -1);
-						}
-					});
+					resolve(await this.searchSubdirectoriesForRepos(directory, maxDepth - 1));
 				} else {
 					resolve(false);
 				}
 			}).catch(() => resolve(false));
+		});
+	}
+
+	/**
+	 * Search the subdirectories of the specified directory for new repositories (and add them).
+	 * @param directory The path of the directory whose children should be searched.
+	 * @param maxDepth The maximum depth to recursively search each child.
+	 * @returns TRUE => At least one repository was added, FALSE => No repositories were added.
+	 */
+	private searchSubdirectoriesForRepos(directory: string, maxDepth: number) {
+		return new Promise<boolean>(resolve => {
+			fs.readdir(directory, async (err, dirContents) => {
+				if (err) {
+					resolve(false);
+				} else {
+					let dirs = [];
+					for (let i = 0; i < dirContents.length; i++) {
+						if (dirContents[i] !== '.git' && await isDirectory(directory + '/' + dirContents[i])) {
+							dirs.push(directory + '/' + dirContents[i]);
+						}
+					}
+					resolve((await evalPromises(dirs, 2, dir => this.searchDirectoryForRepos(dir, maxDepth))).indexOf(true) > -1);
+				}
+			});
 		});
 	}
 

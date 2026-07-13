@@ -69,6 +69,13 @@ export interface GitFileChange {
 	readonly type: GitFileStatus;
 	readonly additions: number | null;
 	readonly deletions: number | null;
+	/** Non-NULL when this change is a submodule gitlink (mode 160000), not a regular file. */
+	readonly submodule: GitSubmoduleChange | null;
+}
+
+export interface GitSubmoduleChange {
+	readonly oldSha: string | null;
+	readonly newSha: string | null;
 }
 
 export const enum GitFileStatus {

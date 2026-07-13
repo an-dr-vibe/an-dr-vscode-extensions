@@ -1,15 +1,15 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getConfig } from '../../config';
-import { DataSource, GitWorkingTreeChange } from '../../dataSource';
+import { DataSource, GitWorkingTreeChange, HeadInfo } from '../../dataSource';
 import { ExtensionState } from '../../extensionState';
 import { RepoManager } from '../../repoManager';
 import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode } from '../../types';
 import { UNCOMMITTED, getSortedRepositoryPaths, viewDiff } from '../../utils';
 import { Event } from '../../utils/event';
 import {
-	GitChangeCounts, HeadInfo,
-	countChanges, getHeadInfo, getRepoRoot
+	GitChangeCounts,
+	countChanges, getRepoRoot
 } from './gitUtils';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph } from './miniGraph';
 import { renderHtml, renderLoadingHtml } from './html';
@@ -126,9 +126,10 @@ export class SidebarView implements vscode.Disposable {
 	}
 
 	/**
-	 * Keeps `this._api` pointed at the native VS Code Git extension - still needed for head/
-	 * branch/remote resolution (Pull/Push/Reset) and the mini graph on the active repo, and as a
-	 * fast-path live-refresh signal. Repo *enumeration* and watching no longer depend on it (see
+	 * Keeps `this._api` pointed at the native VS Code Git extension - used for the working-tree
+	 * badge's instant fast-path (`countChanges`) and as a live-refresh signal. Head/branch/remote
+	 * resolution (Pull/Push/Reset) and the mini graph no longer depend on it (see
+	 * `DataSource.getHeadInfo`), nor does repo enumeration / watching (see
 	 * `_getRepoPaths`/`_syncRepoWatchers`) - RepoManager can know about repos this API hasn't
 	 * opened.
 	 */
@@ -301,7 +302,7 @@ export class SidebarView implements vscode.Disposable {
 			this._view.webview.html = renderLoadingHtml(this._view.webview, this.extensionPath);
 		}
 
-		const graphPromise = fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
+		const graphPromise = fetchMiniGraph(this.dataSource, repo, this._miniGraphLimit);
 
 		const result = await this.dataSource.getWorkingTreeChanges(repo);
 		if (seq !== this._refreshSeq) return;
@@ -328,7 +329,7 @@ export class SidebarView implements vscode.Disposable {
 			case 'loadMoreGraph':
 				this._miniGraphLimit += MINI_GRAPH_LIMIT;
 				if (repo !== null && this._view !== null) {
-					const graph = await fetchMiniGraph(this._api, this.dataSource, repo, this._miniGraphLimit);
+					const graph = await fetchMiniGraph(this.dataSource, repo, this._miniGraphLimit);
 					await this._sendMessage({ command: 'updateGraph', graph });
 				}
 				return;
@@ -406,8 +407,8 @@ export class SidebarView implements vscode.Disposable {
 		await this._refreshPanel();
 	}
 
-	private _resolveHead(repo: string): HeadInfo | null {
-		return getHeadInfo(this._api, repo);
+	private _resolveHead(repo: string): Promise<HeadInfo | null> {
+		return this.dataSource.getHeadInfo(repo);
 	}
 
 	private async _gitFetch(repo: string): Promise<ErrorInfo> {
@@ -416,7 +417,7 @@ export class SidebarView implements vscode.Disposable {
 	}
 
 	private async _gitPull(repo: string): Promise<ErrorInfo> {
-		const head = this._resolveHead(repo);
+		const head = await this._resolveHead(repo);
 		if (head === null) return 'Unable to pull: there is no checked out local branch.';
 		if (head.upstreamRemote === null) return 'Unable to pull because the current branch has no configured remote.';
 		const cfg = getConfig().dialogDefaults.pullBranch;
@@ -424,7 +425,7 @@ export class SidebarView implements vscode.Disposable {
 	}
 
 	private async _gitPush(repo: string, mode: GitPushBranchMode): Promise<ErrorInfo> {
-		const head = this._resolveHead(repo);
+		const head = await this._resolveHead(repo);
 		if (head === null) return 'Unable to push: there is no checked out local branch.';
 		const remote = head.upstreamRemote ?? (head.remoteNames.length === 1 ? head.remoteNames[0] : null);
 		if (remote === null) {
@@ -441,7 +442,7 @@ export class SidebarView implements vscode.Disposable {
 	}
 
 	private async _gitReset(repo: string): Promise<ErrorInfo> {
-		const head = this._resolveHead(repo);
+		const head = await this._resolveHead(repo);
 		if (head === null || head.headHash === null) return 'Unable to reset: there is no checked out local branch.';
 		const defaultMode = getConfig().dialogDefaults.resetCommit.mode;
 		const order = Array.from(new Set([defaultMode, GitResetMode.Soft, GitResetMode.Mixed, GitResetMode.Hard]));

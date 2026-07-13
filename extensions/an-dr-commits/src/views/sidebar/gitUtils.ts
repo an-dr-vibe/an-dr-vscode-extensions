@@ -1,6 +1,5 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { normalisePathCaseForComparison } from '../../utils';
 
 export const STATUS_INDEX_DELETED = 2;
 export const STATUS_DELETED = 6;
@@ -28,41 +27,6 @@ export function getRelativePath(repoRoot: string, filePath: string) {
 
 export function getRepoRoot(repo: any) {
 	return (repo.rootUri?.fsPath as string | undefined) ?? '';
-}
-
-export interface HeadInfo {
-	readonly branchName: string;
-	readonly headHash: string | null;
-	readonly upstreamRemote: string | null;
-	readonly upstreamRef: string | null;
-	readonly remoteNames: string[];
-}
-
-/**
- * Resolves the current branch, its HEAD commit, and its upstream (if any) from the
- * vscode.git extension API. Shared by the mini graph (local/remote lane split) and the
- * sidebar's Pull/Push/Reset actions (branch/remote/commit target resolution).
- *
- * `repoPath` comes from RepoManager, whose paths are always forward-slash-normalized
- * (see utils.ts's getPathFromUri) regardless of platform, while `r.rootUri.fsPath` is the
- * native API's raw fsPath (backslashes on Windows) - comparing them directly with `===`
- * never matches on Windows. Normalize both sides the same way the rest of the codebase
- * does for this class of mismatch (normalizePath + normalisePathCaseForComparison).
- */
-export function getHeadInfo(api: any, repoPath: string): HeadInfo | null {
-	const target = normalisePathCaseForComparison(normalizePath(repoPath));
-	const repo = (api.repositories as any[]).find((r) => normalisePathCaseForComparison(normalizePath(getRepoRoot(r))) === target);
-	if (!repo) return null;
-	const head = repo.state.HEAD as { name?: string; commit?: string; upstream?: { name: string; remote: string } } | undefined;
-	if (!head?.name) return null;
-	const remotes = (repo.state.remotes as any[] | undefined) ?? [];
-	return {
-		branchName: head.name,
-		headHash: head.commit ?? null,
-		upstreamRemote: head.upstream?.remote ?? null,
-		upstreamRef: head.upstream ? `${head.upstream.remote}/${head.upstream.name}` : null,
-		remoteNames: remotes.map((r) => r.name as string).filter((name) => typeof name === 'string')
-	};
 }
 
 export function getWorkingTreeChanges(repo: any): GitActivityChange[] {

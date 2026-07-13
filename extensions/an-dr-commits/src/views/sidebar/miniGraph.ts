@@ -2,7 +2,6 @@ import { DataSource } from '../../dataSource';
 import { CommitOrdering, GitCommit } from '../../types';
 import { GitCommitData } from '../../data-source/models';
 import { SidebarGraphState } from '../../types/sidebar-state';
-import { getHeadInfo } from './gitUtils';
 
 export const MINI_GRAPH_LIMIT = 10;
 
@@ -14,15 +13,12 @@ export const MINI_GRAPH_LIMIT = 10;
  * raw commits + head hashes (web/sidebar/miniGraph.ts's sidebarBuildReachableSet, see ADR-003) -
  * so there's nothing left to convert, and no separate Node-side MiniGraphData type needed either.
  *
- * `api` being null (the native vscode.git extension hasn't finished activating yet) is reported
- * as 'loading', not an error - the next refresh triggered once it attaches (SidebarView's
- * _subscribeToGitApi) will resolve it for real, same as getHeadInfo returning null because the
- * lookup it does internally hasn't got anything to match yet.
+ * HEAD/upstream info comes from DataSource.getHeadInfo, which spawns git directly rather than
+ * going through the vscode.git extension - so this no longer waits on that extension's async
+ * activation. A NULL result now only means detached HEAD, not "not ready yet".
  */
-export async function fetchMiniGraph(api: any, dataSource: DataSource, repoPath: string, limit: number): Promise<SidebarGraphState> {
-	if (!api) return { status: 'loading' };
-
-	const head = getHeadInfo(api, repoPath);
+export async function fetchMiniGraph(dataSource: DataSource, repoPath: string, limit: number): Promise<SidebarGraphState> {
+	const head = await dataSource.getHeadInfo(repoPath);
 	if (!head) return { status: 'ready', data: null };
 
 	const localBranch = head.branchName;

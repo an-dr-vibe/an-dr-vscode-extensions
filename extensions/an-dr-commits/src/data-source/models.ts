@@ -10,6 +10,14 @@ export interface GitBranchData {
 	error: ErrorInfo;
 }
 
+export interface HeadInfo {
+	readonly branchName: string;
+	readonly headHash: string | null;
+	readonly upstreamRemote: string | null;
+	readonly upstreamRef: string | null;
+	readonly remoteNames: string[];
+}
+
 export interface GitCommitRecord {
 	hash: string;
 	parents: string[];

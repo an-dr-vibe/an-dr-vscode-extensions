@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
-import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails } from './data-source/models';
+import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
 import { applyBranchUpstreams, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
@@ -2195,6 +2195,39 @@ export class DataSource extends Disposable {
 	}
 
 	/**
+	 * Get the current branch, its HEAD commit, and its upstream (if any) directly from Git,
+	 * without depending on the vscode.git extension's API or its activation lifecycle.
+	 * @param repo The path of the repository.
+	 * @returns The head info, or NULL if HEAD is detached (mirrors vscode.git's `state.HEAD.name`
+	 * being undefined in that case, which callers previously relied on to short-circuit).
+	 */
+	public getHeadInfo(repo: string): Promise<HeadInfo | null> {
+		return this.spawnGit(['symbolic-ref', '--short', 'HEAD'], repo, (stdout) => stdout.trim())
+			.catch((): null => null)
+			.then((branchName) => {
+				if (branchName === null || branchName === '') return null;
+				return Promise.all([
+					this.spawnGit(['rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch((): null => null),
+					this.spawnGit(
+						['for-each-ref', '--format=%(upstream:short)' + GIT_LOG_SEPARATOR + '%(upstream:remotename)', 'refs/heads/' + branchName],
+						repo,
+						(stdout) => {
+							const [upstreamRef, upstreamRemote] = stdout.trim().split(GIT_LOG_SEPARATOR);
+							return { upstreamRef: upstreamRef || null, upstreamRemote: upstreamRemote || null };
+						}
+					).catch(() => ({ upstreamRef: null, upstreamRemote: null })),
+					this.getRemotes(repo).catch((): string[] => [])
+				]).then(([headHash, upstream, remoteNames]) => ({
+					branchName,
+					headHash,
+					upstreamRemote: upstream.upstreamRemote,
+					upstreamRef: upstream.upstreamRef,
+					remoteNames
+				}));
+			});
+	}
+
+	/**
 	 * Get the signature of a signed tag.
 	 * @param repo The path of the repository.
 	 * @param ref The reference identifying the tag.
@@ -2629,7 +2662,7 @@ export class DataSource extends Disposable {
 	}
 }
 
-export type { GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData } from './data-source/models';
+export type { GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, HeadInfo } from './data-source/models';
 
 export interface BlameLineInfo {
 	readonly author: string;

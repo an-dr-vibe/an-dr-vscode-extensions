@@ -1225,6 +1225,9 @@ describe('RepoManager', () => {
 			const newRepoState = {
 				commitDetailsViewDivider: 0.75,
 				commitDetailsViewHeight: 300,
+				commitDetailsViewTopRowRatio: 0.45,
+				fullDiffCompact: false,
+				fullDiffPanelHeight: 250,
 				columnWidths: null,
 				commitOrdering: RepoCommitOrdering.Default,
 				fileViewType: FileViewType.Default,
@@ -1241,6 +1244,7 @@ describe('RepoManager', () => {
 				showRemoteBranchesV2: BooleanOverride.Default,
 				showStashes: BooleanOverride.Default,
 				showTags: BooleanOverride.Default,
+				starred: false,
 				workspaceFolderIndex: 0
 			};
 
@@ -1894,6 +1898,9 @@ describe('RepoManager', () => {
 					'/path/to/workspace-folder1/repo': {
 						commitDetailsViewDivider: 0.5,
 						commitDetailsViewHeight: 250,
+						commitDetailsViewTopRowRatio: 0.45,
+						fullDiffCompact: false,
+						fullDiffPanelHeight: 250,
 						columnWidths: null,
 						commitOrdering: RepoCommitOrdering.Default,
 						fileViewType: FileViewType.Default,
@@ -1910,6 +1917,7 @@ describe('RepoManager', () => {
 						showRemoteBranchesV2: BooleanOverride.Default,
 						showStashes: BooleanOverride.Default,
 						showTags: BooleanOverride.Default,
+						starred: false,
 						workspaceFolderIndex: 0
 					}
 				};
@@ -2247,6 +2255,9 @@ describe('RepoManager', () => {
 				'/path/to/workspace-folder1/repo1': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -2263,6 +2274,7 @@ describe('RepoManager', () => {
 					showRemoteBranchesV2: BooleanOverride.Default,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: 0
 				}
 			});
@@ -2325,6 +2337,9 @@ describe('RepoManager', () => {
 				'/path/to/workspace-folder1/repo1': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -2341,6 +2356,7 @@ describe('RepoManager', () => {
 					showRemoteBranchesV2: BooleanOverride.Default,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: 0
 				}
 			});

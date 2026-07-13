@@ -5,6 +5,8 @@ import { Disposable, toDisposable } from './disposable';
  */
 export class BufferedQueue<T> extends Disposable {
 	private readonly queue: T[] = [];
+	// Mirrors queue's contents for O(1) duplicate checks; queue remains the source of truth for order.
+	private readonly queueSet = new Set<T>();
 	private timeout: NodeJS.Timer | null = null;
 	private processing: boolean = false;
 
@@ -38,9 +40,13 @@ export class BufferedQueue<T> extends Disposable {
 	 * @param item The item to enqueue.
 	 */
 	public enqueue(item: T) {
-		const itemIndex = this.queue.indexOf(item);
-		if (itemIndex > -1) {
-			this.queue.splice(itemIndex, 1);
+		if (this.queueSet.has(item)) {
+			const itemIndex = this.queue.indexOf(item);
+			if (itemIndex > -1) {
+				this.queue.splice(itemIndex, 1);
+			}
+		} else {
+			this.queueSet.add(item);
 		}
 		this.queue.push(item);
 
@@ -62,6 +68,7 @@ export class BufferedQueue<T> extends Disposable {
 		this.processing = true;
 		let item, changes = false;
 		while (item = this.queue.shift()) {
+			this.queueSet.delete(item);
 			if (await this.onItem(item)) {
 				changes = true;
 			}

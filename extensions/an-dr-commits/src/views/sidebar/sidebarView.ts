@@ -212,6 +212,11 @@ export class SidebarView implements vscode.Disposable {
 	 * Prefers the native Git extension's live state (instant, no git spawn); if the active repo
 	 * isn't tracked there (RepoManager can know about repos that API hasn't opened), falls back
 	 * to this view's own last-fetched working tree changes for that same repo.
+	 *
+	 * Called both eagerly (for instant feedback before a refresh's async git calls resolve) and
+	 * again from `_refreshPanel` once `this._changes` actually reflects the just-fetched data -
+	 * the eager call alone left the badge always one refresh behind whenever the vscode.git fast
+	 * path wasn't available for the active repo.
 	 */
 	private _updateBadge() {
 		if (this._view === null) return;
@@ -287,6 +292,7 @@ export class SidebarView implements vscode.Disposable {
 
 		if (repo === null) {
 			this._changes = [];
+			this._updateBadge();
 			if (needsFullRender) {
 				this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(null, repoPaths, starredRepos, [], null, { status: 'ready', data: null }, graphHeight));
 				this._hasRenderedOnce = true;
@@ -307,6 +313,7 @@ export class SidebarView implements vscode.Disposable {
 		const result = await this.dataSource.getWorkingTreeChanges(repo);
 		if (seq !== this._refreshSeq) return;
 		this._changes = result.changes;
+		this._updateBadge();
 
 		if (needsFullRender) {
 			this._view.webview.html = renderHtml(this._view.webview, this.extensionPath, this._buildInitialState(repo, repoPaths, starredRepos, result.changes, result.error, { status: 'loading' }, graphHeight));

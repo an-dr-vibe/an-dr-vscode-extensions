@@ -133,8 +133,9 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 	}
 	const refBranches = view.renderRefBadgeGroup(branchBadges);
 	const refTags = view.renderRefBadgeGroup(tagBadges);
+	const descriptionHtml = (view.config.referenceLabels.tagLabelsOnRight ? refBranches + message + refTags : refBranches + refTags + message);
 	return '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
-		(view.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td><span class="description">' : '<td></td><td><span class="description">' + refBranches) + (view.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
+		'<td colspan="2"><span class="description" style="padding-left:' + Math.max(widthsAtVertices[i] - 4, 0) + 'px">' + descriptionHtml + '</span></td>' +
 		(colVisibility.committed ? view.getCommittedCellHtml(commit) : '') +
 		(colVisibility.id ? '<td class="text idCol" title="' + escapeHtml(commit.hash) + '">' + abbrevCommit(commit.hash) + '</td>' : '') +
 		'</tr>';
@@ -143,7 +144,7 @@ function commitsRenderCommitRow(view: any, commit: GG.GitCommit, i: number, text
 function commitsRenderTable(view: any) {
 	const currentHash = view.commits.length > 0 && view.commits[0].hash === UNCOMMITTED ? UNCOMMITTED : view.commitHead;
 	const vertexColours = view.graph.getVertexColours();
-	const widthsAtVertices = view.config.referenceLabels.branchLabelsAlignedToGraph ? view.graph.getWidthsAtVertices() : [];
+	const widthsAtVertices = view.graph.getWidthsAtVertices();
 	const mutedCommits = view.graph.getMutedCommits(currentHash);
 	const textFormatter = new TextFormatter(view.commits, view.gitRepos[view.currentRepo].issueLinkingConfig, { emoji: true, issueLinking: true, markdown: view.config.markdown });
 	const selectedTags = new Set<string>(view.currentTags);

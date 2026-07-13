@@ -37,7 +37,7 @@ function sidebarBuildReachableSet(lookup: ReadonlyMap<string, GG.GitCommit>, sta
  * @returns The #miniGraph inner HTML.
  */
 function sidebarRenderMiniGraphInner(data: GG.SidebarMiniGraphInitialState, graphConfig: GG.SidebarGraphConfig): string {
-	const { commits, localHeadHash, remoteHeadHash } = data;
+	const { commits, localHeadHash, remoteHeadHash, moreAvailable } = data;
 	const lookup = new Map<string, GG.GitCommit>();
 	for (const c of commits) lookup.set(c.hash, c);
 	const localSet = sidebarBuildReachableSet(lookup, localHeadHash);
@@ -83,7 +83,12 @@ function sidebarRenderMiniGraphInner(data: GG.SidebarMiniGraphInitialState, grap
 		const parentIdx = hashToIdx.get(parentHash);
 		const isUncommitted = commits[i].hash === UNCOMMITTED;
 		const colour = isUncommitted ? SIDEBAR_COL_UNCOMMITTED : laneColour(lanes[i]);
-		const dashed = isUncommitted && !uncommittedGetsCurrent;
+		// A parent outside the fetched window (parentIdx undefined) isn't necessarily the root -
+		// it's often just truncated by MINI_GRAPH_LIMIT, especially for a lane that's diverged
+		// from the other (local vs. remote). Dash the stub so it reads as "continues off-screen"
+		// rather than a dead end, matching the other truncation cue (moreAvailable).
+		const truncated = parentIdx === undefined && parentHash !== undefined && moreAvailable;
+		const dashed = (isUncommitted && !uncommittedGetsCurrent) || truncated;
 		const x1 = laneX(lanes[i]);
 		const y1 = rowCY(i) + SIDEBAR_MINI_R;
 		let d: string;

@@ -26,7 +26,7 @@ let onDidChangeGitExecutable: EventEmitter<utils.GitExecutable>;
 let logger: Logger;
 let dataSource: DataSource;
 let extensionState: ExtensionState;
-let spyOnGetRepos: jest.SpyInstance, spyOnGetIgnoredRepos: jest.SpyInstance, spyOnSetIgnoredRepos: jest.SpyInstance, spyOnSaveRepos: jest.SpyInstance, spyOnTransferRepo: jest.SpyInstance, spyOnRepoRoot: jest.SpyInstance, spyOnGetSubmodules: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnMkdir: jest.SpyInstance, spyOnReaddir: jest.SpyInstance, spyOnReadFile: jest.SpyInstance, spyOnStat: jest.SpyInstance, spyOnWriteFile: jest.SpyInstance;
+let spyOnGetRepos: jest.SpyInstance, spyOnGetIgnoredRepos: jest.SpyInstance, spyOnSetIgnoredRepos: jest.SpyInstance, spyOnSaveRepos: jest.SpyInstance, spyOnTransferRepo: jest.SpyInstance, spyOnRepoRoot: jest.SpyInstance, spyOnGetSubmodules: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnLogDebug: jest.SpyInstance, spyOnMkdir: jest.SpyInstance, spyOnReaddir: jest.SpyInstance, spyOnReadFile: jest.SpyInstance, spyOnStat: jest.SpyInstance, spyOnWriteFile: jest.SpyInstance;
 
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
@@ -42,6 +42,7 @@ beforeAll(() => {
 	spyOnRepoRoot = jest.spyOn(dataSource, 'repoRoot');
 	spyOnGetSubmodules = jest.spyOn(dataSource, 'getSubmodules');
 	spyOnLog = jest.spyOn(logger, 'log');
+	spyOnLogDebug = jest.spyOn(logger, 'logDebug');
 	spyOnMkdir = jest.spyOn(fs, 'mkdir');
 	spyOnReaddir = jest.spyOn(fs, 'readdir');
 	spyOnReadFile = jest.spyOn(fs, 'readFile');
@@ -1121,7 +1122,7 @@ describe('RepoManager', () => {
 				'/path/to/workspace-folder2/repo2': mockRepoState({ workspaceFolderIndex: 1 })
 			});
 			expect(spyOnTransferRepo).toHaveBeenCalledWith('/path/to/workspace-folder1/repo2', '/path/to/workspace-folder2/repo2');
-			expect(spyOnLog).toHaveBeenCalledWith('Transferred repo state: /path/to/workspace-folder1/repo2 -> /path/to/workspace-folder2/repo2');
+			expect(spyOnLogDebug).toHaveBeenCalledWith('Transferred repo state: /path/to/workspace-folder1/repo2 -> /path/to/workspace-folder2/repo2');
 			expect(onDidChangeReposEvents).toStrictEqual([
 				{
 					repos: {
@@ -1357,7 +1358,7 @@ describe('RepoManager', () => {
 			onDidChangeConfiguration.emit({
 				affectsConfiguration: (section) => section === 'an-dr-commits.maxDepthOfRepoSearch'
 			});
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('Completed searching workspace for new repos'));
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('Completed searching workspace for new repos'));
 
 			// Assert
 			expect(repoManager.getRepos()).toStrictEqual({});
@@ -1388,7 +1389,7 @@ describe('RepoManager', () => {
 			onDidChangeConfiguration.emit({
 				affectsConfiguration: (section) => section === 'an-dr-commits.maxDepthOfRepoSearch'
 			});
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('Completed searching workspace for new repos'));
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('Completed searching workspace for new repos'));
 
 			// Assert
 			expect(repoManager.getRepos()).toStrictEqual({});
@@ -1418,7 +1419,7 @@ describe('RepoManager', () => {
 			onDidChangeConfiguration.emit({
 				affectsConfiguration: (section) => section === 'an-dr-commits.maxDepthOfRepoSearch'
 			});
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('Completed searching workspace for new repos'));
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('Completed searching workspace for new repos'));
 
 			// Assert
 			expect(repoManager.getRepos()).toStrictEqual({});
@@ -2584,7 +2585,7 @@ function constructRepoManager(workspaceFolders: string[] | undefined, repos: str
 }
 
 function waitForRepoManagerToStart() {
-	return waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('Completed searching workspace for new repos'));
+	return waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('Completed searching workspace for new repos'));
 }
 
 async function constructRepoManagerAndWaitUntilStarted(workspaceFolders: string[] | undefined, repos: string[] | GitRepoSet, ignoreRepos: string[] = []) {

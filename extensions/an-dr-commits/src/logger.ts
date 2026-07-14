@@ -22,7 +22,7 @@ export class Logger extends Disposable {
 	 */
 	constructor() {
 		super();
-		this.channel = vscode.window.createOutputChannel('an-dr-commits');
+		this.channel = vscode.window.createOutputChannel('Commits');
 		this.registerDisposable(this.channel);
 	}
 

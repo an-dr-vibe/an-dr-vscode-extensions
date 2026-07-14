@@ -569,7 +569,7 @@ class Config {
 	 * Get the value of the `an-dr-commits.repository.onlyFollowFirstParent` Extension Setting.
 	 */
 	get onlyFollowFirstParent() {
-		return !!this.getRenamedExtensionSetting('repository.onlyFollowFirstParent', 'onlyFollowFirstParent', true);
+		return !!this.getRenamedExtensionSetting('repository.onlyFollowFirstParent', 'onlyFollowFirstParent', false);
 	}
 
 	/**
@@ -666,6 +666,13 @@ class Config {
 	 */
 	get showStatusBarItem() {
 		return !!this.config.get('showStatusBarItem', true);
+	}
+
+	/**
+	 * Get the value of the `an-dr-commits.statusBarIconOnly` Extension Setting.
+	 */
+	get statusBarIconOnly() {
+		return !!this.config.get('statusBarIconOnly', true);
 	}
 
 	/**

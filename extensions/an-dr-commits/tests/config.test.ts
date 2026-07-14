@@ -2,7 +2,7 @@ import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 
 import { getConfig } from '../src/config';
-import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, DateType, FileViewType, GitResetMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType } from '../src/types';
+import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, FileViewType, GitResetMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType } from '../src/types';
 
 import { expectRenamedExtensionSettingToHaveBeenCalled } from './helpers/expectations';
 
@@ -158,48 +158,11 @@ describe('Config', () => {
 		});
 
 		describe('fileViewType', () => {
-			it('Should return FileViewType.Tree when the configuration value is "File Tree"', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue('commitDetailsView.fileView.type', 'File Tree');
-
+			it('Should always return FileViewType.Tree (the only supported file view)', () => {
 				// Run
 				const value = config.commitDetailsView.fileViewType;
 
 				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
-				expect(value).toBe(FileViewType.Tree);
-			});
-
-			it('Should return FileViewType.List when the configuration value is "File List"', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue('commitDetailsView.fileView.type', 'File List');
-
-				// Run
-				const value = config.commitDetailsView.fileViewType;
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
-				expect(value).toBe(FileViewType.List);
-			});
-
-			it('Should return the default value (FileViewType.Tree) when the configuration value is invalid', () => {
-				// Setup
-				vscode.mockExtensionSettingReturnValue('commitDetailsView.fileView.type', 'invalid');
-
-				// Run
-				const value = config.commitDetailsView.fileViewType;
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
-				expect(value).toBe(FileViewType.Tree);
-			});
-
-			it('Should return the default value (FileViewType.Tree) when the configuration value is unknown', () => {
-				// Run
-				const value = config.commitDetailsView.fileViewType;
-
-				// Assert
-				expectRenamedExtensionSettingToHaveBeenCalled('commitDetailsView.fileView.type', 'defaultFileViewType');
 				expect(value).toBe(FileViewType.Tree);
 			});
 		});
@@ -275,6 +238,8 @@ describe('Config', () => {
 					createArchive: true,
 					selectInBranchesDropdown: true,
 					unselectInBranchesDropdown: true,
+					setUpstream: true,
+					unsetUpstream: true,
 					copyName: true
 				},
 				commit: {
@@ -357,6 +322,8 @@ describe('Config', () => {
 					createArchive: true,
 					selectInBranchesDropdown: true,
 					unselectInBranchesDropdown: true,
+					setUpstream: true,
+					unsetUpstream: true,
 					copyName: true
 				},
 				commit: {
@@ -457,6 +424,8 @@ describe('Config', () => {
 					createArchive: true,
 					selectInBranchesDropdown: true,
 					unselectInBranchesDropdown: true,
+					setUpstream: true,
+					unsetUpstream: true,
 					copyName: true
 				},
 				commit: {
@@ -712,133 +681,74 @@ describe('Config', () => {
 		});
 	});
 
-	describe('dateType', () => {
-		it('Should return DateType.Author when the configuration value is "Author Date"', () => {
+	describe('commitsColumnVisibility', () => {
+		it('Should successfully parse the configuration value (Committed column disabled)', () => {
 			// Setup
-			vscode.mockExtensionSettingReturnValue('date.type', 'Author Date');
+			vscode.mockExtensionSettingReturnValue('repository.commits.columnVisibility', { Committed: false, ID: true });
 
 			// Run
-			const value = config.dateType;
+			const value = config.commitsColumnVisibility;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
-			expect(value).toBe(DateType.Author);
+			expect(workspaceConfiguration.get).toBeCalledWith('repository.commits.columnVisibility', {});
+			expect(value).toStrictEqual({ committed: false, id: true });
 		});
 
-		it('Should return DateType.Commit when the configuration value is "Commit Date"', () => {
+		it('Should successfully parse the configuration value (ID column disabled)', () => {
 			// Setup
-			vscode.mockExtensionSettingReturnValue('date.type', 'Commit Date');
+			vscode.mockExtensionSettingReturnValue('repository.commits.columnVisibility', { Committed: true, ID: false });
 
 			// Run
-			const value = config.dateType;
+			const value = config.commitsColumnVisibility;
 
 			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
-			expect(value).toBe(DateType.Commit);
-		});
-
-		it('Should return the default value (DateType.Author) when the configuration value is invalid', () => {
-			// Setup
-			vscode.mockExtensionSettingReturnValue('date.type', 'invalid');
-
-			// Run
-			const value = config.dateType;
-
-			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
-			expect(value).toBe(DateType.Author);
-		});
-
-		it('Should return the default value (DateType.Author) when the configuration value is unknown', () => {
-			// Run
-			const value = config.dateType;
-
-			// Assert
-			expectRenamedExtensionSettingToHaveBeenCalled('date.type', 'dateType');
-			expect(value).toBe(DateType.Author);
-		});
-	});
-
-	describe('defaultColumnVisibility', () => {
-		it('Should successfully parse the configuration value (Date column disabled)', () => {
-			// Setup
-			vscode.mockExtensionSettingReturnValue('defaultColumnVisibility', { Date: false, Author: true, Commit: true });
-
-			// Run
-			const value = config.defaultColumnVisibility;
-
-			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: false, author: true, commit: true });
-		});
-
-		it('Should successfully parse the configuration value (Author column disabled)', () => {
-			// Setup
-			vscode.mockExtensionSettingReturnValue('defaultColumnVisibility', { Date: true, Author: false, Commit: true });
-
-			// Run
-			const value = config.defaultColumnVisibility;
-
-			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: true, author: false, commit: true });
-		});
-
-		it('Should successfully parse the configuration value (Commit  column disabled)', () => {
-			// Setup
-			vscode.mockExtensionSettingReturnValue('defaultColumnVisibility', { Date: true, Author: true, Commit: false });
-
-			// Run
-			const value = config.defaultColumnVisibility;
-
-			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: true, author: true, commit: false });
+			expect(workspaceConfiguration.get).toBeCalledWith('repository.commits.columnVisibility', {});
+			expect(value).toStrictEqual({ committed: true, id: false });
 		});
 
 		it('Should return the default value when the configuration value is invalid (not an object)', () => {
 			// Setup
-			vscode.mockExtensionSettingReturnValue('defaultColumnVisibility', 'invalid');
+			vscode.mockExtensionSettingReturnValue('repository.commits.columnVisibility', 'invalid');
 
 			// Run
-			const value = config.defaultColumnVisibility;
+			const value = config.commitsColumnVisibility;
 
 			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: true, author: true, commit: true });
+			expect(workspaceConfiguration.get).toBeCalledWith('repository.commits.columnVisibility', {});
+			expect(value).toStrictEqual({ committed: true, id: true });
 		});
 
 		it('Should return the default value when the configuration value is invalid (NULL)', () => {
 			// Setup
-			vscode.mockExtensionSettingReturnValue('defaultColumnVisibility', null);
+			vscode.mockExtensionSettingReturnValue('repository.commits.columnVisibility', null);
 
 			// Run
-			const value = config.defaultColumnVisibility;
+			const value = config.commitsColumnVisibility;
 
 			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: true, author: true, commit: true });
+			expect(workspaceConfiguration.get).toBeCalledWith('repository.commits.columnVisibility', {});
+			expect(value).toStrictEqual({ committed: true, id: true });
 		});
 
 		it('Should return the default value when the configuration value is invalid (column value is not a boolean)', () => {
 			// Setup
-			vscode.mockExtensionSettingReturnValue('defaultColumnVisibility', { Date: true, Author: true, Commit: 5 });
+			vscode.mockExtensionSettingReturnValue('repository.commits.columnVisibility', { Committed: true, ID: 5 });
 
 			// Run
-			const value = config.defaultColumnVisibility;
+			const value = config.commitsColumnVisibility;
 
 			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: true, author: true, commit: true });
+			expect(workspaceConfiguration.get).toBeCalledWith('repository.commits.columnVisibility', {});
+			expect(value).toStrictEqual({ committed: true, id: true });
 		});
 
 		it('Should return the default value when the configuration value is not set', () => {
 			// Run
-			const value = config.defaultColumnVisibility;
+			const value = config.commitsColumnVisibility;
 
 			// Assert
-			expect(workspaceConfiguration.get).toBeCalledWith('defaultColumnVisibility', {});
-			expect(value).toStrictEqual({ date: true, author: true, commit: true });
+			expect(workspaceConfiguration.get).toBeCalledWith('repository.commits.columnVisibility', {});
+			expect(value).toStrictEqual({ committed: true, id: true });
 		});
 	});
 
@@ -935,6 +845,9 @@ describe('Config', () => {
 				rebase: {
 					ignoreDate: true,
 					interactive: true
+				},
+				repoInProgress: {
+					confirmAbort: true
 				},
 				resetCommit: {
 					mode: GitResetMode.Mixed
@@ -1041,6 +954,9 @@ describe('Config', () => {
 					ignoreDate: false,
 					interactive: false
 				},
+				repoInProgress: {
+					confirmAbort: true
+				},
 				resetCommit: {
 					mode: GitResetMode.Mixed
 				},
@@ -1145,6 +1061,9 @@ describe('Config', () => {
 				rebase: {
 					ignoreDate: true,
 					interactive: true
+				},
+				repoInProgress: {
+					confirmAbort: true
 				},
 				resetCommit: {
 					mode: GitResetMode.Mixed
@@ -1251,6 +1170,9 @@ describe('Config', () => {
 					ignoreDate: false,
 					interactive: false
 				},
+				repoInProgress: {
+					confirmAbort: true
+				},
 				resetCommit: {
 					mode: GitResetMode.Mixed
 				},
@@ -1341,6 +1263,9 @@ describe('Config', () => {
 					ignoreDate: true,
 					interactive: false
 				},
+				repoInProgress: {
+					confirmAbort: true
+				},
 				resetCommit: {
 					mode: GitResetMode.Mixed
 				},
@@ -1423,6 +1348,9 @@ describe('Config', () => {
 				rebase: {
 					ignoreDate: true,
 					interactive: false
+				},
+				repoInProgress: {
+					confirmAbort: true
 				},
 				resetCommit: {
 					mode: GitResetMode.Mixed
@@ -2926,8 +2854,6 @@ describe('Config', () => {
 	describe('showStatusBarItem', testBooleanExtensionSetting('showStatusBarItem', 'showStatusBarItem', true));
 
 	describe('statusBarIconOnly', testBooleanExtensionSetting('statusBarIconOnly', 'statusBarIconOnly', true));
-
-	describe('statusBarShowCurrentCommit', testRenamedBooleanExtensionSetting('statusBarShowCurrentCommit', 'blame.statusBarShowCurrentCommit', 'statusBarShowCurrentCommit', false));
 
 	describe('tabIconColourTheme', () => {
 		it('Should return TabIconColourTheme.Colour when the configuration value is "colour"', () => {

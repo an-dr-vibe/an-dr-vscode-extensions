@@ -35,6 +35,7 @@ export class StatusBarItem extends Disposable {
 			}),
 			onDidChangeConfiguration((event) => {
 				if (event.affectsConfiguration('an-dr-commits.showStatusBarItem') ||
+					event.affectsConfiguration('an-dr-commits.statusBarIconOnly') ||
 					event.affectsConfiguration('an-dr-commits.statusBarItem.dirtyIndicator')) {
 					this.refresh();
 				}
@@ -46,10 +47,6 @@ export class StatusBarItem extends Disposable {
 		this.subscribeToGitApi();
 		this.refresh();
 	}
-
-	/** No-op stubs so existing callers in InlineBlameController compile without change. */
-	public setRepoCommit(_: unknown) { }
-	public setBlameCommit(_: unknown) { }
 
 	private subscribeToGitApi() {
 		const gitExt = vscode.extensions.getExtension('vscode.git');
@@ -98,11 +95,12 @@ export class StatusBarItem extends Disposable {
 
 	private refresh() {
 		const config = getConfig();
-		const base = this.branchName
-			? StatusBarItem.ICON + ' ' + this.branchName
-			: StatusBarItem.ICON + ' ' + StatusBarItem.FALLBACK_LABEL;
+		const label = this.branchName ?? StatusBarItem.FALLBACK_LABEL;
+		const base = config.statusBarIconOnly ? StatusBarItem.ICON : StatusBarItem.ICON + ' ' + label;
 		this.item.text = base + this.formatDirty(config.statusBarItemDirtyIndicator);
-		this.item.tooltip = StatusBarItem.FALLBACK_LABEL;
+		this.item.tooltip = this.branchName !== null
+			? StatusBarItem.FALLBACK_LABEL + ': ' + this.branchName
+			: StatusBarItem.FALLBACK_LABEL;
 
 		const shouldShow = config.showStatusBarItem && this.numRepos > 0;
 		if (this.isVisible !== shouldShow) {

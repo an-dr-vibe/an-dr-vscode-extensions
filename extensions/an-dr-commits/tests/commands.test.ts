@@ -1,10 +1,9 @@
-import * as date from './mocks/date';
 import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 jest.mock('../src/avatarManager');
 jest.mock('../src/dataSource');
 jest.mock('../src/extensionState');
-jest.mock('../src/commitsView');
+jest.mock('../src/views/tab/tabView');
 jest.mock('../src/logger');
 jest.mock('../src/repoManager');
 
@@ -15,7 +14,7 @@ import { CommandManager } from '../src/commands';
 import { DataSource } from '../src/dataSource';
 import { DiffSide, encodeDiffDocUri } from '../src/diffDocProvider';
 import { ExtensionState } from '../src/extensionState';
-import { CommitsView } from '../src/commitsView';
+import { TabView as CommitsView } from '../src/views/tab/tabView';
 import { Logger } from '../src/logger';
 import { RepoManager } from '../src/repoManager';
 import { GitFileStatus, RepoDropdownOrder } from '../src/types';
@@ -32,7 +31,7 @@ let dataSource: DataSource;
 let extensionState: ExtensionState;
 let avatarManager: AvatarManager;
 let repoManager: RepoManager;
-let spyOnCommitsViewCreateOrShow: jest.SpyInstance, spyOnGetRepos: jest.SpyInstance, spyOnGetKnownRepo: jest.SpyInstance, spyOnRegisterRepo: jest.SpyInstance, spyOnGetCodeReviews: jest.SpyInstance, spyOnEndCodeReview: jest.SpyInstance, spyOnGetCommitSubject: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
+let spyOnCommitsViewCreateOrShow: jest.SpyInstance, spyOnGetRepos: jest.SpyInstance, spyOnGetKnownRepo: jest.SpyInstance, spyOnRegisterRepo: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<utils.GitExecutable>();
@@ -45,10 +44,7 @@ beforeAll(() => {
 	spyOnGetRepos = jest.spyOn(repoManager, 'getRepos');
 	spyOnGetKnownRepo = jest.spyOn(repoManager, 'getKnownRepo');
 	spyOnRegisterRepo = jest.spyOn(repoManager, 'registerRepo');
-	spyOnGetCodeReviews = jest.spyOn(extensionState, 'getCodeReviews');
-	spyOnEndCodeReview = jest.spyOn(extensionState, 'endCodeReview');
-	spyOnGetCommitSubject = jest.spyOn(dataSource, 'getCommitSubject');
-	spyOnLog = jest.spyOn(logger, 'log');
+	spyOnLog = jest.spyOn(logger, 'logDebug');
 	spyOnLogError = jest.spyOn(logger, 'logError');
 });
 
@@ -224,7 +220,7 @@ describe('CommandManager', () => {
 			// Setup
 			vscode.window.activeTextEditor = { document: { uri: vscode.Uri.file('/path/to/workspace-folder/active-file.txt') } };
 			vscode.mockExtensionSettingReturnValue('openToTheRepoOfTheActiveTextEditorDocument', true);
-			jest.spyOn(repoManager, 'getRepoContainingFile').mockReturnValueOnce('/path/to/workspace-folder');
+			jest.spyOn(repoManager, 'resolveRepoContainingFile').mockResolvedValueOnce('/path/to/workspace-folder');
 
 			// Run
 			vscode.commands.executeCommand('an-dr-commits.view');
@@ -844,385 +840,6 @@ describe('CommandManager', () => {
 			await waitForExpect(() => {
 				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.fetch');
 				expect(spyOnCommitsViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
-			});
-		});
-	});
-
-	describe('an-dr-commits.endAllWorkspaceCodeReviews', () => {
-		it('Should end all workspace code reviews', () => {
-			// Setup
-			const spyOnEndAllWorkspaceCodeReviews = jest.spyOn(extensionState, 'endAllWorkspaceCodeReviews');
-			vscode.window.showInformationMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endAllWorkspaceCodeReviews');
-
-			// Assert
-			expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endAllWorkspaceCodeReviews');
-			expect(spyOnEndAllWorkspaceCodeReviews).toBeCalledTimes(1);
-			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Ended All Code Reviews in Workspace');
-		});
-	});
-
-	describe('an-dr-commits.endSpecificWorkspaceCodeReview', () => {
-		it('Should end the selected code review', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockImplementationOnce((items: Promise<any[]>, _: any) => items.then((items) => items[0]));
-			spyOnEndCodeReview.mockResolvedValueOnce(null);
-			vscode.window.showInformationMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endSpecificWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endSpecificWorkspaceCodeReview');
-				expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Successfully ended Code Review "repo: 1a2b3c4d".');
-			});
-			expect(spyOnGetCommitSubject).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
-			expect(spyOnEndCodeReview).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
-			expect(await vscode.window.showQuickPick.mock.calls[0][0]).toStrictEqual([
-				{
-					codeReviewRepo: '/path/to/repo',
-					codeReviewId: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					label: 'repo: 1a2b3c4d',
-					description: '5 seconds ago',
-					detail: 'Commit Subject'
-				}
-			]);
-			expect(vscode.window.showQuickPick.mock.calls[0][1]).toStrictEqual({
-				placeHolder: 'Select the Code Review you want to end:',
-				canPickMany: false
-			});
-		});
-
-		it('Should display an error message when there are no code reviews', () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({});
-			vscode.window.showErrorMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endSpecificWorkspaceCodeReview');
-
-			// Assert
-			expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endSpecificWorkspaceCodeReview');
-			expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('There are no Code Reviews in progress within the current workspace.');
-			expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
-		});
-
-		it('Shouldn\'t end a code review if no code review was selected', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endSpecificWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endSpecificWorkspaceCodeReview');
-				expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
-				expect(spyOnEndCodeReview).not.toHaveBeenCalled();
-			});
-		});
-
-		it('Should handle endCodeReview rejecting', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockImplementationOnce((items: Promise<any[]>, _: any) => items.then((items) => items[0]));
-			spyOnEndCodeReview.mockRejectedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endSpecificWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endSpecificWorkspaceCodeReview');
-				expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
-				expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
-				expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
-			});
-		});
-
-		it('Should display an error message when the code review couldn\'t be ended', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockImplementationOnce((items: Promise<any[]>, _: any) => items.then((items) => items[0]));
-			spyOnEndCodeReview.mockResolvedValueOnce('Visual Studio Code was unable to save the Commits Workspace State Memento.');
-			vscode.window.showErrorMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endSpecificWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endSpecificWorkspaceCodeReview');
-				expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('Visual Studio Code was unable to save the Commits Workspace State Memento.');
-			});
-		});
-
-		it('Should display an error message when showQuickPick rejects', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockRejectedValueOnce(null);
-			vscode.window.showErrorMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.endSpecificWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.endSpecificWorkspaceCodeReview');
-				expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('An unexpected error occurred while running the command "End a specific Code Review in Workspace...".');
-			});
-		});
-	});
-
-	describe('an-dr-commits.resumeWorkspaceCodeReview', () => {
-		it('Should load the selected code review in the Commits View (single commit)', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 10) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					},
-					'2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				},
-				'/path/to/unknown-repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 10) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockImplementationOnce((_: string, hash: string) => hash === '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b' ? 'subject-' + hash : null);
-			spyOnGetCommitSubject.mockImplementationOnce((_: string, hash: string) => hash === '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b' ? 'subject-' + hash : null);
-			vscode.window.showQuickPick.mockImplementationOnce((items: Promise<any[]>, _: any) => items.then((items) => items[0]));
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.resumeWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.resumeWorkspaceCodeReview');
-				expect(spyOnCommitsViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, {
-					repo: '/path/to/repo',
-					commitDetails: {
-						commitHash: '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c',
-						compareWithHash: null
-					}
-				});
-			});
-			expect(spyOnGetCommitSubject).toHaveBeenCalledTimes(2);
-			expect(spyOnGetCommitSubject).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
-			expect(spyOnGetCommitSubject).toHaveBeenCalledWith('/path/to/repo', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c');
-			expect(await vscode.window.showQuickPick.mock.calls[0][0]).toStrictEqual([
-				{
-					codeReviewRepo: '/path/to/repo',
-					codeReviewId: '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c',
-					label: 'repo: 2b3c4d5e',
-					description: '5 seconds ago',
-					detail: '<Unknown Commit Subject>'
-				},
-				{
-					codeReviewRepo: '/path/to/repo',
-					codeReviewId: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b',
-					label: 'repo: 1a2b3c4d',
-					description: '10 seconds ago',
-					detail: 'subject-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'
-				}
-			]);
-			expect(vscode.window.showQuickPick.mock.calls[0][1]).toStrictEqual({
-				placeHolder: 'Select the Code Review you want to resume:',
-				canPickMany: false
-			});
-		});
-
-		it('Should load the selected code review in the Commits View (commit comparison)', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b-2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockImplementationOnce((_: string, hash: string) => 'subject-' + hash);
-			spyOnGetCommitSubject.mockImplementationOnce((_: string, hash: string) => 'subject-' + hash);
-			vscode.window.showQuickPick.mockImplementationOnce((items: Promise<any[]>, _: any) => items.then((items) => items[0]));
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.resumeWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.resumeWorkspaceCodeReview');
-				expect(spyOnCommitsViewCreateOrShow).toHaveBeenCalledWith('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, {
-					repo: '/path/to/repo',
-					commitDetails: {
-						commitHash: '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c',
-						compareWithHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'
-					}
-				});
-			});
-			expect(await vscode.window.showQuickPick.mock.calls[0][0]).toStrictEqual([
-				{
-					codeReviewRepo: '/path/to/repo',
-					codeReviewId: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b-2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c',
-					label: 'repo: 1a2b3c4d ↔ 2b3c4d5e',
-					description: '5 seconds ago',
-					detail: 'subject-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b ↔ subject-2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c'
-				}
-			]);
-			expect(vscode.window.showQuickPick.mock.calls[0][1]).toStrictEqual({
-				placeHolder: 'Select the Code Review you want to resume:',
-				canPickMany: false
-			});
-		});
-
-		it('Shouldn\'t load the the Commits View if no code review was selected', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.resumeWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.resumeWorkspaceCodeReview');
-				expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
-				expect(spyOnCommitsViewCreateOrShow).not.toHaveBeenCalled();
-			});
-		});
-
-		it('Should display an error message when there are no code reviews', () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({});
-			vscode.window.showErrorMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.resumeWorkspaceCodeReview');
-
-			// Assert
-			expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.resumeWorkspaceCodeReview');
-			expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('There are no Code Reviews in progress within the current workspace.');
-			expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
-		});
-
-		it('Should display an error message when showQuickPick rejects', async () => {
-			// Setup
-			spyOnGetCodeReviews.mockReturnValueOnce({
-				'/path/to/repo': {
-					'1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b': {
-						lastActive: (date.now - 5) * 1000,
-						lastViewedFile: null,
-						remainingFiles: ['file.txt']
-					}
-				}
-			});
-			spyOnGetRepos.mockReturnValueOnce({
-				'/path/to/repo': mockRepoState({ name: null, workspaceFolderIndex: 0 })
-			});
-			spyOnGetCommitSubject.mockResolvedValueOnce('Commit Subject');
-			vscode.window.showQuickPick.mockRejectedValueOnce(null);
-			vscode.window.showErrorMessage.mockResolvedValueOnce(null);
-
-			// Run
-			vscode.commands.executeCommand('an-dr-commits.resumeWorkspaceCodeReview');
-
-			// Assert
-			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Command Invoked: an-dr-commits.resumeWorkspaceCodeReview');
-				expect(vscode.window.showErrorMessage).toHaveBeenCalledWith('An unexpected error occurred while running the command "Resume a specific Code Review in Workspace...".');
 			});
 		});
 	});

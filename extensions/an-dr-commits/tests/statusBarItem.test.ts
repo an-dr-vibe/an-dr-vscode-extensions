@@ -23,35 +23,31 @@ afterAll(() => {
 });
 
 describe('StatusBarItem', () => {
-	it('Should show the Status Bar Item on vscode startup', () => {
+	it('Should show the Status Bar Item on vscode startup (icon-only by default)', () => {
 		// Setup
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 		const commitsItem = vscode.getStatusBarItem(0);
-		const blameItem = vscode.getStatusBarItem(1);
 
 		// Assert
-		expect(commitsItem.text).toBe('$(git-commit)');
+		expect(commitsItem.text).toBe('$(git-branch)');
 		expect(commitsItem.tooltip).toBe('Commits');
-		expect(commitsItem.command).toBe('an-dr-commits.view');
+		expect(commitsItem.command).toBe('an-dr-commits.viewFromStatusBar');
 		expect(commitsItem.show).toHaveBeenCalledTimes(1);
 		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
-		expect(blameItem.show).toHaveBeenCalledTimes(0);
-		expect(blameItem.hide).toHaveBeenCalledTimes(0);
 
 		// Teardown
 		statusBarItem.dispose();
 
-		// Asset
+		// Assert
 		expect(commitsItem.dispose).toHaveBeenCalledTimes(1);
-		expect(blameItem.dispose).toHaveBeenCalledTimes(1);
 		expect(onDidChangeRepos['listeners']).toHaveLength(0);
 		expect(onDidChangeConfiguration['listeners']).toHaveLength(0);
 	});
 
-	it('Should show the full name in the Status Bar Item when icon-only is disabled', () => {
+	it('Should show the full label in the Status Bar Item when icon-only is disabled', () => {
 		// Setup
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
 		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', false);
@@ -61,7 +57,7 @@ describe('StatusBarItem', () => {
 		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(commitsItem.text).toBe('$(git-commit) Commits');
+		expect(commitsItem.text).toBe('$(git-branch) Commits');
 		expect(commitsItem.tooltip).toBe('Commits');
 
 		// Teardown
@@ -122,7 +118,7 @@ describe('StatusBarItem', () => {
 		statusBarItem.dispose();
 	});
 
-	it('Should hide the Status Bar Item the extension setting an-dr-commits.showStatusBarItem becomes disabled', () => {
+	it('Should hide the Status Bar Item when the extension setting an-dr-commits.showStatusBarItem becomes disabled', () => {
 		// Setup
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
 
@@ -148,7 +144,7 @@ describe('StatusBarItem', () => {
 		statusBarItem.dispose();
 	});
 
-	it('Should ignore extension setting changes unrelated to an-dr-commits.showStatusBarItem', () => {
+	it('Should ignore extension setting changes unrelated to the status bar', () => {
 		// Setup
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
 
@@ -176,13 +172,14 @@ describe('StatusBarItem', () => {
 	it('Should update the Status Bar Item text when an-dr-commits.statusBarIconOnly changes', () => {
 		// Setup
 		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
+		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', true);
 
 		// Run
 		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
 		const commitsItem = vscode.getStatusBarItem(0);
 
 		// Assert
-		expect(commitsItem.text).toBe('$(git-commit)');
+		expect(commitsItem.text).toBe('$(git-branch)');
 
 		// Run
 		vscode.mockExtensionSettingReturnValue('statusBarIconOnly', false);
@@ -191,73 +188,9 @@ describe('StatusBarItem', () => {
 		});
 
 		// Assert
-		expect(commitsItem.text).toBe('$(git-commit) Commits');
+		expect(commitsItem.text).toBe('$(git-branch) Commits');
 		expect(commitsItem.show).toHaveBeenCalledTimes(1);
 		expect(commitsItem.hide).toHaveBeenCalledTimes(0);
-
-		// Teardown
-		statusBarItem.dispose();
-	});
-
-	it('Should show the current commit when an-dr-commits.statusBarShowCurrentCommit is enabled', () => {
-		// Setup
-		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
-		vscode.mockExtensionSettingReturnValue('statusBarShowCurrentCommit', true);
-		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
-		const commitsItem = vscode.getStatusBarItem(0);
-
-		// Run
-		statusBarItem.setRepoCommit({
-			text: '1a2b3c4d',
-			tooltip: 'Fix current line blame'
-		});
-
-		// Assert
-		expect(commitsItem.text).toBe('$(git-commit) 1a2b3c4d');
-		expect(commitsItem.tooltip).toBe('Fix current line blame');
-		expect(commitsItem.command).toBe('an-dr-commits.view');
-
-		// Teardown
-		statusBarItem.dispose();
-	});
-
-	it('Should show an optional blame Status Bar Item that reveals the commit in Commits', () => {
-		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
-		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
-		const blameItem = vscode.getStatusBarItem(1);
-
-		statusBarItem.setBlameCommit({
-			repo: '/path/to/workspace-folder',
-			hash: '1a2b3c4d',
-			text: '1a2b3c4d',
-			tooltip: 'Fix current line blame'
-		});
-
-		expect(blameItem.text).toBe('$(edit) 1a2b3c4d');
-		expect(blameItem.tooltip).toBe('Fix current line blame');
-		expect(blameItem.show).toHaveBeenCalledTimes(1);
-		expect(blameItem.command).toStrictEqual({
-			title: 'Reveal Commit in Commits',
-			command: 'an-dr-commits.revealCommitInGraph',
-			arguments: [{ repo: '/path/to/workspace-folder', commitHash: '1a2b3c4d' }]
-		});
-		statusBarItem.dispose();
-	});
-
-	it('Should show the Blame label when blame.statusBarIconOnly is disabled', () => {
-		vscode.mockExtensionSettingReturnValue('showStatusBarItem', true);
-		vscode.mockExtensionSettingReturnValue('blame.statusBarIconOnly', false);
-		const statusBarItem = new StatusBarItem(1, onDidChangeRepos.subscribe, onDidChangeConfiguration.subscribe, logger);
-		const blameItem = vscode.getStatusBarItem(1);
-
-		statusBarItem.setBlameCommit({
-			repo: '/path/to/workspace-folder',
-			hash: '1a2b3c4d',
-			text: '1a2b3c4d',
-			tooltip: 'Fix current line blame'
-		});
-
-		expect(blameItem.text).toBe('$(edit) Blame 1a2b3c4d');
 
 		// Teardown
 		statusBarItem.dispose();

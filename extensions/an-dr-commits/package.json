@@ -1322,6 +1322,11 @@
 					"default": true,
 					"description": "Show a status bar item that opens Commits when clicked."
 				},
+				"an-dr-commits.statusBarIconOnly": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show only the icon (and dirty indicator) in the status bar item, without the branch name."
+				},
 				"an-dr-commits.statusBarItem.dirtyIndicator": {
 					"type": "string",
 					"enum": ["+N -M", "*", "none"],

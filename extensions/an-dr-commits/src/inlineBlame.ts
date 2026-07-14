@@ -26,6 +26,9 @@ export class InlineBlameController extends Disposable {
 
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private requestId: number = 0;
+	// Identifies the document version + line the current decoration was rendered for, so cursor
+	// movement within the same line (selection events fire per character) doesn't re-spawn git blame.
+	private renderedBlameKey: string | null = null;
 
 	constructor(dataSource: DataSource, repoManager: RepoManager, _statusBarItem: unknown, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
 		super();
@@ -109,6 +112,11 @@ export class InlineBlameController extends Disposable {
 			return;
 		}
 
+		const blameKey = editor.document.uri.toString() + '@' + editor.document.version + ':' + editor.selection.active.line;
+		if (blameKey === this.renderedBlameKey) {
+			return;
+		}
+
 		const filePath = getPathFromUri(editor.document.uri);
 		const repo = await this.repoManager.resolveRepoContainingFile(filePath);
 		if (repo === null) {
@@ -124,6 +132,7 @@ export class InlineBlameController extends Disposable {
 
 			if (blame === null) {
 				editor.setDecorations(this.decorationType, []);
+				this.renderedBlameKey = blameKey;
 				return;
 			}
 
@@ -133,6 +142,7 @@ export class InlineBlameController extends Disposable {
 			}
 			const line = editor.document.lineAt(editor.selection.active.line);
 			const hoverMessage = this.shouldShowInlineHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : undefined;
+			this.renderedBlameKey = blameKey;
 			editor.setDecorations(this.decorationType, [{
 				hoverMessage: hoverMessage,
 				range: line.range,
@@ -155,6 +165,7 @@ export class InlineBlameController extends Disposable {
 
 	private clear(editor: vscode.TextEditor | undefined) {
 		this.requestId++;
+		this.renderedBlameKey = null;
 		if (editor) {
 			editor.setDecorations(this.decorationType, []);
 		}

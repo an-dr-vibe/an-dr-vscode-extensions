@@ -151,10 +151,17 @@ export class DataSource extends Disposable {
 			this.getBranches(repo, showRemoteBranches, hideRemotes),
 			this.getRemotes(repo),
 			showStashes ? this.getStashes(repo) : Promise.resolve([]),
-			this.getRepoInProgressState(repo)
-		]).then(async (results) => {
+			this.getRepoInProgressState(repo),
+			// Fetched in parallel with the other calls ("git remote -v" doesn't need the remote
+			// names first) so repo-info loads don't pay a serial git round-trip.
+			this.getRemoteUrls(repo).catch((): { [remoteName: string]: string } => ({}))
+		]).then((results) => {
 			const remotes: string[] = results[1];
-			const remoteUrls = await this.getRemoteUrls(repo, remotes).catch(() => ({}));
+			const fetchedUrls = results[4];
+			const remoteUrls: { [remoteName: string]: string | null } = {};
+			for (const remote of remotes) {
+				remoteUrls[remote] = typeof fetchedUrls[remote] === 'string' ? fetchedUrls[remote] : null;
+			}
 			return {
 				branches: results[0].branches,
 				branchUpstreams: results[0].branchUpstreams,
@@ -172,18 +179,19 @@ export class DataSource extends Disposable {
 		});
 	}
 
-	private getRemoteUrls(repo: string, remotes: string[]): Promise<{ [remoteName: string]: string | null }> {
-		if (remotes.length === 0) return Promise.resolve({});
+	/**
+	 * Get the fetch URL of every remote in a repository.
+	 * @param repo The path of the repository.
+	 * @returns A map of remote name to fetch URL.
+	 */
+	private getRemoteUrls(repo: string): Promise<{ [remoteName: string]: string }> {
 		return this.spawnGit(['remote', '-v'], repo, (stdout) => {
-			const result: { [remoteName: string]: string | null } = {};
-			for (const remote of remotes) result[remote] = null;
+			const result: { [remoteName: string]: string } = {};
 			for (const line of stdout.split(EOL_REGEX)) {
 				if (!line.includes('(fetch)')) continue;
 				const tab = line.indexOf('\t');
 				if (tab === -1) continue;
-				const name = line.substring(0, tab);
-				const url = line.substring(tab + 1).replace(' (fetch)', '').trim();
-				if (typeof result[name] !== 'undefined') result[name] = url;
+				result[line.substring(0, tab)] = line.substring(tab + 1).replace(' (fetch)', '').trim();
 			}
 			return result;
 		});
@@ -2646,9 +2654,12 @@ export class DataSource extends Disposable {
 				return reject(UNABLE_TO_FIND_GIT_MSG);
 			}
 
+			// GIT_OPTIONAL_LOCKS=0 stops read commands (e.g. git status) from taking index.lock for
+			// opportunistic index refreshes, so they can safely run concurrently with user-initiated
+			// git actions. Mandatory locks (commit, stage, ...) are unaffected.
 			resolveSpawnOutput(cp.spawn(this.gitExecutable.path, args, {
 				cwd: repo,
-				env: Object.assign({}, process.env, this.askpassEnv)
+				env: Object.assign({}, process.env, this.askpassEnv, { GIT_OPTIONAL_LOCKS: '0' })
 			})).then((values) => {
 				const status = values[0], stdout = values[1], stderr = values[2];
 				if (status.code === 0 || ignoreExitCode) {

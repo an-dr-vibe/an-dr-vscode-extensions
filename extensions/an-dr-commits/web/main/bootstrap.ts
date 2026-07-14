@@ -217,6 +217,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'refresh':
 				commits.refresh(false);
 				break;
+			case 'refreshWorkingTree':
+				commits.refreshWorkingTree(msg.repo, msg.numChanges);
+				break;
 			case 'renameBranch':
 				refreshOrDisplayError(msg.error, 'Unable to Rename Branch');
 				break;

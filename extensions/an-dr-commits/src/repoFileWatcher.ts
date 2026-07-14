@@ -2,17 +2,20 @@ import * as vscode from 'vscode';
 import { Logger } from './logger';
 import { getPathFromUri } from './utils';
 
-const FILE_CHANGE_REGEX = /(^\.git\/(config|index|HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD|rebase-merge\/.*|rebase-apply\/.*|sequencer\/.*|refs\/stash|refs\/heads\/.*|refs\/remotes\/.*|refs\/tags\/.*)$)|(^(?!\.git).*$)|(^\.git[^\/]+$)/;
+const GIT_METADATA_CHANGE_REGEX = /^\.git\/(config|index|HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD|rebase-merge\/.*|rebase-apply\/.*|sequencer\/.*|refs\/stash|refs\/heads\/.*|refs\/remotes\/.*|refs\/tags\/.*)$/;
+
+export type RepoRefreshKind = 'full' | 'workingTree';
 
 /**
  * Watches a Git repository for file events.
  */
 export class RepoFileWatcher {
 	private readonly logger: Logger;
-	private readonly repoChangeCallback: () => void;
+	private readonly repoChangeCallback: (kind: RepoRefreshKind) => void;
 	private repo: string | null = null;
 	private fsWatcher: vscode.FileSystemWatcher | null = null;
 	private refreshTimeout: NodeJS.Timer | null = null;
+	private pendingRefreshKind: RepoRefreshKind | null = null;
 	private muteCount: number = 0;
 	private resumeAt: number = 0;
 
@@ -21,7 +24,7 @@ export class RepoFileWatcher {
 	 * @param logger The Commits Logger instance.
 	 * @param repoChangeCallback A callback to be invoked when a file event occurs in the repository.
 	 */
-	constructor(logger: Logger, repoChangeCallback: () => void) {
+	constructor(logger: Logger, repoChangeCallback: (kind: RepoRefreshKind) => void) {
 		this.logger = logger;
 		this.repoChangeCallback = repoChangeCallback;
 	}
@@ -60,6 +63,7 @@ export class RepoFileWatcher {
 			clearTimeout(this.refreshTimeout);
 			this.refreshTimeout = null;
 		}
+		this.pendingRefreshKind = null;
 	}
 
 	/**
@@ -86,15 +90,22 @@ export class RepoFileWatcher {
 	 */
 	private refresh(uri: vscode.Uri) {
 		if (this.muteCount > 0) return;
-		if (!getPathFromUri(uri).replace(this.repo + '/', '').match(FILE_CHANGE_REGEX)) return;
+		const relativePath = getPathFromUri(uri).replace(this.repo + '/', '');
+		const refreshKind = relativePath === '.git' || GIT_METADATA_CHANGE_REGEX.test(relativePath)
+			? 'full'
+			: relativePath.startsWith('.git/') ? null : 'workingTree';
+		if (refreshKind === null) return;
 		if ((new Date()).getTime() < this.resumeAt) return;
 
+		if (this.pendingRefreshKind !== 'full') this.pendingRefreshKind = refreshKind;
 		if (this.refreshTimeout !== null) {
 			clearTimeout(this.refreshTimeout);
 		}
 		this.refreshTimeout = setTimeout(() => {
 			this.refreshTimeout = null;
-			this.repoChangeCallback();
+			const kind = this.pendingRefreshKind!;
+			this.pendingRefreshKind = null;
+			this.repoChangeCallback(kind);
 		}, 750);
 	}
 }

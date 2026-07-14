@@ -625,6 +625,12 @@ export interface ResponseRefresh extends BaseMessage {
 	readonly command: 'refresh';
 }
 
+export interface ResponseRefreshWorkingTree extends BaseMessage {
+	readonly command: 'refreshWorkingTree';
+	readonly repo: string;
+	readonly numChanges: number;
+}
+
 export interface RequestRenameBranch extends RepoRequest {
 	readonly command: 'renameBranch';
 	readonly oldName: string;
@@ -1065,6 +1071,7 @@ export type ResponseMessage =
 	| ResponseRebase
 	| ResponseRepoInProgressAction
 	| ResponseRefresh
+	| ResponseRefreshWorkingTree
 	| ResponseRenameBranch
 	| ResponseSetBranchUpstream
 	| ResponseUnsetBranchUpstream

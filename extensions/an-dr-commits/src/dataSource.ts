@@ -219,7 +219,7 @@ export class DataSource extends Disposable {
 			this.getRefs(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage),
 			// Fetched in parallel with the log so the (often slow on large working trees) status
 			// call doesn't extend the view's load time; a failure only hides the uncommitted row.
-			config.showUncommittedChanges ? this.getUncommittedChanges(repo).catch(() => 0) : Promise.resolve(0)
+			this.getWorkingTreeChangeCount(repo).catch(() => 0)
 		]).then(async (results) => {
 			let commits: GitCommitRecord[] = results[0], refData: GitRefData | string = results[1], i;
 			const numUncommittedChanges = results[2];
@@ -2287,7 +2287,8 @@ export class DataSource extends Disposable {
 	 * @param repo The path of the repository.
 	 * @returns The number of uncommitted changes.
 	 */
-	private getUncommittedChanges(repo: string) {
+	public getWorkingTreeChangeCount(repo: string) {
+		if (!getConfig().showUncommittedChanges) return Promise.resolve(0);
 		return this.spawnGit(['status', '--untracked-files=' + (getConfig().showUntrackedFiles ? 'all' : 'no'), '--porcelain'], repo, (stdout) => {
 			const numLines = stdout.split(EOL_REGEX).length;
 			return numLines > 1 ? numLines - 1 : 0;

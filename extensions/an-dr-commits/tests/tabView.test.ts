@@ -467,7 +467,7 @@ describe('TabView', () => {
 				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 
 				// Run
-				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']();
+				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']('full');
 
 				// Assert
 				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
@@ -478,6 +478,20 @@ describe('TabView', () => {
 				]);
 			});
 
+			it('Should refresh only working-tree state for ordinary file changes', async () => {
+				const spyOnGetWorkingTreeChangeCount = jest.spyOn(dataSource, 'getWorkingTreeChangeCount').mockResolvedValueOnce(3);
+				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
+				TabView.currentPanel!['currentRepo'] = '/path/to/repo';
+
+				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']('workingTree');
+
+				const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
+				await waitForExpect(() => expect(mockedWebviewPanel.mocks.messages).toStrictEqual([{
+					command: 'refreshWorkingTree', repo: '/path/to/repo', numChanges: 3
+				}]));
+				expect(spyOnGetWorkingTreeChangeCount).toHaveBeenCalledWith('/path/to/repo');
+			});
+
 			it('Shouldn\'t refresh the view when it isn\'t visible', () => {
 				// Setup
 				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
@@ -485,7 +499,7 @@ describe('TabView', () => {
 				mockedWebviewPanel.mocks.panel.setVisibility(false);
 
 				// Run
-				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']();
+				TabView.currentPanel!['repoFileWatcher']['repoChangeCallback']('full');
 
 				// Assert
 				expect(mockedWebviewPanel.mocks.messages).toHaveLength(0);

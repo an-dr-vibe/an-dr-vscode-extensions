@@ -214,17 +214,49 @@ function commitsHandleUnchangedCommits(view: any, commits: GG.GitCommit[], tagsC
 		view.commits[0] = commits[0];
 		view.saveState();
 		view.renderUncommittedChanges();
-		if (view.expandedCommit !== null && view.expandedCommit.commitElem !== null) {
-			if (view.expandedCommit.compareWithHash === null) {
-				if (view.expandedCommit.commitHash === UNCOMMITTED) view.requestCommitDetails(view.expandedCommit.commitHash, true);
-			} else if (view.expandedCommit.compareWithElem !== null && (view.expandedCommit.commitHash === UNCOMMITTED || view.expandedCommit.compareWithHash === UNCOMMITTED)) {
-				view.requestCommitComparison(view.expandedCommit.commitHash, view.expandedCommit.compareWithHash, true);
-			}
-		}
+		commitsRefreshExpandedUncommitted(view);
 	} else if (tagsChanged) {
 		view.saveState();
 	}
 	view.finaliseLoadCommits();
+}
+
+function commitsRefreshWorkingTree(view: any, repo: string, numChanges: number) {
+	if (repo !== view.currentRepo || view.commits.length === 0) return;
+	const hadUncommitted = view.commits[0].hash === UNCOMMITTED;
+	if (!hadUncommitted && numChanges === 0) return;
+	if (numChanges > 0) {
+		const uncommitted: GG.GitCommit = {
+			hash: UNCOMMITTED,
+			parents: view.commitHead === null ? [] : [view.commitHead],
+			author: '*', email: '', date: Math.round(Date.now() / 1000),
+			message: 'Uncommitted Changes (' + numChanges + ')', heads: [], tags: [], remotes: [], stash: null
+		};
+		if (hadUncommitted) view.commits[0] = uncommitted;
+		else view.commits.unshift(uncommitted);
+	} else {
+		view.commits.shift();
+		if (view.expandedCommit !== null && (view.expandedCommit.commitHash === UNCOMMITTED || view.expandedCommit.compareWithHash === UNCOMMITTED)) view.closeCommitDetails(false);
+	}
+	view.commitLookup = {};
+	for (let i = 0; i < view.commits.length; i++) view.commitLookup[view.commits[i].hash] = i;
+	view.saveState();
+	if (hadUncommitted === (numChanges > 0)) {
+		view.renderUncommittedChanges();
+		commitsRefreshExpandedUncommitted(view);
+	} else {
+		view.graph.loadCommits(view.commits, view.commitHead, view.commitLookup, view.onlyFollowFirstParent);
+		view.render();
+	}
+}
+
+function commitsRefreshExpandedUncommitted(view: any) {
+	if (view.expandedCommit === null || view.expandedCommit.commitElem === null) return;
+	if (view.expandedCommit.compareWithHash === null) {
+		if (view.expandedCommit.commitHash === UNCOMMITTED) view.requestCommitDetails(UNCOMMITTED, true);
+	} else if (view.expandedCommit.compareWithElem !== null && (view.expandedCommit.commitHash === UNCOMMITTED || view.expandedCommit.compareWithHash === UNCOMMITTED)) {
+		view.requestCommitComparison(view.expandedCommit.commitHash, view.expandedCommit.compareWithHash, true);
+	}
 }
 
 function commitsLoadCommits(view: any, commits: GG.GitCommit[], commitHead: string | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean) {

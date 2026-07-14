@@ -213,6 +213,8 @@ fast path, since all three call through the same `render()` site.
 ### Loading commits
 Webview sends `loadRepoInfo` / `loadCommits` messages → `TabView.respondToMessage` receives → dispatches to `views/tab/repoLifecycleActions.ts`'s `handleLoadRepoInfo`/`handleLoadCommits` → these call `dataSource.getRepoInfo()` + `dataSource.getCommits()` → send back `loadRepoInfo` / `loadCommits` responses → webview `loadRepoInfo()` / `loadCommits()` update state → `render()`.
 
+`RepoFileWatcher` classifies Git metadata changes as full refreshes and ordinary working-tree events as lightweight refreshes. The latter runs only `DataSource.getWorkingTreeChangeCount()` and sends `refreshWorkingTree`; `web/main/loadProcessing.ts` updates the uncommitted graph node without reloading refs or history (ADR-010).
+
 ### Following Source Control selection
 `TabView` subscribes to the built-in Git extension API on startup (`setupNativeScmWatcher()`). When a repository's `ui.selected` state changes in VS Code Source Control, Commits resolves the selected Git API repository back to a known Commits repo via `repoManager.getKnownRepo()`, sends `loadRepos` with `loadViewTo`, then triggers a refresh so the webview reloads the newly selected repository. The tab and sidebar also sync repo selection with each other directly, independent of VS Code's own SCM selection — see `views/common/repoSelection.ts` and `TabView.configureRepoSelectionSync()`.
 

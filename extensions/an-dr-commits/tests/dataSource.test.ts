@@ -85,6 +85,17 @@ describe('DataSource', () => {
 		});
 	};
 
+	describe('getWorkingTreeChangeCount', () => {
+		it('Should return the number of changed paths', async () => {
+			mockGitSuccessOnce(' M one.txt\n?? two.txt\n');
+
+			const result = await dataSource.getWorkingTreeChangeCount('/path/to/repo');
+
+			expect(result).toBe(2);
+			expect(spyOnSpawn).toHaveBeenCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+	});
+
 	describe('isGitExecutableUnknown', () => {
 		it('Should return FALSE when the Git executable is known', () => {
 			// Run

@@ -43,6 +43,30 @@ describe('RepoFileWatcher', () => {
 		// Assert
 		expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith('/path/to/repo/**');
 		expect(callback).toHaveBeenCalledTimes(1);
+		expect(callback).toHaveBeenCalledWith('workingTree');
+	});
+
+	it('Should classify Git metadata events as full refreshes', () => {
+		repoFileWatcher.start('/path/to/repo');
+		const onDidChange = (<jest.Mock<any, any>>repoFileWatcher['fsWatcher']!.onDidChange).mock.calls[0][0];
+
+		onDidChange(vscode.Uri.file('/path/to/repo/.git/refs/heads/main'));
+		jest.runOnlyPendingTimers();
+
+		expect(callback).toHaveBeenCalledWith('full');
+	});
+
+	it('Should escalate a mixed event burst to a full refresh', () => {
+		repoFileWatcher.start('/path/to/repo');
+		const onDidChange = (<jest.Mock<any, any>>repoFileWatcher['fsWatcher']!.onDidChange).mock.calls[0][0];
+
+		onDidChange(vscode.Uri.file('/path/to/repo/file.txt'));
+		onDidChange(vscode.Uri.file('/path/to/repo/.git/index'));
+		onDidChange(vscode.Uri.file('/path/to/repo/another.txt'));
+		jest.runOnlyPendingTimers();
+
+		expect(callback).toHaveBeenCalledTimes(1);
+		expect(callback).toHaveBeenCalledWith('full');
 	});
 
 	it('Should stop a previous active File System Watcher before creating a new one', () => {

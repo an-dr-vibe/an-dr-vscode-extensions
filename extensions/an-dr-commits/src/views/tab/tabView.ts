@@ -5,7 +5,7 @@ import { getConfig } from '../../config';
 import { DataSource } from '../../dataSource';
 import { ExtensionState } from '../../extensionState';
 import { Logger } from '../../logger';
-import { RepoFileWatcher } from '../../repoFileWatcher';
+import { RepoFileWatcher, RepoRefreshKind } from '../../repoFileWatcher';
 import { RepoManager } from '../../repoManager';
 import { CommitsViewInitialState, GitRepoSet, LoadCommitsViewTo, RequestMessage, ResponseMessage, TabIconColourTheme } from '../../types';
 import { UNABLE_TO_FIND_GIT_MSG, getNonce, isPathInWorkspace, resolveToSymbolicPath } from '../../utils';
@@ -265,11 +265,7 @@ export class TabView extends Disposable {
 		);
 
 		// Instantiate a RepoFileWatcher that watches for file changes in the repository currently open in the Commits View
-		this.repoFileWatcher = new RepoFileWatcher(logger, () => {
-			if (this.panel.visible) {
-				this.sendMessage({ command: 'refresh' });
-			}
-		});
+		this.repoFileWatcher = new RepoFileWatcher(logger, (kind) => this.respondToRepoChange(kind));
 
 		this.repoLifecycleCtx = {
 			dataSource: this.dataSource,
@@ -341,6 +337,25 @@ export class TabView extends Disposable {
 		}
 
 		this.logger.log((restoredFromSerializer ? 'Restored' : 'Created') + ' Commits View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
+	}
+
+	/** Refreshes only the data invalidated by a repository file event. */
+	private async respondToRepoChange(kind: RepoRefreshKind) {
+		if (!this.panel.visible) return;
+		if (kind === 'full') {
+			this.sendMessage({ command: 'refresh' });
+			return;
+		}
+		if (this.currentRepo === null) return;
+		const repo = this.currentRepo;
+		try {
+			const numChanges = await this.dataSource.getWorkingTreeChangeCount(repo);
+			if (this.panel.visible && this.currentRepo === repo) {
+				this.sendMessage({ command: 'refreshWorkingTree', repo, numChanges });
+			}
+		} catch (error) {
+			this.logger.logError('Unable to refresh working tree state: ' + String(error));
+		}
 	}
 
 	/**

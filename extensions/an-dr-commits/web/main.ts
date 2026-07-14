@@ -300,6 +300,7 @@ class CommitsView {
 	public getCurrentRepo() { return this.currentRepo; }
 
 	public refresh(hard: boolean, configChanges: boolean = false) { commitsRefresh(this, hard, configChanges); }
+	public refreshWorkingTree(repo: string, numChanges: number) { commitsRefreshWorkingTree(this, repo, numChanges); }
 
 
 	/* Requests */

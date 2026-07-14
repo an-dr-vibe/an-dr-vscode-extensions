@@ -335,10 +335,10 @@ export class RepoManager extends Disposable {
 	/**
 	 * Add a new repository to Commits.
 	 * @param repo The path of the repository.
-	 * @returns TRUE => The repository was added, FALSE => The repository is ignored and couldn't be added.
+	 * @returns TRUE => The repository was added, FALSE => The repository is ignored or already known (re-adding would reset its saved state).
 	 */
 	private async addRepo(repo: string) {
-		if (this.ignoredRepos.includes(repo)) {
+		if (this.ignoredRepos.includes(repo) || this.isKnownRepo(repo)) {
 			return false;
 		} else {
 			this.repos[repo] = Object.assign({}, DEFAULT_REPO_STATE);

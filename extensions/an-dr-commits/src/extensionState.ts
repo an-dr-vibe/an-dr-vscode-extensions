@@ -15,7 +15,6 @@ const IGNORED_REPOS = 'ignoredRepos';
 const LAST_ACTIVE_REPO = 'lastActiveRepo';
 const LAST_KNOWN_GIT_PATH = 'lastKnownGitPath';
 const REPO_STATES = 'repoStates';
-const REOPEN_GIT_GRAPH_ON_STARTUP = 'reopenCommitsOnStartup';
 const WORKSPACE_VIEW_STATE = 'workspaceViewState';
 
 export const DEFAULT_ACTIVITY_GRAPH_HEIGHT = 120;
@@ -243,23 +242,6 @@ export class ExtensionState extends Disposable {
 	public setLastActiveRepo(repo: string | null) {
 		this.updateWorkspaceState(LAST_ACTIVE_REPO, repo);
 	}
-
-	/**
-	 * Get whether Commits should reopen automatically on extension startup.
-	 * @returns TRUE => Reopen, FALSE => Don't reopen.
-	 */
-	public getReopenCommitsOnStartup() {
-		return this.workspaceState.get<boolean>(REOPEN_GIT_GRAPH_ON_STARTUP, false);
-	}
-
-	/**
-	 * Set whether Commits should reopen automatically on extension startup.
-	 * @param reopen Should reopen on startup.
-	 */
-	public setReopenCommitsOnStartup(reopen: boolean) {
-		this.updateWorkspaceState(REOPEN_GIT_GRAPH_ON_STARTUP, reopen);
-	}
-
 
 	/* Last Known Git Path */
 

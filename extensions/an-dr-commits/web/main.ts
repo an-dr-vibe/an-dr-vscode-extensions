@@ -617,7 +617,7 @@ function bootstrap() {
 	const viewElem = document.getElementById('view');
 	if (viewElem === null) return;
 
-	commits = new CommitsView(viewElem, VSCODE_API.getState() || null);
+	commits = new CommitsView(viewElem, restoredState || VSCODE_API.getState() || null);
 	imageResizer = new ImageResizer();
 
 	commitsRegisterMessageHandler(commits);

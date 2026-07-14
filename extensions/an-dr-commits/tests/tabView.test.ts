@@ -123,7 +123,7 @@ describe('TabView', () => {
 			panel.webview.options = {} as any;
 
 			// Run
-			TabView.revive(panel, '/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger);
+			TabView.revive(panel, { currentRepo: '/path/to/repo' }, '/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger);
 
 			// Assert
 			expect(panel.webview.options).toStrictEqual({
@@ -131,6 +131,7 @@ describe('TabView', () => {
 				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))]
 			});
 			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Restored Commits View \[\d+\]$/));
+			expect(panel.webview.html).toContain('restoredState = {"currentRepo":"/path/to/repo"}');
 		});
 
 		it('Should reveal the existing WebviewPanel (when one exists)', () => {

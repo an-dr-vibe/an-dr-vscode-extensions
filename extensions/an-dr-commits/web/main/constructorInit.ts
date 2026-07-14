@@ -167,13 +167,6 @@ function commitsBootstrapLoad(view: any, prevState: any, loadViewTo: GG.LoadComm
 		}
 		view.requestLoadRepoInfoAndCommits(false, false);
 	}
-	if (prevState !== null && loadViewTo === null) {
-		// After VS Code restores a webview, the first load sequence can occasionally stall.
-		// Re-request repos shortly after startup to guarantee the view fully bootstraps.
-		setTimeout(() => {
-			sendMessage({ command: 'loadRepos', check: false });
-		}, 350);
-	}
 }
 
 function addSingleDblClick(elem: HTMLElement, onSingle: () => void, onDouble: () => void) {

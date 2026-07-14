@@ -71,7 +71,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | `extensionState.ts` | Persists view state across sessions |
 | `types.ts` | Public barrel re-exporting `types/*` — the shared TypeScript interfaces for the backend |
 | `avatarManager.ts` | Fetches and caches author avatars |
-| `editorTabUtils.ts` | Detects duplicate/orphaned Commits editor tabs by matching VS Code `tabGroups` entries against the Commits view types |
+| `editorTabUtils.ts` | Matches existing Commits editor tabs for the explicit-open duplicate safeguard |
 | `views/tab/` | The main-editor-tab webview, class `TabView` — see below |
 | `views/sidebar/` | The Activity Bar sidebar webview, class `SidebarView` — see below |
 | `views/common/` | Backend code shared between `views/tab/` and `views/sidebar/` — see below |
@@ -211,6 +211,8 @@ fast path, since all three call through the same `render()` site.
 
 ### Opening the graph
 `extension.ts:activate` → `TabView.createOrShow()` → `getHtmlForWebview()` injects `initialState` JSON → webview `main.ts` constructor reads it → calls `requestLoadRepoInfoAndCommits()`.
+
+Window reload restoration is owned exclusively by VS Code's registered webview serializer. The serializer passes the persisted webview state into `TabView.revive()`, which injects it as `restoredState`; frontend bootstrap consumes it directly without reopen flags or retry timers (ADR-012).
 
 ### Loading commits
 Webview sends `loadRepoInfo` / `loadCommits` messages → `TabView.respondToMessage` receives → dispatches to `views/tab/repoLifecycleActions.ts`'s `handleLoadRepoInfo`/`handleLoadCommits` → these call `dataSource.getRepoInfo()` + `dataSource.getCommits()` → send back `loadRepoInfo` / `loadCommits` responses → webview `loadRepoInfo()` / `loadCommits()` update state → `render()`.

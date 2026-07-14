@@ -13,6 +13,7 @@ export interface CommitsWebviewHtmlRenderOptions {
 	readonly viewName: string;
 	readonly gitExecutableUnknown: boolean;
 	readonly initialState: CommitsViewInitialState;
+	readonly restoredState: unknown;
 	readonly globalState: CommitsViewGlobalState;
 	readonly workspaceState: CommitsViewWorkspaceState;
 	readonly unableToFindGitMessage: string;
@@ -104,7 +105,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 				<div id="footer"></div>
 			</div>
 			<div id="scrollShadow"></div>
-			<script nonce="${options.nonce}">var initialState = ${JSON.stringify(options.initialState)}, globalState = ${JSON.stringify(options.globalState)}, workspaceState = ${JSON.stringify(options.workspaceState)};</script>
+			<script nonce="${options.nonce}">var initialState = ${JSON.stringify(options.initialState)}, restoredState = ${JSON.stringify(options.restoredState)}, globalState = ${JSON.stringify(options.globalState)}, workspaceState = ${JSON.stringify(options.workspaceState)};</script>
 			<script nonce="${options.nonce}" src="${options.mediaJsUri}"></script>
 			</body>`;
 	}

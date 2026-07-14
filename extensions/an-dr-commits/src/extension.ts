@@ -16,7 +16,6 @@ import { RepoManager } from './repoManager';
 import { StatusBarItem } from './statusBarItem';
 import { SidebarView } from './views/sidebar/sidebarView';
 import { RepoSelectionEvent } from './views/common/repoSelection';
-import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from './editorTabUtils';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, findGit, getGitExecutableFromPaths, showErrorMessage, showInformationMessage } from './utils';
 import { EventEmitter } from './utils/event';
 
@@ -27,23 +26,6 @@ import { EventEmitter } from './utils/event';
 export async function activate(context: vscode.ExtensionContext) {
 	const logger = new Logger();
 	logger.log('Starting Commits ...');
-	const commitsTabViewTypes = new Set([TabView.VIEW_TYPE, 'mainThreadWebview-' + TabView.VIEW_TYPE]);
-	const commitsTabLabel = 'Commits';
-	let orphanCheckTimeout: ReturnType<typeof setTimeout> | null = null;
-	let suppressOrphanChecksUntil = 0;
-	const hasExistingCommitsTab = () => {
-		const tabGroups = (vscode.window as any).tabGroups;
-		return !!(tabGroups && typeof tabGroups.onDidChangeTabs === 'function' && getMatchingTabs(tabGroups, (tab: any) => isMatchingWebviewTab(tab, commitsTabViewTypes, commitsTabLabel)).length > 0);
-	};
-
-	const delayOrphanChecks = (reason: string, durationMs: number) => {
-		const nextSuppressionTime = Date.now() + durationMs;
-		if (nextSuppressionTime > suppressOrphanChecksUntil) {
-			suppressOrphanChecksUntil = nextSuppressionTime;
-		}
-		logger.logDebug('Suppressing Commits orphan checks for ' + durationMs + 'ms (' + reason + ').');
-	};
-
 	const gitExecutableEmitter = new EventEmitter<GitExecutable>();
 	const onDidChangeGitExecutable = gitExecutableEmitter.subscribe;
 
@@ -76,10 +58,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.window.registerWebviewPanelSerializer(TabView.VIEW_TYPE, {
-			async deserializeWebviewPanel(panel: vscode.WebviewPanel, _state: any) {
+			async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: any) {
 				logger.logDebug('Deserializing Commits webview panel...');
-				delayOrphanChecks('webview serializer restore', 750);
-				TabView.revive(panel, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
+				TabView.revive(panel, state, context.extensionPath, dataSource, extensionState, avatarManager, repoManager, logger);
 			}
 		}),
 		vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
@@ -118,76 +99,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		logger
 	);
 
-	const tabGroups = (vscode.window as any).tabGroups;
-	if (tabGroups && typeof tabGroups.onDidChangeTabs === 'function') {
-		let duplicateCloseInFlight = false;
-		const isCommitsTab = (tab: any) => isMatchingWebviewTab(tab, commitsTabViewTypes, commitsTabLabel);
-
-		const doesCommitsTabExist = () => {
-			return getMatchingTabs(tabGroups, isCommitsTab).length > 0;
-		};
-
-		const cancelPendingOrphanCheck = () => {
-			if (orphanCheckTimeout === null) return;
-			clearTimeout(orphanCheckTimeout);
-			orphanCheckTimeout = null;
-		};
-
-		const scheduleOrphanCheck = () => {
-			cancelPendingOrphanCheck();
-			orphanCheckTimeout = setTimeout(() => {
-				orphanCheckTimeout = null;
-				if (!TabView.currentPanel) return;
-				const remainingSuppressionMs = suppressOrphanChecksUntil - Date.now();
-				if (remainingSuppressionMs > 0) {
-					scheduleOrphanCheck();
-					return;
-				}
-				if (doesCommitsTabExist()) return;
-				TabView.recoverOrphanedPanelIfNeeded(logger);
-			}, 250);
-		};
-
-		const closeDuplicateCommitsTabs = async () => {
-			if (duplicateCloseInFlight || typeof tabGroups.close !== 'function') return;
-
-			const duplicateTabs = getDuplicateTabsToClose(tabGroups, isCommitsTab);
-			if (duplicateTabs.length === 0) return;
-
-			duplicateCloseInFlight = true;
-			delayOrphanChecks('closing duplicate Commits tabs', 1000);
-			try {
-				await tabGroups.close(duplicateTabs, true);
-				logger.logWarning('Closed ' + duplicateTabs.length + ' duplicate Commits tab' + (duplicateTabs.length === 1 ? '' : 's') + '.');
-			} catch (error) {
-				logger.logError('Unable to close duplicate Commits tabs: ' + String(error));
-			} finally {
-				duplicateCloseInFlight = false;
-			}
-		};
-
-		context.subscriptions.push(tabGroups.onDidChangeTabs(() => {
-			void closeDuplicateCommitsTabs();
-			try {
-				const hasCommitsTab = doesCommitsTabExist();
-				if (TabView.currentPanel && !hasCommitsTab) {
-					scheduleOrphanCheck();
-				} else if (hasCommitsTab) {
-					cancelPendingOrphanCheck();
-				}
-			} catch (error) {
-				logger.logError('Unable to evaluate Commits tab tracking: ' + String(error));
-			}
-		}));
-		void closeDuplicateCommitsTabs();
-	}
 	logger.log('Started Commits - Ready to use!');
-	if (extensionState.getReopenCommitsOnStartup() && !hasExistingCommitsTab()) {
-		logger.log('Reopening Commits because it was open before reload.');
-		setTimeout(() => {
-			void vscode.commands.executeCommand('an-dr-commits.view');
-		}, 150);
-	}
 
 	onStartUp(context).catch(() => { });
 	inlineBlameController.refresh();

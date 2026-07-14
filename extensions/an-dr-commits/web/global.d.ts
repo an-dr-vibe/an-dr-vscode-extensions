@@ -16,6 +16,7 @@ declare global {
 	type Config = GG.CommitsViewConfig;
 
 	const initialState: GG.CommitsViewInitialState;
+	const restoredState: WebViewState | null;
 	const globalState: GG.DeepReadonly<GG.CommitsViewGlobalState>;
 	const workspaceState: GG.DeepReadonly<GG.CommitsViewWorkspaceState>;
 

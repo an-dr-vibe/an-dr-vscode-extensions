@@ -57,6 +57,7 @@ export class TabView extends Disposable {
 	private currentRepo: string | null = null;
 	private sourceControlRepos: Set<string> | null = null;
 	private loadViewTo: LoadCommitsViewTo = null; // Is used by the next call to getHtmlForWebview, and is then reset to null
+	private restoredState: unknown = null;
 
 	private loadRepoInfoRefreshId: number = 0;
 	private loadCommitsRefreshId: number = 0;
@@ -127,17 +128,11 @@ export class TabView extends Disposable {
 		}
 	}
 
-	public static revive(panel: vscode.WebviewPanel, extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger) {
+	public static revive(panel: vscode.WebviewPanel, state: unknown, extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger) {
 		if (TabView.currentPanel) {
 			TabView.currentPanel.dispose();
 		}
-		TabView.currentPanel = new TabView(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, null, panel.viewColumn, panel, true);
-	}
-
-	public static recoverOrphanedPanelIfNeeded(logger: Logger) {
-		if (!TabView.currentPanel) return;
-		logger.logWarning('TabView detected orphaned panel [' + TabView.currentPanel.instanceId + '], disposing stale panel handle.');
-		TabView.currentPanel.dispose();
+		TabView.currentPanel = new TabView(extensionPath, dataSource, extensionState, avatarManager, repoManager, logger, null, panel.viewColumn, panel, state);
 	}
 
 	/**
@@ -151,7 +146,7 @@ export class TabView extends Disposable {
 	 * @param loadViewTo What to load the view to.
 	 * @param column The column the view should be loaded in.
 	 */
-	private constructor(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadCommitsViewTo, column: vscode.ViewColumn | undefined, existingPanel?: vscode.WebviewPanel, restoredFromSerializer: boolean = false) {
+	private constructor(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, logger: Logger, loadViewTo: LoadCommitsViewTo, column: vscode.ViewColumn | undefined, existingPanel?: vscode.WebviewPanel, restoredState: unknown = null) {
 		super();
 		this.extensionPath = extensionPath;
 		this.avatarManager = avatarManager;
@@ -161,6 +156,7 @@ export class TabView extends Disposable {
 		this.repoManager = repoManager;
 		this.logger = logger;
 		this.loadViewTo = loadViewTo;
+		this.restoredState = restoredState;
 
 		const config = getConfig();
 		if (existingPanel) {
@@ -178,7 +174,6 @@ export class TabView extends Disposable {
 			// Keep the Commits tab pinned so branch checkouts that reload editors don't replace it.
 			void vscode.commands.executeCommand('workbench.action.keepEditor');
 		}
-		this.extensionState.setReopenCommitsOnStartup(true);
 		this.isPanelVisible = this.panel.visible;
 		this.panel.iconPath = config.tabIconColourTheme === TabIconColourTheme.Colour
 			? this.getResourcesUri('webview-icon.svg')
@@ -196,10 +191,7 @@ export class TabView extends Disposable {
 			}),
 
 			// Dispose this Commits View when the Webview Panel is disposed
-			this.panel.onDidDispose(() => {
-				this.extensionState.setReopenCommitsOnStartup(false);
-				this.dispose();
-			}),
+			this.panel.onDidDispose(() => this.dispose()),
 
 			// Register a callback that is called when the view is shown or hidden
 			this.panel.onDidChangeViewState(() => {
@@ -328,15 +320,8 @@ export class TabView extends Disposable {
 
 		// Render the content of the Webview
 		this.update();
-		if (loadViewTo !== null) {
-			setTimeout(() => {
-				if (this.isDisposed()) return;
-				this.logger.logDebug('Re-sending requested repo to Commits webview after initial render: ' + loadViewTo.repo);
-				this.respondLoadRepos(this.repoManager.getRepos(), loadViewTo);
-			}, 300);
-		}
 
-		this.logger.log((restoredFromSerializer ? 'Restored' : 'Created') + ' Commits View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
+		this.logger.log((existingPanel ? 'Restored' : 'Created') + ' Commits View [' + this.instanceId + ']' + (loadViewTo !== null ? ' (active repo: ' + loadViewTo.repo + ')' : ''));
 	}
 
 	/** Refreshes only the data invalidated by a repository file event. */
@@ -728,6 +713,7 @@ export class TabView extends Disposable {
 			viewName: TabView.NAME,
 			gitExecutableUnknown: this.dataSource.isGitExecutableUnknown(),
 			initialState: initialState,
+			restoredState: this.restoredState,
 			globalState: globalState,
 			workspaceState: workspaceState,
 			unableToFindGitMessage: UNABLE_TO_FIND_GIT_MSG,
@@ -736,6 +722,7 @@ export class TabView extends Disposable {
 		});
 		this.isGraphViewLoaded = html.isGraphViewLoaded;
 		this.loadViewTo = null;
+		this.restoredState = null;
 		return html.html;
 	}
 

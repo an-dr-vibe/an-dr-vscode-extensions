@@ -1,4 +1,4 @@
-import { getDuplicateTabsToClose, getMatchingTabs, isMatchingWebviewTab } from '../src/editorTabUtils';
+import { getMatchingTabs, isMatchingWebviewTab } from '../src/editorTabUtils';
 
 describe('editorTabUtils', () => {
 	const viewTypes = new Set(['an-dr-commits', 'mainThreadWebview-an-dr-commits']);
@@ -24,34 +24,4 @@ describe('editorTabUtils', () => {
 		expect(matchingTabs).toHaveLength(2);
 	});
 
-	it('Returns duplicate Commits tabs when the active tab is Commits', () => {
-		const activeTab = { label: 'Commits' };
-		const duplicateTab = { input: { viewType: 'an-dr-commits' }, label: 'Commits' };
-
-		const duplicates = getDuplicateTabsToClose({
-			all: [
-				{ tabs: [activeTab] },
-				{ tabs: [duplicateTab] }
-			],
-			activeTabGroup: {
-				activeTab
-			}
-		}, (tab) => isMatchingWebviewTab(tab, viewTypes, 'Commits'));
-
-		expect(duplicates).toStrictEqual([duplicateTab]);
-	});
-
-	it('Does not close anything when Commits is not the active tab', () => {
-		const duplicates = getDuplicateTabsToClose({
-			all: [
-				{ tabs: [{ label: 'Commits' }] },
-				{ tabs: [{ input: { viewType: 'an-dr-commits' }, label: 'Commits' }] }
-			],
-			activeTabGroup: {
-				activeTab: { label: 'Readme' }
-			}
-		}, (tab) => isMatchingWebviewTab(tab, viewTypes, 'Commits'));
-
-		expect(duplicates).toStrictEqual([]);
-	});
 });

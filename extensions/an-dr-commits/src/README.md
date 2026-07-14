@@ -30,7 +30,7 @@ full architecture writeup and message-protocol data flows.
 | `config.ts` | Reads VS Code settings into typed config objects |
 | `extensionState.ts` | Persists view state across sessions |
 | `avatarManager.ts` | Fetches and caches author avatars |
-| `editorTabUtils.ts` | Detects duplicate/orphaned Commits editor tabs by matching VS Code `tabGroups` entries |
+| `editorTabUtils.ts` | Matches existing Commits editor tabs for the explicit-open duplicate safeguard |
 | `statusBarItem.ts` | The status bar button that opens the graph |
 | `inlineBlame.ts` | Active editor inline blame + optional status bar current-commit display |
 | `diffDocProvider.ts` | Virtual document provider for diff views |

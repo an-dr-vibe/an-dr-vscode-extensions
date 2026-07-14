@@ -19,13 +19,3 @@ export function getMatchingTabs(tabGroups: any, isMatchingTab: (tab: any) => boo
 
 	return matchingTabs;
 }
-
-export function getDuplicateTabsToClose(tabGroups: any, isMatchingTab: (tab: any) => boolean): any[] {
-	const matchingTabs = getMatchingTabs(tabGroups, isMatchingTab);
-	if (matchingTabs.length < 2) return [];
-
-	const activeTab = tabGroups?.activeTabGroup?.activeTab;
-	if (!isMatchingTab(activeTab)) return [];
-
-	return matchingTabs.filter((tab) => tab !== activeTab);
-}

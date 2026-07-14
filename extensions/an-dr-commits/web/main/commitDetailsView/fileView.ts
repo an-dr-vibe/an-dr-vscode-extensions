@@ -292,7 +292,8 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 			newFilePath: workingTreeChange.path,
 			type: <GG.GitFileStatus>workingTreeChange.status,
 			additions: workingTreeChange.additions,
-			deletions: workingTreeChange.deletions
+			deletions: workingTreeChange.deletions,
+			submodule: null
 		};
 		return { file, fromHash: UNCOMMITTED, toHash: UNCOMMITTED, fileStatus: file.type };
 	}

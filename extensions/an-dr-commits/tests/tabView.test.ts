@@ -510,9 +510,82 @@ describe('TabView', () => {
 			spyOnRepoFileWatcherUnmute = jest.spyOn(TabView.currentPanel!['repoFileWatcher'], 'unmute');
 		});
 
-		afterEach(() => {
-			expect(spyOnRepoFileWatcherMute).toHaveBeenCalledWith();
-			expect(spyOnRepoFileWatcherUnmute).toHaveBeenCalledWith();
+		// Mute/unmute of the repo file watcher is asserted once for each message category (see
+		// 'message handling categories' below): repository-mutating messages are serialized with
+		// the watcher muted, read-only messages run concurrently without touching the watcher.
+		describe('message handling categories', () => {
+			it('Should mute the file watcher while handling a repository-mutating message, and unmute it afterwards', async () => {
+				// Setup
+				const spyOnAddRemote = jest.spyOn(dataSource, 'addRemote');
+				spyOnAddRemote.mockResolvedValueOnce(null);
+
+				// Run
+				onDidReceiveMessage({
+					command: 'addRemote',
+					repo: '/path/to/repo',
+					name: 'origin',
+					url: 'url',
+					pushUrl: 'pushUrl',
+					fetch: true
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnRepoFileWatcherMute).toHaveBeenCalledWith();
+					expect(spyOnRepoFileWatcherUnmute).toHaveBeenCalledWith();
+				});
+			});
+
+			it('Should not mute the file watcher for a read-only message', async () => {
+				// Setup
+				const spyOnGetConfig = jest.spyOn(dataSource, 'getConfig');
+				spyOnGetConfig.mockResolvedValueOnce({ config: null, error: null });
+
+				// Run
+				onDidReceiveMessage({
+					command: 'loadConfig',
+					repo: '/path/to/repo',
+					remotes: []
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnGetConfig).toHaveBeenCalledWith('/path/to/repo', []);
+				});
+				expect(spyOnRepoFileWatcherMute).not.toHaveBeenCalled();
+				expect(spyOnRepoFileWatcherUnmute).not.toHaveBeenCalled();
+			});
+
+			it('Should continue handling messages after a mutating handler throws', async () => {
+				// Setup
+				const spyOnAddRemote = jest.spyOn(dataSource, 'addRemote');
+				spyOnAddRemote.mockRejectedValueOnce(new Error('unexpected failure'));
+				spyOnAddRemote.mockResolvedValueOnce(null);
+				const message = {
+					command: 'addRemote' as const,
+					repo: '/path/to/repo',
+					name: 'origin',
+					url: 'url',
+					pushUrl: 'pushUrl',
+					fetch: true
+				};
+
+				// Run
+				onDidReceiveMessage(message);
+				onDidReceiveMessage(message);
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnAddRemote).toHaveBeenCalledTimes(2);
+					expect(spyOnRepoFileWatcherUnmute).toHaveBeenCalledTimes(2);
+					expect(messages).toStrictEqual([
+						{
+							command: 'addRemote',
+							error: null
+						}
+					]);
+				});
+			});
 		});
 
 		describe('addRemote', () => {

@@ -208,9 +208,13 @@ export class DataSource extends Disposable {
 		const config = getConfig();
 		return Promise.all([
 			this.getLog(repo, branches, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes),
-			this.getRefs(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage)
+			this.getRefs(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage),
+			// Fetched in parallel with the log so the (often slow on large working trees) status
+			// call doesn't extend the view's load time; a failure only hides the uncommitted row.
+			config.showUncommittedChanges ? this.getUncommittedChanges(repo).catch(() => 0) : Promise.resolve(0)
 		]).then(async (results) => {
 			let commits: GitCommitRecord[] = results[0], refData: GitRefData | string = results[1], i;
+			const numUncommittedChanges = results[2];
 			let moreCommitsAvailable = commits.length === maxCommits + 1;
 			if (moreCommitsAvailable) commits.pop();
 
@@ -226,13 +230,10 @@ export class DataSource extends Disposable {
 				}
 			}
 
-			if (refData.head !== null && config.showUncommittedChanges) {
+			if (refData.head !== null && config.showUncommittedChanges && numUncommittedChanges > 0) {
 				for (i = 0; i < commits.length; i++) {
 					if (refData.head === commits[i].hash) {
-						const numUncommittedChanges = await this.getUncommittedChanges(repo);
-						if (numUncommittedChanges > 0) {
-							commits.unshift({ hash: UNCOMMITTED, parents: [refData.head], author: '*', email: '', date: Math.round((new Date()).getTime() / 1000), message: 'Uncommitted Changes (' + numUncommittedChanges + ')' });
-						}
+						commits.unshift({ hash: UNCOMMITTED, parents: [refData.head], author: '*', email: '', date: Math.round((new Date()).getTime() / 1000), message: 'Uncommitted Changes (' + numUncommittedChanges + ')' });
 						break;
 					}
 				}

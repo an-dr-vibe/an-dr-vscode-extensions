@@ -176,6 +176,17 @@ const sidebarBundle = buildJsBundle({
 // above only reads back the tmp files it just wrote) - safe to delete the whole compiled tree.
 allCompiledJsFiles.forEach((filePath) => fs.unlinkSync(filePath));
 
+// Deleting the compiled tree leaves tsc's directory skeleton behind - remove any dirs that are
+// now empty so media/ only contains the bundles and the codicon font.
+function removeEmptyDirsRecursive(dir) {
+	fs.readdirSync(dir).forEach((entry) => {
+		const full = path.join(dir, entry);
+		if (fs.statSync(full).isDirectory()) removeEmptyDirsRecursive(full);
+	});
+	if (dir !== MEDIA_DIRECTORY && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+}
+removeEmptyDirsRecursive(MEDIA_DIRECTORY);
+
 Promise.all([tabBundle, sidebarBundle]).catch((err) => {
 	console.log('ERROR:');
 	console.log(err);

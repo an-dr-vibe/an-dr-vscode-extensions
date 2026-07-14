@@ -2328,6 +2328,7 @@ describe('DataSource', () => {
 			// Setup
 			mockGitSuccessOnce('\n');
 			mockGitThrowingErrorOnce();
+			mockGitThrowingErrorOnce(); // The uncommitted-changes status call is spawned in parallel with the log, and also fails in an empty repository
 			vscode.mockExtensionSettingReturnValue('repository.showCommitsOnlyReferencedByTags', true);
 			vscode.mockExtensionSettingReturnValue('repository.showRemoteHeads', true);
 
@@ -2342,7 +2343,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toHaveBeenCalledTimes(2);
+			expect(spyOnSpawn).toHaveBeenCalledTimes(3);
 		});
 
 		it('Should return the commits (ignoring invalid show-ref records)', async () => {

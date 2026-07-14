@@ -139,9 +139,12 @@ export class SidebarView implements vscode.Disposable {
 
 		const attach = (api: any) => {
 			this._api = api;
+			// Badge updates instantly (native API state, no git spawn); the panel's own git
+			// fetches go through _scheduleRefresh so rapid events (editor switches, vscode.git
+			// state churn) coalesce instead of spawning git per event.
 			const update = () => {
 				this._updateBadge();
-				void this._refreshPanel();
+				this._scheduleRefresh();
 			};
 
 			for (const repo of api.repositories) {

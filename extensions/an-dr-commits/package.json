@@ -32,7 +32,7 @@
 		"workspace"
 	],
 	"activationEvents": [
-		"*"
+		"onStartupFinished"
 	],
 	"extensionDependencies": [
 		"vscode.git"

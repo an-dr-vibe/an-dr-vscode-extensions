@@ -61,6 +61,21 @@ export class TabView extends Disposable {
 	private loadRepoInfoRefreshId: number = 0;
 	private loadCommitsRefreshId: number = 0;
 	private messageHandlerChain: Promise<void> = Promise.resolve();
+
+	/**
+	 * Commands that never modify the repository (no Git index / working tree / ref writes).
+	 * They are handled concurrently - outside the mutating-message chain and without muting
+	 * the repo file watcher - so a long-running action never blocks reading data.
+	 */
+	private static readonly READ_ONLY_COMMANDS: ReadonlySet<RequestMessage['command']> = new Set<RequestMessage['command']>([
+		'commitDetails', 'compareCommits', 'copyFilePath', 'copyToClipboard', 'createPullRequest',
+		'fetchAvatar', 'getFileDiff', 'getFullDiffContent', 'loadCommits', 'loadConfig',
+		'loadRepoInfo', 'loadRepos', 'loadWorkingTreeChanges', 'openExtensionSettings',
+		'openExternalUrl', 'openFile', 'rescanForRepos', 'resolveSidebarTagContext',
+		'sendToCodeReview', 'setColumnVisibility', 'setGlobalViewState', 'setRepoState',
+		'setRepoStarred', 'setWorkspaceViewState', 'showErrorMessage', 'tagDetails',
+		'viewDiff', 'viewDiffWithWorkingFile', 'viewFileAtRevision', 'viewScm'
+	]);
 	private readonly repoLifecycleCtx: RepoLifecycleActionContext;
 	private readonly branchRemoteCtx: BranchRemoteActionContext;
 	private readonly tagStashCtx: TagStashActionContext;
@@ -227,11 +242,16 @@ export class TabView extends Disposable {
 				});
 			}),
 
-			// Respond to messages sent from the Webview
-			// Chain each handler on the previous one so only one runs at a time, preventing
+			// Respond to messages sent from the Webview. Read-only requests run concurrently, so a
+			// long-running action (fetch, rebase, ...) never blocks the view from loading data.
+			// Repository-mutating requests are chained so only one runs at a time, preventing
 			// concurrent git operations from racing for index.lock.
-			this.panel.webview.onDidReceiveMessage((msg) => {
-				this.messageHandlerChain = this.messageHandlerChain.then(() => this.respondToMessage(msg));
+			this.panel.webview.onDidReceiveMessage((msg: RequestMessage) => {
+				if (TabView.READ_ONLY_COMMANDS.has(msg.command)) {
+					this.respondToMessage(msg).catch((error) => this.logger.logError('Unable to handle "' + msg.command + '" message: ' + String(error)));
+				} else {
+					this.messageHandlerChain = this.messageHandlerChain.then(() => this.respondToMutatingMessage(msg));
+				}
 			}),
 
 			TabView.onDidChangeRepoSelection !== null
@@ -324,12 +344,27 @@ export class TabView extends Disposable {
 	}
 
 	/**
+	 * Respond to a repository-mutating message: the repo file watcher is muted to suppress
+	 * self-inflicted refresh events, and errors are contained so a failing handler can never
+	 * leave the watcher muted or poison the message chain (which would drop all later messages).
+	 * @param msg The message that was received.
+	 */
+	private async respondToMutatingMessage(msg: RequestMessage) {
+		this.repoFileWatcher.mute();
+		try {
+			await this.respondToMessage(msg);
+		} catch (error) {
+			this.logger.logError('Unable to handle "' + msg.command + '" message: ' + String(error));
+		} finally {
+			this.repoFileWatcher.unmute();
+		}
+	}
+
+	/**
 	 * Respond to a message sent from the front-end.
 	 * @param msg The message that was received.
 	 */
 	private async respondToMessage(msg: RequestMessage) {
-		this.repoFileWatcher.mute();
-
 		switch (msg.command) {
 			case 'addRemote':
 				await handleAddRemote(this.branchRemoteCtx, msg);
@@ -575,8 +610,6 @@ export class TabView extends Disposable {
 				handleSendToCodeReview(this.miscCtx, msg);
 				break;
 		}
-
-		this.repoFileWatcher.unmute();
 	}
 
 	/**

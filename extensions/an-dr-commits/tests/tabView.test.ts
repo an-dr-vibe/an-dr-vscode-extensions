@@ -34,6 +34,7 @@ describe('TabView', () => {
 	let repoManager: RepoManager;
 
 	let spyOnLog: jest.SpyInstance;
+	let spyOnLogDebug: jest.SpyInstance;
 	let spyOnLogError: jest.SpyInstance;
 	let spyOnGetRepos: jest.SpyInstance;
 	let spyOnIsGitExecutableUnknown: jest.SpyInstance;
@@ -51,6 +52,7 @@ describe('TabView', () => {
 		repoManager = new RepoManager(dataSource, extensionState, onDidChangeConfiguration.subscribe, logger);
 
 		spyOnLog = jest.spyOn(logger, 'log');
+		spyOnLogDebug = jest.spyOn(logger, 'logDebug');
 		spyOnLogError = jest.spyOn(logger, 'logError');
 		spyOnGetRepos = jest.spyOn(repoManager, 'getRepos');
 		spyOnIsGitExecutableUnknown = jest.spyOn(dataSource, 'isGitExecutableUnknown');
@@ -103,7 +105,7 @@ describe('TabView', () => {
 				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))],
 				retainContextWhenHidden: true
 			});
-			expect(spyOnLog).toHaveBeenCalledWith('Created Commits View');
+			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Created Commits View \[\d+\]$/));
 		});
 
 		it('Should pin the Commits tab when constructing a new WebviewPanel', () => {
@@ -191,7 +193,7 @@ describe('TabView', () => {
 
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-			expect(spyOnLog).toHaveBeenCalledWith('Created Commits View (active repo: /path/to/repo)');
+			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Created Commits View \[\d+\] \(active repo: \/path\/to\/repo\)$/));
 			expect(mockedWebviewPanel.panel.webview.html).toContain('"loadViewTo":{"repo":"/path/to/repo"}');
 		});
 
@@ -208,7 +210,7 @@ describe('TabView', () => {
 				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))],
 				retainContextWhenHidden: true
 			});
-			expect(spyOnLog).toHaveBeenCalledWith('Created Commits View');
+			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Created Commits View \[\d+\]$/));
 		});
 
 		it('Should construct a WebviewPanel with retainContextWhenHidden set to TRUE', () => {
@@ -224,7 +226,7 @@ describe('TabView', () => {
 				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))],
 				retainContextWhenHidden: true
 			});
-			expect(spyOnLog).toHaveBeenCalledWith('Created Commits View');
+			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Created Commits View \[\d+\]$/));
 		});
 
 		it('Should construct a WebviewPanel with retainContextWhenHidden set to FALSE', () => {
@@ -240,7 +242,7 @@ describe('TabView', () => {
 				localResourceRoots: [vscode.Uri.file(path.join('/path/to/extension', 'media'))],
 				retainContextWhenHidden: false
 			});
-			expect(spyOnLog).toHaveBeenCalledWith('Created Commits View');
+			expect(spyOnLog).toHaveBeenCalledWith(expect.stringMatching(/^Created Commits View \[\d+\]$/));
 		});
 
 		it('Should construct a WebviewPanel with a colour icon', () => {
@@ -1866,7 +1868,7 @@ describe('TabView', () => {
 				const rewordCommitResolvedValue = null;
 				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
 				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
-				const spyOnScheduleReopen = jest.spyOn<any, any>(TabView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				const spyOnScheduleReopen = jest.fn();
 				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce(promptForRewordCommitMessageResolvedValue);
 				spyOnRewordCommit.mockResolvedValueOnce(rewordCommitResolvedValue);
 
@@ -1917,7 +1919,7 @@ describe('TabView', () => {
 				// Setup
 				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
 				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
-				const spyOnScheduleReopen = jest.spyOn<any, any>(TabView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				const spyOnScheduleReopen = jest.fn();
 				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce({ message: null, error: null });
 
 				// Run
@@ -1948,7 +1950,7 @@ describe('TabView', () => {
 				const squashCommitsResolvedValue = null;
 				const spyOnPromptForSquashCommitMessage = jest.spyOn(dataSource, 'promptForSquashCommitMessage');
 				const spyOnSquashCommits = jest.spyOn(dataSource, 'squashCommits');
-				const spyOnScheduleReopen = jest.spyOn<any, any>(TabView.currentPanel as any, 'scheduleReopenAfterUnexpectedClose');
+				const spyOnScheduleReopen = jest.fn();
 				spyOnPromptForSquashCommitMessage.mockResolvedValueOnce(promptForSquashCommitMessageResolvedValue);
 				spyOnSquashCommits.mockResolvedValueOnce(squashCommitsResolvedValue);
 
@@ -3215,6 +3217,10 @@ describe('TabView', () => {
 					expect(messages).toStrictEqual([
 						{
 							command: 'pushBranch',
+							repo: '/path/to/repo',
+							branchName: 'develop',
+							remotes: ['origin'],
+							setUpstream: true,
 							willUpdateBranchConfig: false,
 							errors: pushBranchToMultipleRemotesResolvedValue
 						}
@@ -3628,7 +3634,7 @@ describe('TabView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnViewDiff).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', 'old-file.txt', 'new-file.txt', GitFileStatus.Renamed);
+					expect(spyOnViewDiff).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', 'old-file.txt', 'new-file.txt', GitFileStatus.Renamed, undefined);
 					expect(messages).toStrictEqual([
 						{
 							command: 'viewDiff',
@@ -3725,6 +3731,7 @@ describe('TabView', () => {
 		beforeEach(() => {
 			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 			spyOnLog.mockReset();
+			spyOnLogDebug.mockReset();
 			spyOnLogError.mockReset();
 		});
 
@@ -3792,7 +3799,7 @@ describe('TabView', () => {
 					command: 'viewScm',
 					error: null
 				});
-				expect(spyOnLog).toHaveBeenCalledWith('The Commits View was disposed while sending "viewScm" message.');
+				expect(spyOnLogDebug).toHaveBeenCalledWith('The Commits View was disposed while sending "viewScm" message.');
 				expect(spyOnLogError).not.toHaveBeenCalled();
 			});
 		});
@@ -3812,7 +3819,7 @@ describe('TabView', () => {
 			// Assert
 			await waitForExpect(() => {
 				expect(mockedWebviewPanel.panel.webview.postMessage).not.toHaveBeenCalled();
-				expect(spyOnLog).toHaveBeenCalledWith('The Commits View has already been disposed, ignored sending "viewScm" message.');
+				expect(spyOnLogDebug).toHaveBeenCalledWith('The Commits View has already been disposed, ignored sending "viewScm" message.');
 				expect(spyOnLogError).not.toHaveBeenCalled();
 			});
 		});
@@ -3911,7 +3918,7 @@ describe('TabView', () => {
 		afterEach(() => {
 			// Assert
 			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-			expect(mockedWebviewPanel.panel.webview.html).toContain('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src vscode-webview-resource: \'unsafe-inline\'; script-src \'nonce-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d\'; img-src data:;">');
+			expect(mockedWebviewPanel.panel.webview.html).toContain('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src vscode-webview-resource: \'unsafe-inline\'; font-src vscode-webview-resource:; script-src \'nonce-1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d\'; img-src data:;">');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<link rel="stylesheet" type="text/css" href="vscode-webview-resource://file///path/to/extension/media/out.min.css">');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<title>Commits</title>');
 			expect(mockedWebviewPanel.panel.webview.html).toContain('<style>body{--an-dr-commits-color0:#6ba2f2; --an-dr-commits-color1:#ca3a7d; --an-dr-commits-color2:#f3b33e; --an-dr-commits-color3:#61aea6; --an-dr-commits-color4:#ac70f7; } [data-color=\"0\"]{--an-dr-commits-color:var(--an-dr-commits-color0);} [data-color=\"1\"]{--an-dr-commits-color:var(--an-dr-commits-color1);} [data-color=\"2\"]{--an-dr-commits-color:var(--an-dr-commits-color2);} [data-color=\"3\"]{--an-dr-commits-color:var(--an-dr-commits-color3);} [data-color=\"4\"]{--an-dr-commits-color:var(--an-dr-commits-color4);} </style>');

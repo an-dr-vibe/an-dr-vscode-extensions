@@ -49,14 +49,22 @@ beforeAll(() => {
 	spyOnStat = jest.spyOn(fs, 'stat');
 	spyOnWriteFile = jest.spyOn(fs, 'writeFile');
 
-	spyOnReadFile.mockImplementation((_: string, callback: (err: NodeJS.ErrnoException | null, data: Buffer) => void) => {
-		callback(new Error(), Buffer.alloc(0));
-	});
-
 	jest.spyOn(bufferedQueue, 'BufferedQueue').mockImplementation(<T>(onItem: (item: T) => Promise<boolean>, onChanges: () => void) => {
 		const realBufferedQueue = jest.requireActual('../src/utils/bufferedQueue');
 		return new realBufferedQueue.BufferedQueue(onItem, onChanges, 1);
 	});
+});
+
+beforeEach(() => {
+	spyOnRepoRoot.mockReset().mockResolvedValue(null);
+	spyOnGetSubmodules.mockReset().mockResolvedValue([]);
+	spyOnMkdir.mockReset();
+	spyOnReaddir.mockReset();
+	spyOnReadFile.mockReset().mockImplementation((_: string, callback: (err: NodeJS.ErrnoException | null, data: Buffer) => void) => {
+		callback(new Error(), Buffer.alloc(0));
+	});
+	spyOnStat.mockReset();
+	spyOnWriteFile.mockReset();
 });
 
 afterAll(() => {
@@ -387,11 +395,15 @@ describe('RepoManager', () => {
 	describe('startupTasks', () => {
 		it('Should run startup tasks', async () => {
 			// Setup
-			mockRepositoryWithNoSubmodules(); // Exists: /path/to/workspace-folder1/repo1
-			mockDirectoryThatsNotRepository(); // Removed: Re/path/to/workspace-folder1/repo2
-			mockRepositoryWithNoSubmodules(); // Exists: /path/to/another
-			mockDirectoryThatsNotRepository(); // Not Repo: /path/to/workspace-folder1
-			mockRepositoryWithNoSubmodules(); // New: /path/to/workspace-folder3
+			const roots: { [repo: string]: string | null } = {
+				'/path/to/workspace-folder1/repo1': '/path/to/workspace-folder1/repo1',
+				'/path/to/workspace-folder1/repo2': null,
+				'/path/to/another': '/path/to/another',
+				'/path/to/workspace-folder1': null,
+				'/path/to/another/workspace-folder': '/path/to/another',
+				'/path/to/workspace-folder3': '/path/to/workspace-folder3'
+			};
+			spyOnRepoRoot.mockImplementation((repo) => Promise.resolve(roots[repo] ?? null));
 
 			// Run
 			const repoManager = await constructRepoManagerAndWaitUntilStarted(
@@ -587,14 +599,15 @@ describe('RepoManager', () => {
 
 		it('Shouldn\'t remove repositories that contain a workspace folder', async () => {
 			// Setup
-			mockRepositoryWithNoSubmodules();
+			spyOnRepoRoot.mockImplementation((repo) => Promise.resolve(repo === '/path/to/workspace-folder1' ? '/path/to' : repo));
 
 			// Run
 			const repoManager = await constructRepoManagerAndWaitUntilStarted(['/path/to/workspace-folder1'], ['/path/to']);
 
 			// Assert
-			expect(spyOnRepoRoot).toHaveBeenCalledTimes(1);
+			expect(spyOnRepoRoot).toHaveBeenCalledTimes(2);
 			expect(spyOnRepoRoot).toHaveBeenCalledWith('/path/to');
+			expect(spyOnRepoRoot).toHaveBeenCalledWith('/path/to/workspace-folder1');
 			expect(repoManager.getRepos()).toStrictEqual({
 				'/path/to': mockRepoState({ workspaceFolderIndex: 0 })
 			});
@@ -1670,7 +1683,7 @@ describe('RepoManager', () => {
 
 		it('Should remove a repository when a repository is deleted', async () => {
 			// Setup
-			mockFsStatOnce(new Error(), true);
+			mockMissingPath();
 
 			// Run
 			emitOnDidChange(vscode.Uri.file('/path/to/workspace-folder1/repo'));
@@ -1695,7 +1708,7 @@ describe('RepoManager', () => {
 
 		it('Should remove a repository when a .git directory is deleted', async () => {
 			// Setup
-			mockFsStatOnce(new Error(), true);
+			mockMissingPath();
 
 			// Run
 			emitOnDidChange(vscode.Uri.file('/path/to/workspace-folder1/repo/.git'));
@@ -1748,7 +1761,7 @@ describe('RepoManager', () => {
 
 		it('Shouldn\'t remove a repository when a directory is removed, but it doesn\'t contain any repositories', async () => {
 			// Setup
-			mockFsStatOnce(new Error(), true);
+			mockMissingPath();
 
 			// Run
 			emitOnDidChange(vscode.Uri.file('/path/to/workspace-folder1/dir/repo'));
@@ -1782,9 +1795,10 @@ describe('RepoManager', () => {
 			const emitOnDidDelete = (<jest.Mock<any, any>>repoManager['folderWatchers']['/path/to/workspace-folder1'].onDidDelete).mock.calls[0][0];
 			const onDidChangeReposEvents: RepoChangeEvent[] = [];
 			repoManager.onDidChangeRepos((event) => onDidChangeReposEvents.push(event));
+			mockMissingPath();
 
 			// Run
-			emitOnDidDelete(vscode.Uri.file('/path/to/workspace-folder1/dir'));
+			await emitOnDidDelete(vscode.Uri.file('/path/to/workspace-folder1/dir'));
 
 			// Assert
 			expect(spyOnLog).toHaveBeenCalledWith('Removed repo: /path/to/workspace-folder1/dir/repo1');
@@ -1820,9 +1834,10 @@ describe('RepoManager', () => {
 			const emitOnDidDelete = (<jest.Mock<any, any>>repoManager['folderWatchers']['/path/to/workspace-folder1'].onDidDelete).mock.calls[0][0];
 			const onDidChangeReposEvents: RepoChangeEvent[] = [];
 			repoManager.onDidChangeRepos((event) => onDidChangeReposEvents.push(event));
+			mockMissingPath();
 
 			// Run
-			emitOnDidDelete(vscode.Uri.file('/path/to/workspace-folder1/repo1/.git'));
+			await emitOnDidDelete(vscode.Uri.file('/path/to/workspace-folder1/repo1/.git'));
 
 			// Assert
 			expect(spyOnLog).toHaveBeenCalledWith('Removed repo: /path/to/workspace-folder1/repo1');
@@ -2108,7 +2123,7 @@ describe('RepoManager', () => {
 			expect(repoManager.getRepos()).toStrictEqual({
 				'/path/to/workspace-folder1/repo': mockRepoState({ workspaceFolderIndex: 0 })
 			});
-			expect(spyOnIsKnownRepo).toHaveBeenCalledTimes(1);
+			expect(spyOnIsKnownRepo).toHaveBeenCalledTimes(2);
 
 			// Teardown
 			repoManager.dispose();
@@ -2129,7 +2144,7 @@ describe('RepoManager', () => {
 			expect(repoManager.getRepos()).toStrictEqual({
 				'/path/to/workspace-folder1/repo': mockRepoState({ workspaceFolderIndex: 0 })
 			});
-			expect(spyOnIsKnownRepo).toHaveBeenCalledTimes(1);
+			expect(spyOnIsKnownRepo).toHaveBeenCalledTimes(2);
 
 			// Teardown
 			repoManager.dispose();
@@ -2557,6 +2572,10 @@ function mockFsStatOnce(err: NodeJS.ErrnoException | null, isDirectory: boolean)
 	spyOnStat.mockImplementationOnce((_: string, callback: (err: NodeJS.ErrnoException | null, stats: fs.Stats) => void) => {
 		callback(err, { isDirectory: () => isDirectory } as any as fs.Stats);
 	});
+}
+
+function mockMissingPath() {
+	for (let i = 0; i < 3; i++) mockFsStatOnce(new Error(), false);
 }
 
 function mockFsMkdirOnce(err: NodeJS.ErrnoException | null) {

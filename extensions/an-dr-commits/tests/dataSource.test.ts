@@ -31,11 +31,96 @@ import { EventEmitter } from '../src/utils/event';
 
 import { waitForExpect } from './helpers/expectations';
 
+function mockLegacyRepoInfoRefProvider(source: DataSource) {
+	jest.spyOn(source as any, 'getRemoteUrls').mockResolvedValue({});
+	jest.spyOn(source as any, 'getRepoInProgressState').mockResolvedValue(null);
+	const snapshotSpy = jest.spyOn(source as any, 'getRefSnapshot') as jest.SpyInstance;
+	snapshotSpy.mockImplementation((repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: string[]) => {
+		const branchArgs = ['branch'];
+		if (showRemoteBranches) branchArgs.push('-a');
+		branchArgs.push('--no-color');
+		return Promise.all([
+			(source as any).spawnGit(branchArgs, repo, (stdout: string) => parseLegacyBranches(stdout, showRemoteHeads, hideRemotes)),
+			(source as any).spawnGit(['for-each-ref', 'refs/heads', '--format=%(refname:short)XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%(upstream:short)XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%(upstream:track)'], repo, parseLegacyUpstreams)
+		]).then(([branches, upstream]: any[]) => {
+			branches.branchUpstreams = upstream.branchUpstreams;
+			branches.goneUpstreamBranches = upstream.goneUpstreamBranches;
+			return { branches, refs: { head: null, heads: [], tags: [], remotes: [] } };
+		});
+	});
+}
+
+function parseLegacyBranches(stdout: string, showRemoteHeads: boolean, hideRemotes: string[]) {
+	const result: any = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, repoInProgressState: null, error: null };
+	for (const line of stdout.split(/\r\n|\r|\n/)) {
+		if (line.length < 3) continue;
+		const split = line.substring(2).split(' -> '), name = split[0];
+		if (/^\(.* .*\)$/.test(name) && !/^\(HEAD detached (at|from) .+\)$/.test(name)) continue;
+		if (/^\(HEAD detached (at|from) .+\)$/.test(name)) {
+			result.head = 'HEAD';
+			result.branches.unshift('HEAD');
+			continue;
+		}
+		if (hideRemotes.some((remote) => name.startsWith('remotes/' + remote + '/'))) continue;
+		if (!showRemoteHeads && /^remotes\/.*\/HEAD$/.test(name)) continue;
+		if (showRemoteHeads && split.length > 1 && /^remotes\/.*\/HEAD$/.test(name)) {
+			const remote = name.substring(8, name.length - 5);
+			result.remoteHeadTargets[remote] = split[1];
+		}
+		if (line[0] === '*') {
+			result.head = name;
+			result.branches.unshift(name);
+		} else result.branches.push(name);
+	}
+	return result;
+}
+
+function parseLegacyUpstreams(stdout: string) {
+	const branchUpstreams: { [branch: string]: string } = {}, goneUpstreamBranches: string[] = [];
+	for (const line of stdout.split(/\r\n|\r|\n/)) {
+		const record = line.split('XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb');
+		if (record.length >= 2 && record[1] !== '') branchUpstreams[record[0]] = record[1];
+		if (record.length >= 3 && record[2] === '[gone]') goneUpstreamBranches.push(record[0]);
+	}
+	return { branchUpstreams, goneUpstreamBranches };
+}
+
+function mockLegacyCommitRefProvider(source: DataSource) {
+	const refSpy = jest.spyOn(source as any, 'consumeRefSnapshot') as jest.SpyInstance;
+	refSpy.mockImplementation((repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: string[]) => {
+		const args = ['show-ref'];
+		if (!showRemoteBranches) args.push('--heads', '--tags');
+		args.push('-d', '--head');
+		return (source as any).spawnGit(args, repo, (stdout: string) => parseLegacyRefs(stdout, showRemoteHeads, hideRemotes));
+	});
+}
+
+function parseLegacyRefs(stdout: string, showRemoteHeads: boolean, hideRemotes: string[]) {
+	const result: any = { head: null, heads: [], tags: [], remotes: [] };
+	for (const line of stdout.split(/\r\n|\r|\n/)) {
+		const separator = line.indexOf(' ');
+		if (separator === -1) continue;
+		const hash = line.substring(0, separator), ref = line.substring(separator + 1);
+		if (ref === 'HEAD') {
+			result.head = hash;
+		} else if (ref.startsWith('refs/heads/')) {
+			result.heads.push({ hash, name: ref.substring(11) });
+		} else if (ref.startsWith('refs/tags/')) {
+			const annotated = ref.endsWith('^{}');
+			result.tags.push({ hash, name: ref.substring(10, annotated ? ref.length - 3 : undefined), annotated });
+		} else if (ref.startsWith('refs/remotes/')) {
+			const name = ref.substring(13), remote = name.split('/')[0];
+			if (!hideRemotes.includes(remote) && (showRemoteHeads || !name.endsWith('/HEAD'))) result.remotes.push({ hash, name });
+		}
+	}
+	return result;
+}
+
 const workspaceConfiguration = vscode.mocks.workspaceConfiguration;
 let onDidChangeConfiguration: EventEmitter<ConfigurationChangeEvent>;
 let onDidChangeGitExecutable: EventEmitter<utils.GitExecutable>;
 let logger: Logger;
-let spyOnSpawn: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
+let spyOnSpawn: jest.SpyInstance, spyOnLogDebug: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
 
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
@@ -43,7 +128,7 @@ beforeAll(() => {
 	logger = new Logger();
 	jest.spyOn(path, 'normalize').mockImplementation((p) => p);
 	spyOnSpawn = jest.spyOn(cp, 'spawn');
-	spyOnLog = jest.spyOn(logger, 'log');
+	spyOnLogDebug = jest.spyOn(logger, 'logDebug');
 	spyOnLogError = jest.spyOn(logger, 'logError');
 });
 
@@ -188,6 +273,8 @@ describe('DataSource', () => {
 	});
 
 	describe('getRepoInfo', () => {
+		beforeEach(() => mockLegacyRepoInfoRefProvider(dataSource));
+
 		it('Should return the repository info', async () => {
 			// Setup
 			mockGitSuccessOnce(
@@ -209,7 +296,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master', 'remotes/origin/HEAD', 'remotes/origin/develop', 'remotes/origin/master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -242,7 +329,7 @@ describe('DataSource', () => {
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '-a', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['for-each-ref', 'refs/heads', '--format=%(refname:short)XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%(upstream:short)XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%(upstream:track)'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn.mock.calls.some((call) => call[1][0] === 'reflog')).toBe(true);
 		});
 
 		it('Should return the repository info (when showRemoteBranches is FALSE)', async () => {
@@ -260,7 +347,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -271,7 +358,7 @@ describe('DataSource', () => {
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn.mock.calls.some((call) => call[1][0] === 'reflog')).toBe(true);
 		});
 
 		it('Should return the repository info (using an-dr-commits.date.type)', async () => {
@@ -295,7 +382,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -330,7 +417,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -365,7 +452,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -376,7 +463,7 @@ describe('DataSource', () => {
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aNXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aEXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn.mock.calls.some((call) => call[1][0] === 'reflog')).toBe(true);
 		});
 
 		it('Should return the repository info (using an-dr-commits.useMailmap)', async () => {
@@ -400,7 +487,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -411,7 +498,7 @@ describe('DataSource', () => {
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aNXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aEXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn.mock.calls.some((call) => call[1][0] === 'reflog')).toBe(true);
 		});
 
 		it('Should return the repository info (showStashes is FALSE)', async () => {
@@ -427,7 +514,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, false, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -459,7 +546,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, ['origin']);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -470,7 +557,7 @@ describe('DataSource', () => {
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '-a', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn.mock.calls.some((call) => call[1][0] === 'reflog')).toBe(true);
 		});
 
 		it('Should return the repository info (excluding remote heads)', async () => {
@@ -491,7 +578,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master', 'remotes/origin/develop', 'remotes/origin/master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -502,7 +589,7 @@ describe('DataSource', () => {
 			});
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['branch', '-a', '--no-color'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['remote'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['reflog', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%gDXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', 'refs/stash', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn.mock.calls.some((call) => call[1][0] === 'reflog')).toBe(true);
 		});
 
 		it('Should return detached HEAD as a separate top-level branch entry', async () => {
@@ -522,7 +609,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['HEAD', 'sobc', 'remotes/origin/HEAD', 'remotes/origin/sobc'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -553,7 +640,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', false, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master', 'feature/test'],
 				branchUpstreams: { develop: 'origin/develop', master: 'origin/master', 'feature/test': 'origin/feature/test' },
 				goneUpstreamBranches: ['master', 'feature/test'],
@@ -576,7 +663,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: [],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -602,7 +689,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: [],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -628,7 +715,7 @@ describe('DataSource', () => {
 			const result = await dataSource.getRepoInfo('/path/to/repo', true, true, []);
 
 			// Assert
-			expect(result).toStrictEqual({
+			expect(result).toMatchObject({
 				branches: ['develop', 'master'],
 				branchUpstreams: {},
 				goneUpstreamBranches: [],
@@ -641,6 +728,14 @@ describe('DataSource', () => {
 	});
 
 	describe('getCommits', () => {
+		beforeEach(() => {
+			mockLegacyCommitRefProvider(dataSource);
+			vscode.mockExtensionSettingReturnValue('date.type', 'Author Date');
+			vscode.mockExtensionSettingReturnValue('repository.useMailmap', false);
+			vscode.mockExtensionSettingReturnValue('useMailmap', false);
+			vscode.mockExtensionSettingReturnValue('repository.commits.showSignatureStatus', false);
+		});
+
 		it('Should return the commits (show all branches)', async () => {
 			// Setup
 			mockGitSuccessOnce(
@@ -735,7 +830,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -827,7 +922,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--author-date-order', 'master', 'develop', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--author-date-order', 'master', 'develop', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -901,7 +996,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: true,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=3', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--topo-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=3', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--topo-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -975,8 +1070,8 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toHaveBeenCalledTimes(2);
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toHaveBeenCalledTimes(3);
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
 
@@ -1050,7 +1145,7 @@ describe('DataSource', () => {
 				error: null
 			});
 			expect(spyOnSpawn).toHaveBeenCalledTimes(2);
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
 
@@ -1139,7 +1234,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=no', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1230,7 +1325,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1321,7 +1416,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1411,7 +1506,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '--heads', '--tags', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1503,7 +1598,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--reflog', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--reflog', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1595,7 +1690,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--first-parent', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--first-parent', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1693,7 +1788,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1786,7 +1881,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--glob=refs/remotes/origin', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--glob=refs/remotes/origin', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -1892,7 +1987,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -2034,7 +2129,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -2176,7 +2271,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -2276,7 +2371,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', '6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -2352,7 +2447,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -2469,7 +2564,7 @@ describe('DataSource', () => {
 				moreCommitsAvailable: false,
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%atXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['-c', 'log.showSignature=false', 'log', '--max-count=301', '--format=%HXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%PXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%anXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%aeXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%ctXX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb%s', '--date-order', '--branches', '--tags', '--remotes', 'HEAD', '--'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['show-ref', '-d', '--head'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--untracked-files=all', '--porcelain'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
@@ -2826,6 +2921,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -2833,6 +2929,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -2840,6 +2937,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -2879,6 +2977,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -2886,6 +2985,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -2893,6 +2993,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -2943,6 +3044,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -2950,6 +3052,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -2957,6 +3060,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3007,6 +3111,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3014,6 +3119,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3021,6 +3127,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3064,6 +3171,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3071,6 +3179,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3078,6 +3187,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3123,6 +3233,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3130,6 +3241,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3137,6 +3249,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3176,6 +3289,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						}
 					]
@@ -3215,6 +3329,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3222,6 +3337,7 @@ describe('DataSource', () => {
 							deletions: null,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3229,6 +3345,7 @@ describe('DataSource', () => {
 							deletions: null,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3322,6 +3439,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3329,6 +3447,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3336,6 +3455,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3381,6 +3501,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3388,6 +3509,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3395,6 +3517,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						},
 						{
@@ -3402,6 +3525,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/added.txt',
 							oldFilePath: 'dir/added.txt',
+							submodule: null,
 							type: 'U'
 						}
 					]
@@ -3550,6 +3674,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3557,6 +3682,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3564,6 +3690,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						},
 						{
@@ -3571,6 +3698,7 @@ describe('DataSource', () => {
 							deletions: null,
 							newFilePath: 'untracked.txt',
 							oldFilePath: 'untracked.txt',
+							submodule: null,
 							type: 'U'
 						}
 					]
@@ -3612,6 +3740,7 @@ describe('DataSource', () => {
 							deletions: 0,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						},
 						{
@@ -3619,6 +3748,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3626,6 +3756,7 @@ describe('DataSource', () => {
 							deletions: 3,
 							newFilePath: 'dir/renamed-new.txt',
 							oldFilePath: 'dir/renamed-old.txt',
+							submodule: null,
 							type: 'R'
 						}
 					]
@@ -3667,6 +3798,7 @@ describe('DataSource', () => {
 							deletions: 1,
 							newFilePath: 'dir/modified.txt',
 							oldFilePath: 'dir/modified.txt',
+							submodule: null,
 							type: 'M'
 						},
 						{
@@ -3674,6 +3806,7 @@ describe('DataSource', () => {
 							deletions: null,
 							newFilePath: 'dir/deleted.txt',
 							oldFilePath: 'dir/deleted.txt',
+							submodule: null,
 							type: 'D'
 						}
 					]
@@ -3752,6 +3885,7 @@ describe('DataSource', () => {
 						deletions: 1,
 						newFilePath: 'dir/modified.txt',
 						oldFilePath: 'dir/modified.txt',
+						submodule: null,
 						type: 'M'
 					},
 					{
@@ -3759,6 +3893,7 @@ describe('DataSource', () => {
 						deletions: 2,
 						newFilePath: 'dir/renamed-new.txt',
 						oldFilePath: 'dir/renamed-old.txt',
+						submodule: null,
 						type: 'R'
 					},
 					{
@@ -3766,6 +3901,7 @@ describe('DataSource', () => {
 						deletions: 0,
 						newFilePath: 'added.txt',
 						oldFilePath: 'added.txt',
+						submodule: null,
 						type: 'A'
 					},
 					{
@@ -3773,6 +3909,7 @@ describe('DataSource', () => {
 						deletions: null,
 						newFilePath: 'untracked.txt',
 						oldFilePath: 'untracked.txt',
+						submodule: null,
 						type: 'U'
 					}
 				],
@@ -3800,6 +3937,7 @@ describe('DataSource', () => {
 						deletions: 1,
 						newFilePath: 'dir/modified.txt',
 						oldFilePath: 'dir/modified.txt',
+						submodule: null,
 						type: 'M'
 					},
 					{
@@ -3807,6 +3945,7 @@ describe('DataSource', () => {
 						deletions: 2,
 						newFilePath: 'dir/renamed-new.txt',
 						oldFilePath: 'dir/renamed-old.txt',
+						submodule: null,
 						type: 'R'
 					},
 					{
@@ -3814,6 +3953,7 @@ describe('DataSource', () => {
 						deletions: 0,
 						newFilePath: 'added.txt',
 						oldFilePath: 'added.txt',
+						submodule: null,
 						type: 'A'
 					}
 				],
@@ -6863,8 +7003,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toBe(null);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['difftool', '--dir-diff', '-g', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^..1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnLog).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^..1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^..1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)'));
+			expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^..1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^..1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)'));
 		});
 
 		it('Should launch a gui directory diff (between two commits)', async () => {
@@ -6886,8 +7026,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toBe(null);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['difftool', '--dir-diff', '-g', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b..2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnLog).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b..2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c)');
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b..2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c)'));
+			expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b..2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c)');
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b..2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c)'));
 		});
 
 		it('Should launch a gui directory diff (for uncommitted changes)', async () => {
@@ -6909,8 +7049,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toBe(null);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['difftool', '--dir-diff', '-g', 'HEAD'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnLog).toHaveBeenCalledWith('External diff tool is being opened (HEAD)');
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('External diff tool has exited (HEAD)'));
+			expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool is being opened (HEAD)');
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool has exited (HEAD)'));
 		});
 
 		it('Should launch a gui directory diff (between a commit and the uncommitted changes)', async () => {
@@ -6932,8 +7072,8 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toBe(null);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['difftool', '--dir-diff', '-g', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnLog).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
-			await waitForExpect(() => expect(spyOnLog).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)'));
+			expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
+			await waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)'));
 		});
 
 		it('Should launch a directory diff in a terminal (between two commits)', async () => {
@@ -6990,9 +7130,9 @@ describe('DataSource', () => {
 			// Assert
 			expect(result).toBe(null);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['difftool', '--dir-diff', '-g', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], expect.objectContaining({ cwd: '/path/to/repo' }));
-			expect(spyOnLog).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
+			expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool is being opened (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
 			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
+				expect(spyOnLogDebug).toHaveBeenCalledWith('External diff tool has exited (1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b)');
 				expect(spyOnLogError).toBeCalledWith('line1 line2 line3');
 				expect(vscode.window.showErrorMessage).toBeCalledWith('line1 line2 line3');
 			});

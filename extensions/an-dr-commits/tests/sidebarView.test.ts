@@ -2,6 +2,7 @@ import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 
 import { SidebarView, countChanges, getWorkingTreeChanges } from '../src/views/sidebar/sidebarView';
+import { EventEmitter } from '../src/utils/event';
 
 function mockRepo(root: string, workingTreeChanges: any[] = [], indexChanges: any[] = [], mergeChanges: any[] = []) {
 	return {
@@ -42,6 +43,24 @@ function mockDataSource(changes: any[]) {
 	};
 }
 
+function createSidebarView(dataSource: any) {
+	const repoSelection = new EventEmitter<any>();
+	const extensionState = {
+		getLastActiveRepo: jest.fn(() => null),
+		setLastActiveRepo: jest.fn(),
+		getActivityGraphHeight: jest.fn(() => 150),
+		setActivityGraphHeight: jest.fn()
+	};
+	const repoManager = {
+		getRepos: jest.fn(() => ({ '/repo': { starred: false } })),
+		findKnownRepoPath: jest.fn((repo: string) => repo === '/repo' ? repo : null),
+		getRepoContainingFile: jest.fn(() => null),
+		isRepoStarred: jest.fn(() => false),
+		onDidChangeRepos: jest.fn(() => ({ dispose: jest.fn() }))
+	};
+	return new SidebarView(vscode.mocks.extensionContext as any, dataSource, extensionState as any, repoManager as any, repoSelection.subscribe, jest.fn());
+}
+
 async function flushPromises() {
 	await Promise.resolve();
 	await Promise.resolve();
@@ -72,7 +91,7 @@ describe('SidebarView', () => {
 		const repo = mockRepo('/repo');
 		mockGitApi(repo);
 		const dataSource = mockDataSource([]);
-		const view = new SidebarView(vscode.mocks.extensionContext as any, dataSource as any);
+		const view = createSidebarView(dataSource);
 		const webviewView = vscode.createWebviewView();
 
 		vscode.mocks.webviewViewProviders[0].resolveWebviewView(webviewView);
@@ -98,7 +117,7 @@ describe('SidebarView', () => {
 			{ path: 'src/modified.ts', status: 'M', staged: false, additions: 8, deletions: 2 },
 			{ path: 'src/new.ts', status: 'U', staged: false, additions: null, deletions: null }
 		]);
-		const view = new SidebarView(vscode.mocks.extensionContext as any, dataSource as any);
+		const view = createSidebarView(dataSource);
 		const webviewView = vscode.createWebviewView();
 
 		vscode.mocks.webviewViewProviders[0].resolveWebviewView(webviewView);

@@ -111,6 +111,9 @@ describe('ExtensionState', () => {
 				'/path/to/repo': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -127,6 +130,7 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Default,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				}
 			});
@@ -149,6 +153,9 @@ describe('ExtensionState', () => {
 				'/path/to/repo': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -165,6 +172,7 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Default,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				}
 			});
@@ -187,6 +195,9 @@ describe('ExtensionState', () => {
 				'/path/to/repo': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -203,6 +214,7 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Disabled,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				}
 			});
@@ -225,6 +237,9 @@ describe('ExtensionState', () => {
 				'/path/to/repo': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -241,6 +256,7 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Default,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				}
 			});
@@ -263,6 +279,9 @@ describe('ExtensionState', () => {
 				'/path/to/repo': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -279,6 +298,7 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Enabled,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				}
 			});
@@ -304,6 +324,9 @@ describe('ExtensionState', () => {
 				'/path/to/repo-1': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -320,11 +343,15 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Default,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				},
 				'/path/to/repo-2': {
 					commitDetailsViewDivider: 0.5,
 					commitDetailsViewHeight: 250,
+					commitDetailsViewTopRowRatio: 0.45,
+					fullDiffCompact: false,
+					fullDiffPanelHeight: 250,
 					columnWidths: null,
 					commitOrdering: RepoCommitOrdering.Default,
 					fileViewType: FileViewType.Default,
@@ -341,6 +368,7 @@ describe('ExtensionState', () => {
 					showRemoteBranchesV2: BooleanOverride.Disabled,
 					showStashes: BooleanOverride.Default,
 					showTags: BooleanOverride.Default,
+					starred: false,
 					workspaceFolderIndex: null
 				}
 			});

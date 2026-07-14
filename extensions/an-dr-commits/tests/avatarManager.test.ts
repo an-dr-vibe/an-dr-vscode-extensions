@@ -26,7 +26,7 @@ let onDidChangeGitExecutable: EventEmitter<GitExecutable>;
 let logger: Logger;
 let dataSource: DataSource;
 let extensionState: ExtensionState;
-let spyOnSaveAvatar: jest.SpyInstance, spyOnRemoveAvatarFromCache: jest.SpyInstance, spyOnHttpsGet: jest.SpyInstance, spyOnWriteFile: jest.SpyInstance, spyOnReadFile: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnGetRemoteUrl: jest.SpyInstance;
+let spyOnSaveAvatar: jest.SpyInstance, spyOnRemoveAvatarFromCache: jest.SpyInstance, spyOnHttpsGet: jest.SpyInstance, spyOnWriteFile: jest.SpyInstance, spyOnReadFile: jest.SpyInstance, spyOnLogDebug: jest.SpyInstance, spyOnLogWarning: jest.SpyInstance, spyOnGetRemoteUrl: jest.SpyInstance;
 
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
@@ -39,7 +39,8 @@ beforeAll(() => {
 	spyOnHttpsGet = jest.spyOn(https, 'get');
 	spyOnWriteFile = jest.spyOn(fs, 'writeFile');
 	spyOnReadFile = jest.spyOn(fs, 'readFile');
-	spyOnLog = jest.spyOn(logger, 'log');
+	spyOnLogDebug = jest.spyOn(logger, 'logDebug');
+	spyOnLogWarning = jest.spyOn(logger, 'logWarning');
 	spyOnGetRemoteUrl = jest.spyOn(dataSource, 'getRemoteUrl');
 });
 
@@ -111,7 +112,7 @@ describe('AvatarManager', () => {
 			it('Should fetch a new avatar from GitHub (HTTPS Remote)', async () => {
 				// Setup
 				spyOnGetRemoteUrl.mockResolvedValueOnce('https://github.com/mhutchie/test-repo.git');
-				mockHttpsResponse(200, '{"author":{"avatar_url":"https://avatar-url"}}');
+				mockHttpsResponse(200, '{"author":{"avatar_url":"https://avatar-url/"}}');
 				mockHttpsResponse(200, 'binary-image-data');
 				mockWriteFile(null);
 				mockReadFile('binary-image-data');
@@ -152,7 +153,7 @@ describe('AvatarManager', () => {
 			it('Should fetch a new avatar from GitHub (SSH Remote)', async () => {
 				// Setup
 				spyOnGetRemoteUrl.mockResolvedValueOnce('git@github.com:mhutchie/test-repo.git');
-				mockHttpsResponse(200, '{"author":{"avatar_url":"https://avatar-url"}}');
+				mockHttpsResponse(200, '{"author":{"avatar_url":"https://avatar-url/"}}');
 				mockHttpsResponse(200, 'binary-image-data');
 				mockWriteFile(null);
 				mockReadFile('binary-image-data');
@@ -284,7 +285,7 @@ describe('AvatarManager', () => {
 			it('Should halt fetching the avatar when the GitHub avatar url request is unsuccessful', async () => {
 				// Setup
 				spyOnGetRemoteUrl.mockResolvedValueOnce('https://github.com/mhutchie/test-repo.git');
-				mockHttpsResponse(200, '{"author":{"avatar_url":"https://avatar-url"}}');
+				mockHttpsResponse(200, '{"author":{"avatar_url":"https://avatar-url/"}}');
 				mockHttpsResponse(404, '');
 
 				// Run
@@ -292,7 +293,7 @@ describe('AvatarManager', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnLog).toHaveBeenCalledWith('Failed to download avatar from GitHub for user4@*****');
+					expect(spyOnLogWarning).toHaveBeenCalledWith('Failed to download avatar from GitHub for user4@*****');
 				});
 				expect(spyOnGetRemoteUrl).toHaveBeenCalledWith('test-repo', 'test-remote');
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
@@ -349,7 +350,7 @@ describe('AvatarManager', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnLog).toHaveBeenCalledWith('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
+					expect(spyOnLogWarning).toHaveBeenCalledWith('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
 				});
 				expect(avatarManager['queue']['queue']).toStrictEqual([
 					{
@@ -488,7 +489,7 @@ describe('AvatarManager', () => {
 			it('Should fetch a new avatar from GitLab (HTTPS Remote)', async () => {
 				// Setup
 				spyOnGetRemoteUrl.mockResolvedValueOnce('https://gitlab.com/mhutchie/test-repo.git');
-				mockHttpsResponse(200, '[{"avatar_url":"https://avatar-url"}]');
+				mockHttpsResponse(200, '[{"avatar_url":"https://avatar-url/"}]');
 				mockHttpsResponse(200, 'binary-image-data');
 				mockWriteFile(null);
 				mockReadFile('binary-image-data');
@@ -529,7 +530,7 @@ describe('AvatarManager', () => {
 			it('Should fetch a new avatar from GitLab (SSH Remote)', async () => {
 				// Setup
 				spyOnGetRemoteUrl.mockResolvedValueOnce('git@gitlab.com:mhutchie/test-repo.git');
-				mockHttpsResponse(200, '[{"avatar_url":"https://avatar-url"}]');
+				mockHttpsResponse(200, '[{"avatar_url":"https://avatar-url/"}]');
 				mockHttpsResponse(200, 'binary-image-data');
 				mockWriteFile(null);
 				mockReadFile('binary-image-data');
@@ -652,7 +653,7 @@ describe('AvatarManager', () => {
 			it('Should halt fetching the avatar when the GitLab avatar url request is unsuccessful', async () => {
 				// Setup
 				spyOnGetRemoteUrl.mockResolvedValueOnce('https://gitlab.com/mhutchie/test-repo.git');
-				mockHttpsResponse(200, '[{"avatar_url":"https://avatar-url"}]');
+				mockHttpsResponse(200, '[{"avatar_url":"https://avatar-url/"}]');
 				mockHttpsResponse(404, '');
 
 				// Run
@@ -660,7 +661,7 @@ describe('AvatarManager', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnLog).toHaveBeenCalledWith('Failed to download avatar from GitLab for user4@*****');
+					expect(spyOnLogWarning).toHaveBeenCalledWith('Failed to download avatar from GitLab for user4@*****');
 				});
 				expect(spyOnGetRemoteUrl).toHaveBeenCalledWith('test-repo', 'test-remote');
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
@@ -689,7 +690,7 @@ describe('AvatarManager', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnLog).toHaveBeenCalledWith('GitLab API Rate Limit Reached - Paused fetching from GitLab until the Rate Limit is reset');
+					expect(spyOnLogWarning).toHaveBeenCalledWith('GitLab API Rate Limit Reached - Paused fetching from GitLab until the Rate Limit is reset');
 				});
 				expect(avatarManager['queue']['queue']).toStrictEqual([
 					{
@@ -842,8 +843,8 @@ describe('AvatarManager', () => {
 					image: 'data:image/png;base64,YmluYXJ5LWltYWdlLWRhdGE='
 				}]);
 				await waitForExpect(() => {
-					expect(spyOnLog).toHaveBeenCalledWith('Saved Avatar for user4@*****');
-					expect(spyOnLog).toHaveBeenCalledWith('Sent Avatar for user4@***** to the Commits View');
+					expect(spyOnLogDebug).toHaveBeenCalledWith('Saved Avatar for user4@*****');
+					expect(spyOnLogDebug).toHaveBeenCalledWith('Sent Avatar for user4@***** to the Commits View');
 				});
 				expect(spyOnGetRemoteUrl).toHaveBeenCalledWith('test-repo', 'test-remote');
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
@@ -929,7 +930,7 @@ describe('AvatarManager', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnLog).toHaveBeenCalledWith('No Avatar could be found for user4@*****');
+					expect(spyOnLogDebug).toHaveBeenCalledWith('No Avatar could be found for user4@*****');
 				});
 				expect(spyOnGetRemoteUrl).toHaveBeenCalledWith('test-repo', 'test-remote');
 				expect(spyOnHttpsGet).toHaveBeenCalledWith({
@@ -1450,8 +1451,8 @@ describe('AvatarManager', () => {
 
 			// Assert
 			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Saved Avatar for user4@*****');
-				expect(spyOnLog).toHaveBeenCalledWith('Failed to Send Avatar for user4@***** to the Commits View');
+				expect(spyOnLogDebug).toHaveBeenCalledWith('Saved Avatar for user4@*****');
+				expect(spyOnLogWarning).toHaveBeenCalledWith('Failed to Send Avatar for user4@***** to the Commits View');
 			});
 			expect(spyOnGetRemoteUrl).toHaveBeenCalledWith('test-repo', 'test-remote');
 			expect(spyOnHttpsGet).toHaveBeenCalledWith({
@@ -1480,8 +1481,8 @@ describe('AvatarManager', () => {
 
 			// Assert
 			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('Saved Avatar for user4@*****');
-				expect(spyOnLog).toHaveBeenCalledWith('Avatar for user4@***** is ready to be used the next time the Commits View is opened');
+				expect(spyOnLogDebug).toHaveBeenCalledWith('Saved Avatar for user4@*****');
+				expect(spyOnLogDebug).toHaveBeenCalledWith('Avatar for user4@***** is ready to be used the next time the Commits View is opened');
 			});
 			expect(spyOnGetRemoteUrl).toHaveBeenCalledWith('test-repo', 'test-remote');
 			expect(spyOnHttpsGet).toHaveBeenCalledWith({
@@ -1513,7 +1514,7 @@ describe('AvatarManager', () => {
 
 			// Assert
 			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
+				expect(spyOnLogWarning).toHaveBeenCalledWith('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
 			});
 
 			// Run
@@ -1554,7 +1555,7 @@ describe('AvatarManager', () => {
 
 			// Assert
 			await waitForExpect(() => {
-				expect(spyOnLog).toHaveBeenCalledWith('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
+				expect(spyOnLogWarning).toHaveBeenCalledWith('GitHub API Rate Limit Reached - Paused fetching from GitHub until the Rate Limit is reset');
 			});
 
 			// Run

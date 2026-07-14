@@ -40,12 +40,12 @@ export function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], n
 			if (typeof fileLookup[filePath] === 'number') {
 				fileChanges[fileLookup[filePath]].type = GitFileStatus.Deleted;
 			} else {
-				fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Deleted, additions: null, deletions: null });
+				fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Deleted, additions: null, deletions: null, submodule: null });
 			}
 		}
 		for (i = 0; i < status.untracked.length; i++) {
 			filePath = getPathFromStr(status.untracked[i]);
-			fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Untracked, additions: null, deletions: null });
+			fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Untracked, additions: null, deletions: null, submodule: null });
 		}
 	}
 

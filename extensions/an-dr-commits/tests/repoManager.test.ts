@@ -1589,6 +1589,25 @@ describe('RepoManager', () => {
 			expect(spyOnEnqueue).not.toHaveBeenCalled();
 		});
 
+		it('Should skip ordinary create events inside a known repo at search depth zero', () => {
+			repoManager['repos']['/path/to/workspace-folder1/repo'] = mockRepoState({ starred: true });
+
+			emitOnDidCreate(vscode.Uri.file('/path/to/workspace-folder1/repo/node_modules/package'));
+
+			expect(spyOnEnqueue).not.toHaveBeenCalled();
+			expect(repoManager.getRepos()['/path/to/workspace-folder1/repo'].starred).toBe(true);
+		});
+
+		it('Should retain nested repository discovery inside a known repo', () => {
+			repoManager['repos']['/path/to/workspace-folder1/repo'] = mockRepoState({ starred: true });
+			spyOnEnqueue.mockImplementation(() => { });
+
+			emitOnDidCreate(vscode.Uri.file('/path/to/workspace-folder1/repo/nested/.git'));
+
+			expect(spyOnEnqueue).toHaveBeenCalledWith('/path/to/workspace-folder1/repo/nested');
+			expect(repoManager.getRepos()['/path/to/workspace-folder1/repo'].starred).toBe(true);
+		});
+
 		it('Shouldn\'t add a repository when a file is added', async () => {
 			// Setup
 			mockFsStatOnce(null, false);

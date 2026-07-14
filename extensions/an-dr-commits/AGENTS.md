@@ -88,6 +88,8 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | `repo-manager/externalRepoConfig.ts` | External repo config read/write/validate/apply/export helpers |
 | `types/*` | Grouped contract exports by concern; `types.ts` is the public barrel. `sidebar-state.ts`/`sidebar-protocol.ts` hold the sidebar's own initial-state and discriminated-union request/response types |
 
+At `maxDepthOfRepoSearch === 0`, the workspace creation watcher drops ordinary paths inside known repositories before queueing any filesystem or Git work. Explicit nested `.git` creation remains discoverable (ADR-011, extending ADR-008).
+
 ### Tab view (`src/views/tab/`)
 
 `TabView` (`VIEW_TYPE = 'an-dr-commits'`) owns the webview panel lifecycle, HTML rendering, and message dispatch, but the ~70 message handlers themselves live in seven sibling `*Actions.ts` modules grouped by category — `respondToMessage`'s switch is a pure dispatch table delegating into these. Each module exports a small `*ActionContext` interface (a facade over exactly the `TabView` fields/methods that group's handlers need — usually just `dataSource` + `sendMessage`, occasionally more) built once in the `TabView` constructor and passed to every handler call in that group.

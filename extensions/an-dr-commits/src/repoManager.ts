@@ -683,7 +683,9 @@ export class RepoManager extends Disposable {
 	private onWatcherCreate(uri: vscode.Uri) {
 		let path = getPathFromUri(uri);
 		if (path.indexOf('/.git/') > -1) return;
-		if (path.endsWith('/.git')) path = path.slice(0, -5);
+		const gitDirectoryCreated = path.endsWith('/.git');
+		if (gitDirectoryCreated) path = path.slice(0, -5);
+		if (!gitDirectoryCreated && this.maxDepthOfRepoSearch === 0 && this.isDirectoryWithinRepos(path)) return;
 		this.onWatcherCreateQueue.enqueue(path);
 	}
 

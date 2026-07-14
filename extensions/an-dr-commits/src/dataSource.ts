@@ -11,8 +11,8 @@ import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
-import { GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
-import { applyBranchUpstreams, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
+import { BlameLineInfo, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
+import { applyBranchUpstreams, parseBlameIncrementalOutput, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitEditorManager } from './gitEditor/gitEditorManager';
@@ -387,26 +387,41 @@ export class DataSource extends Disposable {
 	}
 
 	/**
-	 * Get blame information for a single line in a file.
+	 * Get blame information for every line in a file.
 	 * @param repo The repository to run Git in.
 	 * @param filePath The normalised absolute file path.
-	 * @param lineNumber The zero-based line number.
-	 * @returns The blame information, or NULL when the line cannot be blamed.
+	 * @param cancellationToken Cancels the Git process when the document becomes stale.
+	 * @returns Blame information keyed by zero-based line number.
 	 */
-	public getBlameLine(repo: string, filePath: string, lineNumber: number): Promise<BlameLineInfo | null> {
+	public getBlameFile(repo: string, filePath: string, cancellationToken: vscode.CancellationToken): Promise<ReadonlyMap<number, BlameLineInfo>> {
 		const relativeFilePath = filePath.startsWith(pathWithTrailingSlash(repo))
 			? filePath.substring(repo.length + 1)
 			: filePath;
 		const config = getConfig(repo);
-		const args = ['blame', '--line-porcelain'];
+		const args = ['blame', '--incremental'];
 		if (config.blameIgnoreWhitespace) {
 			args.push('-w');
 		}
 		for (let i = 0; i < config.blameDetectMoveOrCopyFromOtherFiles; i++) {
 			args.push('-C');
 		}
-		args.push('-L' + (lineNumber + 1) + ',' + (lineNumber + 1), '--', relativeFilePath);
-		return this.spawnGit(args, repo, (stdout) => parseBlameLineOutput(stdout));
+		args.push('--', relativeFilePath);
+		return this.spawnGit(args, repo, (stdout) => parseBlameIncrementalOutput(stdout), cancellationToken);
+	}
+
+	/** Gets one line through the whole-file API for callers migrating to document caching. */
+	public getBlameLine(repo: string, filePath: string, lineNumber: number): Promise<BlameLineInfo | null> {
+		const cancellation = new vscode.CancellationTokenSource();
+		return this.getBlameFile(repo, filePath, cancellation.token).then(
+			(lines) => {
+				cancellation.dispose();
+				return lines.get(lineNumber) ?? null;
+			},
+			(error) => {
+				cancellation.dispose();
+				throw error;
+			}
+		);
 	}
 
 	public getCommitDisplayInfo(repo: string, commitHash: string): Promise<CommitDisplayInfo | null> {
@@ -2638,8 +2653,8 @@ export class DataSource extends Disposable {
 	 * @param repo The repository to run the command in.
 	 * @param resolveValue A callback invoked to resolve the data from `stdout`.
 	 */
-	private spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: string): T }) {
-		return this._spawnGit(args, repo, (stdout) => resolveValue(stdout.toString()));
+	private spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: string): T }, cancellationToken?: vscode.CancellationToken) {
+		return this._spawnGit(args, repo, (stdout) => resolveValue(stdout.toString()), false, cancellationToken);
 	}
 
 	/**
@@ -2648,8 +2663,9 @@ export class DataSource extends Disposable {
 	 * @param repo The repository to run the command in.
 	 * @param resolveValue A callback invoked to resolve the data from `stdout` and `stderr`.
 	 * @param ignoreExitCode Ignore the exit code returned by Git (default: `FALSE`).
+	 * @param cancellationToken Cancels the child process when requested.
 	 */
-	private _spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: Buffer, stderr: string): T }, ignoreExitCode: boolean = false) {
+	private _spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: Buffer, stderr: string): T }, ignoreExitCode: boolean = false, cancellationToken?: vscode.CancellationToken) {
 		return new Promise<T>((resolve, reject) => {
 			if (this.gitExecutable === null) {
 				return reject(UNABLE_TO_FIND_GIT_MSG);
@@ -2658,71 +2674,31 @@ export class DataSource extends Disposable {
 			// GIT_OPTIONAL_LOCKS=0 stops read commands (e.g. git status) from taking index.lock for
 			// opportunistic index refreshes, so they can safely run concurrently with user-initiated
 			// git actions. Mandatory locks (commit, stage, ...) are unaffected.
-			resolveSpawnOutput(cp.spawn(this.gitExecutable.path, args, {
+			const child = cp.spawn(this.gitExecutable.path, args, {
 				cwd: repo,
 				env: Object.assign({}, process.env, this.askpassEnv, { GIT_OPTIONAL_LOCKS: '0' })
-			})).then((values) => {
+			});
+			const cancellation = cancellationToken?.onCancellationRequested(() => child.kill());
+			if (cancellationToken?.isCancellationRequested) child.kill();
+			resolveSpawnOutput(child).then((values) => {
 				const status = values[0], stdout = values[1], stderr = values[2];
 				if (status.code === 0 || ignoreExitCode) {
 					resolve(resolveValue(stdout, stderr));
 				} else {
 					reject(getErrorMessage(status.error, stdout, stderr));
 				}
-			});
+			}).then(() => cancellation?.dispose(), () => cancellation?.dispose());
 
 			this.logger.logCmd('git', args);
 		});
 	}
 }
 
-export type { GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, HeadInfo } from './data-source/models';
-
-export interface BlameLineInfo {
-	readonly author: string;
-	readonly authorEmail: string;
-	readonly authorTime: number;
-	readonly committed: boolean;
-	readonly hash: string;
-	readonly summary: string;
-}
+export type { BlameLineInfo, GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, HeadInfo } from './data-source/models';
 
 export interface CommitDisplayInfo {
 	readonly hash: string;
 	readonly summary: string;
-}
-
-function parseBlameLineOutput(stdout: string): BlameLineInfo | null {
-	const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
-	if (lines.length === 0) return null;
-
-	const firstLineParts = lines[0].split(' ');
-	const hash = firstLineParts[0];
-	if (typeof hash !== 'string' || hash.length === 0) return null;
-
-	let author = '';
-	let authorEmail = '';
-	let authorTime = 0;
-	let summary = '';
-	for (let i = 1; i < lines.length; i++) {
-		if (lines[i].startsWith('author ')) {
-			author = lines[i].substring(7);
-		} else if (lines[i].startsWith('author-mail ')) {
-			authorEmail = lines[i].substring(12).replace(/^<|>$/g, '');
-		} else if (lines[i].startsWith('author-time ')) {
-			authorTime = parseInt(lines[i].substring(12), 10) || 0;
-		} else if (lines[i].startsWith('summary ')) {
-			summary = lines[i].substring(8);
-		}
-	}
-
-	return {
-		author: author,
-		authorEmail: authorEmail,
-		authorTime: authorTime,
-		committed: hash !== '0000000000000000000000000000000000000000',
-		hash: hash,
-		summary: summary
-	};
 }
 
 function parseCommitDisplayOutput(stdout: string): CommitDisplayInfo | null {

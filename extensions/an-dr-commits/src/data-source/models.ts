@@ -1,5 +1,14 @@
 import { CommitOrdering, DeepWriteable, ErrorInfo, GitCommit, GitCommitDetails, GitFileChange, GitRepoConfig, GitRepoInProgressState, GitSignatureStatus, GitStash, GitTagDetails } from '../types';
 
+export interface BlameLineInfo {
+	readonly author: string;
+	readonly authorEmail: string;
+	readonly authorTime: number;
+	readonly committed: boolean;
+	readonly hash: string;
+	readonly summary: string;
+}
+
 export interface GitBranchData {
 	branches: string[];
 	branchUpstreams: { [branchName: string]: string };

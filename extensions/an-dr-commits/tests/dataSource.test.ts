@@ -96,6 +96,28 @@ describe('DataSource', () => {
 		});
 	});
 
+	describe('getBlameFile', () => {
+		it('Should parse incremental blame for the entire file', async () => {
+			const hash = '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b';
+			mockGitSuccessOnce([
+				hash + ' 1 1 2', 'author Jane Doe', 'author-mail <jane@example.com>',
+				'author-time 1710000000', 'summary First change', 'filename file.txt',
+				hash + ' 3 3 1', 'filename file.txt',
+				'0000000000000000000000000000000000000000 4 4 1', 'author Not Committed Yet',
+				'author-mail <not.committed.yet>', 'author-time 1710000001', 'summary Version of file.txt from file.txt', 'filename file.txt', ''
+			].join('\n'));
+			const cancellation = new vscode.CancellationTokenSource();
+
+			const result = await dataSource.getBlameFile('/path/to/repo', '/path/to/repo/file.txt', cancellation.token as any);
+
+			expect(result.size).toBe(4);
+			expect(result.get(0)).toStrictEqual({ author: 'Jane Doe', authorEmail: 'jane@example.com', authorTime: 1710000000, committed: true, hash, summary: 'First change' });
+			expect(result.get(2)).toStrictEqual(result.get(0));
+			expect(result.get(3)?.committed).toBe(false);
+			expect(spyOnSpawn).toHaveBeenCalledWith('/path/to/git', ['blame', '--incremental', '--', 'file.txt'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+	});
+
 	describe('isGitExecutableUnknown', () => {
 		it('Should return FALSE when the Git executable is known', () => {
 			// Run

@@ -136,6 +136,26 @@ export const EventEmitter = jest.fn(() => ({
 	fire: jest.fn()
 }));
 
+export class CancellationTokenSource {
+	private listeners: Array<() => void> = [];
+	public readonly token = {
+		isCancellationRequested: false,
+		onCancellationRequested: (listener: () => void) => {
+			this.listeners.push(listener);
+			return { dispose: () => this.listeners.splice(this.listeners.indexOf(listener), 1) };
+		}
+	};
+
+	public cancel() {
+		this.token.isCancellationRequested = true;
+		this.listeners.slice().forEach((listener) => listener());
+	}
+
+	public dispose() {
+		this.listeners = [];
+	}
+}
+
 export class Uri implements vscode.Uri {
 	public readonly scheme: string;
 	public readonly authority: string;
@@ -368,7 +388,8 @@ beforeEach(() => {
 			lineAt: jest.fn((line: number) => ({
 				range: new Range(line, 0, line, 40)
 			})),
-			lineCount: 10
+			lineCount: 10,
+			version: 1
 		},
 		selection: {
 			active: {

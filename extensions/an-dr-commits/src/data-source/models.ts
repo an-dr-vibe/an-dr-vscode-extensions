@@ -84,6 +84,12 @@ export interface GitRefData {
 	remotes: GitRef[];
 }
 
+/** Branch and commit-reference data parsed from the same Git ref snapshot. */
+export interface GitRefSnapshot {
+	readonly branches: GitBranchData;
+	readonly refs: GitRefData;
+}
+
 export interface GitRepoInfo extends GitBranchData {
 	remotes: string[];
 	remoteUrls: { [remoteName: string]: string | null };
@@ -111,11 +117,6 @@ export interface GitTagContextData {
 export interface GpgStatusCodeParsingDetails {
 	readonly status: GitSignatureStatus;
 	readonly uid: boolean;
-}
-
-export interface BranchUpstreamData {
-	branchUpstreams: { [branchName: string]: string };
-	goneUpstreamBranches: string[];
 }
 
 export interface DiffRequest {

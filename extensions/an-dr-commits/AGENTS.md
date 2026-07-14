@@ -64,7 +64,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | File | Purpose |
 |---|---|
 | `extension.ts` | Activation, registers all commands, wires up managers |
-| `dataSource.ts` | **All git commands** — spawns git, parses output. Key methods: `getCommits()`, `getBranches()`, `getRefs()`, `getLog()` |
+| `dataSource.ts` | **All git commands** — spawns git, parses output. Repository loads share a one-use `for-each-ref` snapshot between repo-info and commits (ADR-014). Key methods: `getCommits()`, `getRepoInfo()`, `getLog()` |
 | `repoManager.ts` | Discovers `.git` repos in the workspace, tracks them |
 | `commands.ts` | Handlers for every Git action (checkout, merge, push, tag, etc.) |
 | `config.ts` | Reads VS Code settings into typed config objects |
@@ -83,7 +83,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | `utils.ts` | General backend utilities |
 | `data-source/helpers.ts` | DataSource parsing helpers (diff/status/config/error formatting) |
 | `data-source/models.ts` | DataSource-internal model and response interfaces extracted from `dataSource.ts` |
-| `data-source/parsers.ts` | DataSource stdout parsing helpers for branches/refs/log/status/stashes |
+| `data-source/parsers.ts` | DataSource stdout parsing helpers for consolidated ref snapshots, log, blame, status, and stashes |
 | `repo-manager/workspaceUtils.ts` | Workspace folder / path inclusion utilities |
 | `repo-manager/externalRepoConfig.ts` | External repo config read/write/validate/apply/export helpers |
 | `types/*` | Grouped contract exports by concern; `types.ts` is the public barrel. `sidebar-state.ts`/`sidebar-protocol.ts` hold the sidebar's own initial-state and discriminated-union request/response types |

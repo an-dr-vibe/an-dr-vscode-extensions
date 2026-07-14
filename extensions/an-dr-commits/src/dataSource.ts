@@ -11,8 +11,8 @@ import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
-import { BlameLineInfo, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
-import { applyBranchUpstreams, parseBlameIncrementalOutput, parseBranchUpstreamsOutput, parseBranchesOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefsOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
+import { BlameLineInfo, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRefSnapshot, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
+import { parseBlameIncrementalOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefSnapshotOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitEditorManager } from './gitEditor/gitEditorManager';
@@ -22,10 +22,9 @@ import { Event } from './utils/event';
 
 const DRIVE_LETTER_PATH_REGEX = /^[a-z]:\//;
 const EOL_REGEX = /\r\n|\r|\n/g;
-const DETACHED_HEAD_BRANCH_REGEXP = /^\((HEAD detached (at|from) .+|no branch)\)$/;
 const INVALID_BRANCH_REGEXP = /^\(.* .*\)$/;
-const REMOTE_HEAD_BRANCH_REGEXP = /^remotes\/.*\/HEAD$/;
 const GIT_LOG_SEPARATOR = 'XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb';
+const GIT_REF_FORMAT = ['%(objectname)', '%(refname)', '%(*objectname)', '%(symref)', '%(upstream:short)', '%(upstream:track)', '%(HEAD)'].join(GIT_LOG_SEPARATOR);
 
 export const enum GitConfigKey {
 	DiffGuiTool = 'diff.guitool',
@@ -56,6 +55,7 @@ export class DataSource extends Disposable {
 	private gitFormatCommitDetails!: string;
 	private gitFormatLog!: string;
 	private gitFormatStash!: string;
+	private readonly pendingRefSnapshots = new Map<string, GitRefData>();
 
 	/**
 	 * Creates the Commits Data Source.
@@ -147,8 +147,9 @@ export class DataSource extends Disposable {
 	 * @returns The repositories information.
 	 */
 	public getRepoInfo(repo: string, showRemoteBranches: boolean, showStashes: boolean, hideRemotes: ReadonlyArray<string>): Promise<GitRepoInfo> {
+		const showRemoteHeads = getConfig().showRemoteHeads;
 		return Promise.all([
-			this.getBranches(repo, showRemoteBranches, hideRemotes),
+			this.getRefSnapshot(repo, showRemoteBranches, showRemoteHeads, hideRemotes),
 			this.getRemotes(repo),
 			showStashes ? this.getStashes(repo) : Promise.resolve([]),
 			this.getRepoInProgressState(repo),
@@ -156,6 +157,7 @@ export class DataSource extends Disposable {
 			// names first) so repo-info loads don't pay a serial git round-trip.
 			this.getRemoteUrls(repo).catch((): { [remoteName: string]: string } => ({}))
 		]).then((results) => {
+			this.pendingRefSnapshots.set(this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes), results[0].refs);
 			const remotes: string[] = results[1];
 			const fetchedUrls = results[4];
 			const remoteUrls: { [remoteName: string]: string | null } = {};
@@ -163,11 +165,11 @@ export class DataSource extends Disposable {
 				remoteUrls[remote] = typeof fetchedUrls[remote] === 'string' ? fetchedUrls[remote] : null;
 			}
 			return {
-				branches: results[0].branches,
-				branchUpstreams: results[0].branchUpstreams,
-				goneUpstreamBranches: results[0].goneUpstreamBranches,
-				remoteHeadTargets: results[0].remoteHeadTargets,
-				head: results[0].head,
+				branches: results[0].branches.branches,
+				branchUpstreams: results[0].branches.branchUpstreams,
+				goneUpstreamBranches: results[0].branches.goneUpstreamBranches,
+				remoteHeadTargets: results[0].branches.remoteHeadTargets,
+				head: results[0].branches.head,
 				remotes: remotes,
 				remoteUrls: remoteUrls,
 				stashes: results[2],
@@ -216,7 +218,7 @@ export class DataSource extends Disposable {
 		const config = getConfig();
 		return Promise.all([
 			this.getLog(repo, branches, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes),
-			this.getRefs(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage),
+			this.consumeRefSnapshot(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage),
 			// Fetched in parallel with the log so the (often slow on large working trees) status
 			// call doesn't extend the view's load time; a failure only hides the uncommitted row.
 			this.getWorkingTreeChangeCount(repo).catch(() => 0)
@@ -1968,37 +1970,15 @@ export class DataSource extends Disposable {
 
 	/* Private Data Providers */
 
-	/**
-	 * Get the branches in a repository.
-	 * @param repo The path of the repository.
-	 * @param showRemoteBranches Are remote branches shown.
-	 * @param hideRemotes An array of hidden remotes.
-	 * @returns The branch data.
-	 */
-	private getBranches(repo: string, showRemoteBranches: boolean, hideRemotes: ReadonlyArray<string>) {
-		let args = ['branch'];
-		if (showRemoteBranches) args.push('-a');
-		args.push('--no-color');
-
-		const hideRemotePatterns = hideRemotes.map((remote) => 'remotes/' + remote + '/');
-		const showRemoteHeads = getConfig().showRemoteHeads;
-
+	private getRefSnapshot(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>): Promise<GitRefSnapshot> {
 		return Promise.all([
-			this.spawnGit(args, repo, (stdout) => parseBranchesOutput(stdout, {
-				showRemoteHeads,
-				hideRemotePatterns,
-				detachedHeadRegex: DETACHED_HEAD_BRANCH_REGEXP,
-				invalidBranchRegex: INVALID_BRANCH_REGEXP,
-				remoteHeadRegex: REMOTE_HEAD_BRANCH_REGEXP
-			})),
-			this.spawnGit(
-				['for-each-ref', 'refs/heads', '--format=%(refname:short)' + GIT_LOG_SEPARATOR + '%(upstream:short)' + GIT_LOG_SEPARATOR + '%(upstream:track)'],
-				repo,
-				(stdout) => parseBranchUpstreamsOutput(stdout, GIT_LOG_SEPARATOR)
-			)
-		]).then(([branchData, upstreamData]) => {
-			return applyBranchUpstreams(branchData, upstreamData);
-		});
+			this.spawnGit(['for-each-ref', '--format=' + GIT_REF_FORMAT, 'refs/heads', 'refs/remotes', 'refs/tags'], repo, (stdout) => stdout),
+			this.spawnGit(['rev-parse', '--verify', 'HEAD'], repo, (stdout) => stdout.trim()).catch((): null => null)
+		]).then(([stdout, headHash]) => parseRefSnapshotOutput(stdout, headHash, GIT_LOG_SEPARATOR, {
+			showRemoteBranches,
+			showRemoteHeads,
+			hideRemotePatterns: hideRemotes.map((remote) => 'refs/remotes/' + remote + '/')
+		}));
 	}
 
 	/**
@@ -2144,22 +2124,18 @@ export class DataSource extends Disposable {
 		return this.spawnGit(args, repo, (stdout) => parseLogOutput(stdout, GIT_LOG_SEPARATOR));
 	}
 
-	/**
-	 * Get the references in a repository.
-	 * @param repo The path of the repository.
-	 * @param showRemoteBranches Are remote branches shown.
-	 * @param showRemoteHeads Are remote heads shown.
-	 * @param hideRemotes An array of hidden remotes.
-	 * @returns The references data.
-	 */
-	private getRefs(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>) {
-		let args = ['show-ref'];
-		if (!showRemoteBranches) args.push('--heads', '--tags');
-		args.push('-d', '--head');
+	private consumeRefSnapshot(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>) {
+		const key = this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes);
+		const pending = this.pendingRefSnapshots.get(key);
+		if (typeof pending !== 'undefined') {
+			this.pendingRefSnapshots.delete(key);
+			return Promise.resolve(pending);
+		}
+		return this.getRefSnapshot(repo, showRemoteBranches, showRemoteHeads, hideRemotes).then((snapshot) => snapshot.refs);
+	}
 
-		const hideRemotePatterns = hideRemotes.map((remote) => 'refs/remotes/' + remote + '/');
-
-		return this.spawnGit(args, repo, (stdout) => parseRefsOutput(stdout, { showRemoteHeads, hideRemotePatterns }));
+	private getRefSnapshotKey(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>) {
+		return [repo, showRemoteBranches ? '1' : '0', showRemoteHeads ? '1' : '0', ...hideRemotes].join('\0');
 	}
 
 	/**

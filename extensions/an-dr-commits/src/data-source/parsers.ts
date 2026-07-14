@@ -1,17 +1,10 @@
 import { DiffNameStatusRecord, DiffNumStatRecord, GitStatusFiles, removeTrailingBlankLines } from './helpers';
-import { BlameLineInfo, BranchUpstreamData, GitBranchData, GitCommitRecord, GitRefData, ParsedCommitDetails } from './models';
+import { BlameLineInfo, GitBranchData, GitCommitRecord, GitRefData, GitRefSnapshot, ParsedCommitDetails } from './models';
 import { GitFileStatus, GitStash, GitSignatureStatus } from '../types';
 import { getPathFromStr } from '../utils';
 
-type BranchParserOptions = {
-	showRemoteHeads: boolean;
-	hideRemotePatterns: ReadonlyArray<string>;
-	detachedHeadRegex: RegExp;
-	invalidBranchRegex: RegExp;
-	remoteHeadRegex: RegExp;
-};
-
-type RefParserOptions = {
+type RefSnapshotParserOptions = {
+	showRemoteBranches: boolean;
 	showRemoteHeads: boolean;
 	hideRemotePatterns: ReadonlyArray<string>;
 };
@@ -40,66 +33,43 @@ export function parseBlameIncrementalOutput(stdout: string): ReadonlyMap<number,
 	return result;
 }
 
-export function parseBranchesOutput(stdout: string, options: BranchParserOptions): GitBranchData {
-	const branchData: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, repoInProgressState: null, error: null };
-	const lines = stdout.split(/\r\n|\r|\n/g);
-	for (let i = 0; i < lines.length - 1; i++) {
-		const lineContents = lines[i].substring(2);
-		const symbolicRefSplit = lineContents.split(' -> ');
-		const name = symbolicRefSplit[0];
-		const symbolicTarget = symbolicRefSplit.length > 1 ? symbolicRefSplit.slice(1).join(' -> ').trim() : null;
-
-		if (options.showRemoteHeads && symbolicTarget !== null && options.remoteHeadRegex.test(name)) {
-			const remoteName = name.substring(8, name.length - 5);
-			if (remoteName !== '' && symbolicTarget !== '') {
-				branchData.remoteHeadTargets[remoteName] = symbolicTarget;
+/** Parses one `for-each-ref` snapshot into branch-navigation and commit-reference data. */
+export function parseRefSnapshotOutput(stdout: string, headHash: string | null, separator: string, options: RefSnapshotParserOptions): GitRefSnapshot {
+	const branches: GitBranchData = { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, repoInProgressState: null, error: null };
+	const refs: GitRefData = { head: headHash, heads: [], tags: [], remotes: [] };
+	for (const line of stdout.split(/\r\n|\r|\n/g)) {
+		const record = line.split(separator);
+		if (record.length !== 7) continue;
+		const [objectHash, ref, peeledHash, symbolicTarget, upstream, upstreamTrack, headMarker] = record;
+		if (ref.startsWith('refs/heads/')) {
+			const name = ref.substring(11);
+			refs.heads.push({ hash: objectHash, name });
+			if (headMarker === '*') {
+				branches.head = name;
+				branches.branches.unshift(name);
+			} else branches.branches.push(name);
+			if (upstream !== '') branches.branchUpstreams[name] = upstream;
+			if (upstreamTrack === '[gone]') branches.goneUpstreamBranches.push(name);
+		} else if (ref.startsWith('refs/remotes/')) {
+			if (!options.showRemoteBranches || options.hideRemotePatterns.some((pattern) => ref.startsWith(pattern))) continue;
+			const name = ref.substring(13), isHead = name.endsWith('/HEAD');
+			if (isHead && symbolicTarget !== '' && options.showRemoteHeads) {
+				const remoteName = name.substring(0, name.length - 5);
+				branches.remoteHeadTargets[remoteName] = symbolicTarget.replace(/^refs\/remotes\/|^remotes\//, '');
 			}
-		}
-
-		if (options.detachedHeadRegex.test(name)) {
-			branchData.head = 'HEAD';
-			branchData.branches.unshift('HEAD');
-			continue;
-		}
-
-		if (options.invalidBranchRegex.test(name) || options.hideRemotePatterns.some((pattern) => name.startsWith(pattern)) || (!options.showRemoteHeads && options.remoteHeadRegex.test(name))) {
-			continue;
-		}
-
-		if (lines[i][0] === '*') {
-			branchData.head = name;
-			branchData.branches.unshift(name);
-		} else {
-			branchData.branches.push(name);
+			if (!isHead || options.showRemoteHeads) {
+				branches.branches.push('remotes/' + name);
+				refs.remotes.push({ hash: objectHash, name });
+			}
+		} else if (ref.startsWith('refs/tags/')) {
+			refs.tags.push({ hash: peeledHash || objectHash, name: ref.substring(10), annotated: peeledHash !== '' });
 		}
 	}
-	return branchData;
-}
-
-export function parseBranchUpstreamsOutput(stdout: string, separator: string): BranchUpstreamData {
-	const branchUpstreams: { [branchName: string]: string } = {};
-	const goneUpstreamBranches: string[] = [];
-	const lines = stdout.split(/\r\n|\r|\n/g);
-	for (let i = 0; i < lines.length - 1; i++) {
-		const record = lines[i].split(separator);
-		if (record.length >= 2 && record[1] !== '') {
-			branchUpstreams[record[0]] = record[1];
-		}
-		if (record.length >= 3 && record[2] === '[gone]') {
-			goneUpstreamBranches.push(record[0]);
-		}
+	if (branches.head === null && headHash !== null) {
+		branches.head = 'HEAD';
+		branches.branches.unshift('HEAD');
 	}
-	return { branchUpstreams, goneUpstreamBranches };
-}
-
-export function applyBranchUpstreams(branchData: GitBranchData, upstreamData: BranchUpstreamData): GitBranchData {
-	Object.keys(upstreamData.branchUpstreams).forEach((branch) => {
-		if (branchData.branches.includes(branch)) {
-			branchData.branchUpstreams[branch] = upstreamData.branchUpstreams[branch];
-		}
-	});
-	branchData.goneUpstreamBranches = upstreamData.goneUpstreamBranches.filter((branch) => branchData.branches.includes(branch));
-	return branchData;
+	return { branches, refs };
 }
 
 export function parseCommitDetailsOutput(stdout: string, separator: string): ParsedCommitDetails {
@@ -170,32 +140,6 @@ export function parseLogOutput(stdout: string, separator: string): GitCommitReco
 		commits.push({ hash: line[0], parents: line[1] !== '' ? line[1].split(' ') : [], author: line[2], email: line[3], date: parseInt(line[4]), message: line[5] });
 	}
 	return commits;
-}
-
-export function parseRefsOutput(stdout: string, options: RefParserOptions): GitRefData {
-	const refData: GitRefData = { head: null, heads: [], tags: [], remotes: [] };
-	const lines = stdout.split(/\r\n|\r|\n/g);
-	for (let i = 0; i < lines.length - 1; i++) {
-		const line = lines[i].split(' ');
-		if (line.length < 2) continue;
-
-		const hash = line.shift()!;
-		const ref = line.join(' ');
-
-		if (ref.startsWith('refs/heads/')) {
-			refData.heads.push({ hash, name: ref.substring(11) });
-		} else if (ref.startsWith('refs/tags/')) {
-			const annotated = ref.endsWith('^{}');
-			refData.tags.push({ hash, name: (annotated ? ref.substring(10, ref.length - 3) : ref.substring(10)), annotated });
-		} else if (ref.startsWith('refs/remotes/')) {
-			if (!options.hideRemotePatterns.some((pattern) => ref.startsWith(pattern)) && (options.showRemoteHeads || !ref.endsWith('/HEAD'))) {
-				refData.remotes.push({ hash, name: ref.substring(13) });
-			}
-		} else if (ref === 'HEAD') {
-			refData.head = hash;
-		}
-	}
-	return refData;
 }
 
 export function parseRemotesContainingCommitOutput(stdout: string, invalidBranchRegex: RegExp, knownRemotes: string[]): string[] {

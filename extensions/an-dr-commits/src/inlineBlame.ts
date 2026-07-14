@@ -26,9 +26,12 @@ export class InlineBlameController extends Disposable {
 
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private requestId: number = 0;
-	// Identifies the document version + line the current decoration was rendered for, so cursor
-	// movement within the same line (selection events fire per character) doesn't re-spawn git blame.
-	private renderedBlameKey: string | null = null;
+	private cachedBlameKey: string | null = null;
+	private cachedBlame: Promise<ReadonlyMap<number, BlameLineInfo>> | null = null;
+	private blameCancellation: vscode.CancellationTokenSource | null = null;
+	private renderedEditor: vscode.TextEditor | null = null;
+	private renderedVersion: number | null = null;
+	private renderedLine: number | null = null;
 
 	constructor(dataSource: DataSource, repoManager: RepoManager, _statusBarItem: unknown, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
 		super();
@@ -41,12 +44,14 @@ export class InlineBlameController extends Disposable {
 			this.decorationType,
 			repoManager.onDidChangeRepos(() => {
 				this.currentUserCache.clear();
+				this.invalidateBlameCache();
 				this.scheduleRefresh(vscode.window.activeTextEditor, 0);
 			}),
 			vscode.window.onDidChangeActiveTextEditor((editor) => this.scheduleRefresh(editor, 0)),
 			vscode.window.onDidChangeTextEditorSelection((event) => this.scheduleRefresh(event.textEditor, getConfig().blameDelay)),
 			vscode.workspace.onDidChangeTextDocument((event) => {
 				if (vscode.window.activeTextEditor && event.document === vscode.window.activeTextEditor.document) {
+					this.invalidateBlameCache();
 					this.scheduleRefresh(vscode.window.activeTextEditor, getConfig().blameDelay);
 				}
 			}),
@@ -56,6 +61,7 @@ export class InlineBlameController extends Disposable {
 				}
 			}),
 			vscode.workspace.onDidCloseTextDocument((document) => {
+				this.invalidateBlameCache();
 				if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document === document) {
 					this.clear(vscode.window.activeTextEditor);
 				}
@@ -63,6 +69,7 @@ export class InlineBlameController extends Disposable {
 			onDidChangeConfiguration((event) => {
 				if (event.affectsConfiguration('an-dr-commits.blame') || event.affectsConfiguration('an-dr-commits.inlineBlame.enabled')) {
 					this.currentUserCache.clear();
+					this.invalidateBlameCache();
 					this.scheduleRefresh(vscode.window.activeTextEditor, 0);
 				}
 			})
@@ -79,6 +86,7 @@ export class InlineBlameController extends Disposable {
 			this.refreshTimer = null;
 		}
 		this.clear(vscode.window.activeTextEditor);
+		this.invalidateBlameCache();
 		super.dispose();
 	}
 
@@ -112,8 +120,8 @@ export class InlineBlameController extends Disposable {
 			return;
 		}
 
-		const blameKey = editor.document.uri.toString() + '@' + editor.document.version + ':' + editor.selection.active.line;
-		if (blameKey === this.renderedBlameKey) {
+		const lineNumber = editor.selection.active.line;
+		if (this.renderedEditor === editor && this.renderedVersion === editor.document.version && this.renderedLine === lineNumber) {
 			return;
 		}
 
@@ -125,14 +133,14 @@ export class InlineBlameController extends Disposable {
 		}
 
 		try {
-			const blame = await this.dataSource.getBlameLine(repo, filePath, editor.selection.active.line);
+			const blame = (await this.getDocumentBlame(repo, filePath, editor.document.uri.toString(), editor.document.version)).get(lineNumber) ?? null;
 			if (this.isDisposed() || currentRequestId !== this.requestId || vscode.window.activeTextEditor !== editor) {
 				return;
 			}
 
 			if (blame === null) {
 				editor.setDecorations(this.decorationType, []);
-				this.renderedBlameKey = blameKey;
+				this.setRenderedLocation(editor, lineNumber);
 				return;
 			}
 
@@ -140,9 +148,9 @@ export class InlineBlameController extends Disposable {
 			if (this.isDisposed() || currentRequestId !== this.requestId || vscode.window.activeTextEditor !== editor) {
 				return;
 			}
-			const line = editor.document.lineAt(editor.selection.active.line);
+			const line = editor.document.lineAt(lineNumber);
 			const hoverMessage = this.shouldShowInlineHover(config.blameExtendedHoverInformation) ? this.getTooltip(blame, displayAuthor) : undefined;
-			this.renderedBlameKey = blameKey;
+			this.setRenderedLocation(editor, lineNumber);
 			editor.setDecorations(this.decorationType, [{
 				hoverMessage: hoverMessage,
 				range: line.range,
@@ -165,10 +173,44 @@ export class InlineBlameController extends Disposable {
 
 	private clear(editor: vscode.TextEditor | undefined) {
 		this.requestId++;
-		this.renderedBlameKey = null;
+		this.renderedEditor = null;
+		this.renderedVersion = null;
+		this.renderedLine = null;
 		if (editor) {
 			editor.setDecorations(this.decorationType, []);
 		}
+	}
+
+	private getDocumentBlame(repo: string, filePath: string, uri: string, version: number) {
+		const key = repo + '\0' + uri + '@' + version;
+		if (this.cachedBlameKey === key && this.cachedBlame !== null) return this.cachedBlame;
+		this.invalidateBlameCache();
+		const cancellation = new vscode.CancellationTokenSource();
+		const blame = this.dataSource.getBlameFile(repo, filePath, cancellation.token);
+		this.cachedBlameKey = key;
+		this.cachedBlame = blame;
+		this.blameCancellation = cancellation;
+		blame.then(() => this.disposeBlameCancellation(cancellation), () => this.disposeBlameCancellation(cancellation));
+		return blame;
+	}
+
+	private invalidateBlameCache() {
+		this.blameCancellation?.cancel();
+		this.blameCancellation?.dispose();
+		this.blameCancellation = null;
+		this.cachedBlameKey = null;
+		this.cachedBlame = null;
+	}
+
+	private disposeBlameCancellation(cancellation: vscode.CancellationTokenSource) {
+		cancellation.dispose();
+		if (this.blameCancellation === cancellation) this.blameCancellation = null;
+	}
+
+	private setRenderedLocation(editor: vscode.TextEditor, line: number) {
+		this.renderedEditor = editor;
+		this.renderedVersion = editor.document.version;
+		this.renderedLine = line;
 	}
 
 	private getInlineText(blame: BlameLineInfo, displayAuthor: string) {

@@ -76,7 +76,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | `views/sidebar/` | The Activity Bar sidebar webview, class `SidebarView` — see below |
 | `views/common/` | Backend code shared between `views/tab/` and `views/sidebar/` — see below |
 | `statusBarItem.ts` | The status bar button that opens the graph |
-| `inlineBlame.ts` | Active editor inline blame + optional status bar current-commit display |
+| `inlineBlame.ts` | Active editor inline blame backed by a cancellable per-document-version incremental blame cache (ADR-013) |
 | `diffDocProvider.ts` | Virtual document provider for diff views |
 | `repoFileWatcher.ts` | Watches `.git` for changes, triggers refresh |
 | `logger.ts` | Output channel logging |

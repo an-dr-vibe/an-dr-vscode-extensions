@@ -409,21 +409,6 @@ export class DataSource extends Disposable {
 		return this.spawnGit(args, repo, (stdout) => parseBlameIncrementalOutput(stdout), cancellationToken);
 	}
 
-	/** Gets one line through the whole-file API for callers migrating to document caching. */
-	public getBlameLine(repo: string, filePath: string, lineNumber: number): Promise<BlameLineInfo | null> {
-		const cancellation = new vscode.CancellationTokenSource();
-		return this.getBlameFile(repo, filePath, cancellation.token).then(
-			(lines) => {
-				cancellation.dispose();
-				return lines.get(lineNumber) ?? null;
-			},
-			(error) => {
-				cancellation.dispose();
-				throw error;
-			}
-		);
-	}
-
 	public getCommitDisplayInfo(repo: string, commitHash: string): Promise<CommitDisplayInfo | null> {
 		return this.spawnGit(['show', '--quiet', '--format=%H%n%s', commitHash], repo, (stdout) => parseCommitDisplayOutput(stdout));
 	}

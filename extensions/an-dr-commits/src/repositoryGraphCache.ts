@@ -14,7 +14,7 @@ export interface GraphProjectionKeyInput {
 	readonly commitOrdering: string;
 	readonly remotes: ReadonlyArray<string>;
 	readonly hideRemotes: ReadonlyArray<string>;
-	readonly stashHashes: ReadonlyArray<string>;
+	readonly stashKeys: ReadonlyArray<string>;
 }
 
 /** A cached projection and whether it belongs to an older repository generation. */
@@ -46,7 +46,7 @@ export function createGraphProjectionKey(input: GraphProjectionKeyInput): string
 		input.commitOrdering,
 		input.remotes,
 		input.hideRemotes,
-		input.stashHashes
+		input.stashKeys
 	]);
 }
 
@@ -82,6 +82,13 @@ export class RepositoryGraphCache<TCommit extends CacheableGraphCommit, TProject
 		this.trimMap(cache.projections, this.maxProjectionsPerRepository);
 	}
 
+	/** Stores a projection only if its source generation is still current. */
+	public setProjectionForGeneration(repo: string, key: string, generation: number, commits: ReadonlyArray<TCommit>, projection: TProjection): boolean {
+		if (this.getGeneration(repo) !== generation) return false;
+		this.setProjection(repo, key, commits, projection);
+		return true;
+	}
+
 	/** Returns an immutable commit retained from any projection and refreshes its LRU position. */
 	public getCommit(repo: string, hash: string): TCommit | null {
 		const commits = this.repositories.get(repo)?.commits;
@@ -95,6 +102,11 @@ export class RepositoryGraphCache<TCommit extends CacheableGraphCommit, TProject
 	/** Marks existing projections stale while retaining immutable commit records. */
 	public advanceGeneration(repo: string): void {
 		this.getOrCreateRepository(repo).generation++;
+	}
+
+	/** Returns the current repository generation. */
+	public getGeneration(repo: string): number {
+		return this.getOrCreateRepository(repo).generation;
 	}
 
 	/** Removes all cached state for a repository. */

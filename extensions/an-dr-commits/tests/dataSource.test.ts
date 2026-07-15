@@ -736,6 +736,52 @@ describe('DataSource', () => {
 			vscode.mockExtensionSettingReturnValue('repository.commits.showSignatureStatus', false);
 		});
 
+		describe('graph projection cache', () => {
+			const projection = { commits: [], head: null, tags: [], moreCommitsAvailable: false, error: null };
+			const request = (source: DataSource) => source.getCommits('/path/to/repo', ['main'], 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+
+			it('Should reuse a successful graph projection', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
+
+				expect(await request(dataSource)).toBe(projection);
+				expect(await request(dataSource)).toBe(projection);
+				expect(load).toHaveBeenCalledTimes(1);
+			});
+
+			it('Should deduplicate concurrent graph projection loads', async () => {
+				let resolveLoad!: (value: typeof projection) => void;
+				const pending = new Promise<typeof projection>((resolve) => { resolveLoad = resolve; });
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockReturnValue(pending);
+
+				const first = request(dataSource), second = request(dataSource);
+				expect(first).toBe(second);
+				resolveLoad(projection);
+				expect(await first).toBe(projection);
+				expect(load).toHaveBeenCalledTimes(1);
+			});
+
+			it('Should reload a projection after its repository generation advances', async () => {
+				const updated = { ...projection, head: 'updated' };
+				const load = jest.spyOn(dataSource as any, 'loadCommits')
+					.mockResolvedValueOnce(projection)
+					.mockResolvedValueOnce(updated);
+
+				expect(await request(dataSource)).toBe(projection);
+				dataSource.advanceGraphGeneration('/path/to/repo');
+				expect(await request(dataSource)).toBe(updated);
+				expect(load).toHaveBeenCalledTimes(2);
+			});
+
+			it('Should not cache failed graph projections', async () => {
+				const failed = { ...projection, error: 'failed' };
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(failed);
+
+				expect(await request(dataSource)).toBe(failed);
+				expect(await request(dataSource)).toBe(failed);
+				expect(load).toHaveBeenCalledTimes(2);
+			});
+		});
+
 		it('Should return the commits (show all branches)', async () => {
 			// Setup
 			mockGitSuccessOnce(

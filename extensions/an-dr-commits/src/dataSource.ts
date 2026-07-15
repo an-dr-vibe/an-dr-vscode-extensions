@@ -14,6 +14,7 @@ import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfig
 import { BlameLineInfo, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRefSnapshot, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
 import { parseBlameIncrementalOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefSnapshotOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
+import { GraphProjectionKeyInput, RepositoryGraphCache, createGraphProjectionKey } from './repositoryGraphCache';
 import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitEditorManager } from './gitEditor/gitEditorManager';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
@@ -56,6 +57,9 @@ export class DataSource extends Disposable {
 	private gitFormatLog!: string;
 	private gitFormatStash!: string;
 	private readonly pendingRefSnapshots = new Map<string, GitRefData>();
+	private readonly graphCache = new RepositoryGraphCache<GitCommit, GitCommitData>();
+	private readonly pendingGraphProjections = new Map<string, Promise<GitCommitData>>();
+	private readonly refFingerprints = new Map<string, string>();
 
 	/**
 	 * Creates the Commits Data Source.
@@ -157,6 +161,7 @@ export class DataSource extends Disposable {
 			// names first) so repo-info loads don't pay a serial git round-trip.
 			this.getRemoteUrls(repo).catch((): { [remoteName: string]: string } => ({}))
 		]).then((results) => {
+			this.updateGraphGeneration(repo, results[0].refs);
 			this.pendingRefSnapshots.set(this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes), results[0].refs);
 			const remotes: string[] = results[1];
 			const fetchedUrls = results[4];
@@ -215,6 +220,42 @@ export class DataSource extends Disposable {
 	 * @returns The commits in the repository.
 	 */
 	public getCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
+		const key = this.createCommitProjectionKey({
+			branches, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs,
+			onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes
+		});
+		const cached = this.graphCache.getProjection(repo, key);
+		if (cached !== null && !cached.stale) {
+			this.pendingRefSnapshots.delete(this.getRefSnapshotKey(repo, showRemoteBranches, getConfig().showRemoteHeads, hideRemotes));
+			return Promise.resolve(cached.projection);
+		}
+
+		const generation = this.graphCache.getGeneration(repo);
+		const pendingKey = repo + '\0' + generation + '\0' + key;
+		const existing = this.pendingGraphProjections.get(pendingKey);
+		if (existing) return existing;
+
+		const pending = this.loadCommits(repo, branches, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes)
+			.then((projection) => {
+				if (projection.error === null) {
+					this.graphCache.setProjectionForGeneration(repo, key, generation, projection.commits.filter((commit) => commit.hash !== UNCOMMITTED), projection);
+				}
+				this.pendingGraphProjections.delete(pendingKey);
+				return projection;
+			}, (error) => {
+				this.pendingGraphProjections.delete(pendingKey);
+				throw error;
+			});
+		this.pendingGraphProjections.set(pendingKey, pending);
+		return pending;
+	}
+
+	/** Marks graph projections stale while retaining immutable commit records. */
+	public advanceGraphGeneration(repo: string): void {
+		this.graphCache.advanceGeneration(repo);
+	}
+
+	private loadCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
 		const config = getConfig();
 		return Promise.all([
 			this.getLog(repo, branches, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes),
@@ -409,6 +450,21 @@ export class DataSource extends Disposable {
 		}
 		args.push('--', relativeFilePath);
 		return this.spawnGit(args, repo, (stdout) => parseBlameIncrementalOutput(stdout), cancellationToken);
+	}
+
+	private createCommitProjectionKey(input: Omit<GraphProjectionKeyInput, 'commitOrdering' | 'stashKeys'> & { readonly commitOrdering: CommitOrdering, readonly stashes: ReadonlyArray<GitStash> }): string {
+		return createGraphProjectionKey({
+			...input,
+			commitOrdering: input.commitOrdering,
+			stashKeys: input.stashes.map((stash) => [stash.selector, stash.hash, stash.baseHash, stash.untrackedFilesHash, stash.date, stash.message].join('\0'))
+		});
+	}
+
+	private updateGraphGeneration(repo: string, refs: GitRefData): void {
+		const fingerprint = JSON.stringify([refs.head, refs.heads, refs.tags, refs.remotes]);
+		const previous = this.refFingerprints.get(repo);
+		if (typeof previous !== 'undefined' && previous !== fingerprint) this.graphCache.advanceGeneration(repo);
+		this.refFingerprints.set(repo, fingerprint);
 	}
 
 	public getCommitDisplayInfo(repo: string, commitHash: string): Promise<CommitDisplayInfo | null> {

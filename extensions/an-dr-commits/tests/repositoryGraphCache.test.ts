@@ -14,7 +14,7 @@ function createKeyInput(branches: ReadonlyArray<string> | null = ['main']): Grap
 		commitOrdering: 'date',
 		remotes: ['origin'],
 		hideRemotes: [],
-		stashHashes: []
+		stashKeys: []
 	};
 }
 
@@ -24,7 +24,7 @@ describe('RepositoryGraphCache', () => {
 		expect(createGraphProjectionKey(input)).toBe(createGraphProjectionKey({ ...input }));
 		expect(createGraphProjectionKey(input)).not.toBe(createGraphProjectionKey({ ...input, branches: ['develop'] }));
 		expect(createGraphProjectionKey(input)).not.toBe(createGraphProjectionKey({ ...input, maxCommits: 400 }));
-		expect(createGraphProjectionKey(input)).not.toBe(createGraphProjectionKey({ ...input, stashHashes: ['abc'] }));
+		expect(createGraphProjectionKey(input)).not.toBe(createGraphProjectionKey({ ...input, stashKeys: ['stash@{0}:abc'] }));
 	});
 
 	it('Should retain projections and mark them stale after a generation change', () => {
@@ -70,5 +70,14 @@ describe('RepositoryGraphCache', () => {
 
 		expect(cache.getProjection('/repo', 'main')).toBeNull();
 		expect(cache.getCommit('/repo', 'a')).toBeNull();
+	});
+
+	it('Should reject a projection produced for an obsolete generation', () => {
+		const cache = new RepositoryGraphCache<TestCommit, TestProjection>();
+		const generation = cache.getGeneration('/repo');
+		cache.advanceGeneration('/repo');
+
+		expect(cache.setProjectionForGeneration('/repo', 'main', generation, [], { hashes: [] })).toBe(false);
+		expect(cache.getProjection('/repo', 'main')).toBeNull();
 	});
 });

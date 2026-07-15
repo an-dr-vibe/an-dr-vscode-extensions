@@ -14,6 +14,7 @@ instance as its first argument rather than being a method.
 | `tableRender.ts` | Commit table row rendering |
 | `diffPreview.ts` | Quick-diff panel rendering and switching |
 | `fullDiffPanel.ts` | Full-diff bottom panel rendering |
+| `syntaxHighlight.ts` | File-path language detection and safe full-file syntax highlighting for diff rows |
 | `fileTree.ts` | File tree rendering (commit details view and full-diff panel) |
 | `repoState.ts` | Resolves per-repo config overrides against global defaults (ordering, show-stashes, reflog inclusion, …) |
 | `requestsState.ts` | Read-only accessors over current view state used when building outgoing request messages (branch list/options, remote head targets, commit id lookup) |

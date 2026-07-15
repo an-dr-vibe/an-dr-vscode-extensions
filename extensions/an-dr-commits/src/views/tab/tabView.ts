@@ -730,6 +730,7 @@ export class TabView extends Disposable {
 			workspaceState: workspaceState,
 			unableToFindGitMessage: UNABLE_TO_FIND_GIT_MSG,
 			mediaCssUri: this.getMediaUri('out.min.css'),
+			syntaxHighlightJsUri: this.getMediaUri('syntax-highlight.min.js'),
 			mediaJsUri: this.getMediaUri('out.min.js')
 		});
 		this.isGraphViewLoaded = html.isGraphViewLoaded;

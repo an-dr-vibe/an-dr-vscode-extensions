@@ -18,6 +18,7 @@ export interface CommitsWebviewHtmlRenderOptions {
 	readonly workspaceState: CommitsViewWorkspaceState;
 	readonly unableToFindGitMessage: string;
 	readonly mediaCssUri: vscode.Uri;
+	readonly syntaxHighlightJsUri: vscode.Uri;
 	readonly mediaJsUri: vscode.Uri;
 }
 
@@ -106,6 +107,7 @@ function getBodyHtml(options: CommitsWebviewHtmlRenderOptions, numRepos: number)
 			</div>
 			<div id="scrollShadow"></div>
 			<script nonce="${options.nonce}">var initialState = ${JSON.stringify(options.initialState)}, restoredState = ${JSON.stringify(options.restoredState)}, globalState = ${JSON.stringify(options.globalState)}, workspaceState = ${JSON.stringify(options.workspaceState)};</script>
+			<script nonce="${options.nonce}" src="${options.syntaxHighlightJsUri}"></script>
 			<script nonce="${options.nonce}" src="${options.mediaJsUri}"></script>
 			</body>`;
 	}

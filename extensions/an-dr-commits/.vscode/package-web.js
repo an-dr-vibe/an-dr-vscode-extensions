@@ -7,6 +7,7 @@ const STYLES_DIRECTORY = './web/styles';
 const SIDEBAR_STYLES_DIRECTORY = './web/sidebar/styles';
 const CODICONS_CSS_FILE = './node_modules/@vscode/codicons/dist/codicon.css';
 const CODICONS_FONT_FILE = './node_modules/@vscode/codicons/dist/codicon.ttf';
+const HIGHLIGHT_JS_DIRECTORY = './node_modules/@highlightjs/cdn-assets';
 
 const MAIN_CSS_FILE = 'main.css';
 const MAIN_JS_FILE = 'main.js';
@@ -20,13 +21,21 @@ const OUTPUT_TMP_JS_FILE = 'out.tmp.js';
 const SIDEBAR_OUTPUT_MIN_CSS_FILE = 'sidebar.min.css';
 const SIDEBAR_OUTPUT_MIN_JS_FILE = 'sidebar.min.js';
 const SIDEBAR_OUTPUT_TMP_JS_FILE = 'sidebar.tmp.js';
+const SYNTAX_HIGHLIGHT_OUTPUT_JS_FILE = 'syntax-highlight.min.js';
+
+const EXTRA_HIGHLIGHT_LANGUAGES = [
+	'clojure', 'cmake', 'coffeescript', 'dart', 'dockerfile', 'dos', 'elixir',
+	'erlang', 'fsharp', 'groovy', 'handlebars', 'haskell', 'julia', 'matlab',
+	'nginx', 'nix', 'ocaml', 'powershell', 'protobuf', 'reasonml', 'scala', 'vim',
+	'x86asm'
+];
 
 // web/common/ compiles alongside web/sidebar/ and the tab's own files; its output is shared by
 // both bundles below. web/sidebar/ is exclusive to the sidebar bundle.
 const COMMON_SCOPE_PREFIX = 'common/';
 const SIDEBAR_SCOPE_PREFIX = 'sidebar/';
 
-const RESERVED_OUTPUT_FILES = [OUTPUT_MIN_JS_FILE, OUTPUT_TMP_JS_FILE, SIDEBAR_OUTPUT_MIN_JS_FILE, SIDEBAR_OUTPUT_TMP_JS_FILE];
+const RESERVED_OUTPUT_FILES = [OUTPUT_MIN_JS_FILE, OUTPUT_TMP_JS_FILE, SIDEBAR_OUTPUT_MIN_JS_FILE, SIDEBAR_OUTPUT_TMP_JS_FILE, SYNTAX_HIGHLIGHT_OUTPUT_JS_FILE];
 
 const DEBUG = process.argv.length > 2 && process.argv[2] === 'debug';
 
@@ -144,6 +153,16 @@ function buildCssBundle({ stylesDir, includeCodicons, outFile }) {
 	fs.writeFileSync(path.join(MEDIA_DIRECTORY, outFile), cssFileContents);
 }
 
+/** Packages highlight.js' common build and selected extra grammars as a tab-only browser asset. */
+function buildSyntaxHighlightAsset() {
+	const files = [path.join(HIGHLIGHT_JS_DIRECTORY, 'highlight.min.js')];
+	EXTRA_HIGHLIGHT_LANGUAGES.forEach((language) => {
+		files.push(path.join(HIGHLIGHT_JS_DIRECTORY, 'languages', language + '.min.js'));
+	});
+	const contents = files.map((fileName) => fs.readFileSync(fileName).toString()).join('\r\n');
+	fs.writeFileSync(path.join(MEDIA_DIRECTORY, SYNTAX_HIGHLIGHT_OUTPUT_JS_FILE), contents);
+}
+
 console.log('Packaging Mode = ' + (DEBUG ? 'DEBUG' : 'PRODUCTION'));
 
 // Tab bundle: everything compiled from web/ except web/sidebar/'s own files - i.e. the existing
@@ -186,6 +205,7 @@ function removeEmptyDirsRecursive(dir) {
 	if (dir !== MEDIA_DIRECTORY && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
 }
 removeEmptyDirsRecursive(MEDIA_DIRECTORY);
+buildSyntaxHighlightAsset();
 
 Promise.all([tabBundle, sidebarBundle]).catch((err) => {
 	console.log('ERROR:');

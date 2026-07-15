@@ -17,8 +17,10 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 		return;
 	}
 
-	const oldLines = commitsGetDisplayLines(data.oldExists ? data.oldContent : null);
-	const newLines = commitsGetDisplayLines(data.newExists ? data.newContent : null);
+	const oldFilePath = view.currentDiffRequest ? view.currentDiffRequest.oldFilePath : '';
+	const newFilePath = view.currentDiffRequest ? view.currentDiffRequest.newFilePath : '';
+	const oldLines = commitsGetSyntaxHighlightedLines(data.oldExists ? data.oldContent : null, oldFilePath);
+	const newLines = commitsGetSyntaxHighlightedLines(data.newExists ? data.newContent : null, newFilePath);
 	const hunks = commitsParseUnifiedDiffHunks(data.diff);
 	const isSbs = view.fullDiffViewMode === 'sideBySide';
 	const isRaw = view.fullDiffViewMode === 'raw';
@@ -112,9 +114,9 @@ function commitsBuildFullUnifiedFileView(view: any, oldLines: string[], newLines
 				rows.push({ kind: 'context', oldNum: String(oldIndex++), newNum: String(newIndex++), content: newLines[newPos++], changed: false });
 				oldPos++;
 			} else if (line.startsWith('-')) {
-				rows.push({ kind: 'removed', oldNum: String(oldIndex++), newNum: '', content: oldLines[oldPos++] ?? line.slice(1), changed: true });
+				rows.push({ kind: 'removed', oldNum: String(oldIndex++), newNum: '', content: oldLines[oldPos++] ?? escapeHtml(line.slice(1)), changed: true });
 			} else if (line.startsWith('+')) {
-				rows.push({ kind: 'added', oldNum: '', newNum: String(newIndex++), content: newLines[newPos++] ?? line.slice(1), changed: true });
+				rows.push({ kind: 'added', oldNum: '', newNum: String(newIndex++), content: newLines[newPos++] ?? escapeHtml(line.slice(1)), changed: true });
 			}
 		}
 	}
@@ -132,7 +134,7 @@ function commitsBuildFullUnifiedFileView(view: any, oldLines: string[], newLines
 			continue;
 		}
 		const classes = row.changed ? 'diffRow fullDiffChanged fullDiffChangedNav diff' + row.kind.charAt(0).toUpperCase() + row.kind.slice(1) : 'diffRow diffContext';
-		html += '<div class="' + classes + '"><span class="diffLnOld">' + row.oldNum + '</span><span class="diffLnNew">' + row.newNum + '</span><span class="diffLnSep">│</span><span class="diffRowContent">' + escapeHtml(row.content) + '</span></div>';
+		html += '<div class="' + classes + '"><span class="diffLnOld">' + row.oldNum + '</span><span class="diffLnNew">' + row.newNum + '</span><span class="diffLnSep">│</span><span class="diffRowContent">' + row.content + '</span></div>';
 	}
 	return html + '</div>';
 }
@@ -220,12 +222,12 @@ function commitsBuildFullSideBySideFileView(view: any, oldLines: string[], newLi
 		if (row.leftContent === null) {
 			leftHtml += '<div class="diffSbsFullRow diffSbsPlaceholder' + navClass + '"></div>';
 		} else {
-			leftHtml += '<div class="diffSbsFullRow' + (row.changed && row.leftNum !== '' ? ' diffSbsRemoved fullDiffChanged' : ' diffContext') + navClass + '"><span class="diffLnOld">' + row.leftNum + '</span><span class="diffSbsContent">' + escapeHtml(row.leftContent) + '</span></div>';
+			leftHtml += '<div class="diffSbsFullRow' + (row.changed && row.leftNum !== '' ? ' diffSbsRemoved fullDiffChanged' : ' diffContext') + navClass + '"><span class="diffLnOld">' + row.leftNum + '</span><span class="diffSbsContent">' + row.leftContent + '</span></div>';
 		}
 		if (row.rightContent === null) {
 			rightHtml += '<div class="diffSbsFullRow diffSbsPlaceholder"></div>';
 		} else {
-			rightHtml += '<div class="diffSbsFullRow' + (row.changed && row.rightNum !== '' ? ' diffSbsAdded fullDiffChanged' : ' diffContext') + '"><span class="diffLnNew">' + row.rightNum + '</span><span class="diffSbsContent">' + escapeHtml(row.rightContent) + '</span></div>';
+			rightHtml += '<div class="diffSbsFullRow' + (row.changed && row.rightNum !== '' ? ' diffSbsAdded fullDiffChanged' : ' diffContext') + '"><span class="diffLnNew">' + row.rightNum + '</span><span class="diffSbsContent">' + row.rightContent + '</span></div>';
 		}
 	}
 	leftHtml += '</div></div>';

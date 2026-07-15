@@ -1757,6 +1757,7 @@
 		"test-and-report-coverage": "jest --verbose --coverage"
 	},
 	"dependencies": {
+		"@highlightjs/cdn-assets": "11.11.1",
 		"iconv-lite": "0.5.0"
 	},
 	"devDependencies": {

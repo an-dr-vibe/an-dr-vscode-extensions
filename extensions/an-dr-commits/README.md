@@ -19,8 +19,9 @@ View a Commits of your repository, and easily perform Git actions from the graph
         * Apply, Create Branch From, Drop & Pop Stashes
         * View annotated tag details (name, email, date and message)
         * Copy commit hashes, and branch, stash & tag names to the clipboard
-    * View commit details and file changes by clicking on a commit. On the Commit Details View you can:
-        * View the Visual Studio Code Diff of any file change by clicking on it.
+	* View commit details and file changes by clicking on a commit. On the Commit Details View you can:
+		* View the Visual Studio Code Diff of any file change by clicking on it.
+		* Inspect syntax-highlighted full-file diffs in unified or side-by-side mode for major languages.
         * Open the current version of any file that was affected in the commit.
         * Copy the path of any file that was affected in the commit to the clipboard.
         * Click on any HTTP/HTTPS url in the commit body to open it in your default web browser.

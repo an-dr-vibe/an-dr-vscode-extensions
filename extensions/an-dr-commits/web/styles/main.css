@@ -1028,6 +1028,19 @@ body.filesPanelHidden #commitDetailsViewInlineFiles{
 .diffSbsFullRow.diffSbsAdded{background:rgba(0,160,0,0.15);}
 .diffSbsFullRow.diffCompactSpacer{color:rgba(128,128,128,0.7);font-style:italic;text-align:center;background:rgba(128,128,128,0.08);padding:4px 8px;min-width:unset;}
 .diffSbsPlaceholder{background:rgba(128,128,128,0.08);min-height:1.4em;}
+.hljs-comment,.hljs-quote{color:var(--vscode-descriptionForeground);font-style:italic;}
+.hljs-keyword,.hljs-selector-tag,.hljs-literal,.hljs-doctag{color:var(--vscode-symbolIcon-keywordForeground,#c586c0);}
+.hljs-string,.hljs-regexp,.hljs-addition,.hljs-attribute{color:var(--vscode-symbolIcon-stringForeground,#ce9178);}
+.hljs-number,.hljs-meta .hljs-number{color:var(--vscode-symbolIcon-numberForeground,#b5cea8);}
+.hljs-title,.hljs-title.class_,.hljs-title.function_,.hljs-section{color:var(--vscode-symbolIcon-functionForeground,#dcdcaa);}
+.hljs-type,.hljs-class .hljs-title,.hljs-built_in{color:var(--vscode-symbolIcon-classForeground,#4ec9b0);}
+.hljs-variable,.hljs-template-variable,.hljs-params{color:var(--vscode-symbolIcon-variableForeground,#9cdcfe);}
+.hljs-attr,.hljs-property,.hljs-selector-attr{color:var(--vscode-symbolIcon-propertyForeground,#9cdcfe);}
+.hljs-meta,.hljs-meta .hljs-keyword,.hljs-symbol,.hljs-bullet{color:var(--vscode-symbolIcon-operatorForeground,#d4d4d4);}
+.hljs-tag,.hljs-name,.hljs-selector-id,.hljs-selector-class{color:var(--vscode-symbolIcon-methodForeground,#569cd6);}
+.hljs-deletion{color:var(--vscode-errorForeground,#f44747);}
+.hljs-emphasis{font-style:italic;}
+.hljs-strong{font-weight:bold;}
 .commitDetailsViewDiffViewBtn.hidden{
 	display:none !important;
 }

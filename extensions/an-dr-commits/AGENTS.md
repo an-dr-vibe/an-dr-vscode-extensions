@@ -224,7 +224,7 @@ Webview sends `loadRepoInfo` / `loadCommits` messages → `TabView.respondToMess
 `TabView` subscribes to the built-in Git extension API on startup (`setupNativeScmWatcher()`). When a repository's `ui.selected` state changes in VS Code Source Control, Commits resolves the selected Git API repository back to a known Commits repo via `repoManager.getKnownRepo()`, sends `loadRepos` with `loadViewTo`, then triggers a refresh so the webview reloads the newly selected repository. The tab and sidebar also sync repo selection with each other directly, independent of VS Code's own SCM selection — see `views/common/repoSelection.ts` and `TabView.configureRepoSelectionSync()`.
 
 ### Branch filter
-`BranchPanel.changeCallback` → `main.ts` sets `this.currentBranches` → `requestLoadCommits()` → backend `dataSource.getLog(repo, branches, ...)` → passes branch names directly as `git log <branch>` args. `null` means show all (`--branches --tags --remotes`). Tag names work as valid git refs.
+`BranchPanel.changeCallback` → `main/constructorInit.ts` sets `currentBranches` → requests a soft commit projection without clearing the current graph (ADR-015) → backend `dataSource.getCommits()` returns a cached exact projection or runs `git log <branch>`. `null` means show all (`--branches --tags --remotes`). Tag names work as valid git refs.
 
 ### Git operations
 User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` → `sendMessage({command: 'someAction', ...})` → `TabView.respondToMessage` dispatches to the matching `views/tab/*Actions.ts` handler → `commands.ts` (or `dataSource.ts` directly) runs git → response sent back to webview.

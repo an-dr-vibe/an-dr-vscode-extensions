@@ -46,8 +46,8 @@ function commitsInitDropdowns(view: any) {
 		if (expanded.length > values.length) view.branchDropdown.addToSelection(expanded);
 		view.maxCommits = view.config.initialLoadCommits;
 		view.saveState();
-		view.clearCommits();
-		view.requestLoadRepoInfoAndCommits(true, true);
+		// Keep the current graph interactive while the exact branch projection is resolved.
+		view.requestLoadRepoInfoAndCommits(false, true);
 	}, (values: string[]) => {
 		view.currentTags = values;
 		view.saveState();
@@ -119,8 +119,7 @@ function commitsInitDropdowns(view: any) {
 		}
 		view.maxCommits = view.config.initialLoadCommits;
 		view.saveState();
-		view.clearCommits();
-		view.requestLoadRepoInfoAndCommits(true, true);
+		view.requestLoadRepoInfoAndCommits(false, true);
 	}, () => { view.updateControlsLayout(); view.updateCommittedColumnDisplayMode(); });
 
 }

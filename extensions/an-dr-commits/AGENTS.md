@@ -64,7 +64,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | File | Purpose |
 |---|---|
 | `extension.ts` | Activation, registers all commands, wires up managers |
-| `dataSource.ts` | **All git commands** — spawns git, parses output. Repository loads share a one-use `for-each-ref` snapshot between repo-info and commits (ADR-014). Key methods: `getCommits()`, `getRepoInfo()`, `getLog()` |
+| `dataSource.ts` | **All git commands** — spawns git, parses output. Repository loads share a one-use `for-each-ref` snapshot (ADR-014), cache exact graph projections, and prewarm up to twelve individual refs after a show-all load (ADR-015). Key methods: `getCommits()`, `getRepoInfo()`, `getLog()` |
 | `repositoryGraphCache.ts` | Bounded per-repository immutable commit pool and exact graph-projection LRU with generation-based staleness (ADR-015) |
 | `repoManager.ts` | Discovers `.git` repos in the workspace, tracks them |
 | `commands.ts` | Handlers for every Git action (checkout, merge, push, tag, etc.) |

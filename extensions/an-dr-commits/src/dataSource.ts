@@ -60,6 +60,7 @@ export class DataSource extends Disposable {
 	private readonly graphCache = new RepositoryGraphCache<GitCommit, GitCommitData>();
 	private readonly pendingGraphProjections = new Map<string, Promise<GitCommitData>>();
 	private readonly refFingerprints = new Map<string, string>();
+	private readonly graphWarmupTimers = new Map<string, NodeJS.Timer>();
 
 	/**
 	 * Creates the Commits Data Source.
@@ -92,6 +93,7 @@ export class DataSource extends Disposable {
 			askpassManager,
 			gitEditorManager
 		);
+		this.registerDisposable({ dispose: () => this.graphWarmupTimers.forEach((timer) => clearTimeout(timer)) });
 	}
 
 	/**
@@ -237,8 +239,8 @@ export class DataSource extends Disposable {
 
 		const pending = this.loadCommits(repo, branches, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes)
 			.then((projection) => {
-				if (projection.error === null) {
-					this.graphCache.setProjectionForGeneration(repo, key, generation, projection.commits.filter((commit) => commit.hash !== UNCOMMITTED), projection);
+				if (projection.error === null && this.graphCache.setProjectionForGeneration(repo, key, generation, projection.commits.filter((commit) => commit.hash !== UNCOMMITTED), projection) && branches === null) {
+					this.scheduleGraphWarmup(repo, projection, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes, generation);
 				}
 				this.pendingGraphProjections.delete(pendingKey);
 				return projection;
@@ -465,6 +467,35 @@ export class DataSource extends Disposable {
 		const previous = this.refFingerprints.get(repo);
 		if (typeof previous !== 'undefined' && previous !== fingerprint) this.graphCache.advanceGeneration(repo);
 		this.refFingerprints.set(repo, fingerprint);
+	}
+
+	private scheduleGraphWarmup(repo: string, projection: GitCommitData, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>, generation: number): void {
+		const branches: string[] = [];
+		for (const commit of projection.commits) {
+			for (const head of commit.heads) {
+				if (!branches.includes(head)) branches.push(head);
+			}
+			for (const remote of commit.remotes) {
+				const name = 'remotes/' + remote.name;
+				if (!branches.includes(name)) branches.push(name);
+			}
+			if (branches.length >= 12) break;
+		}
+		if (branches.length === 0) return;
+
+		const existing = this.graphWarmupTimers.get(repo);
+		if (existing) clearTimeout(existing);
+		const timer = setTimeout(() => {
+			this.graphWarmupTimers.delete(repo);
+			let chain = Promise.resolve();
+			for (const branch of branches.slice(0, 12)) {
+				chain = chain.then(() => {
+					if (this.isDisposed() || this.graphCache.getGeneration(repo) !== generation) return;
+					return this.getCommits(repo, [branch], maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes).then(() => undefined, () => undefined);
+				});
+			}
+		}, 750);
+		this.graphWarmupTimers.set(repo, timer);
 	}
 
 	public getCommitDisplayInfo(repo: string, commitHash: string): Promise<CommitDisplayInfo | null> {

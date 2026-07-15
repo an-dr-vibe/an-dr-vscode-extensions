@@ -326,6 +326,7 @@ export class TabView extends Disposable {
 
 	/** Refreshes only the data invalidated by a repository file event. */
 	private async respondToRepoChange(kind: RepoRefreshKind) {
+		if (this.currentRepo !== null) this.dataSource.advanceGraphGeneration(this.currentRepo);
 		if (!this.panel.visible) return;
 		if (kind === 'full') {
 			this.sendMessage({ command: 'refresh' });
@@ -350,6 +351,8 @@ export class TabView extends Disposable {
 	 * @param msg The message that was received.
 	 */
 	private async respondToMutatingMessage(msg: RequestMessage) {
+		const repo = (msg as { readonly repo?: unknown }).repo;
+		if (typeof repo === 'string') this.dataSource.advanceGraphGeneration(repo);
 		this.repoFileWatcher.mute();
 		try {
 			await this.respondToMessage(msg);
@@ -769,7 +772,8 @@ export class TabView extends Disposable {
 			if (this.isDisposed()) return;
 			let refreshTimeout: NodeJS.Timer | null = null;
 
-			const scheduleRefresh = () => {
+			const scheduleRefresh = (repoPath: string | null = null) => {
+				if (repoPath !== null) this.dataSource.advanceGraphGeneration(repoPath);
 				if (refreshTimeout !== null) clearTimeout(refreshTimeout);
 				refreshTimeout = setTimeout(() => {
 					refreshTimeout = null;
@@ -825,7 +829,7 @@ export class TabView extends Disposable {
 			};
 
 			const watchRepo = (repo: any) => {
-				this.registerDisposables(repo.state.onDidChange(scheduleRefresh));
+				this.registerDisposables(repo.state.onDidChange(() => scheduleRefresh(repo.rootUri?.fsPath ?? null)));
 				if (repo?.ui && typeof repo.ui.onDidChange === 'function') {
 					this.registerDisposables(repo.ui.onDidChange(() => {
 						void syncVisibleRepositories(true);

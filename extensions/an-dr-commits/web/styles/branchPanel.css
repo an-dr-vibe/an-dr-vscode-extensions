@@ -455,4 +455,41 @@ body.compactUi .branchPanelRemoteDefaultBadge{
 	height:14px;
 	line-height:14px;
 }
+body.extraCompactUi #sidebar{
+	font-size:11px;
+}
+body.extraCompactUi .branchPanelList{
+	padding-top:1px;
+	padding-bottom:3px;
+}
+body.extraCompactUi .branchPanelSectionHeader,
+body.extraCompactUi .branchPanelFolder,
+body.extraCompactUi .branchPanelItem{
+	padding-top:0;
+	padding-bottom:0;
+}
+body.extraCompactUi .branchPanelFolderIcon{
+	width:14px;
+	height:14px;
+	min-width:14px;
+	margin-right:3px;
+}
+body.extraCompactUi .branchPanelFolderIcon .openFolderIcon,
+body.extraCompactUi .branchPanelFolderIcon .closedFolderIcon{
+	width:13px;
+	height:13px;
+	font-size:13px;
+	line-height:13px;
+}
+body.extraCompactUi .branchPanelCheck{
+	width:12px;
+	height:12px;
+	margin-right:3px;
+}
+body.extraCompactUi .branchPanelCurrentBadge,
+body.extraCompactUi .branchPanelRemoteDefaultBadge{
+	height:12px;
+	line-height:12px;
+	font-size:9px;
+}
 

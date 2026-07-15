@@ -2,7 +2,7 @@ import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 
 import { getConfig } from '../src/config';
-import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, FileViewType, GitResetMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType } from '../src/types';
+import { CommitDetailsViewLocation, CommitOrdering, DateFormatType, FileViewType, GitResetMode, GraphStyle, GraphUncommittedChangesStyle, RepoDropdownOrder, SquashMessageFormat, TabIconColourTheme, TagType, UiDensity } from '../src/types';
 
 import { expectRenamedExtensionSettingToHaveBeenCalled } from './helpers/expectations';
 
@@ -1589,7 +1589,21 @@ describe('Config', () => {
 	});
 
 	describe('enhancedAccessibility', testBooleanExtensionSetting('enhancedAccessibility', 'enhancedAccessibility', false));
-	describe('compactUi', testBooleanExtensionSetting('compactUi', 'compactUi', false));
+	describe('uiDensity', () => {
+		it.each([UiDensity.Big, UiDensity.Normal, UiDensity.Compact])('Should return %s when configured', (density) => {
+			vscode.mockExtensionSettingReturnValue('uiDensity', density);
+			expect(config.uiDensity).toBe(density);
+		});
+
+		it('Should use Normal by default', () => {
+			expect(config.uiDensity).toBe(UiDensity.Normal);
+		});
+
+		it('Should use Normal for an invalid value', () => {
+			vscode.mockExtensionSettingReturnValue('uiDensity', 'invalid');
+			expect(config.uiDensity).toBe(UiDensity.Normal);
+		});
+	});
 
 	describe('fileEncoding', () => {
 		it('Should return the configured value', () => {

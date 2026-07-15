@@ -3,6 +3,7 @@ jest.mock('vscode', () => vscode, { virtual: true });
 
 import { SidebarView, countChanges, getWorkingTreeChanges } from '../src/views/sidebar/sidebarView';
 import { EventEmitter } from '../src/utils/event';
+import { UiDensity } from '../src/types';
 
 function mockRepo(root: string, workingTreeChanges: any[] = [], indexChanges: any[] = [], mergeChanges: any[] = []) {
 	return {
@@ -68,15 +69,18 @@ async function flushPromises() {
 
 describe('SidebarView', () => {
 	it('Should expose compact density and aligned mini-graph geometry', () => {
-		vscode.mockExtensionSettingReturnValue('compactUi', true);
+		vscode.mockExtensionSettingReturnValue('uiDensity', UiDensity.Compact);
 		const view = createSidebarView(mockDataSource([]));
 
 		const state = view['_buildInitialState'](null, [], [], [], null, { status: 'ready', data: null }, 150);
 
-		expect(state.compactUi).toBe(true);
-		expect(state.graphConfig.grid.y).toBe(20);
-		expect(state.graphConfig.grid.offsetY).toBe(10);
-		vscode.mockExtensionSettingReturnValue('compactUi', false);
+		expect(state.uiDensity).toBe(UiDensity.Compact);
+		expect(state.graphConfig.grid.y).toBe(18);
+		expect(state.graphConfig.grid.offsetY).toBe(9);
+		vscode.mockExtensionSettingReturnValue('uiDensity', UiDensity.Normal);
+		expect(view['_buildInitialState'](null, [], [], [], null, { status: 'ready', data: null }, 150).graphConfig.grid.y).toBe(20);
+		vscode.mockExtensionSettingReturnValue('uiDensity', UiDensity.Big);
+		expect(view['_buildInitialState'](null, [], [], [], null, { status: 'ready', data: null }, 150).graphConfig.grid.y).toBe(24);
 		view.dispose();
 	});
 

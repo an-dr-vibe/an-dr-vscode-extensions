@@ -229,3 +229,10 @@ body.compactUi .cpSectionHeader{
 body.compactUi .cpFile .fileTreeFileRecord{
 	font-size:11px;
 }
+body.extraCompactUi .cpSectionHeader{
+	padding-top:0;
+	padding-bottom:0;
+}
+body.extraCompactUi .cpFile .fileTreeFileRecord{
+	font-size:10px;
+}

@@ -165,9 +165,10 @@ Compiles into the separate `sidebar.min.js`/`sidebar.min.css` bundle (see "Build
 | `styles/main.css` | Sidebar-only CSS, bundled into `sidebar.min.css` |
 | `global.d.ts` | Declares the `sidebarInitialState: GG.SidebarInitialState` global injected by `views/sidebar/html.ts` |
 
-The opt-in `an-dr-commits.compactUi` setting is carried in both typed initial-state payloads and
-adds `body.compactUi`. It reduces tab graph/sidebar/file-tree/diff density without resizing tab
-controls, while the Activity Bar sidebar also compacts its controls (ADR-016).
+`an-dr-commits.uiDensity` (`Big` / `Normal` / `Compact`) is carried in both typed initial-state
+payloads. `Normal` is the default and applies `body.compactUi`; `Compact` additionally applies
+`body.extraCompactUi`. Tab controls keep their original dimensions, while Activity Bar controls
+follow the selected density (ADR-017, superseding ADR-016).
 
 ### Styles (`web/styles/`)
 

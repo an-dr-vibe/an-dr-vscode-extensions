@@ -124,7 +124,8 @@ class CommitsView {
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
 		this.gitRepos = initialState.repos;
 		this.config = initialState.config;
-		alterClass(document.body, 'compactUi', this.config.compactUi);
+		alterClass(document.body, 'compactUi', this.config.uiDensity !== GG.UiDensity.Big);
+		alterClass(document.body, 'extraCompactUi', this.config.uiDensity === GG.UiDensity.Compact);
 		this.maxCommits = this.config.initialLoadCommits;
 		this.viewElem = viewElem;
 		this.currentRepoRefreshState = {

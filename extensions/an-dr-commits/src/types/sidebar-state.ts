@@ -1,7 +1,7 @@
 import { ErrorInfo } from './base';
 import { GitCommit } from './git-domain';
 import { GitWorkingTreeChangeMsg } from './message-protocol';
-import { GraphUncommittedChangesStyle } from './settings';
+import { GraphUncommittedChangesStyle, UiDensity } from './settings';
 
 /**
  * Raw ingredients for the sidebar's mini graph - deliberately not the reachability sets
@@ -44,7 +44,7 @@ export type SidebarGraphState =
  */
 export interface SidebarInitialState {
 	readonly repo: string | null;
-	readonly compactUi: boolean;
+	readonly uiDensity: UiDensity;
 	readonly repoPaths: ReadonlyArray<string>;
 	readonly starredRepos: ReadonlyArray<string>;
 	readonly changes: ReadonlyArray<GitWorkingTreeChangeMsg>;

@@ -108,10 +108,16 @@
 			"type": "object",
 			"title": "an-dr-commits",
 			"properties": {
-				"an-dr-commits.compactUi": {
-					"type": "boolean",
-					"default": false,
-					"description": "Use a denser commit graph, sidebars, file trees, and diff text. Controls in the Commits tab keep their normal size; controls in the Activity Bar sidebar are compacted."
+				"an-dr-commits.uiDensity": {
+					"type": "string",
+					"enum": ["Big", "Normal", "Compact"],
+					"enumDescriptions": [
+						"Use the original, spacious Commits UI.",
+						"Use the balanced, denser Commits UI.",
+						"Fit the most graph, sidebar, file tree, and diff content on screen."
+					],
+					"default": "Normal",
+					"description": "Controls the density of the commit graph, sidebars, file trees, and diff text. Commits tab controls keep their normal size; Activity Bar controls follow the selected density."
 				},
 				"an-dr-commits.commitDetailsView.autoCenter": {
 					"type": "boolean",

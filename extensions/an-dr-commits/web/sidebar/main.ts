@@ -65,7 +65,8 @@ class SidebarView {
 	private readonly repoDropdown: Dropdown;
 
 	constructor(state: GG.SidebarInitialState) {
-		alterClass(document.body, 'compactUi', state.compactUi);
+		alterClass(document.body, 'compactUi', state.uiDensity !== GG.UiDensity.Big);
+		alterClass(document.body, 'extraCompactUi', state.uiDensity === GG.UiDensity.Compact);
 		this.repo = state.repo;
 		this.repoPaths = state.repoPaths;
 		this.starredRepos = state.starredRepos;

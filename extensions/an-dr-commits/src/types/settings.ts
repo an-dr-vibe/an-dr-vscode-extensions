@@ -17,6 +17,12 @@ export const enum CommitOrdering {
 	Topological = 'topo'
 }
 
+export const enum UiDensity {
+	Big = 'Big',
+	Normal = 'Normal',
+	Compact = 'Compact'
+}
+
 export const enum AuthorAvatarMode {
 	Auto = 'auto',
 	FetchedOnly = 'fetched-only',

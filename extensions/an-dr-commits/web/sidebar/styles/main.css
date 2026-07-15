@@ -296,3 +296,65 @@ body.compactUi #cpCommitBtn{
 body.compactUi #cpCommitArrow{
 	padding:3px 6px;
 }
+body.activityChangesBody.extraCompactUi{
+	font-size:11px;
+}
+body.extraCompactUi #activityRepoRow,
+body.extraCompactUi #activityActionsRow{
+	gap:1px;
+	padding:1px 4px;
+}
+body.extraCompactUi .activityIconBtn{
+	width:22px;
+	height:22px;
+}
+body.extraCompactUi #activityRepoDropdown .dropdownCurrentValue{
+	line-height:18px;
+}
+body.extraCompactUi #activityContent{
+	padding-top:1px;
+}
+body.extraCompactUi .miniCommit{
+	height:18px;
+	gap:2px;
+}
+body.extraCompactUi .miniCommitMsg{
+	font-size:10px;
+}
+body.extraCompactUi .miniCommitHash{
+	font-size:8px;
+}
+body.extraCompactUi .fileTreeFolder,
+body.extraCompactUi .fileTreeRepo,
+body.extraCompactUi .fileTreeFileRecord{
+	line-height:16px;
+}
+body.extraCompactUi .fileTreeFileIcon,
+body.extraCompactUi .fileTreeFolderIcon,
+body.extraCompactUi .fileTreeRepoIcon,
+body.extraCompactUi .fileTreeFileAction{
+	height:16px;
+}
+body.extraCompactUi li > .fileTreeFolderContents{
+	padding-left:12px;
+}
+body.extraCompactUi .cpSectionHeader{
+	padding-top:0;
+	padding-bottom:0;
+}
+body.extraCompactUi #cpFooter{
+	gap:2px;
+	padding:3px 4px;
+}
+body.extraCompactUi #cpMessage{
+	min-height:36px;
+	padding:2px 4px;
+	font-size:10px;
+}
+body.extraCompactUi #cpCommitBtn{
+	padding:2px 6px;
+	font-size:10px;
+}
+body.extraCompactUi #cpCommitArrow{
+	padding:2px 5px;
+}

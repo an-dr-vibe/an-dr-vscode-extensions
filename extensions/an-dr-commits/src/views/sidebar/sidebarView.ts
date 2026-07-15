@@ -4,7 +4,7 @@ import { getConfig } from '../../config';
 import { DataSource, GitWorkingTreeChange, HeadInfo } from '../../dataSource';
 import { ExtensionState } from '../../extensionState';
 import { RepoManager } from '../../repoManager';
-import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode } from '../../types';
+import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode, UiDensity } from '../../types';
 import { UNCOMMITTED, getSortedRepositoryPaths, viewDiff } from '../../utils';
 import { Event } from '../../utils/event';
 import {
@@ -73,7 +73,7 @@ export class SidebarView implements vscode.Disposable {
 		}));
 		if (typeof vscode.workspace.onDidChangeConfiguration === 'function') {
 			this._disposables.push(vscode.workspace.onDidChangeConfiguration((event) => {
-				if (!event.affectsConfiguration('an-dr-commits.compactUi')) return;
+				if (!event.affectsConfiguration('an-dr-commits.uiDensity')) return;
 				this._hasRenderedOnce = false;
 				void this._refreshPanel();
 			}));
@@ -262,14 +262,15 @@ export class SidebarView implements vscode.Disposable {
 	private _buildInitialState(repo: string | null, repoPaths: string[], starredRepos: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, graph: SidebarGraphState, graphHeight: number): SidebarInitialState {
 		const config = getConfig();
 		const grid = config.graph.grid;
+		const gridY = config.uiDensity === UiDensity.Big ? grid.y : config.uiDensity === UiDensity.Normal ? 20 : 18;
 		return {
 			repo, repoPaths, starredRepos, changes, error, graphHeight, graph,
-			compactUi: config.compactUi,
+			uiDensity: config.uiDensity,
 			enhancedAccessibility: config.enhancedAccessibility,
 			graphConfig: {
 				showTags: config.graph.showTagsInActivityBar,
 				colours: config.graph.colours,
-				grid: config.compactUi ? { ...grid, y: 20, offsetY: 10 } : grid,
+				grid: gridY === grid.y ? grid : { ...grid, y: gridY, offsetY: gridY / 2 },
 				uncommittedChangesStyle: config.graph.uncommittedChanges
 			}
 		};

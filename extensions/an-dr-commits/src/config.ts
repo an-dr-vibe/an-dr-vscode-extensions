@@ -30,7 +30,8 @@ import {
 	RepoDropdownOrder,
 	SquashMessageFormat,
 	TabIconColourTheme,
-	TagType
+	TagType,
+	UiDensity
 } from './types';
 
 const VIEW_COLUMN_MAPPING: { [column: string]: vscode.ViewColumn } = {
@@ -661,9 +662,11 @@ class Config {
 		return !!this.config.get('retainContextWhenHidden', true);
 	}
 
-	/** Use reduced-density graph and sidebar presentation. */
-	get compactUi() {
-		return !!this.config.get('compactUi', false);
+	/** Get the selected UI density. */
+	get uiDensity(): UiDensity {
+		const configured = this.config.get<string>('uiDensity', UiDensity.Normal);
+		if (configured === UiDensity.Big || configured === UiDensity.Compact) return configured;
+		return UiDensity.Normal;
 	}
 
 	/**

@@ -213,7 +213,7 @@ export class TabView extends Disposable {
 
 			typeof vscode.workspace.onDidChangeConfiguration === 'function'
 				? vscode.workspace.onDidChangeConfiguration((event) => {
-					if (!event.affectsConfiguration('an-dr-commits.compactUi')) return;
+					if (!event.affectsConfiguration('an-dr-commits.uiDensity')) return;
 					this.loadViewTo = this.currentRepo === null ? null : { repo: this.currentRepo };
 					this.update();
 				})
@@ -677,7 +677,7 @@ export class TabView extends Disposable {
 				avatarMode: config.authorAvatarMode,
 				avatarSize: config.authorAvatarSize,
 				avatarShape: config.authorAvatarShape,
-				compactUi: config.compactUi,
+				uiDensity: config.uiDensity,
 				committedVisual: config.committedVisual,
 				branchPanel: config.branchPanel,
 				commitDetailsView: config.commitDetailsView,

@@ -89,6 +89,78 @@ body.compactUi .fileTreeFileAction{
 body.compactUi li > .fileTreeFolderContents{
 	padding-left:14px;
 }
+body.extraCompactUi #commitTable th,
+body.extraCompactUi #commitTable td{
+	font-size:11px;
+}
+body.extraCompactUi #commitTable td{
+	line-height:18px;
+}
+body.extraCompactUi #commitTable th{
+	line-height:14px;
+	padding-top:3px;
+	padding-bottom:3px;
+}
+body.extraCompactUi .commit .avatar.normal{
+	width:14px;
+	height:14px;
+	margin-top:2px;
+}
+body.extraCompactUi .commit .avatar.small{
+	width:12px;
+	height:12px;
+	margin-top:3px;
+}
+body.extraCompactUi .gitRef,
+body.extraCompactUi .gitRefName,
+body.extraCompactUi .gitRefHeadRemote{
+	height:15px;
+	line-height:15px;
+}
+body.extraCompactUi .gitRef{
+	font-size:10px;
+}
+body.extraCompactUi #commitDetailsView.inline td,
+body.extraCompactUi #commitDetailsView.docked{
+	font-size:10px;
+	line-height:13px;
+}
+body.extraCompactUi #fullDiffContent.diffSbsMode,
+body.extraCompactUi #fullDiffContent.diffRawMode{
+	font-size:10px;
+}
+body.extraCompactUi .diffRow,
+body.extraCompactUi .diffLnOld,
+body.extraCompactUi .diffLnNew,
+body.extraCompactUi .diffLnSep,
+body.extraCompactUi .diffRowContent,
+body.extraCompactUi .diffRawLine,
+body.extraCompactUi .diffSideBySideFull .diffSbsCell,
+body.extraCompactUi .diffSideBySideFull td .diffLnOld,
+body.extraCompactUi .diffSideBySideFull td .diffLnNew,
+body.extraCompactUi .diffSideBySideFull td .diffSbsContent,
+body.extraCompactUi .diffSbsFullRow,
+body.extraCompactUi .diffSbsFullRow .diffLnOld,
+body.extraCompactUi .diffSbsFullRow .diffLnNew,
+body.extraCompactUi .diffSbsFullRow .diffSbsContent{
+	line-height:1.15;
+}
+body.extraCompactUi .fileTreeFolder,
+body.extraCompactUi .fileTreeRepo,
+body.extraCompactUi .fileTreeFileRecord{
+	padding-top:0;
+	padding-bottom:0;
+	line-height:16px;
+}
+body.extraCompactUi .fileTreeFileIcon,
+body.extraCompactUi .fileTreeFolderIcon,
+body.extraCompactUi .fileTreeRepoIcon,
+body.extraCompactUi .fileTreeFileAction{
+	height:16px;
+}
+body.extraCompactUi li > .fileTreeFolderContents{
+	padding-left:12px;
+}
 
 body.unableToLoad{
 	margin:0 20px;

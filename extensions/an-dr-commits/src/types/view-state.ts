@@ -15,7 +15,8 @@ import {
 	FileViewType,
 	GraphStyle,
 	GraphUncommittedChangesStyle,
-	RepoDropdownOrder
+	RepoDropdownOrder,
+	UiDensity
 } from './settings';
 
 export interface CommitsViewInitialState {
@@ -63,7 +64,7 @@ export interface CommitsViewConfig {
 	readonly avatarMode: AuthorAvatarMode;
 	readonly avatarSize: AuthorAvatarSize;
 	readonly avatarShape: AuthorAvatarShape;
-	readonly compactUi: boolean;
+	readonly uiDensity: UiDensity;
 	readonly committedVisual: CommittedVisualMode;
 	readonly branchPanel: BranchPanelConfig;
 	readonly commitDetailsView: CommitDetailsViewConfig;

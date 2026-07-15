@@ -65,6 +65,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 |---|---|
 | `extension.ts` | Activation, registers all commands, wires up managers |
 | `dataSource.ts` | **All git commands** — spawns git, parses output. Repository loads share a one-use `for-each-ref` snapshot between repo-info and commits (ADR-014). Key methods: `getCommits()`, `getRepoInfo()`, `getLog()` |
+| `repositoryGraphCache.ts` | Bounded per-repository immutable commit pool and exact graph-projection LRU with generation-based staleness (ADR-015) |
 | `repoManager.ts` | Discovers `.git` repos in the workspace, tracks them |
 | `commands.ts` | Handlers for every Git action (checkout, merge, push, tag, etc.) |
 | `config.ts` | Reads VS Code settings into typed config objects |

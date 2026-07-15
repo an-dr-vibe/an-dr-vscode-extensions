@@ -9,7 +9,7 @@ must not collide (by name) with anything else in either bundle.
 | File | Purpose |
 |---|---|
 | `htmlHelpers.ts` | `escapeHtml`/`unescapeHtml`, `codicon(name, extraClass)` |
-| `refPills.ts` | `renderTagPill`, `renderTagOverflowPill` — the small colored ref/tag badges |
+| `refPills.ts` | `renderTagPill`, `renderTagOverflowPill` — the compact rectangular ref/tag badges |
 | `dropdown.ts` | `Dropdown` class — the repo-selector dropdown widget (used by the tab's top bar and the sidebar) |
 | `mathHelpers.ts` | `clamp(value, min, max)` |
 | `outsideClick.ts` | `addOutsideClickListener(isInside, onClick)` — dismiss-on-outside-click for `Dropdown`/`CustomSelect` |

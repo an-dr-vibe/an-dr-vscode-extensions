@@ -33,7 +33,8 @@ View a Commits of your repository, and easily perform Git actions from the graph
         * Code Review's can be performed on any commit, or between any two commits (not on Uncommitted Changes).
         * When a Code Review is started, all files needing to be reviewed are bolded. When you view the diff / open a file, it will then be un-bolded.
         * Code Reviews persist across Visual Studio Code sessions. They are automatically closed after 90 days of inactivity.
-    * View uncommitted changes, and compare the uncommitted changes with any commit.
+	* View uncommitted changes, and compare the uncommitted changes with any commit.
+	* Compact rectangular branch and tag badges alongside familiar circular graph vertices.
     * Hover over any commit vertex on the graph to see a tooltip indicating:
         * Whether the commit is included in the HEAD.
         * Which branches, tags and stashes include the commit. 

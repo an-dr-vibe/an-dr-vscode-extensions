@@ -1,6 +1,6 @@
 /**
- * Shared tag-ref-pill rendering (the `.gitRef.tag` markup contract) for every webview bundle
- * that shows tag pills - the tab's commit table and (from a later increment) the sidebar's
+ * Shared tag-ref-badge rendering (the `.gitRef.tag` markup contract) for every webview bundle
+ * that shows tag badges - the tab's commit table and the sidebar's
  * mini graph. See ADR-003. Global scope, no imports - same concatenated-script model as the
  * rest of web/.
  */
@@ -17,10 +17,10 @@ interface RenderTagPillOptions {
 }
 
 /**
- * Render a single tag reference pill.
+ * Render a single tag reference badge.
  * @param name The tag name (unescaped).
  * @param options Rendering variants - see {@link RenderTagPillOptions}.
- * @returns The pill HTML.
+ * @returns The badge HTML.
  */
 function renderTagPill(name: string, options: RenderTagPillOptions = {}): string {
 	const escapedName = escapeHtml(name);
@@ -33,10 +33,10 @@ function renderTagPill(name: string, options: RenderTagPillOptions = {}): string
 }
 
 /**
- * Render a compact "+N" overflow pill representing tags collapsed for lack of space.
+ * Render a compact "+N" overflow badge representing tags collapsed for lack of space.
  * @param count The number of additional tags represented.
  * @param title Tooltip listing the represented tag names.
- * @returns The pill HTML.
+ * @returns The badge HTML.
  */
 function renderTagOverflowPill(count: number, title: string): string {
 	const label = '+' + count;

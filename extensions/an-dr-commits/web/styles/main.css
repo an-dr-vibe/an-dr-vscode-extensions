@@ -1277,9 +1277,9 @@ body.vscode-high-contrast #commitTable tr.commit.findCurrentCommit{
 	height:19px;
 	line-height:19px;
 	margin-top:2px;
-	margin-right:5px;
+	margin-right:3px;
 	background-color:var(--an-dr-commits-color);
-	border-radius:999px;
+	border-radius:3px;
 	border:0;
 	color:var(--vscode-editor-background);
 	vertical-align:top;
@@ -1309,7 +1309,7 @@ body.vscode-light .gitRef{
 	font-size:14px;
 	line-height:14px;
 	flex:0 0 14px;
-	margin:0 2px 0 4px;
+	margin:0 1px 0 3px;
 	display:block;
 }
 
@@ -1317,16 +1317,16 @@ body.vscode-light .gitRef{
 	display:inline-block;
 	height:19px;
 	line-height:19px;
-	padding:0 7px 0 4px;
+	padding:0 4px 0 2px;
 	font-weight:400;
 }
 .gitRefHeadRemote{
 	display:inline-flex;
 	align-items:center;
-	gap:3px;
+	gap:2px;
 	height:19px;
 	line-height:19px;
-	padding:0 7px 0 6px;
+	padding:0 4px;
 	border-left:1px solid rgba(255,255,255,0.3);
 	color:inherit;
 	background-color:rgba(0,0,0,0.14);
@@ -1367,7 +1367,7 @@ body.vscode-light .gitRef{
 	min-width:19px;
 	height:19px;
 	padding:0;
-	border-radius:50%;
+	border-radius:3px;
 	margin-right:4px;
 }
 .gitRef.compact .gitRefName,
@@ -1385,18 +1385,18 @@ body.vscode-light .gitRef{
 	vertical-align:middle;
 }
 .gitRef.tag > .codicon{
-	width:16px;
-	height:16px;
-	font-size:16px;
-	line-height:16px;
-	flex:0 0 16px;
+	width:14px;
+	height:14px;
+	font-size:14px;
+	line-height:14px;
+	flex:0 0 14px;
 }
 .gitRef.compact.tag > .codicon{
-	width:16px;
-	height:16px;
-	font-size:16px;
-	line-height:16px;
-	flex:0 0 16px;
+	width:14px;
+	height:14px;
+	font-size:14px;
+	line-height:14px;
+	flex:0 0 14px;
 }
 
 .gitRefRemoteDefaultBadge{

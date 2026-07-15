@@ -165,6 +165,10 @@ Compiles into the separate `sidebar.min.js`/`sidebar.min.css` bundle (see "Build
 | `styles/main.css` | Sidebar-only CSS, bundled into `sidebar.min.css` |
 | `global.d.ts` | Declares the `sidebarInitialState: GG.SidebarInitialState` global injected by `views/sidebar/html.ts` |
 
+The opt-in `an-dr-commits.compactUi` setting is carried in both typed initial-state payloads and
+adds `body.compactUi`. It reduces tab graph/sidebar/file-tree/diff density without resizing tab
+controls, while the Activity Bar sidebar also compacts its controls (ADR-016).
+
 ### Styles (`web/styles/`)
 
 Each CSS file corresponds 1:1 to its component. All get concatenated into `media/out.min.css` (the tab bundle only — `web/sidebar/styles/main.css` is separate and goes into `media/sidebar.min.css`, see above).

@@ -15,6 +15,81 @@ body{
 	--files-panel-inline-width:220px;
 }
 
+/* Optional content density. Toolbar, dialog, and action-control dimensions stay unchanged. */
+body.compactUi #commitTable th,
+body.compactUi #commitTable td{
+	font-size:12px;
+}
+body.compactUi #commitTable td{
+	line-height:20px;
+}
+body.compactUi #commitTable th{
+	line-height:16px;
+	padding-top:4px;
+	padding-bottom:4px;
+}
+body.compactUi .commit .avatar.normal{
+	width:16px;
+	height:16px;
+	margin-top:2px;
+}
+body.compactUi .commit .avatar.small{
+	width:13px;
+	height:13px;
+	margin-top:3px;
+}
+body.compactUi .gitRef,
+body.compactUi .gitRefName,
+body.compactUi .gitRefHeadRemote{
+	height:17px;
+	line-height:17px;
+}
+body.compactUi .gitRef{
+	margin-top:1px;
+	font-size:11px;
+}
+body.compactUi #commitDetailsView.inline td,
+body.compactUi #commitDetailsView.docked{
+	font-size:11px;
+	line-height:15px;
+}
+body.compactUi #fullDiffContent.diffSbsMode,
+body.compactUi #fullDiffContent.diffRawMode{
+	font-size:11px;
+}
+body.compactUi .diffRow,
+body.compactUi .diffLnOld,
+body.compactUi .diffLnNew,
+body.compactUi .diffLnSep,
+body.compactUi .diffRowContent,
+body.compactUi .diffRawLine,
+body.compactUi .diffSideBySideFull .diffSbsCell,
+body.compactUi .diffSideBySideFull td .diffLnOld,
+body.compactUi .diffSideBySideFull td .diffLnNew,
+body.compactUi .diffSideBySideFull td .diffSbsContent,
+body.compactUi .diffSbsFullRow,
+body.compactUi .diffSbsFullRow .diffLnOld,
+body.compactUi .diffSbsFullRow .diffLnNew,
+body.compactUi .diffSbsFullRow .diffSbsContent{
+	line-height:1.25;
+}
+body.compactUi .fileTreeFolder,
+body.compactUi .fileTreeRepo,
+body.compactUi .fileTreeFileRecord{
+	padding-top:1px;
+	padding-bottom:1px;
+	line-height:18px;
+}
+body.compactUi .fileTreeFileIcon,
+body.compactUi .fileTreeFolderIcon,
+body.compactUi .fileTreeRepoIcon,
+body.compactUi .fileTreeFileAction{
+	height:18px;
+}
+body.compactUi li > .fileTreeFolderContents{
+	padding-left:14px;
+}
+
 body.unableToLoad{
 	margin:0 20px;
 }

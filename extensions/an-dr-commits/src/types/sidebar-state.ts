@@ -44,6 +44,7 @@ export type SidebarGraphState =
  */
 export interface SidebarInitialState {
 	readonly repo: string | null;
+	readonly compactUi: boolean;
 	readonly repoPaths: ReadonlyArray<string>;
 	readonly starredRepos: ReadonlyArray<string>;
 	readonly changes: ReadonlyArray<GitWorkingTreeChangeMsg>;

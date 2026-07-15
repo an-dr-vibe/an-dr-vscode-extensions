@@ -71,6 +71,13 @@ export class SidebarView implements vscode.Disposable {
 			this._syncRepoWatchers();
 			this._scheduleRefresh();
 		}));
+		if (typeof vscode.workspace.onDidChangeConfiguration === 'function') {
+			this._disposables.push(vscode.workspace.onDidChangeConfiguration((event) => {
+				if (!event.affectsConfiguration('an-dr-commits.compactUi')) return;
+				this._hasRenderedOnce = false;
+				void this._refreshPanel();
+			}));
+		}
 		this._syncRepoWatchers();
 		this._subscribeToGitApi();
 	}
@@ -254,13 +261,15 @@ export class SidebarView implements vscode.Disposable {
 	 */
 	private _buildInitialState(repo: string | null, repoPaths: string[], starredRepos: string[], changes: GitWorkingTreeChange[], error: ErrorInfo, graph: SidebarGraphState, graphHeight: number): SidebarInitialState {
 		const config = getConfig();
+		const grid = config.graph.grid;
 		return {
 			repo, repoPaths, starredRepos, changes, error, graphHeight, graph,
+			compactUi: config.compactUi,
 			enhancedAccessibility: config.enhancedAccessibility,
 			graphConfig: {
 				showTags: config.graph.showTagsInActivityBar,
 				colours: config.graph.colours,
-				grid: config.graph.grid,
+				grid: config.compactUi ? { ...grid, y: 20, offsetY: 10 } : grid,
 				uncommittedChangesStyle: config.graph.uncommittedChanges
 			}
 		};

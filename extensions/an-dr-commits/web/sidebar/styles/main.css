@@ -230,3 +230,69 @@ body.vscode-light #miniCommitGraph path.line,body.vscode-light #miniCommitGraph 
 	justify-content:center;
 	gap:4px;
 }
+
+/* In the narrow Activity Bar view compact mode applies to content and controls alike. */
+body.activityChangesBody.compactUi{
+	font-size:12px;
+}
+body.compactUi #activityRepoRow,
+body.compactUi #activityActionsRow{
+	gap:2px;
+	padding:2px 6px;
+}
+body.compactUi .activityIconBtn{
+	width:24px;
+	height:24px;
+}
+body.compactUi #activityRepoDropdown .dropdownCurrentValue{
+	line-height:20px;
+}
+body.compactUi #activityContent{
+	padding-top:2px;
+}
+body.compactUi .miniCommit{
+	height:20px;
+	gap:3px;
+}
+body.compactUi .miniCommitMsg{
+	font-size:11px;
+}
+body.compactUi .miniCommitHash{
+	font-size:9px;
+}
+body.compactUi .fileTreeFolder,
+body.compactUi .fileTreeRepo,
+body.compactUi .fileTreeFileRecord{
+	padding-top:0;
+	padding-bottom:0;
+	line-height:18px;
+}
+body.compactUi .fileTreeFileIcon,
+body.compactUi .fileTreeFolderIcon,
+body.compactUi .fileTreeRepoIcon,
+body.compactUi .fileTreeFileAction{
+	height:18px;
+}
+body.compactUi li > .fileTreeFolderContents{
+	padding-left:14px;
+}
+body.compactUi .cpSectionHeader{
+	padding-top:1px;
+	padding-bottom:1px;
+}
+body.compactUi #cpFooter{
+	gap:3px;
+	padding:4px 6px;
+}
+body.compactUi #cpMessage{
+	min-height:42px;
+	padding:3px 5px;
+	font-size:11px;
+}
+body.compactUi #cpCommitBtn{
+	padding:3px 8px;
+	font-size:11px;
+}
+body.compactUi #cpCommitArrow{
+	padding:3px 6px;
+}

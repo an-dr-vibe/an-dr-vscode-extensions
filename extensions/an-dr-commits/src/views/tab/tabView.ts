@@ -211,6 +211,14 @@ export class TabView extends Disposable {
 				}
 			}),
 
+			typeof vscode.workspace.onDidChangeConfiguration === 'function'
+				? vscode.workspace.onDidChangeConfiguration((event) => {
+					if (!event.affectsConfiguration('an-dr-commits.compactUi')) return;
+					this.loadViewTo = this.currentRepo === null ? null : { repo: this.currentRepo };
+					this.update();
+				})
+				: toDisposable(() => { }),
+
 			// Subscribe to events triggered when a repository is added or deleted from Commits
 			repoManager.onDidChangeRepos((event) => {
 				if (!this.panel.visible) return;
@@ -669,6 +677,7 @@ export class TabView extends Disposable {
 				avatarMode: config.authorAvatarMode,
 				avatarSize: config.authorAvatarSize,
 				avatarShape: config.authorAvatarShape,
+				compactUi: config.compactUi,
 				committedVisual: config.committedVisual,
 				branchPanel: config.branchPanel,
 				commitDetailsView: config.commitDetailsView,

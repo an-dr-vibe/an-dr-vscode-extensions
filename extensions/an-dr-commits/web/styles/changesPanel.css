@@ -221,3 +221,11 @@
 	color:var(--vscode-errorForeground, #f48771);
 	user-select:none;
 }
+
+body.compactUi .cpSectionHeader{
+	padding-top:1px;
+	padding-bottom:1px;
+}
+body.compactUi .cpFile .fileTreeFileRecord{
+	font-size:11px;
+}

@@ -1589,6 +1589,7 @@ describe('Config', () => {
 	});
 
 	describe('enhancedAccessibility', testBooleanExtensionSetting('enhancedAccessibility', 'enhancedAccessibility', false));
+	describe('compactUi', testBooleanExtensionSetting('compactUi', 'compactUi', false));
 
 	describe('fileEncoding', () => {
 		it('Should return the configured value', () => {

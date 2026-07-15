@@ -661,6 +661,11 @@ class Config {
 		return !!this.config.get('retainContextWhenHidden', true);
 	}
 
+	/** Use reduced-density graph and sidebar presentation. */
+	get compactUi() {
+		return !!this.config.get('compactUi', false);
+	}
+
 	/**
 	 * Get the value of the `an-dr-commits.showStatusBarItem` Extension Setting.
 	 */

@@ -108,6 +108,11 @@
 			"type": "object",
 			"title": "an-dr-commits",
 			"properties": {
+				"an-dr-commits.compactUi": {
+					"type": "boolean",
+					"default": false,
+					"description": "Use a denser commit graph, sidebars, file trees, and diff text. Controls in the Commits tab keep their normal size; controls in the Activity Bar sidebar are compacted."
+				},
 				"an-dr-commits.commitDetailsView.autoCenter": {
 					"type": "boolean",
 					"default": true,

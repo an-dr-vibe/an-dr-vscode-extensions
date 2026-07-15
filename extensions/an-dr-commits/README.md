@@ -72,6 +72,7 @@ View a Commits of your repository, and easily perform Git actions from the graph
 Detailed information of all Commits settings is available [here](https://github.com/mhutchie/vscode-an-dr-commits/wiki/Extension-Settings), including: descriptions, screenshots, default values and types.
 
 A summary of the Commits extension settings are:
+* **Compact UI**: Use denser graph rows, sidebars, file trees, and diff text. The tab's controls keep their normal size; Activity Bar controls are compacted too.
 * **Commit Details View**:
     * **Auto Center**: Automatically center the Commit Details View when it is opened.
     * **File View**:

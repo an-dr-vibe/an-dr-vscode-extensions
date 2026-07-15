@@ -67,6 +67,19 @@ async function flushPromises() {
 }
 
 describe('SidebarView', () => {
+	it('Should expose compact density and aligned mini-graph geometry', () => {
+		vscode.mockExtensionSettingReturnValue('compactUi', true);
+		const view = createSidebarView(mockDataSource([]));
+
+		const state = view['_buildInitialState'](null, [], [], [], null, { status: 'ready', data: null }, 150);
+
+		expect(state.compactUi).toBe(true);
+		expect(state.graphConfig.grid.y).toBe(20);
+		expect(state.graphConfig.grid.offsetY).toBe(10);
+		vscode.mockExtensionSettingReturnValue('compactUi', false);
+		view.dispose();
+	});
+
 	it('Should collect deduped uncommitted files for badge counts', () => {
 		const repo = mockRepo('/repo', [
 			gitChange('/repo/src/modified.ts', 5),

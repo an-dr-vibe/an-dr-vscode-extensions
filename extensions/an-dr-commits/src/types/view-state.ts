@@ -63,6 +63,7 @@ export interface CommitsViewConfig {
 	readonly avatarMode: AuthorAvatarMode;
 	readonly avatarSize: AuthorAvatarSize;
 	readonly avatarShape: AuthorAvatarShape;
+	readonly compactUi: boolean;
 	readonly committedVisual: CommittedVisualMode;
 	readonly branchPanel: BranchPanelConfig;
 	readonly commitDetailsView: CommitDetailsViewConfig;

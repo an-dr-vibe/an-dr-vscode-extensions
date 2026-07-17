@@ -53,6 +53,11 @@ export class DiffDocProvider extends Disposable implements vscode.TextDocumentCo
 		}
 
 		const request = decodeDiffDocUri(uri);
+		if (request.content !== undefined) {
+			const document = new DiffDocument(request.content);
+			this.docs.set(uri.toString(), document);
+			return document.value;
+		}
 		if (!request.exists) {
 			// Return empty file (used for one side of added / deleted file diff)
 			return '';
@@ -105,6 +110,8 @@ type DiffDocUriData = {
 	commit: string;
 	repo: string;
 	exists: boolean;
+	/** Pre-rendered content used when a Git object cannot be read as a file blob. */
+	content?: string;
 };
 
 /**
@@ -116,7 +123,7 @@ type DiffDocUriData = {
  * @param diffSide The side of the Diff View that this URI will be displayed on.
  * @returns A URI of the form `an-dr-commits://file.ext?encoded-data` or `file://path/file.ext`
  */
-export function encodeDiffDocUri(repo: string, filePath: string, commit: string, type: GitFileStatus, diffSide: DiffSide): vscode.Uri {
+export function encodeDiffDocUri(repo: string, filePath: string, commit: string, type: GitFileStatus, diffSide: DiffSide, content?: string): vscode.Uri {
 	if (commit === UNCOMMITTED && type !== GitFileStatus.Deleted) {
 		return vscode.Uri.file(path.join(repo, filePath));
 	}
@@ -126,7 +133,8 @@ export function encodeDiffDocUri(repo: string, filePath: string, commit: string,
 		filePath: getPathFromStr(filePath),
 		commit: commit,
 		repo: repo,
-		exists: !fileDoesNotExist
+		exists: !fileDoesNotExist,
+		content
 	};
 
 	let extension: string;

@@ -245,7 +245,7 @@ User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` →
 |---|---|
 | Top toolbar button order / overflow | `web/main/controlsLayout.ts` + `src/views/tab/webviewHtml.ts` |
 | Quick diff rendering / switching | `web/main/diffPreview.ts` + `web/styles/main.css` |
-| Full diff bottom panel rendering | `web/main/fullDiffPanel.ts` + `web/styles/main.css` |
+| Full diff bottom panel rendering, including submodule endpoint cards in Unified/Split and semantic Git output in Raw | `web/main/fullDiffPanel.ts` + `web/styles/main.css` |
 | Git command execution | `src/dataSource.ts` |
 | Branch/tag sidebar UI (tab's left panel, not the Activity Bar sidebar) | `web/branchPanel.ts` + `web/styles/branchPanel.css` |
 | Remote URL display / edit in sidebar | `web/branchPanelRender.ts` + `web/main/contextMenus/sidebar.ts` + `web/main/actions/gitActions.ts` |

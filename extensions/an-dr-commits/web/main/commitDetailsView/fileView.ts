@@ -57,6 +57,11 @@ function commitsHandleCommitDetailsViewFileClick(view: any, e: Event) {
 		sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath });
 	});
 
+	addListenerToClass('fileTreeRepo', 'click', (e) => {
+		const repoElem = (e.target as Element).closest('.fileTreeRepo') as HTMLElement | null;
+		if (repoElem !== null) view.openSubmoduleRepository(decodeURIComponent(repoElem.dataset.path!));
+	});
+
 	void e;
 }
 
@@ -91,6 +96,7 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 		const diffPossible = file.type === GG.GitFileStatus.Untracked || (file.additions !== null && file.deletions !== null);
 		const fileExistsAtThisRevision = file.type !== GG.GitFileStatus.Deleted && !isUncommitted;
 		const fileExistsAtThisRevisionAndDiffPossible = fileExistsAtThisRevision && diffPossible;
+		const submoduleRepo = view.currentRepo + '/' + file.newFilePath;
 		const visibility = view.config.contextMenuActionsVisibility.commitDetailsViewFile;
 
 		const getCommitHashForFile = (file: GG.GitFileChange) => {
@@ -131,13 +137,13 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 		const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
 			const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
 			view.commitDetailsViewUpdateFileState(file, fileElem, true, true);
-			view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
+			view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus, submodule: file.submodule };
 			view.currentDiffFilePath = file.newFilePath;
 			view.currentDiffText = null;
 			view.currentFullDiffData = null;
 			view.createFullDiffPanel();
 			view.hideDiffPane();
-			sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+			sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus, submodule: file.submodule });
 		};
 		const showRestoreFileConfirmation = (buttonTitle: string, actionLabel: string, commitHash: string, filePath: string) => {
 			dialog.showConfirmation('Are you sure you want to restore <b><i>' + escapeHtml(filePath) + '</i></b> from commit <b><i>' + abbrevCommit(commitHash) + '</i></b>? Any uncommitted changes made to this file will be overwritten.', buttonTitle, () => {
@@ -154,7 +160,7 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 					visible: visibility.viewDiff && diffPossible,
 					onClick: () => {
 						const { fromHash, toHash, fileStatus } = getFileDiffHashes(file);
-						sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+						sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus, submodule: file.submodule });
 					}
 				},
 				{
@@ -171,6 +177,11 @@ function commitsHandleCommitDetailsViewFileContext(view: any, e: Event) {
 					title: 'Open File',
 					visible: visibility.openFile && file.type !== GG.GitFileStatus.Deleted,
 					onClick: () => { view.commitDetailsViewUpdateFileState(file, fileElem, true, true); sendMessage({ command: 'openFile', repo: view.currentRepo, hash: getCommitHashForFile(file), filePath: file.newFilePath }); }
+				},
+				{
+					title: 'Open Submodule Repository',
+					visible: file.submodule !== null && typeof view.gitRepos[submoduleRepo] !== 'undefined',
+					onClick: () => view.openSubmoduleRepository(submoduleRepo)
 				}
 			],
 			[
@@ -261,18 +272,18 @@ function commitsHandleFilesPanelClick(view: any, e: MouseEvent) {
 	const { file, fromHash, toHash, fileStatus } = hashes;
 	const record = target.closest('.fileTreeFileRecord') as HTMLElement | null;
 	if (record !== null) commitsSetSelectedFileRecord(record);
-	view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus };
+	view.currentDiffRequest = { fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus, submodule: file.submodule };
 	view.currentDiffFilePath = file.newFilePath;
 	view.currentFullDiffData = null;
 	view.createFullDiffPanel();
-	sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+	sendMessage({ command: 'getFullDiffContent', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus, submodule: file.submodule });
 }
 
 function commitsHandleFilesPanelDblClick(view: any, e: MouseEvent) {
 	const hashes = commitsGetFilesPanelDiffHashes(view, e.target as Element);
 	if (!hashes) return;
 	const { file, fromHash, toHash, fileStatus } = hashes;
-	sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus });
+	sendMessage({ command: 'viewDiff', repo: view.currentRepo, fromHash, toHash, oldFilePath: file.oldFilePath, newFilePath: file.newFilePath, type: fileStatus, submodule: file.submodule });
 }
 
 function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.GitFileChange; fromHash: string; toHash: string; fileStatus: GG.GitFileStatus } | null {
@@ -293,7 +304,7 @@ function commitsGetFilesPanelDiffHashes(view: any, target: Element): { file: GG.
 			type: <GG.GitFileStatus>workingTreeChange.status,
 			additions: workingTreeChange.additions,
 			deletions: workingTreeChange.deletions,
-			submodule: null
+			submodule: workingTreeChange.submodule
 		};
 		return { file, fromHash: UNCOMMITTED, toHash: UNCOMMITTED, fileStatus: file.type };
 	}

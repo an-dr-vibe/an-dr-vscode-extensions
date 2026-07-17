@@ -201,6 +201,8 @@ with attribution preserved in the extension sources and notice files.
 Git commit graph webview with branch/tag filtering, repository selection, common Git actions,
 and an Activity Bar sidebar for working-tree changes. The sidebar shares the selected repository
 with the main Commits tab and shows a compact current-branch graph below the commit controls.
+Submodule full diffs show old/new commit details in Unified or Split view, while Raw shows Git's
+semantic submodule log.
 
 **Config** (`an-dr-commits.*`):
 

@@ -25,6 +25,7 @@ type CurrentDiffRequest = {
 	oldFilePath: string;
 	newFilePath: string;
 	type: GG.GitFileStatus;
+	submodule: GG.GitSubmoduleChange | null;
 };
 
 class CommitsView {
@@ -73,7 +74,7 @@ class CommitsView {
 	public fullDiffViewMode: 'unified' | 'sideBySide' | 'raw' = globalState.fullDiffViewMode;
 	public currentDiffRequest: CurrentDiffRequest | null = null;
 	public currentDiffText: string | null = null;
-	public currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null = null;
+	public currentFullDiffData: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean; oldSubmoduleCommit: GG.GitSubmoduleCommit | null; newSubmoduleCommit: GG.GitSubmoduleCommit | null } | null = null;
 	public currentDiffFilePath: string | null = null;
 	public previewCommitHash: string | null = null;
 	public filesPanelCommitHash: string | null = null;
@@ -170,6 +171,11 @@ class CommitsView {
 
 	public loadRepos(repos: GG.GitRepoSet, lastActiveRepo: string | null, loadViewTo: GG.LoadCommitsViewTo) {
 		return commitsLoadRepos(this, repos, lastActiveRepo, loadViewTo);
+	}
+
+	/** Switch the graph to a discovered submodule repository. */
+	public openSubmoduleRepository(repo: string) {
+		this.loadRepos(this.gitRepos, null, { repo });
 	}
 
 	private loadRepo(repo: string) {
@@ -574,7 +580,7 @@ class CommitsView {
 	private makeCommitDetailsViewResizable() { commitsMakeCommitDetailsViewResizable(this); }
 	private makeCommitDetailsViewDividerDraggable() { commitsMakeCommitDetailsViewDividerDraggable(this); }
 
-	public renderFullDiffContent(data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null) { commitsRenderFullDiffContent(this, data); }
+	public renderFullDiffContent(data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean; oldSubmoduleCommit: GG.GitSubmoduleCommit | null; newSubmoduleCommit: GG.GitSubmoduleCommit | null } | null) { commitsRenderFullDiffContent(this, data); }
 	public getDisplayLines(content: string | null): string[] { return commitsGetDisplayLines(content); }
 	public parseUnifiedDiffHunks(diff: string): { oldStart: number; newStart: number; lines: string[] }[] { return commitsParseUnifiedDiffHunks(diff); }
 	public buildFullUnifiedFileView(oldLines: string[], newLines: string[], hunks: { oldStart: number; newStart: number; lines: string[] }[]): string { return commitsBuildFullUnifiedFileView(this, oldLines, newLines, hunks); }

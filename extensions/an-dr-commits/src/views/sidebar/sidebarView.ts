@@ -5,7 +5,7 @@ import { DataSource, GitWorkingTreeChange, HeadInfo } from '../../dataSource';
 import { ExtensionState } from '../../extensionState';
 import { RepoManager } from '../../repoManager';
 import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode, UiDensity } from '../../types';
-import { UNCOMMITTED, getSortedRepositoryPaths, viewDiff } from '../../utils';
+import { UNCOMMITTED, getSortedRepositoryPaths, viewDiff, viewSubmoduleDiff } from '../../utils';
 import { Event } from '../../utils/event';
 import {
 	GitChangeCounts,
@@ -25,6 +25,11 @@ function resetModeLabel(mode: GitResetMode): string {
 		case GitResetMode.Mixed: return 'Mixed - Keep working tree, but reset index';
 		case GitResetMode.Hard: return 'Hard - Discard all changes';
 	}
+}
+
+/** Return whether staging this change can update the parent repository index. */
+function canStageWorkingTreeChange(change: GitWorkingTreeChange): boolean {
+	return change.submodule === null || change.submodule.oldSha !== change.submodule.newSha;
 }
 
 /**
@@ -384,13 +389,22 @@ export class SidebarView implements vscode.Disposable {
 				error = await this.dataSource.unstageFiles(repo, [msg.filePath]);
 				break;
 			case 'stageAll':
-				error = await this.dataSource.stageFiles(repo, this._changes.filter((c) => !c.staged).map((c) => c.path));
+				{
+					const files = this._changes.filter((c) => !c.staged && canStageWorkingTreeChange(c)).map((c) => c.path);
+					error = files.length > 0 ? await this.dataSource.stageFiles(repo, files) : null;
+				}
 				break;
 			case 'unstageAll':
-				error = await this.dataSource.unstageFiles(repo, this._changes.filter((c) => c.staged).map((c) => c.path));
+				{
+					const files = this._changes.filter((c) => c.staged && canStageWorkingTreeChange(c)).map((c) => c.path);
+					error = files.length > 0 ? await this.dataSource.unstageFiles(repo, files) : null;
+				}
 				break;
 			case 'discard':
 				error = await this.dataSource.discardFileChanges(repo, [msg.filePath], msg.isUntracked, !!msg.restoreToIndex);
+				break;
+			case 'discardSubmodule':
+				error = await this.dataSource.discardSubmoduleChanges(repo, msg.filePath, msg.cleanUntracked);
 				break;
 			case 'commit':
 				error = await this._commit(repo, msg.message, msg.amend);
@@ -400,7 +414,9 @@ export class SidebarView implements vscode.Disposable {
 				if (change !== undefined) {
 					// viewDiff falls back to opening the file directly for GitFileStatus.Untracked,
 					// since there's nothing to diff against - no need to special-case it here too.
-					error = await viewDiff(repo, UNCOMMITTED, UNCOMMITTED, change.oldPath || change.path, change.path, this._toGitFileStatus(change.status));
+					error = change.submodule !== null
+						? await viewSubmoduleDiff(repo, UNCOMMITTED, UNCOMMITTED, change.path, this.dataSource)
+						: await viewDiff(repo, UNCOMMITTED, UNCOMMITTED, change.oldPath || change.path, change.path, this._toGitFileStatus(change.status));
 				}
 				break;
 			}
@@ -483,8 +499,8 @@ export class SidebarView implements vscode.Disposable {
 		if (!commitMessage && !amend) return 'Commit message is required.';
 		const hasStagedChanges = this._changes.some((c) => c.staged);
 		if (!hasStagedChanges) {
-			const files = this._changes.map((c) => c.path);
-			if (files.length === 0) return null;
+			const files = this._changes.filter(canStageWorkingTreeChange).map((c) => c.path);
+			if (files.length === 0) return 'No submodule pointer change is available to commit. Commit the nested submodule changes inside the submodule first.';
 			const stageError = await this.dataSource.stageFiles(repo, files);
 			if (stageError !== null) return stageError;
 		}

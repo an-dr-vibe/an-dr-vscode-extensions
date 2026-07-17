@@ -31,6 +31,9 @@ function _cpBasename(p: string) {
 function _cpStatusTitle(status: GG.GitWorkingTreeChangeMsg['status']) {
 	return status === 'U' ? 'Untracked' : status === 'A' ? 'Added' : status === 'D' ? 'Deleted' : status === 'R' ? 'Renamed' : 'Modified';
 }
+function _cpCanStage(f: GG.GitWorkingTreeChangeMsg) {
+	return f.submodule === null || f.submodule.oldSha !== f.submodule.newSha;
+}
 function _cpRenderAddDel(f: GG.GitWorkingTreeChangeMsg): string {
 	if (f.additions === null || f.deletions === null) return '';
 	return '<span class="fileTreeFileAddDel cpFileAddDel">(<span class="fileTreeFileAdd" title="' + f.additions + ' addition' + (f.additions !== 1 ? 's' : '') + '">+' + f.additions + '</span>|<span class="fileTreeFileDel" title="' + f.deletions + ' deletion' + (f.deletions !== 1 ? 's' : '') + '">-' + f.deletions + '</span>)</span>';
@@ -44,21 +47,20 @@ function _cpRenderFileRow(f: GG.GitWorkingTreeChangeMsg, isStaged: boolean): str
 	const stageTitle = isStaged ? 'Unstage file' : 'Stage file';
 	const stageAction = isStaged ? 'unstage' : 'stage';
 	const stageIcon = isStaged ? ICONS.minus : ICONS.plus;
-	const discardTitle = 'Discard changes';
-	const changeTypeMessage = _cpStatusTitle(f.status) + (f.oldPath ? ' (' + escapeHtml(f.oldPath) + ' → ' + encodedPath + ')' : '');
+	const discardTitle = f.submodule === null ? 'Discard changes' : 'Reset submodule';
+	const changeTypeMessage = (f.submodule === null ? '' : 'Submodule • ') + _cpStatusTitle(f.status) + (f.oldPath ? ' (' + escapeHtml(f.oldPath) + ' → ' + encodedPath + ')' : '');
 	return `<div class="cpFile fileTreeFileRecord" data-path="${encodedPath}" data-staged="${isStaged}">` +
 		`<span class="fileTreeFile gitDiffPossible" title="Click to View Diff • ${changeTypeMessage}">` +
-		`<span class="fileTreeFileIcon">${getFileIcon(f.path)}</span>` +
+		`<span class="fileTreeFileIcon">${f.submodule === null ? getFileIcon(f.path) : ICONS.closedFolder}</span>` +
 		`<span class="gitFileName ${f.status}" title="${encodedPath + (f.oldPath ? ' ← ' + escapeHtml(f.oldPath) : '')}">${name}</span>` +
 		`</span>` +
 		(initialState.config.enhancedAccessibility ? `<span class="fileTreeFileType" title="${changeTypeMessage}">${f.status}</span>` : '') +
 		_cpRenderAddDel(f) +
 		`<span class="cpFileActions">` +
-		(isStaged
+		(_cpCanStage(f) && (isStaged
 			? `<button class="cpFileBtn" data-action="${stageAction}" data-path="${encodedPath}" title="${stageTitle}">${stageIcon}</button>`
-			: `<button class="cpFileBtn" data-action="${stageAction}" data-path="${encodedPath}" title="${stageTitle}">${stageIcon}</button>` +
-			  `<button class="cpFileBtn" data-action="discard" data-path="${encodedPath}" title="${discardTitle}">${ICONS.discard}</button>`
-		) +
+			: `<button class="cpFileBtn" data-action="${stageAction}" data-path="${encodedPath}" title="${stageTitle}">${stageIcon}</button>`)) +
+		(!isStaged ? `<button class="cpFileBtn" data-action="discard" data-path="${encodedPath}" title="${discardTitle}">${ICONS.discard}</button>` : '') +
 		`</span>` +
 		`</div>`;
 }
@@ -148,7 +150,7 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 		if (!commitBtn) return;
 		const hasMessage = !!(msgEl && msgEl.value.trim());
 		const hasDefault = !!(initialState.config.defaultCommitMessage);
-		const canCommit = _cpChanges.length > 0 && (hasMessage || hasDefault);
+		const canCommit = _cpChanges.some((c) => c.staged || _cpCanStage(c)) && (hasMessage || hasDefault);
 		commitBtn.disabled = !canCommit;
 		const arrow = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
 		if (arrow) arrow.disabled = !canCommit;
@@ -186,7 +188,7 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 			if (!msg || !repo || commitBtn.disabled) return;
 			const hasStagedChanges = _cpChanges.some((c) => c.staged);
 			if (!hasStagedChanges) {
-				const files = _cpChanges.map((c) => c.path);
+				const files = _cpChanges.filter(_cpCanStage).map((c) => c.path);
 				if (!files.length) return;
 				_cpPendingCommit = { msg, amend: false };
 				sendMessage({ command: 'stageFiles', repo, files });
@@ -259,6 +261,7 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 			if (!fileEntry) return;
 			const isUntracked = fileEntry.status === 'U';
 			const isDeleted = fileEntry.status === 'D';
+			const isSubmodule = fileEntry.submodule !== null;
 
 			contextMenu.show([
 				[
@@ -272,7 +275,8 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 							toHash: UNCOMMITTED,
 							oldFilePath: fileEntry.oldPath || filePath,
 							newFilePath: filePath,
-							type: fileEntry.status as GG.GitFileStatus
+							type: fileEntry.status as GG.GitFileStatus,
+							submodule: fileEntry.submodule
 						})
 					},
 					{
@@ -284,18 +288,18 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 				[
 					{
 						title: 'Stage Changes',
-						visible: !isStaged,
+						visible: !isStaged && _cpCanStage(fileEntry),
 						onClick: () => sendMessage({ command: 'stageFiles', repo, files: [filePath] })
 					},
 					{
 						title: 'Unstage Changes',
-						visible: isStaged,
+						visible: isStaged && _cpCanStage(fileEntry),
 						onClick: () => sendMessage({ command: 'unstageFiles', repo, files: [filePath] })
 					},
 					{
-						title: 'Discard Changes',
+						title: isSubmodule ? 'Reset Submodule' + ELLIPSIS : 'Discard Changes',
 						visible: !isStaged && !isUntracked,
-						onClick: () => _cpShowDiscardDialog(repo, filePath)
+						onClick: () => isSubmodule ? _cpShowDiscardSubmoduleDialog(repo, filePath) : _cpShowDiscardDialog(repo, filePath)
 					},
 					{
 						title: 'Delete Untracked File',
@@ -345,10 +349,10 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 			} else if (action === 'unstage' && filePath) {
 				sendMessage({ command: 'unstageFiles', repo, files: [filePath] });
 			} else if (action === 'stageAll') {
-				const files = _cpChanges.filter((c) => !c.staged).map((c) => c.path);
+				const files = _cpChanges.filter((c) => !c.staged && _cpCanStage(c)).map((c) => c.path);
 				if (files.length) sendMessage({ command: 'stageFiles', repo, files });
 			} else if (action === 'unstageAll') {
-				const files = _cpChanges.filter((c) => c.staged).map((c) => c.path);
+				const files = _cpChanges.filter((c) => c.staged && _cpCanStage(c)).map((c) => c.path);
 				if (files.length) sendMessage({ command: 'unstageFiles', repo, files });
 			} else if (action === 'discard' && filePath) {
 				const fileEntry = _cpChanges.find((c) => c.path === filePath);
@@ -361,7 +365,7 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 						null
 					);
 				} else {
-					_cpShowDiscardDialog(repo, filePath);
+					fileEntry !== undefined && fileEntry.submodule !== null ? _cpShowDiscardSubmoduleDialog(repo, filePath) : _cpShowDiscardDialog(repo, filePath);
 				}
 			}
 			void isStaged;
@@ -423,7 +427,7 @@ function filesPanelHandleWorkingTreeChanges(changes: GG.GitWorkingTreeChangeMsg[
 		const msgEl2 = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
 		const hasMessage2 = !!(msgEl2 && msgEl2.value.trim());
 		const hasDefault2 = !!(initialState.config.defaultCommitMessage);
-		const canCommit = _cpChanges.length > 0 && (hasMessage2 || hasDefault2);
+		const canCommit = _cpChanges.some((c) => c.staged || _cpCanStage(c)) && (hasMessage2 || hasDefault2);
 		commitBtn2.disabled = !canCommit;
 		if (arrowBtn2) arrowBtn2.disabled = !canCommit;
 	}
@@ -465,6 +469,19 @@ function _cpShowDiscardDialog(repo: string, filePath: string) {
 		[{ type: DialogInputType.Radio, name: '', options, default: 'head' }],
 		'Reset',
 		(values) => sendMessage({ command: 'discardFileChanges', repo, files: [filePath], isUntracked: false, restoreToIndex: values[0] === 'index' }),
+		null
+	);
+}
+
+function _cpShowDiscardSubmoduleDialog(repo: string, filePath: string) {
+	dialog.showForm(
+		'Reset submodule <b><i>' + escapeHtml(filePath) + '</i></b>:',
+		[{ type: DialogInputType.Radio, name: '', options: [
+			{ name: 'Reset checkout', value: 'safe', description: 'Restore the recorded commit and preserve nested untracked files' },
+			{ name: 'Reset and delete untracked files', value: 'clean', description: 'Restore the recorded commit and delete untracked files inside the submodule' }
+		], default: 'safe' }],
+		'Reset Submodule',
+		(values) => sendMessage({ command: 'discardSubmoduleChanges', repo, filePath, cleanUntracked: values[0] === 'clean' }),
 		null
 	);
 }

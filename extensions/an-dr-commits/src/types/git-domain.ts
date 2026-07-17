@@ -76,6 +76,20 @@ export interface GitFileChange {
 export interface GitSubmoduleChange {
 	readonly oldSha: string | null;
 	readonly newSha: string | null;
+	/** TRUE when tracked content inside the submodule differs from its checked-out commit. */
+	readonly trackedChanges: boolean;
+	/** TRUE when the submodule contains untracked content. */
+	readonly untrackedChanges: boolean;
+}
+
+/** Commit metadata rendered alongside a semantic submodule diff. */
+export interface GitSubmoduleCommit {
+	readonly hash: string;
+	readonly author: string;
+	readonly authorEmail: string;
+	readonly authorDate: number;
+	readonly subject: string;
+	readonly body: string;
 }
 
 export const enum GitFileStatus {

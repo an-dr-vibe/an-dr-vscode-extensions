@@ -1,4 +1,4 @@
-function commitsRenderFullDiffContent(view: any, data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean } | null) {
+function commitsRenderFullDiffContent(view: any, data: { diff: string | null; oldContent: string | null; newContent: string | null; oldExists: boolean; newExists: boolean; oldSubmoduleCommit: GG.GitSubmoduleCommit | null; newSubmoduleCommit: GG.GitSubmoduleCommit | null } | null) {
 	view.currentDiffText = data !== null ? data.diff : null;
 	view.currentFullDiffData = data;
 	const contentElem = document.getElementById('fullDiffContent');
@@ -13,6 +13,20 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 
 	if (data === null || data.diff === null) {
 		contentElem.innerHTML = '<div class="commitDetailsViewDiffMessage">Unable to load file contents</div>';
+		view.attachFullDiffHunkNav();
+		return;
+	}
+	if (data.oldSubmoduleCommit !== null || data.newSubmoduleCommit !== null) {
+		const isSbs = view.fullDiffViewMode === 'sideBySide';
+		const isRaw = view.fullDiffViewMode === 'raw';
+		contentElem.innerHTML = isRaw
+			? commitsBuildRawDiffView(data.diff)
+			: isSbs
+			? commitsBuildSubmoduleSplitDiffView(data.oldSubmoduleCommit, data.newSubmoduleCommit)
+			: commitsBuildSubmoduleUnifiedDiffView(data.oldSubmoduleCommit, data.newSubmoduleCommit);
+		alterClass(contentElem, 'diffSbsMode', false);
+		alterClass(contentElem, 'diffRawMode', isRaw);
+		contentElem.scrollTop = 0;
 		view.attachFullDiffHunkNav();
 		return;
 	}
@@ -42,6 +56,31 @@ function commitsRenderFullDiffContent(view: any, data: { diff: string | null; ol
 		}
 	}
 	view.attachFullDiffHunkNav();
+}
+
+/** Render one submodule endpoint with the same author/date/body hierarchy as commit details. */
+function commitsBuildSubmoduleCommitCard(commit: GG.GitSubmoduleCommit | null, label: string): string {
+	let html = '<article class="submoduleDiffCommit"><div class="submoduleDiffCommitLabel">' + label + '</div>';
+	if (commit === null) return html + '<div class="submoduleDiffCommitMissing">Not present in this version</div></article>';
+	return html + '<div class="submoduleDiffCommitSubject">' + escapeHtml(commit.subject) + '</div>'
+		+ '<div class="submoduleDiffCommitMeta"><b>Commit:</b> ' + escapeHtml(commit.hash) + '<br>'
+		+ '<b>Author:</b> ' + escapeHtml(commit.author) + (commit.authorEmail !== '' ? ' &lt;' + escapeHtml(commit.authorEmail) + '&gt;' : '') + '<br>'
+		+ '<b>Date:</b> ' + escapeHtml(formatLongDate(commit.authorDate)) + '</div>'
+		+ (commit.body !== '' ? '<div class="submoduleDiffCommitBody">' + escapeHtml(commit.body).replace(/\n/g, '<br>') + '</div>' : '')
+		+ '</article>';
+}
+
+/** Render submodule gitlink endpoints vertically for the unified view. */
+function commitsBuildSubmoduleUnifiedDiffView(oldCommit: GG.GitSubmoduleCommit | null, newCommit: GG.GitSubmoduleCommit | null): string {
+	return '<div class="submoduleDiffView"><div class="submoduleDiffHeading">Submodule commits</div>'
+		+ commitsBuildSubmoduleCommitCard(oldCommit, 'Old commit')
+		+ commitsBuildSubmoduleCommitCard(newCommit, 'New commit') + '</div>';
+}
+
+/** Render the old and new submodule gitlink endpoints in separate panes. */
+function commitsBuildSubmoduleSplitDiffView(oldCommit: GG.GitSubmoduleCommit | null, newCommit: GG.GitSubmoduleCommit | null): string {
+	return '<div class="submoduleDiffSplitView"><div class="submoduleDiffPane">' + commitsBuildSubmoduleCommitCard(oldCommit, 'Old commit')
+		+ '</div><div class="submoduleDiffPane">' + commitsBuildSubmoduleCommitCard(newCommit, 'New commit') + '</div></div>';
 }
 
 function commitsGetDisplayLines(content: string | null): string[] {

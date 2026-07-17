@@ -15,6 +15,10 @@ function sidebarStatusTitle(status: GG.GitWorkingTreeChangeMsg['status']): strin
 	return status === 'U' ? 'Untracked' : status === 'A' ? 'Added' : status === 'D' ? 'Deleted' : status === 'R' ? 'Renamed' : 'Modified';
 }
 
+function sidebarCanStage(f: GG.GitWorkingTreeChangeMsg): boolean {
+	return f.submodule === null || f.submodule.oldSha !== f.submodule.newSha;
+}
+
 function sidebarRenderAddDel(f: GG.GitWorkingTreeChangeMsg): string {
 	if (f.additions === null || f.deletions === null) return '';
 	return '<span class="fileTreeFileAddDel cpFileAddDel">(<span class="fileTreeFileAdd" title="' + f.additions + ' addition' + (f.additions !== 1 ? 's' : '') + '">+' + f.additions + '</span>|<span class="fileTreeFileDel" title="' + f.deletions + ' deletion' + (f.deletions !== 1 ? 's' : '') + '">-' + f.deletions + '</span>)</span>';
@@ -26,20 +30,19 @@ function sidebarRenderFileRow(f: GG.GitWorkingTreeChangeMsg, isStaged: boolean, 
 	const stageTitle = isStaged ? 'Unstage file' : 'Stage file';
 	const stageAction = isStaged ? 'unstage' : 'stage';
 	const stageIcon = isStaged ? codicon('remove') : codicon('add');
-	const changeTypeMessage = sidebarStatusTitle(f.status) + (f.oldPath ? ' (' + escapeHtml(f.oldPath) + ' -> ' + encodedPath + ')' : '');
-	return `<div class="cpFile fileTreeFileRecord" data-path="${encodedPath}" data-status="${f.status}" data-staged="${isStaged}">` +
+	const changeTypeMessage = (f.submodule === null ? '' : 'Submodule • ') + sidebarStatusTitle(f.status) + (f.oldPath ? ' (' + escapeHtml(f.oldPath) + ' -> ' + encodedPath + ')' : '');
+	return `<div class="cpFile fileTreeFileRecord" data-path="${encodedPath}" data-status="${f.status}" data-staged="${isStaged}" data-submodule="${f.submodule !== null}">` +
 		`<span class="fileTreeFile gitDiffPossible" title="Click to View Diff - ${changeTypeMessage}">` +
-		`<span class="fileTreeFileIcon">${codicon('file', 'fileTreeCodicon fileIcon')}</span>` +
+		`<span class="fileTreeFileIcon">${f.submodule === null ? codicon('file', 'fileTreeCodicon fileIcon') : codicon('repo', 'fileTreeCodicon fileIcon')}</span>` +
 		`<span class="gitFileName ${f.status}" title="${encodedPath + (f.oldPath ? ' <- ' + escapeHtml(f.oldPath) : '')}">${name}</span>` +
 		`</span>` +
 		(enhancedAccessibility ? `<span class="fileTreeFileType" title="${changeTypeMessage}">${f.status}</span>` : '') +
 		sidebarRenderAddDel(f) +
 		`<span class="cpFileActions">` +
-		(isStaged
+		(sidebarCanStage(f) && (isStaged
 			? `<button class="cpFileBtn" data-action="${stageAction}" data-path="${encodedPath}" title="${stageTitle}">${stageIcon}</button>`
-			: `<button class="cpFileBtn" data-action="${stageAction}" data-path="${encodedPath}" title="${stageTitle}">${stageIcon}</button>` +
-			  `<button class="cpFileBtn" data-action="discard" data-path="${encodedPath}" data-untracked="${f.status === 'U'}" title="Discard changes">${codicon('discard')}</button>`
-		) +
+			: `<button class="cpFileBtn" data-action="${stageAction}" data-path="${encodedPath}" title="${stageTitle}">${stageIcon}</button>`)) +
+		(!isStaged ? `<button class="cpFileBtn" data-action="discard" data-path="${encodedPath}" data-untracked="${f.status === 'U'}" data-submodule="${f.submodule !== null}" title="${f.submodule === null ? 'Discard changes' : 'Reset submodule'}">${codicon('discard')}</button>` : '') +
 		`</span>` +
 		`</div>`;
 }

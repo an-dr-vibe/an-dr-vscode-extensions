@@ -453,6 +453,21 @@ export function viewDiff(repo: string, fromHash: string, toHash: string, oldFile
 }
 
 /**
+ * Open Git's textual summary for a submodule rather than attempting to read its gitlink as a blob.
+ */
+export async function viewSubmoduleDiff(repo: string, fromHash: string, toHash: string, filePath: string, dataSource: DataSource, viewColumn: vscode.ViewColumn = getConfig().openNewTabEditorGroup): Promise<ErrorInfo> {
+	const content = await dataSource.getSubmoduleDiff(repo, fromHash, toHash, filePath);
+	if (content === null) return 'Unable to retrieve the submodule diff for ' + filePath + '.';
+	return vscode.commands.executeCommand('vscode.open', encodeDiffDocUri(repo, filePath, toHash, GitFileStatus.Modified, DiffSide.New, content).with({ path: filePath + ' (Submodule Diff)' }), {
+		preview: true,
+		viewColumn
+	}).then(
+		() => null,
+		() => 'Visual Studio Code was unable to open the submodule diff for ' + filePath + '.'
+	);
+}
+
+/**
  * Open the Visual Studio Code Diff View to display the changes of a file between a commit hash and the working tree.
  * @param repo The repository the file is contained in.
  * @param hash The revision of the left-side of the Diff View.

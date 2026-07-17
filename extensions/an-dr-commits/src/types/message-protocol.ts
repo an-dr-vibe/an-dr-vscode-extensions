@@ -1,5 +1,5 @@
 import { BaseMessage, ErrorInfo, RepoRequest, ResponseWithErrorInfo, ResponseWithMultiErrorInfo, DeepReadonly, DeepWriteable, Writeable } from './base';
-import { GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitResetMode, GitStash, GitTagDetails } from './git-domain';
+import { GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitResetMode, GitStash, GitSubmoduleChange, GitSubmoduleCommit, GitTagDetails } from './git-domain';
 import { CommitsBranchPanelState, GitRepoSet, GitRepoState, PullRequestConfig } from './repo-state';
 import { CommitOrdering, CommitsColumnVisibility, TagType } from './settings';
 import { CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoInProgressState, GitRepoInProgressStateType, LoadCommitsViewTo } from './view-state';
@@ -801,6 +801,8 @@ export interface RequestViewDiff extends RepoRequest {
 	readonly oldFilePath: string;
 	readonly newFilePath: string;
 	readonly type: GitFileStatus;
+	/** Present when this path is a submodule gitlink and needs semantic diff rendering. */
+	readonly submodule?: GitSubmoduleChange | null;
 	readonly viewColumn?: number;
 }
 export interface ResponseViewDiff extends ResponseWithErrorInfo {
@@ -827,6 +829,8 @@ export interface RequestGetFullDiffContent extends RepoRequest {
 	readonly oldFilePath: string;
 	readonly newFilePath: string;
 	readonly type: GitFileStatus;
+	/** Present when this path is a submodule gitlink and needs semantic diff rendering. */
+	readonly submodule?: GitSubmoduleChange | null;
 }
 export interface ResponseGetFullDiffContent extends BaseMessage {
 	readonly command: 'getFullDiffContent';
@@ -835,6 +839,9 @@ export interface ResponseGetFullDiffContent extends BaseMessage {
 	readonly newContent: string | null;
 	readonly oldExists: boolean;
 	readonly newExists: boolean;
+	/** Expanded metadata for the old/new gitlink endpoints in a semantic submodule diff. */
+	readonly oldSubmoduleCommit?: GitSubmoduleCommit | null;
+	readonly newSubmoduleCommit?: GitSubmoduleCommit | null;
 	readonly error: ErrorInfo;
 }
 
@@ -870,6 +877,7 @@ export interface GitWorkingTreeChangeMsg {
 	readonly staged: boolean;
 	readonly additions: number | null;
 	readonly deletions: number | null;
+	readonly submodule: GitSubmoduleChange | null;
 }
 
 export interface RequestLoadWorkingTreeChanges extends RepoRequest {
@@ -917,6 +925,17 @@ export interface RequestDiscardFileChanges extends RepoRequest {
 }
 export interface ResponseDiscardFileChanges {
 	readonly command: 'discardFileChanges';
+	readonly error: ErrorInfo;
+}
+
+/** Reset a submodule checkout, optionally removing its nested untracked files. */
+export interface RequestDiscardSubmoduleChanges extends RepoRequest {
+	readonly command: 'discardSubmoduleChanges';
+	readonly filePath: string;
+	readonly cleanUntracked: boolean;
+}
+export interface ResponseDiscardSubmoduleChanges {
+	readonly command: 'discardSubmoduleChanges';
 	readonly error: ErrorInfo;
 }
 
@@ -1016,6 +1035,7 @@ export type RequestMessage =
 	| RequestUnstageFiles
 	| RequestCommitChanges
 	| RequestDiscardFileChanges
+	| RequestDiscardSubmoduleChanges
 	| RequestAddToGitignore
 	| RequestSendToCodeReview;
 
@@ -1097,6 +1117,7 @@ export type ResponseMessage =
 	| ResponseUnstageFiles
 	| ResponseCommitChanges
 	| ResponseDiscardFileChanges
+	| ResponseDiscardSubmoduleChanges
 	| ResponseAddToGitignore;
 
 export { DeepReadonly, DeepWriteable, Writeable };

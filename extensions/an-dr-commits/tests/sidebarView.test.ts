@@ -37,6 +37,7 @@ function mockGitApi(repo: any) {
 function mockDataSource(changes: any[]) {
 	return {
 		getWorkingTreeChanges: jest.fn(() => Promise.resolve({ changes, error: null })),
+		getHeadInfo: jest.fn(() => Promise.resolve(null)),
 		stageFiles: jest.fn(() => Promise.resolve(null)),
 		unstageFiles: jest.fn(() => Promise.resolve(null)),
 		discardFileChanges: jest.fn(() => Promise.resolve(null)),
@@ -104,7 +105,7 @@ describe('SidebarView', () => {
 		expect(countChanges(repo)).toStrictEqual({ modified: 2, deleted: 1 });
 	});
 
-	it('Should render Open Commits and the clean working tree placeholder', async () => {
+	it('Should serialize Open Commits and a clean working tree for client-side rendering', async () => {
 		const repo = mockRepo('/repo');
 		mockGitApi(repo);
 		const dataSource = mockDataSource([]);
@@ -116,14 +117,15 @@ describe('SidebarView', () => {
 
 		expect(webviewView.webview.html).toContain('activityOpenCommits');
 		expect(webviewView.webview.html).toContain('Open Commits');
-		expect(webviewView.webview.html).toContain('No uncommitted changes.');
+		expect(webviewView.webview.html).toContain('sidebarInitialState');
+		expect(webviewView.webview.html).toContain('"changes":[]');
 		expect(webviewView.badge).toBeUndefined();
 		expect(dataSource.getWorkingTreeChanges).toHaveBeenCalledWith('/repo');
 
 		view.dispose();
 	});
 
-	it('Should render the same uncommitted changes panel sections in the activity webview', async () => {
+	it('Should serialize uncommitted changes for the activity webview', async () => {
 		const repo = mockRepo('/repo', [
 			gitChange('/repo/src/modified.ts', 5),
 			gitChange('/repo/src/deleted.ts', 6)
@@ -140,8 +142,7 @@ describe('SidebarView', () => {
 		vscode.mocks.webviewViewProviders[0].resolveWebviewView(webviewView);
 		await flushPromises();
 
-		expect(webviewView.webview.html).toContain('Staged Changes');
-		expect(webviewView.webview.html).toContain('Changes');
+		expect(webviewView.webview.html).toContain('sidebarInitialState');
 		expect(webviewView.webview.html).toContain('staged.ts');
 		expect(webviewView.webview.html).toContain('modified.ts');
 		expect(webviewView.webview.html).toContain('new.ts');

@@ -99,13 +99,18 @@ export function parseDiffNameStatusOutput(output: string[]): DiffNameStatusRecor
 	const records: DiffNameStatusRecord[] = [];
 	let i = 0;
 	while (i < output.length && output[i] !== '') {
-		const type = <GitFileStatus>output[i][0];
+		const rawFields = output[i][0] === ':' ? output[i].substring(1).split(' ') : null;
+		const rawType = rawFields !== null ? rawFields[4]?.[0] : output[i][0];
+		const type = <GitFileStatus>(rawType === 'T' ? GitFileStatus.Modified : rawType);
+		const metadata = rawFields !== null && rawFields.length === 5
+			? { oldMode: rawFields[0], newMode: rawFields[1], oldSha: rawFields[2], newSha: rawFields[3] }
+			: { oldMode: null, newMode: null, oldSha: null, newSha: null };
 		if (type === GitFileStatus.Added || type === GitFileStatus.Deleted || type === GitFileStatus.Modified) {
 			const path = getPathFromStr(output[i + 1]);
-			records.push({ type, oldFilePath: path, newFilePath: path });
+			records.push({ type, oldFilePath: path, newFilePath: path, ...metadata });
 			i += 2;
 		} else if (type === GitFileStatus.Renamed) {
-			records.push({ type, oldFilePath: getPathFromStr(output[i + 1]), newFilePath: getPathFromStr(output[i + 2]) });
+			records.push({ type, oldFilePath: getPathFromStr(output[i + 1]), newFilePath: getPathFromStr(output[i + 2]), ...metadata });
 			i += 3;
 		} else {
 			break;
@@ -127,6 +132,53 @@ export function parseDiffNumStatOutput(output: string[]): DiffNumStatRecord[] {
 			records.push({ filePath: getPathFromStr(output[i + 2]), additions: parseInt(fields[0]), deletions: parseInt(fields[1]) });
 			i += 3;
 		}
+	}
+	return records;
+}
+
+export interface WorkingTreeStatusRecord {
+	readonly path: string;
+	readonly oldPath?: string;
+	readonly indexStatus: string;
+	readonly workTreeStatus: string;
+	readonly headSha: string | null;
+	readonly indexSha: string | null;
+	readonly submodule: {
+		readonly commitChanged: boolean;
+		readonly trackedChanges: boolean;
+		readonly untrackedChanges: boolean;
+	} | null;
+}
+
+/** Parses Git's machine-readable porcelain v2 working-tree records. */
+export function parseWorkingTreeStatusOutput(stdout: string): WorkingTreeStatusRecord[] {
+	const entries = stdout.split('\0');
+	const records: WorkingTreeStatusRecord[] = [];
+	for (let i = 0; i < entries.length && entries[i] !== ''; i++) {
+		const entry = entries[i];
+		if (entry[0] === '?') {
+			records.push({ path: entry.substring(2), indexStatus: '.', workTreeStatus: '?', headSha: null, indexSha: null, submodule: null });
+			continue;
+		}
+		if (entry[0] !== '1' && entry[0] !== '2') continue;
+		const fields = entry.split(' ');
+		const renamed = entry[0] === '2';
+		const pathIndex = renamed ? 9 : 8;
+		if (fields.length <= pathIndex) continue;
+		const submoduleState = fields[2];
+		records.push({
+			path: fields.slice(pathIndex).join(' '),
+			oldPath: renamed ? entries[++i] : undefined,
+			indexStatus: fields[1][0],
+			workTreeStatus: fields[1][1],
+			headSha: fields[6],
+			indexSha: fields[7],
+			submodule: submoduleState[0] === 'S' ? {
+				commitChanged: submoduleState[1] === 'C',
+				trackedChanges: submoduleState[2] === 'M',
+				untrackedChanges: submoduleState[3] === 'U'
+			} : null
+		});
 	}
 	return records;
 }

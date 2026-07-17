@@ -184,8 +184,13 @@ class SidebarView {
 				sidebarSendMessage({ command: 'unstageAll' });
 				return;
 			case 'discard':
-				// eslint-disable-next-line no-alert -- deliberate: native confirm() over a custom dialog for this one action (ADR-002); pre-existing behavior, only now visible to lint since it moved out of a template-string script.ts.
-				if (path && confirm('Discard changes in ' + path + '?')) {
+				if (path && fileButton.dataset.submodule === 'true') {
+					// Native confirmation keeps the small sidebar dependency-free while retaining both reset choices.
+					if (confirm('Reset submodule ' + path + ' to its recorded commit?')) {
+						const cleanUntracked = confirm('Also delete untracked files inside ' + path + '?');
+						sidebarSendMessage({ command: 'discardSubmodule', filePath: path, cleanUntracked });
+					}
+				} else if (path && confirm('Discard changes in ' + path + '?')) {
 					sidebarSendMessage({ command: 'discard', filePath: path, isUntracked: fileButton.dataset.untracked === 'true' });
 				}
 				return;
@@ -216,7 +221,7 @@ class SidebarView {
 		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
 		const commitBtn = document.getElementById('cpCommitBtn') as HTMLButtonElement | null;
 		const commitArrow = document.getElementById('cpCommitArrow') as HTMLButtonElement | null;
-		const hasChanges = this.error === null && this.changes.length > 0;
+		const hasChanges = this.error === null && this.changes.some((change) => change.staged || sidebarCanStage(change));
 		const hasMessage = !!(message && message.value.trim());
 		const enabled = hasChanges && hasMessage;
 		if (commitBtn) commitBtn.disabled = !enabled && !hasChanges;

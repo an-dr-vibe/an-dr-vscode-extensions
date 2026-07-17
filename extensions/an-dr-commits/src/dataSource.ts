@@ -12,10 +12,10 @@ import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
 import { BlameLineInfo, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRefSnapshot, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
-import { parseBlameIncrementalOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefSnapshotOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput } from './data-source/parsers';
+import { parseBlameIncrementalOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefSnapshotOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput, parseWorkingTreeStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { GraphProjectionKeyInput, RepositoryGraphCache, createGraphProjectionKey } from './repositoryGraphCache';
-import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitSubmoduleCommit, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitEditorManager } from './gitEditor/gitEditorManager';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
@@ -516,7 +516,7 @@ export class DataSource extends Disposable {
 		const fromCommit = commitHash + (hasParents ? '^' : '');
 		return Promise.all([
 			this.getCommitDetailsBase(repo, commitHash),
-			this.getDiffNameStatus(repo, fromCommit, commitHash),
+			this.getDiffFileChanges(repo, fromCommit, commitHash),
 			this.getDiffNumStat(repo, fromCommit, commitHash)
 		]).then((results) => {
 			results[0].fileChanges = generateFileChanges(results[1], results[2], null);
@@ -536,9 +536,9 @@ export class DataSource extends Disposable {
 	public getStashDetails(repo: string, commitHash: string, stash: GitCommitStash): Promise<GitCommitDetailsData> {
 		return Promise.all([
 			this.getCommitDetailsBase(repo, commitHash),
-			this.getDiffNameStatus(repo, stash.baseHash, commitHash),
+			this.getDiffFileChanges(repo, stash.baseHash, commitHash),
 			this.getDiffNumStat(repo, stash.baseHash, commitHash),
-			stash.untrackedFilesHash !== null ? this.getDiffNameStatus(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([]),
+			stash.untrackedFilesHash !== null ? this.getDiffFileChanges(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([]),
 			stash.untrackedFilesHash !== null ? this.getDiffNumStat(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([])
 		]).then((results) => {
 			results[0].fileChanges = generateFileChanges(results[1], results[2], null);
@@ -563,7 +563,7 @@ export class DataSource extends Disposable {
 	 */
 	public getUncommittedDetails(repo: string): Promise<GitCommitDetailsData> {
 		return Promise.all([
-			this.getDiffNameStatus(repo, 'HEAD', ''),
+			this.getDiffFileChanges(repo, 'HEAD', ''),
 			this.getDiffNumStat(repo, 'HEAD', ''),
 			this.getStatus(repo)
 		]).then((results) => {
@@ -590,7 +590,7 @@ export class DataSource extends Disposable {
 	 */
 	public getCommitComparison(repo: string, fromHash: string, toHash: string): Promise<GitCommitComparisonData> {
 		return Promise.all<DiffNameStatusRecord[], DiffNumStatRecord[], GitStatusFiles | null>([
-			this.getDiffNameStatus(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
+			this.getDiffFileChanges(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
 			this.getDiffNumStat(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
 			toHash === UNCOMMITTED ? this.getStatus(repo) : Promise.resolve(null)
 		]).then((results) => {
@@ -644,6 +644,32 @@ export class DataSource extends Disposable {
 			}
 		}
 		return this.spawnGit(args, repo, (stdout) => stdout).catch(() => null);
+	}
+
+	/**
+	 * Get Git's semantic summary for a submodule change instead of treating its gitlink as a blob.
+	 */
+	public getSubmoduleDiff(repo: string, fromHash: string, toHash: string, filePath: string): Promise<string | null> {
+		let args: string[];
+		if (fromHash === toHash) {
+			args = toHash === UNCOMMITTED
+				? ['diff', '--submodule=log', 'HEAD', '--', filePath]
+				: ['diff', '--submodule=log', toHash + '^', toHash, '--', filePath];
+		} else {
+			args = toHash === UNCOMMITTED
+				? ['diff', '--submodule=log', fromHash, '--', filePath]
+				: ['diff', '--submodule=log', fromHash, toHash, '--', filePath];
+		}
+		return this.spawnGit(args, repo, (stdout) => stdout).catch(() => null);
+	}
+
+	/** Get display metadata for one submodule gitlink endpoint. */
+	public getSubmoduleCommit(repo: string, filePath: string, sha: string | null): Promise<GitSubmoduleCommit | null> {
+		if (sha === null) return Promise.resolve(null);
+		return this.spawnGit(['-C', filePath, 'show', '-s', '--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%b', sha], repo, (stdout) => {
+			const [hash, author, authorEmail, authorDate, subject, body = ''] = stdout.replace(/^\s+/, '').replace(/\x1e$/, '').split('\x1f');
+			return { hash, author, authorEmail, authorDate: Date.parse(authorDate) / 1000, subject, body: body.trim() };
+		}).catch(() => null);
 	}
 
 	/**
@@ -701,7 +727,7 @@ export class DataSource extends Disposable {
 	 * @returns The new renamed file path, or NULL if either: the file wasn't renamed or the Git command failed to execute.
 	 */
 	public getNewPathOfRenamedFile(repo: string, commitHash: string, oldFilePath: string) {
-		return this.getDiffNameStatus(repo, commitHash, '', 'R').then((renamed) => {
+		return this.getDiffFileChanges(repo, commitHash, '', 'R').then((renamed) => {
 			const renamedRecordForFile = renamed.find((record) => record.oldFilePath === oldFilePath);
 			return renamedRecordForFile ? renamedRecordForFile.newFilePath : null;
 		}).catch(() => null);
@@ -1239,44 +1265,43 @@ export class DataSource extends Disposable {
 		);
 
 		return Promise.all([
-			this.spawnGit(['status', '--porcelain=v1', '-z', '--untracked-files=all'], repo, (stdout) => stdout),
+			this.spawnGit(['status', '--porcelain=v2', '-z', '--untracked-files=all'], repo, (stdout) => stdout),
 			getNumStatLookup(true),
 			getNumStatLookup(false)
-		]).then((results) => {
-			const stdout = results[0];
+		]).then(async (results) => {
 			const stagedStats = results[1];
 			const unstagedStats = results[2];
 			const changes: GitWorkingTreeChange[] = [];
-			const entries = stdout.split('\0');
 			const getStats = (filePath: string, staged: boolean) => (staged ? stagedStats[filePath] : unstagedStats[filePath]) || { additions: null, deletions: null };
-			let i = 0;
-			while (i < entries.length && entries[i] !== '') {
-				const entry = entries[i];
-				if (entry.length < 4) { i++; continue; }
-				const x = entry[0]; // index status
-				const y = entry[1]; // worktree status
-				const filePath = entry.substring(3);
-				const isRenamed = (x === 'R' || x === 'C');
-				const oldPath = isRenamed && entries[i + 1] !== undefined ? entries[i + 1] : undefined;
-				if (isRenamed) i++;
-
-				if (x !== ' ' && x !== '?') {
-					// staged change
-					const status = x === 'D' ? 'D' : x === 'A' ? 'A' : x === 'R' || x === 'C' ? 'R' : 'M';
-					changes.push({ path: filePath, oldPath, status: status as GitWorkingTreeChange['status'], staged: true, ...getStats(filePath, true) });
+			const records = parseWorkingTreeStatusOutput(results[0]);
+			for (let i = 0; i < records.length; i++) {
+				const record = records[i];
+				const worktreeSha = record.submodule !== null && record.submodule.commitChanged
+					? await this.getSubmoduleHead(repo, record.path)
+					: record.indexSha;
+				const createSubmodule = (oldSha: string | null, newSha: string | null) => record.submodule === null ? null : ({
+					oldSha,
+					newSha,
+					trackedChanges: record.submodule.trackedChanges,
+					untrackedChanges: record.submodule.untrackedChanges
+				});
+				if (record.indexStatus !== '.' && record.indexStatus !== '?') {
+					const status = record.indexStatus === 'D' ? 'D' : record.indexStatus === 'A' ? 'A' : record.indexStatus === 'R' || record.indexStatus === 'C' ? 'R' : 'M';
+					changes.push({ path: record.path, oldPath: record.oldPath, status: status as GitWorkingTreeChange['status'], staged: true, ...getStats(record.path, true), submodule: createSubmodule(record.headSha, record.indexSha) });
 				}
-				if (y !== ' ' && y !== '?' && !isRenamed) {
-					// unstaged change
-					const status = y === 'D' ? 'D' : 'M';
-					changes.push({ path: filePath, status: status as GitWorkingTreeChange['status'], staged: false, ...getStats(filePath, false) });
+				const hasWorktreeChange = record.workTreeStatus !== '.' || (record.submodule !== null && (record.submodule.commitChanged || record.submodule.trackedChanges || record.submodule.untrackedChanges));
+				if (hasWorktreeChange && record.indexStatus !== '?') {
+					const status = record.workTreeStatus === '?' ? 'U' : record.workTreeStatus === 'D' ? 'D' : 'M';
+					changes.push({ path: record.path, status: status as GitWorkingTreeChange['status'], staged: false, ...getStats(record.path, false), submodule: createSubmodule(record.indexSha, worktreeSha) });
 				}
-				if (x === '?' && y === '?') {
-					changes.push({ path: filePath, status: 'U', staged: false, additions: null, deletions: null });
-				}
-				i++;
 			}
 			return { changes, error: null };
 		}).catch((errorMessage) => ({ changes: [], error: errorMessage }));
+	}
+
+	/** Gets the checked-out commit of an initialised submodule. */
+	private getSubmoduleHead(repo: string, filePath: string): Promise<string | null> {
+		return this.spawnGit(['-C', filePath, 'rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch(() => null);
 	}
 
 	public stageFiles(repo: string, files: string[]): Promise<ErrorInfo> {
@@ -1303,6 +1328,15 @@ export class DataSource extends Disposable {
 			return this.runGitCommand(['checkout', '--', ...filePaths], repo);
 		}
 		return this.runGitCommand(['checkout', 'HEAD', '--', ...filePaths], repo);
+	}
+
+	/** Reset a submodule to the parent index, optionally deleting nested untracked content. */
+	public async discardSubmoduleChanges(repo: string, filePath: string, cleanUntracked: boolean): Promise<ErrorInfo> {
+		const resetError = await this.runGitCommand(['submodule', 'update', '--checkout', '--force', '--recursive', '--', filePath], repo);
+		if (resetError !== null || !cleanUntracked) return resetError;
+		const cleanError = await this.runGitCommand(['-C', filePath, 'clean', '-fd'], repo);
+		if (cleanError !== null) return cleanError;
+		return this.runGitCommand(['-C', filePath, 'submodule', 'foreach', '--recursive', 'git clean -fd'], repo);
 	}
 
 	public async addToGitignore(repo: string, filePath: string, type: 'root' | 'local' | 'extension'): Promise<ErrorInfo> {
@@ -2138,15 +2172,15 @@ export class DataSource extends Disposable {
 	}
 
 	/**
-	 * Get the diff `--name-status` records.
+	 * Get the diff raw file-change records, including modes and object IDs.
 	 * @param repo The path of the repository.
 	 * @param fromHash The revision the diff is from.
 	 * @param toHash The revision the diff is to.
 	 * @param filter The types of file changes to retrieve (defaults to `AMDR`).
-	 * @returns An array of `--name-status` records.
+	 * @returns An array of raw file-change records.
 	 */
-	private getDiffNameStatus(repo: string, fromHash: string, toHash: string, filter: string = 'AMDR') {
-		return this.execDiff(repo, fromHash, toHash, '--name-status', filter).then((output) => parseDiffNameStatusOutput(output));
+	private getDiffFileChanges(repo: string, fromHash: string, toHash: string, filter: string = 'AMDRT') {
+		return this.execDiff(repo, fromHash, toHash, '--raw', filter).then((output) => parseDiffNameStatusOutput(output));
 	}
 
 	/**
@@ -2669,7 +2703,7 @@ export class DataSource extends Disposable {
 	 * @param filter The types of file changes to retrieve.
 	 * @returns The diff output.
 	 */
-	private execDiff(repo: string, fromHash: string, toHash: string, arg: '--numstat' | '--name-status', filter: string) {
+	private execDiff(repo: string, fromHash: string, toHash: string, arg: '--numstat' | '--raw', filter: string) {
 		let args: string[];
 		if (fromHash === toHash) {
 			args = ['diff-tree', arg, '-r', '--root', '--find-renames', '--diff-filter=' + filter, '-z', fromHash];
@@ -2677,6 +2711,7 @@ export class DataSource extends Disposable {
 			args = ['diff', arg, '--find-renames', '--diff-filter=' + filter, '-z', fromHash];
 			if (toHash !== '') args.push(toHash);
 		}
+		if (arg === '--raw') args.splice(2, 0, '--no-abbrev');
 
 		return this.spawnGit(args, repo, (stdout) => {
 			let lines = stdout.split('\0');

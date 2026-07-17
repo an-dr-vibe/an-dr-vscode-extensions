@@ -67,6 +67,13 @@ export interface SidebarRequestDiscard extends BaseMessage {
 	readonly restoreToIndex?: boolean;
 }
 
+/** Reset a submodule checkout, optionally deleting its nested untracked files. */
+export interface SidebarRequestDiscardSubmodule extends BaseMessage {
+	readonly command: 'discardSubmodule';
+	readonly filePath: string;
+	readonly cleanUntracked: boolean;
+}
+
 export interface SidebarRequestCommit extends BaseMessage {
 	readonly command: 'commit';
 	readonly message: string;
@@ -110,6 +117,7 @@ export type SidebarRequestMessage =
 	| SidebarRequestStageAll
 	| SidebarRequestUnstageAll
 	| SidebarRequestDiscard
+	| SidebarRequestDiscardSubmodule
 	| SidebarRequestCommit
 	| SidebarRequestOpenChanges
 	| SidebarRequestGitFetch

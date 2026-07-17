@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { DataSource } from '../../dataSource';
 import { RequestAddToGitignore, RequestCopyFilePath, RequestCopyToClipboard, RequestCreateArchive, RequestGetFileDiff, RequestGetFullDiffContent, RequestOpenExternalDirDiff, RequestOpenFile, RequestResetFileToRevision, RequestViewDiff, RequestViewDiffWithWorkingFile, RequestViewFileAtRevision, ResponseMessage } from '../../types';
-import { UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, openFile, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision } from '../../utils';
+import { UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, openFile, viewDiff, viewSubmoduleDiff, viewDiffWithWorkingFile, viewFileAtRevision } from '../../utils';
 
 /**
  * The subset of TabView's dependencies needed to handle diff viewing and
@@ -51,7 +51,10 @@ export async function handleOpenFile(ctx: DiffFileContentActionContext, msg: Req
 export async function handleViewDiff(ctx: DiffFileContentActionContext, msg: RequestViewDiff): Promise<void> {
 	ctx.sendMessage({
 		command: 'viewDiff',
-		error: await viewDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath, msg.type,
+		error: msg.submodule !== null && msg.submodule !== undefined
+			? await viewSubmoduleDiff(msg.repo, msg.fromHash, msg.toHash, msg.newFilePath, ctx.dataSource,
+				msg.viewColumn !== undefined ? msg.viewColumn as vscode.ViewColumn : undefined)
+			: await viewDiff(msg.repo, msg.fromHash, msg.toHash, msg.oldFilePath, msg.newFilePath, msg.type,
 			msg.viewColumn !== undefined ? msg.viewColumn as vscode.ViewColumn : undefined)
 	});
 }
@@ -65,6 +68,30 @@ export async function handleGetFileDiff(ctx: DiffFileContentActionContext, msg: 
 }
 
 export async function handleGetFullDiffContent(ctx: DiffFileContentActionContext, msg: RequestGetFullDiffContent): Promise<void> {
+	if (msg.submodule !== null && msg.submodule !== undefined) {
+		const oldContent = 'Submodule commit: ' + (msg.submodule.oldSha ?? '(not present)');
+		const dirtyState = [
+			msg.submodule.trackedChanges ? 'Contains tracked changes' : null,
+			msg.submodule.untrackedChanges ? 'Contains untracked files' : null
+		].filter((state): state is string => state !== null);
+		const [diff, oldSubmoduleCommit, newSubmoduleCommit] = await Promise.all([
+			ctx.dataSource.getSubmoduleDiff(msg.repo, msg.fromHash, msg.toHash, msg.newFilePath),
+			ctx.dataSource.getSubmoduleCommit(msg.repo, msg.newFilePath, msg.submodule.oldSha),
+			ctx.dataSource.getSubmoduleCommit(msg.repo, msg.newFilePath, msg.submodule.newSha)
+		]);
+		ctx.sendMessage({
+			command: 'getFullDiffContent',
+			diff,
+			oldContent,
+			newContent: ['Submodule commit: ' + (msg.submodule.newSha ?? '(not present)'), ...dirtyState].join('\n'),
+			oldExists: msg.submodule.oldSha !== null,
+			newExists: msg.submodule.newSha !== null,
+			oldSubmoduleCommit,
+			newSubmoduleCommit,
+			error: null
+		});
+		return;
+	}
 	const readCommitFile = async (commitHash: string, filePath: string) => {
 		try {
 			return { exists: true, content: await ctx.dataSource.getCommitFile(msg.repo, commitHash, filePath) };

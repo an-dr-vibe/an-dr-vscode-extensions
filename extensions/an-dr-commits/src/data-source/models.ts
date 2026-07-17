@@ -1,4 +1,4 @@
-import { CommitOrdering, DeepWriteable, ErrorInfo, GitCommit, GitCommitDetails, GitFileChange, GitRepoConfig, GitRepoInProgressState, GitSignatureStatus, GitStash, GitTagDetails } from '../types';
+import { CommitOrdering, DeepWriteable, ErrorInfo, GitCommit, GitCommitDetails, GitFileChange, GitRepoConfig, GitRepoInProgressState, GitSignatureStatus, GitStash, GitSubmoduleChange, GitTagDetails } from '../types';
 
 export interface BlameLineInfo {
 	readonly author: string;
@@ -61,6 +61,7 @@ export interface GitWorkingTreeChange {
 	staged: boolean;
 	additions: number | null;
 	deletions: number | null;
+	submodule: GitSubmoduleChange | null;
 }
 
 export interface GitWorkingTreeChangesData {

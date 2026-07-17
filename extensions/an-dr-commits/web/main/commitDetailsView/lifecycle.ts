@@ -152,7 +152,7 @@ function commitsCreateFileTree(view: any, gitFiles: ReadonlyArray<GG.GitFileChan
 		absPath = view.currentRepo;
 		for (j = 0; j < path.length; j++) {
 			absPath += '/' + path[j];
-			if (typeof view.gitRepos[absPath] !== 'undefined') {
+			if (typeof view.gitRepos[absPath] !== 'undefined' && gitFiles[i].submodule === null) {
 				if (typeof cur.contents[path[j]] === 'undefined') {
 					cur.contents[path[j]] = { type: 'repo', name: path[j], path: absPath };
 				}

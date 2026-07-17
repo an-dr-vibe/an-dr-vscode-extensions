@@ -7,6 +7,11 @@ export interface DiffNameStatusRecord {
 	type: GitFileStatus;
 	oldFilePath: string;
 	newFilePath: string;
+	/** Git modes and object IDs are populated by raw diff output. */
+	oldMode: string | null;
+	newMode: string | null;
+	oldSha: string | null;
+	newSha: string | null;
 }
 
 export interface DiffNumStatRecord {
@@ -29,8 +34,22 @@ export function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], n
 	let fileChanges: Writeable<GitFileChange>[] = [], fileLookup: { [file: string]: number } = {}, i = 0;
 
 	for (i = 0; i < nameStatusRecords.length; i++) {
+		const record = nameStatusRecords[i];
+		const isSubmodule = record.oldMode === '160000' || record.newMode === '160000';
 		fileLookup[nameStatusRecords[i].newFilePath] = fileChanges.length;
-		fileChanges.push({ oldFilePath: nameStatusRecords[i].oldFilePath, newFilePath: nameStatusRecords[i].newFilePath, type: nameStatusRecords[i].type, additions: null, deletions: null, submodule: null });
+		fileChanges.push({
+			oldFilePath: record.oldFilePath,
+			newFilePath: record.newFilePath,
+			type: record.type,
+			additions: null,
+			deletions: null,
+			submodule: isSubmodule ? {
+				oldSha: record.oldMode === '160000' ? record.oldSha : null,
+				newSha: record.newMode === '160000' ? record.newSha : null,
+				trackedChanges: false,
+				untrackedChanges: false
+			} : null
+		});
 	}
 
 	if (status !== null) {
@@ -50,7 +69,7 @@ export function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], n
 	}
 
 	for (i = 0; i < numStatRecords.length; i++) {
-		if (typeof fileLookup[numStatRecords[i].filePath] === 'number') {
+		if (typeof fileLookup[numStatRecords[i].filePath] === 'number' && fileChanges[fileLookup[numStatRecords[i].filePath]].submodule === null) {
 			fileChanges[fileLookup[numStatRecords[i].filePath]].additions = numStatRecords[i].additions;
 			fileChanges[fileLookup[numStatRecords[i].filePath]].deletions = numStatRecords[i].deletions;
 		}

@@ -19,7 +19,7 @@ import { BranchRemoteActionContext, handleAddRemote, handleCheckoutBranch, handl
 import { TagStashActionContext, handleAddTag, handleApplyStash, handleBranchFromStash, handleDeleteTag, handleDropStash, handlePopStash, handlePushStash, handlePushTag, handleResolveSidebarTagContext, handleTagDetails } from './tagStashActions';
 import { CommitGraphActionContext, handleCheckoutCommit, handleCherrypickCommit, handleCommitDetails, handleCompareCommits, handleDropCommit, handleEditCommitAuthor, handleResetToCommit, handleResetToHead, handleRevertCommit, handleRewordCommit, handleSidebarBatchRefAction, handleSquashCommits } from './commitGraphActions';
 import { DiffFileContentActionContext, handleAddToGitignore, handleCopyFilePath, handleCopyToClipboard, handleCreateArchive, handleGetFileDiff, handleGetFullDiffContent, handleOpenExternalDirDiff, handleOpenFile, handleResetFileToRevision, handleViewDiff, handleViewDiffWithWorkingFile, handleViewFileAtRevision } from './diffFileContentActions';
-import { WorkingTreeActionContext, handleCleanUntrackedFiles, handleCommitChanges, handleDiscardFileChanges, handleLoadWorkingTreeChanges, handleStageFiles, handleUnstageFiles } from './workingTreeActions';
+import { WorkingTreeActionContext, handleCleanUntrackedFiles, handleCommitChanges, handleDiscardFileChanges, handleDiscardSubmoduleChanges, handleLoadWorkingTreeChanges, handleStageFiles, handleUnstageFiles } from './workingTreeActions';
 import { MiscActionContext, handleDeleteUserDetails, handleEditUserDetails, handleFetchAvatar, handleOpenExtensionSettings, handleOpenExternalUrl, handleSendToCodeReview, handleShowErrorMessage, handleViewScm } from './miscActions';
 import { loadFileIcons } from './fileIcons';
 
@@ -613,6 +613,9 @@ export class TabView extends Disposable {
 				break;
 			case 'discardFileChanges':
 				await handleDiscardFileChanges(this.workingTreeCtx, msg);
+				break;
+			case 'discardSubmoduleChanges':
+				await handleDiscardSubmoduleChanges(this.workingTreeCtx, msg);
 				break;
 			case 'addToGitignore':
 				await handleAddToGitignore(this.diffFileContentCtx, msg);

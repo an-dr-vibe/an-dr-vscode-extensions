@@ -266,7 +266,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 					oldContent: msg.oldContent,
 					newContent: msg.newContent,
 					oldExists: msg.oldExists,
-					newExists: msg.newExists
+					newExists: msg.newExists,
+					oldSubmoduleCommit: msg.oldSubmoduleCommit || null,
+					newSubmoduleCommit: msg.newSubmoduleCommit || null
 				});
 				break;
 			case 'viewDiffWithWorkingFile':
@@ -284,6 +286,7 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'stageFiles':
 			case 'unstageFiles':
 			case 'discardFileChanges':
+			case 'discardSubmoduleChanges':
 				filesPanelHandleStageUnstageResponse(msg.error);
 				break;
 			case 'addToGitignore':

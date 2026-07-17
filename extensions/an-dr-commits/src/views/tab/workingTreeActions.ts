@@ -1,6 +1,6 @@
 import { DataSource } from '../../dataSource';
 import { RepoManager } from '../../repoManager';
-import { GitRepoSet, LoadCommitsViewTo, RequestCleanUntrackedFiles, RequestCommitChanges, RequestDiscardFileChanges, RequestLoadWorkingTreeChanges, RequestStageFiles, RequestUnstageFiles, ResponseMessage } from '../../types';
+import { GitRepoSet, LoadCommitsViewTo, RequestCleanUntrackedFiles, RequestCommitChanges, RequestDiscardFileChanges, RequestDiscardSubmoduleChanges, RequestLoadWorkingTreeChanges, RequestStageFiles, RequestUnstageFiles, ResponseMessage } from '../../types';
 
 /**
  * The subset of TabView's dependencies needed to handle working-tree
@@ -52,4 +52,11 @@ export async function handleCommitChanges(ctx: WorkingTreeActionContext, msg: Re
 export async function handleDiscardFileChanges(ctx: WorkingTreeActionContext, msg: RequestDiscardFileChanges): Promise<void> {
 	const discardError = await ctx.dataSource.discardFileChanges(msg.repo, msg.files, msg.isUntracked, msg.restoreToIndex ?? false);
 	ctx.sendMessage({ command: 'discardFileChanges', error: discardError });
+}
+
+export async function handleDiscardSubmoduleChanges(ctx: WorkingTreeActionContext, msg: RequestDiscardSubmoduleChanges): Promise<void> {
+	ctx.sendMessage({
+		command: 'discardSubmoduleChanges',
+		error: await ctx.dataSource.discardSubmoduleChanges(msg.repo, msg.filePath, msg.cleanUntracked)
+	});
 }

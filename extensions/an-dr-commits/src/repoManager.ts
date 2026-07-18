@@ -26,6 +26,8 @@ export { ExternalRepoConfig } from './repo-manager/externalRepoConfig';
  * Detects and manages repositories in Commits.
  */
 export class RepoManager extends Disposable {
+	private static readonly STARTUP_FALLBACK_DELAY_MS = 10000;
+
 	private readonly dataSource: DataSource;
 	private readonly extensionState: ExtensionState;
 	private readonly logger: Logger;
@@ -42,9 +44,12 @@ export class RepoManager extends Disposable {
 	private readonly onWatcherCreateQueue: BufferedQueue<string>;
 	private readonly onWatcherChangeQueue: BufferedQueue<string>;
 	private readonly checkRepoConfigQueue: BufferedQueue<string>;
+	private startupPromise: Promise<void> | null = null;
+	private startupTimer: ReturnType<typeof setTimeout> | null = null;
 
 	/**
-	 * Creates the Commits Repository Manager, and runs startup tasks.
+	 * Creates the Commits Repository Manager. Repository reconciliation is deferred until
+	 * requested, with a delayed fallback for sessions where no Commits view is opened.
 	 * @param dataSource The Commits DataSource instance.
 	 * @param extensionState The Commits ExtensionState instance.
 	 * @param logger The Commits Logger instance.
@@ -68,7 +73,12 @@ export class RepoManager extends Disposable {
 		this.onWatcherChangeQueue = new BufferedQueue<string>(this.processOnWatcherChangeEvent.bind(this), this.sendRepos.bind(this));
 		this.checkRepoConfigQueue = new BufferedQueue<string>(this.checkRepoForNewConfig.bind(this), this.sendRepos.bind(this));
 
-		this.startupTasks();
+		this.startupTimer = setTimeout(() => {
+			this.startupTimer = null;
+			void this.ensureReady().catch((error) => {
+				this.logger.logError('Unable to reconcile repositories: ' + (error instanceof Error ? error.message : String(error)));
+			});
+		}, RepoManager.STARTUP_FALLBACK_DELAY_MS);
 
 		this.registerDisposables(
 			// Monitor changes to the workspace folders to:
@@ -125,12 +135,33 @@ export class RepoManager extends Disposable {
 
 			// Stop watching folders when disposed
 			toDisposable(() => {
+				if (this.startupTimer !== null) {
+					clearTimeout(this.startupTimer);
+					this.startupTimer = null;
+				}
 				const folders = Object.keys(this.folderWatchers);
 				for (let i = 0; i < folders.length; i++) {
 					this.stopWatchingFolder(folders[i]);
 				}
 			})
 		);
+	}
+
+	/**
+	 * Reconcile persisted repository state with the workspace exactly once. Concurrent callers
+	 * share the same work; a failed attempt may be retried by a later caller.
+	 */
+	public ensureReady(): Promise<void> {
+		if (this.startupPromise !== null) return this.startupPromise;
+		if (this.startupTimer !== null) {
+			clearTimeout(this.startupTimer);
+			this.startupTimer = null;
+		}
+		this.startupPromise = this.startupTasks().catch((error) => {
+			this.startupPromise = null;
+			throw error;
+		});
+		return this.startupPromise;
 	}
 
 	/**
@@ -161,6 +192,9 @@ export class RepoManager extends Disposable {
 		if (this.updateReposWorkspaceFolderIndex()) {
 			this.extensionState.saveRepos(this.repos);
 		}
+		// Watch before asynchronous reconciliation. The scan covers events before this point;
+		// the watchers cover events that occur while the scan is running.
+		this.startWatchingFolders();
 		if (!await this.checkReposExist()) {
 			// On startup, ensure that sendRepo is called (even if no changes were made)
 			this.sendRepos();
@@ -168,7 +202,6 @@ export class RepoManager extends Disposable {
 		this.checkReposForNewConfig();
 		await this.checkReposForNewSubmodules();
 		await this.searchWorkspaceForRepos();
-		this.startWatchingFolders();
 	}
 
 	/**

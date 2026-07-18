@@ -31,15 +31,17 @@ let dataSource: DataSource;
 let extensionState: ExtensionState;
 let avatarManager: AvatarManager;
 let repoManager: RepoManager;
+let statusMonitor: { getActiveRepoPath: jest.Mock };
 let spyOnCommitsViewCreateOrShow: jest.SpyInstance, spyOnGetRepos: jest.SpyInstance, spyOnGetKnownRepo: jest.SpyInstance, spyOnRegisterRepo: jest.SpyInstance, spyOnLog: jest.SpyInstance, spyOnLogError: jest.SpyInstance;
 beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<utils.GitExecutable>();
 	logger = new Logger();
-	dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+	dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 	extensionState = new ExtensionState(vscode.mocks.extensionContext, onDidChangeGitExecutable.subscribe);
 	avatarManager = new AvatarManager(dataSource, extensionState, logger);
 	repoManager = new RepoManager(dataSource, extensionState, onDidChangeConfiguration.subscribe, logger);
+	statusMonitor = { getActiveRepoPath: jest.fn(() => null) };
 	spyOnCommitsViewCreateOrShow = jest.spyOn(CommitsView, 'createOrShow');
 	spyOnGetRepos = jest.spyOn(repoManager, 'getRepos');
 	spyOnGetKnownRepo = jest.spyOn(repoManager, 'getKnownRepo');
@@ -61,7 +63,7 @@ afterAll(() => {
 describe('CommandManager', () => {
 	let commandManager: CommandManager;
 	beforeEach(() => {
-		commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
+		commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, statusMonitor as any, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
 	});
 	afterEach(() => {
 		commandManager.dispose();
@@ -105,7 +107,7 @@ describe('CommandManager', () => {
 			vscode.commands.executeCommand.mockResolvedValueOnce(null);
 
 			// Run
-			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
+			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, statusMonitor as any, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
 
 			// Assert
 			await waitForExpect(() => {
@@ -122,7 +124,7 @@ describe('CommandManager', () => {
 			vscode.commands.executeCommand.mockResolvedValueOnce(null);
 
 			// Run
-			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
+			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, statusMonitor as any, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
 
 			// Assert
 			await waitForExpect(() => {
@@ -139,7 +141,7 @@ describe('CommandManager', () => {
 			vscode.commands.executeCommand.mockRejectedValueOnce(null);
 
 			// Run
-			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
+			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, statusMonitor as any, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
 
 			// Assert
 			await waitForExpect(() => {
@@ -160,7 +162,7 @@ describe('CommandManager', () => {
 			});
 
 			// Run
-			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
+			commandManager = new CommandManager(vscode.mocks.extensionContext, avatarManager, dataSource, extensionState, repoManager, statusMonitor as any, { path: '/path/to/git', version: '2.25.0' }, onDidChangeGitExecutable.subscribe, logger);
 
 			// Assert
 			await waitForExpect(() => {

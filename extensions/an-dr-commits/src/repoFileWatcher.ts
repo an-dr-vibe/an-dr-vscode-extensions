@@ -1,6 +1,8 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { Logger } from './logger';
-import { getPathFromUri } from './utils';
+import { getPathFromStr, getPathFromUri } from './utils';
 
 const GIT_METADATA_CHANGE_REGEX = /^\.git\/(config|index|HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD|rebase-merge\/.*|rebase-apply\/.*|sequencer\/.*|refs\/stash|refs\/heads\/.*|refs\/remotes\/.*|refs\/tags\/.*)$/;
 
@@ -14,6 +16,7 @@ export class RepoFileWatcher {
 	private readonly repoChangeCallback: (kind: RepoRefreshKind) => void;
 	private repo: string | null = null;
 	private fsWatcher: vscode.FileSystemWatcher | null = null;
+	private gitDirWatchers: vscode.FileSystemWatcher[] = [];
 	private refreshTimeout: NodeJS.Timer | null = null;
 	private pendingRefreshKind: RepoRefreshKind | null = null;
 	private muteCount: number = 0;
@@ -42,9 +45,16 @@ export class RepoFileWatcher {
 		this.repo = repo;
 		// Create a File System Watcher for all events within the specified repository
 		this.fsWatcher = vscode.workspace.createFileSystemWatcher(repo + '/**');
-		this.fsWatcher.onDidCreate(uri => this.refresh(uri));
-		this.fsWatcher.onDidChange(uri => this.refresh(uri));
-		this.fsWatcher.onDidDelete(uri => this.refresh(uri));
+		this.fsWatcher.onDidCreate(uri => this.refreshRepo(uri));
+		this.fsWatcher.onDidChange(uri => this.refreshRepo(uri));
+		this.fsWatcher.onDidDelete(uri => this.refreshRepo(uri));
+		for (const gitDir of this.resolveRedirectedGitDirs(repo)) {
+			const watcher = vscode.workspace.createFileSystemWatcher(gitDir + '/**');
+			watcher.onDidCreate(uri => this.refreshGitDir(uri, gitDir));
+			watcher.onDidChange(uri => this.refreshGitDir(uri, gitDir));
+			watcher.onDidDelete(uri => this.refreshGitDir(uri, gitDir));
+			this.gitDirWatchers.push(watcher);
+		}
 		this.logger.logDebug('Started watching repo: ' + repo);
 	}
 
@@ -63,6 +73,8 @@ export class RepoFileWatcher {
 			clearTimeout(this.refreshTimeout);
 			this.refreshTimeout = null;
 		}
+		this.gitDirWatchers.forEach((watcher) => watcher.dispose());
+		this.gitDirWatchers = [];
 		this.pendingRefreshKind = null;
 	}
 
@@ -88,12 +100,23 @@ export class RepoFileWatcher {
 	 * Handle a file event triggered by the File System Watcher.
 	 * @param uri The URI of the file that the event occurred on.
 	 */
-	private refresh(uri: vscode.Uri) {
+	private refreshRepo(uri: vscode.Uri) {
 		if (this.muteCount > 0) return;
 		const relativePath = getPathFromUri(uri).replace(this.repo + '/', '');
 		const refreshKind = relativePath === '.git' || GIT_METADATA_CHANGE_REGEX.test(relativePath)
 			? 'full'
 			: relativePath.startsWith('.git/') ? null : 'workingTree';
+		this.queueRefresh(refreshKind);
+	}
+
+	/** Handle metadata events from a linked worktree or submodule's redirected Git directory. */
+	private refreshGitDir(uri: vscode.Uri, gitDir: string) {
+		if (this.muteCount > 0) return;
+		const relativePath = getPathFromUri(uri).replace(gitDir + '/', '');
+		this.queueRefresh(GIT_METADATA_CHANGE_REGEX.test('.git/' + relativePath) ? 'full' : null);
+	}
+
+	private queueRefresh(refreshKind: RepoRefreshKind | null) {
 		if (refreshKind === null) return;
 		if ((new Date()).getTime() < this.resumeAt) return;
 
@@ -107,5 +130,24 @@ export class RepoFileWatcher {
 			this.pendingRefreshKind = null;
 			this.repoChangeCallback(kind);
 		}, 750);
+	}
+
+	/** Resolve external per-worktree and shared Git directories referenced by a `.git` file. */
+	private resolveRedirectedGitDirs(repo: string): string[] {
+		try {
+			const dotGit = path.join(repo, '.git');
+			if (!fs.statSync(dotGit).isFile()) return [];
+			const redirect = fs.readFileSync(dotGit, 'utf8').match(/^gitdir:\s*(.+)$/m);
+			if (redirect === null) return [];
+			const gitDir = getPathFromStr(path.resolve(repo, redirect[1].trim()));
+			const dirs = [gitDir];
+			try {
+				const commonDir = fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim();
+				if (commonDir !== '') dirs.push(getPathFromStr(path.resolve(gitDir, commonDir)));
+			} catch (_) { /* Standalone redirected Git directories have no commondir file. */ }
+			return Array.from(new Set(dirs));
+		} catch (_) {
+			return [];
+		}
 	}
 }

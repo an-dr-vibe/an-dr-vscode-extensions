@@ -41,7 +41,7 @@ beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<GitExecutable>();
 	logger = new Logger();
-	dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+	dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 	spyOnSpawn = jest.spyOn(cp, 'spawn');
 });
 

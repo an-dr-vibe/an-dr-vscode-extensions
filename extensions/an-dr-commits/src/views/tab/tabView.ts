@@ -14,7 +14,7 @@ import { Event } from '../../utils/event';
 import { renderCommitsWebviewHtml } from './webviewHtml';
 import { getMatchingTabs, isMatchingWebviewTab } from '../../editorTabUtils';
 import { RepoSelectionEvent } from '../common/repoSelection';
-import { RepoLifecycleActionContext, handleExportRepoConfig, handleLoadCommits, handleLoadConfig, handleLoadRepoInfo, handleLoadRepos, handleRepoInProgressAction, handleRescanForRepos, handleSetColumnVisibility, handleSetGlobalViewState, handleSetRepoState, handleSetRepoStarred, handleSetWorkspaceViewState } from './repoLifecycleActions';
+import { RepoLifecycleActionContext, handleExportRepoConfig, handleLoadCommits, handleLoadConfig, handleLoadRepoInfo, handleLoadRepos, handleRepoInProgressAction, handleRescanForRepos, handleSetColumnVisibility, handleSetGlobalViewState, handleSetRepoStarred, handleSetRepoState, handleSetWorkspaceViewState } from './repoLifecycleActions';
 import { BranchRemoteActionContext, handleAddRemote, handleCheckoutBranch, handleCleanupLocalBranches, handleCreateBranch, handleCreatePullRequest, handleDeleteBranch, handleDeleteRemote, handleDeleteRemoteBranch, handleEditRemote, handleFetch, handleFetchIntoLocalBranch, handleMerge, handlePruneRemote, handlePullBranch, handlePullBranchWithStash, handlePushBranch, handleRebase, handleRenameBranch, handleSetBranchUpstream, handleSetRemoteDefaultBranch, handleUnsetBranchUpstream } from './branchRemoteActions';
 import { TagStashActionContext, handleAddTag, handleApplyStash, handleBranchFromStash, handleDeleteTag, handleDropStash, handlePopStash, handlePushStash, handlePushTag, handleResolveSidebarTagContext, handleTagDetails } from './tagStashActions';
 import { CommitGraphActionContext, handleCheckoutCommit, handleCherrypickCommit, handleCommitDetails, handleCompareCommits, handleDropCommit, handleEditCommitAuthor, handleResetToCommit, handleResetToHead, handleRevertCommit, handleRewordCommit, handleSidebarBatchRefAction, handleSquashCommits } from './commitGraphActions';
@@ -55,7 +55,6 @@ export class TabView extends Disposable {
 	private isGraphViewLoaded: boolean = false;
 	private isPanelVisible: boolean = true;
 	private currentRepo: string | null = null;
-	private sourceControlRepos: Set<string> | null = null;
 	private loadViewTo: LoadCommitsViewTo = null; // Is used by the next call to getHtmlForWebview, and is then reset to null
 	private restoredState: unknown = null;
 
@@ -197,6 +196,9 @@ export class TabView extends Disposable {
 			this.panel.onDidChangeViewState(() => {
 				if (this.panel.visible !== this.isPanelVisible) {
 					if (this.panel.visible) {
+						// The repo file watcher was stopped while hidden, so any cached graph
+						// projection may be stale - invalidate before the refresh reloads it.
+						if (this.currentRepo !== null) this.dataSource.advanceGraphGeneration(this.currentRepo);
 						if (this.panel.webview.html.trim().length === 0) {
 							this.update();
 						} else {
@@ -222,8 +224,7 @@ export class TabView extends Disposable {
 			// Subscribe to events triggered when a repository is added or deleted from Commits
 			repoManager.onDidChangeRepos((event) => {
 				if (!this.panel.visible) return;
-				const visibleRepos = this.getVisibleRepos(event.repos);
-				const numVisibleRepos = Object.keys(visibleRepos).length;
+				const numVisibleRepos = Object.keys(event.repos).length;
 				const loadViewTo = event.loadRepo !== null ? { repo: event.loadRepo } : null;
 				if ((numVisibleRepos === 0 && this.isGraphViewLoaded) || (numVisibleRepos > 0 && !this.isGraphViewLoaded)) {
 					this.loadViewTo = loadViewTo;
@@ -321,10 +322,6 @@ export class TabView extends Disposable {
 			avatarManager: this.avatarManager,
 			sendMessage: (msg) => this.sendMessage(msg)
 		};
-
-		// Also hook into VS Code's built-in Git extension to catch commits made via the native SCM panel.
-		// This handles cases where the file watcher is muted or misses events from external git operations.
-		this.setupNativeScmWatcher();
 
 		// Render the content of the Webview
 		this.update();
@@ -773,104 +770,6 @@ export class TabView extends Disposable {
 	}
 
 
-	/**
-	 * Subscribe to VS Code's built-in Git extension repository state changes so that commits
-	 * made via the native Source Control panel are detected and trigger a refresh.
-	 */
-	private setupNativeScmWatcher(): void {
-		const gitExt = vscode.extensions.getExtension<any>('vscode.git');
-		if (!gitExt) return;
-
-		const attach = (api: any) => {
-			if (this.isDisposed()) return;
-			let refreshTimeout: NodeJS.Timer | null = null;
-
-			const scheduleRefresh = (repoPath: string | null = null) => {
-				if (repoPath !== null) this.dataSource.advanceGraphGeneration(repoPath);
-				if (refreshTimeout !== null) clearTimeout(refreshTimeout);
-				refreshTimeout = setTimeout(() => {
-					refreshTimeout = null;
-					if (this.panel.visible) {
-						this.sendMessage({ command: 'refresh' });
-					}
-				}, 750);
-			};
-
-			const getSelectedApiRepository = () => {
-				if (!api || !Array.isArray(api.repositories)) return null;
-				for (const repo of api.repositories) {
-					if (repo?.ui?.selected) return repo;
-				}
-				return null;
-			};
-
-			const getKnownRepoForScmPath = async (repoPath: string) => {
-				let knownRepo = await this.repoManager.getKnownRepo(repoPath);
-				if (knownRepo === null && isPathInWorkspace(repoPath)) {
-					const registerResult = await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), false);
-					knownRepo = registerResult.root;
-				}
-				return knownRepo;
-			};
-
-			const syncVisibleRepositories = async (loadSelectedRepository: boolean) => {
-				if (this.isDisposed()) return;
-
-				const visibleRepos = new Set<string>();
-				if (api && Array.isArray(api.repositories)) {
-					for (const repo of api.repositories) {
-						const repoPath = repo?.rootUri?.fsPath;
-						if (typeof repoPath !== 'string' || repoPath.length === 0) continue;
-						const knownRepo = await getKnownRepoForScmPath(repoPath);
-						if (knownRepo !== null) visibleRepos.add(knownRepo);
-					}
-				}
-				this.sourceControlRepos = visibleRepos;
-
-				if (!this.panel.visible) return;
-				let loadViewTo: LoadCommitsViewTo = null;
-				if (loadSelectedRepository) {
-					const selectedRepoPath = getSelectedApiRepository()?.rootUri?.fsPath;
-					if (typeof selectedRepoPath === 'string' && selectedRepoPath.length > 0) {
-						const knownRepo = await getKnownRepoForScmPath(selectedRepoPath);
-						if (knownRepo !== null) loadViewTo = { repo: knownRepo };
-					}
-				}
-
-				this.respondLoadRepos(this.repoManager.getRepos(), loadViewTo);
-				if (loadSelectedRepository) scheduleRefresh();
-			};
-
-			const watchRepo = (repo: any) => {
-				this.registerDisposables(repo.state.onDidChange(() => scheduleRefresh(repo.rootUri?.fsPath ?? null)));
-				if (repo?.ui && typeof repo.ui.onDidChange === 'function') {
-					this.registerDisposables(repo.ui.onDidChange(() => {
-						void syncVisibleRepositories(true);
-					}));
-				}
-			};
-
-			api.repositories.forEach(watchRepo);
-			this.registerDisposables(api.onDidOpenRepository((repo: any) => {
-				watchRepo(repo);
-				void syncVisibleRepositories(false);
-			}));
-			if (typeof api.onDidCloseRepository === 'function') {
-				this.registerDisposables(api.onDidCloseRepository(() => {
-					void syncVisibleRepositories(false);
-				}));
-			}
-			void syncVisibleRepositories(true);
-		};
-
-		if (gitExt.isActive) {
-			attach(gitExt.exports.getAPI(1));
-		} else {
-			gitExt.activate().then(() => attach(gitExt.exports.getAPI(1)));
-		}
-	}
-
-
 	/* Response Construction Methods */
 
 	/**
@@ -879,27 +778,13 @@ export class TabView extends Disposable {
 	 * @param loadViewTo What to load the view to.
 	 */
 	private respondLoadRepos(repos: GitRepoSet, loadViewTo: LoadCommitsViewTo) {
-		const visibleRepos = this.getVisibleRepos(repos, loadViewTo?.repo ?? null);
 		this.sendMessage({
 			command: 'loadRepos',
-			repos: visibleRepos,
+			repos: repos,
 			lastActiveRepo: this.extensionState.getLastActiveRepo(),
 			loadViewTo: loadViewTo
 		});
 	}
-
-	private getVisibleRepos(repos: GitRepoSet, forceIncludeRepo: string | null = null): GitRepoSet {
-		if (this.sourceControlRepos === null) return repos;
-		const visibleRepos: GitRepoSet = {};
-		for (const repo of this.sourceControlRepos) {
-			if (typeof repos[repo] !== 'undefined') visibleRepos[repo] = repos[repo];
-		}
-		if (forceIncludeRepo !== null && typeof repos[forceIncludeRepo] !== 'undefined') {
-			visibleRepos[forceIncludeRepo] = repos[forceIncludeRepo];
-		}
-		return visibleRepos;
-	}
-
 }
 
 export { standardiseCspSource } from '../common/webviewChrome';

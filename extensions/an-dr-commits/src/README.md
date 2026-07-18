@@ -31,7 +31,8 @@ full architecture writeup and message-protocol data flows.
 | `extensionState.ts` | Persists view state across sessions |
 | `avatarManager.ts` | Fetches and caches author avatars |
 | `editorTabUtils.ts` | Matches existing Commits editor tabs for the explicit-open duplicate safeguard |
-| `statusBarItem.ts` | The status bar button that opens the graph |
+| `statusBarItem.ts` | The status bar button that opens the graph — branch/dirty state from `GitStatusMonitor` |
+| `gitStatusMonitor.ts` | The active repo/branch/dirty-counts authority — own watcher + `.git/HEAD` read, no vscode.git (ADR-022) |
 | `inlineBlame.ts` | Active editor inline blame backed by a cancellable per-document-version incremental blame cache |
 | `diffDocProvider.ts` | Virtual document provider for diff views |
 | `repoFileWatcher.ts` | Watches `.git` for changes, triggers refresh |

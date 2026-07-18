@@ -32,7 +32,7 @@ beforeAll(() => {
 	onDidChangeConfiguration = new EventEmitter<ConfigurationChangeEvent>();
 	onDidChangeGitExecutable = new EventEmitter<utils.GitExecutable>();
 	logger = new Logger();
-	dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+	dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 	extensionState = new ExtensionState(vscode.mocks.extensionContext, onDidChangeGitExecutable.subscribe);
 	spyOnGetRepos = jest.spyOn(extensionState, 'getRepos');
 	spyOnGetIgnoredRepos = jest.spyOn(extensionState, 'getIgnoredRepos');
@@ -393,6 +393,31 @@ describe('RepoManager', () => {
 	});
 
 	describe('startupTasks', () => {
+		it('Should defer startup work until readiness is requested', async () => {
+			const repoManager = constructRepoManager(['/path/to/workspace-folder1'], []);
+
+			expect(spyOnRepoRoot).not.toHaveBeenCalled();
+			expect(vscode.workspace.createFileSystemWatcher).not.toHaveBeenCalledWith('/path/to/workspace-folder1/**');
+
+			await repoManager.ensureReady();
+
+			expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith('/path/to/workspace-folder1/**');
+			repoManager.dispose();
+		});
+
+		it('Should share repository reconciliation between concurrent callers', async () => {
+			const repoManager = constructRepoManager(['/path/to/workspace-folder1'], []);
+			const spyOnSearchWorkspaceForRepos = jest.spyOn(repoManager, 'searchWorkspaceForRepos');
+
+			const first = repoManager.ensureReady();
+			const second = repoManager.ensureReady();
+
+			expect(second).toBe(first);
+			await Promise.all([first, second]);
+			expect(spyOnSearchWorkspaceForRepos).toHaveBeenCalledTimes(1);
+			repoManager.dispose();
+		});
+
 		it('Should run startup tasks', async () => {
 			// Setup
 			const roots: { [repo: string]: string | null } = {
@@ -491,7 +516,7 @@ describe('RepoManager', () => {
 				['/path/to/workspace-folder1']
 			);
 			repoManager.onDidChangeRepos((event) => onDidChangeReposEvents.push(event));
-			await waitForRepoManagerToStart();
+			await repoManager.ensureReady();
 
 			// Assert
 			expect(repoManager.getRepos()).toStrictEqual({});
@@ -519,7 +544,7 @@ describe('RepoManager', () => {
 				[]
 			);
 			repoManager.onDidChangeRepos((event) => onDidChangeReposEvents.push(event));
-			await waitForRepoManagerToStart();
+			await repoManager.ensureReady();
 
 			// Assert
 			expect(repoManager.getRepos()).toStrictEqual({});
@@ -2622,12 +2647,8 @@ function constructRepoManager(workspaceFolders: string[] | undefined, repos: str
 	return new RepoManager(dataSource, extensionState, onDidChangeConfiguration.subscribe, logger);
 }
 
-function waitForRepoManagerToStart() {
-	return waitForExpect(() => expect(spyOnLogDebug).toHaveBeenCalledWith('Completed searching workspace for new repos'));
-}
-
 async function constructRepoManagerAndWaitUntilStarted(workspaceFolders: string[] | undefined, repos: string[] | GitRepoSet, ignoreRepos: string[] = []) {
 	const repoManager = constructRepoManager(workspaceFolders, repos, ignoreRepos);
-	await waitForRepoManagerToStart();
+	await repoManager.ensureReady();
 	return repoManager;
 }

@@ -14,7 +14,7 @@ import { ExtensionState } from '../src/extensionState';
 import { TabView, standardiseCspSource } from '../src/views/tab/tabView';
 import { Logger } from '../src/logger';
 import { RepoChangeEvent, RepoManager } from '../src/repoManager';
-import { CommitOrdering, GitCommitStash, GitConfigLocation, GitFileStatus, CommitsViewGlobalState, CommitsViewWorkspaceState, GitPushBranchMode, GitResetMode, MergeActionOn, PullRequestConfig, PullRequestProvider, RebaseActionOn, RequestMessage, ResponseMessage, TagType } from '../src/types';
+import { CommitOrdering, CommitsViewGlobalState, CommitsViewWorkspaceState, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitResetMode, MergeActionOn, PullRequestConfig, PullRequestProvider, RebaseActionOn, RequestMessage, ResponseMessage, TagType } from '../src/types';
 import * as utils from '../src/utils';
 import { EventEmitter } from '../src/utils/event';
 
@@ -46,7 +46,8 @@ describe('TabView', () => {
 		onAvatar = new EventEmitter<AvatarEvent>();
 
 		logger = new Logger();
-		dataSource = new DataSource({ path: '/path/to/git', version: '2.25.0' }, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+		dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+		onDidChangeGitExecutable.emit({ path: '/path/to/git', version: '2.25.0' });
 		extensionState = new ExtensionState(vscode.mocks.extensionContext, onDidChangeGitExecutable.subscribe);
 		avatarManager = new AvatarManager(dataSource, extensionState, logger);
 		repoManager = new RepoManager(dataSource, extensionState, onDidChangeConfiguration.subscribe, logger);
@@ -1873,7 +1874,6 @@ describe('TabView', () => {
 				const rewordCommitResolvedValue = null;
 				const spyOnPromptForRewordCommitMessage = jest.spyOn(dataSource, 'promptForRewordCommitMessage');
 				const spyOnRewordCommit = jest.spyOn(dataSource, 'rewordCommit');
-				const spyOnScheduleReopen = jest.fn();
 				spyOnPromptForRewordCommitMessage.mockResolvedValueOnce(promptForRewordCommitMessageResolvedValue);
 				spyOnRewordCommit.mockResolvedValueOnce(rewordCommitResolvedValue);
 
@@ -1900,16 +1900,6 @@ describe('TabView', () => {
 				// Assert
 				await waitForExpect(() => {
 					expect(spyOnPromptForRewordCommitMessage).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');
-					expect(spyOnScheduleReopen).toHaveBeenCalledWith('/path/to/repo', ['master'], ['v1.0.0'], 123, {
-						filterValue: '',
-						localCollapsed: false,
-						remoteCollapsed: false,
-						tagsCollapsed: false,
-						folderCollapsed: {},
-						sidebarWidth: 280,
-						sidebarHidden: false,
-						scrollTop: 12
-					}, 30000);
 					expect(spyOnRewordCommit).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'Reworded subject\n');
 					expect(messages).toStrictEqual([
 						{
@@ -1955,7 +1945,6 @@ describe('TabView', () => {
 				const squashCommitsResolvedValue = null;
 				const spyOnPromptForSquashCommitMessage = jest.spyOn(dataSource, 'promptForSquashCommitMessage');
 				const spyOnSquashCommits = jest.spyOn(dataSource, 'squashCommits');
-				const spyOnScheduleReopen = jest.fn();
 				spyOnPromptForSquashCommitMessage.mockResolvedValueOnce(promptForSquashCommitMessageResolvedValue);
 				spyOnSquashCommits.mockResolvedValueOnce(squashCommitsResolvedValue);
 
@@ -1982,16 +1971,6 @@ describe('TabView', () => {
 				// Assert
 				await waitForExpect(() => {
 					expect(spyOnPromptForSquashCommitMessage).toHaveBeenCalledWith('/path/to/repo', ['1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c']);
-					expect(spyOnScheduleReopen).toHaveBeenCalledWith('/path/to/repo', ['master'], ['v1.0.0'], 123, {
-						filterValue: '',
-						localCollapsed: false,
-						remoteCollapsed: false,
-						tagsCollapsed: false,
-						folderCollapsed: {},
-						sidebarWidth: 280,
-						sidebarHidden: false,
-						scrollTop: 12
-					}, 30000);
 					expect(spyOnSquashCommits).toHaveBeenCalledWith('/path/to/repo', ['1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c'], 'Squashed subject\n');
 					expect(messages).toStrictEqual([
 						{
@@ -3086,33 +3065,6 @@ describe('TabView', () => {
 			});
 		});
 
-		describe('openTerminal', () => {
-			it('Should open a terminal', async () => {
-				// Setup
-				const openGitTerminalResolvedValue = null;
-				const spyOnOpenGitTerminal = jest.spyOn(dataSource, 'openGitTerminal');
-				spyOnOpenGitTerminal.mockResolvedValueOnce(openGitTerminalResolvedValue);
-
-				// Run
-				onDidReceiveMessage(<any>{
-					command: 'openTerminal',
-					repo: '/path/to/repo',
-					name: 'repo-name'
-				});
-
-				// Assert
-				await waitForExpect(() => {
-					expect(spyOnOpenGitTerminal).toHaveBeenCalledWith('/path/to/repo', null, 'repo-name');
-					expect(messages).toStrictEqual([
-						{
-							command: 'openTerminal',
-							error: openGitTerminalResolvedValue
-						}
-					]);
-				});
-			});
-		});
-
 		describe('popStash', () => {
 			it('Should pop a stash', async () => {
 				// Setup
@@ -3826,92 +3778,6 @@ describe('TabView', () => {
 				expect(mockedWebviewPanel.panel.webview.postMessage).not.toHaveBeenCalled();
 				expect(spyOnLogDebug).toHaveBeenCalledWith('The Commits View has already been disposed, ignored sending "viewScm" message.');
 				expect(spyOnLogError).not.toHaveBeenCalled();
-			});
-		});
-	});
-
-	describe('Native SCM Selection', () => {
-		it('Should load and refresh the selected Source Control repository when the Git API selection changes', async () => {
-			// Setup
-			const stateOnDidChange = new EventEmitter<void>();
-			const uiOnDidChange = new EventEmitter<void>();
-			const repo = {
-				rootUri: vscode.Uri.file('/path/to/repo'),
-				state: {
-					onDidChange: stateOnDidChange.subscribe
-				},
-				ui: {
-					selected: false,
-					onDidChange: uiOnDidChange.subscribe
-				}
-			};
-			vscode.mockExtension('vscode.git', {
-				isActive: true,
-				exports: {
-					getAPI: jest.fn(() => ({
-						repositories: [repo],
-						onDidOpenRepository: jest.fn(() => ({ dispose: jest.fn() }))
-					}))
-				}
-			});
-			jest.spyOn(repoManager, 'getKnownRepo').mockResolvedValue('/path/to/repo');
-
-			// Run
-			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
-			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-			repo.ui.selected = true;
-			uiOnDidChange.emit();
-
-			// Assert
-			await waitForExpect(() => {
-				expect(mockedWebviewPanel.mocks.messages).toContainEqual({
-					command: 'loadRepos',
-					lastActiveRepo: null,
-					loadViewTo: { repo: '/path/to/repo' },
-					repos: {
-						'/path/to/repo': mockRepoState()
-					}
-				});
-				expect(mockedWebviewPanel.mocks.messages).toContainEqual({
-					command: 'refresh'
-				});
-			});
-		});
-
-		it('Should ignore selected Source Control repositories that are unknown to Commits', async () => {
-			// Setup
-			const uiOnDidChange = new EventEmitter<void>();
-			const repo = {
-				rootUri: vscode.Uri.file('/path/to/external-repo'),
-				state: {
-					onDidChange: jest.fn(() => ({ dispose: jest.fn() }))
-				},
-				ui: {
-					selected: false,
-					onDidChange: uiOnDidChange.subscribe
-				}
-			};
-			vscode.mockExtension('vscode.git', {
-				isActive: true,
-				exports: {
-					getAPI: jest.fn(() => ({
-						repositories: [repo],
-						onDidOpenRepository: jest.fn(() => ({ dispose: jest.fn() }))
-					}))
-				}
-			});
-			jest.spyOn(repoManager, 'getKnownRepo').mockResolvedValue(null);
-
-			// Run
-			TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
-			const mockedWebviewPanel = vscode.getMockedWebviewPanel(0);
-			mockedWebviewPanel.mocks.messages.length = 0;
-			repo.ui.selected = true;
-			uiOnDidChange.emit();
-
-			// Assert
-			await waitForExpect(() => {
-				expect(mockedWebviewPanel.mocks.messages).toStrictEqual([]);
 			});
 		});
 	});

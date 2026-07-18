@@ -1,14 +1,16 @@
 import * as vscode from 'vscode';
 import { getConfig } from './config';
+import { GitChangeCounts } from './dataSource';
+import { GitStatusMonitor } from './gitStatusMonitor';
 import { Logger } from './logger';
 import { RepoChangeEvent } from './repoManager';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
-import { countChanges, GitChangeCounts } from './views/sidebar/sidebarView';
 
 /**
  * Manages the Commits Status Bar Item — a single button that opens the Commits View.
- * Displays the current branch name, updated whenever the active editor's repo HEAD changes.
+ * Displays the active repository's branch name and dirty state, sourced from the
+ * GitStatusMonitor (no dependency on the vscode.git extension - see ADR-022).
  */
 export class StatusBarItem extends Disposable {
 	private static readonly ICON = '$(git-branch)';
@@ -21,7 +23,7 @@ export class StatusBarItem extends Disposable {
 	private isVisible: boolean = false;
 	private changes: GitChangeCounts = { modified: 0, deleted: 0 };
 
-	constructor(initialNumRepos: number, onDidChangeRepos: Event<RepoChangeEvent>, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
+	constructor(initialNumRepos: number, onDidChangeRepos: Event<RepoChangeEvent>, statusMonitor: GitStatusMonitor, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, logger: Logger) {
 		super();
 		this.logger = logger;
 
@@ -40,57 +42,19 @@ export class StatusBarItem extends Disposable {
 					this.refresh();
 				}
 			}),
+			statusMonitor.onDidChangeStatus((status) => {
+				this.branchName = status.branchName;
+				this.changes = status.counts;
+				this.refresh();
+			}),
 			this.item
 		);
 
 		this.numRepos = initialNumRepos;
-		this.subscribeToGitApi();
+		const status = statusMonitor.getStatus();
+		this.branchName = status.branchName;
+		this.changes = status.counts;
 		this.refresh();
-	}
-
-	private subscribeToGitApi() {
-		const gitExt = vscode.extensions.getExtension('vscode.git');
-		if (!gitExt) { return; }
-
-		const attach = (api: any) => {
-			const pickRepo = () => {
-				// Prefer the repo rooted at the workspace folder to avoid picking a
-				// submodule when the active editor happens to be inside one.
-				const folders = vscode.workspace.workspaceFolders;
-				if (folders && folders.length > 0) {
-					const wsPath = folders[0].uri.fsPath;
-					const wsRepo = api.repositories.find((r: any) => r.rootUri?.fsPath === wsPath);
-					if (wsRepo) { return wsRepo; }
-				}
-				const activeUri = vscode.window.activeTextEditor?.document.uri;
-				const activeRepo = activeUri ? api.getRepository(activeUri) : null;
-				return activeRepo ?? (api.repositories.length > 0 ? api.repositories[0] : null);
-			};
-
-			const update = () => {
-				const repo = pickRepo();
-				this.branchName = (repo?.state?.HEAD?.name as string | undefined) ?? null;
-				this.changes = repo ? countChanges(repo) : { modified: 0, deleted: 0 };
-				this.refresh();
-			};
-
-			const watchRepo = (r: any) => {
-				this.registerDisposables(r.state.onDidChange(update));
-			};
-
-			api.repositories.forEach(watchRepo);
-			this.registerDisposables(
-				api.onDidOpenRepository((r: any) => { watchRepo(r); update(); }),
-				vscode.window.onDidChangeActiveTextEditor(update)
-			);
-			update();
-		};
-
-		if (gitExt.isActive) {
-			attach(gitExt.exports.getAPI(1));
-		} else {
-			gitExt.activate().then(() => attach(gitExt.exports.getAPI(1)));
-		}
 	}
 
 	private refresh() {

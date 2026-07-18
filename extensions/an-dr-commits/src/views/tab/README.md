@@ -13,7 +13,7 @@ and reuses it for every handler call in that group.
 
 | File | Purpose |
 |---|---|
-| `tabView.ts` | **Core class `TabView`** — panel lifecycle, HTML rendering, native-SCM-extension watcher, the `respondToMessage` dispatch switch |
+| `tabView.ts` | **Core class `TabView`** — panel lifecycle, HTML rendering, repository watcher, and the `respondToMessage` dispatch switch |
 | `webviewHtml.ts` | Tab webview HTML + CSP rendering (`renderCommitsWebviewHtml`) |
 | `repoLifecycleActions.ts` | `loadRepos`/`loadRepoInfo`/`loadCommits`/`loadConfig`/`rescanForRepos`/`setRepoState`/`exportRepoConfig`/`setGlobalViewState`/`setWorkspaceViewState`/`setColumnVisibility`/`repoInProgressAction` |
 | `branchRemoteActions.ts` | Branch and remote management (checkout/create/delete/rename/push/pull/fetch/merge/rebase/create-PR/…) |

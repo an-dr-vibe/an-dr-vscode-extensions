@@ -10,8 +10,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
-import { DiffNameStatusRecord, DiffNumStatRecord, generateFileChanges, getConfigValue, getErrorMessage, GitConfigSet, GitStatusFiles, removeTrailingBlankLines, unique } from './data-source/helpers';
-import { BlameLineInfo, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRefSnapshot, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
+import { DiffNameStatusRecord, DiffNumStatRecord, GitConfigSet, GitStatusFiles, generateFileChanges, getConfigValue, getErrorMessage, removeTrailingBlankLines, unique } from './data-source/helpers';
+import { BlameLineInfo, GitChangeCounts, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRefSnapshot, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
 import { parseBlameIncrementalOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefSnapshotOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput, parseWorkingTreeStatusOutput } from './data-source/parsers';
 import { Logger } from './logger';
 import { GraphProjectionKeyInput, RepositoryGraphCache, createGraphProjectionKey } from './repositoryGraphCache';
@@ -52,6 +52,7 @@ export class DataSource extends Disposable {
 	private readonly askpassEnv: AskpassEnvironment;
 	private readonly gitEditorManager: GitEditorManager;
 	private gitExecutable!: GitExecutable | null;
+	private readonly whenGitExecutableResolved: Promise<unknown>;
 	private gitExecutableSupportsGpgInfo!: boolean;
 	private gitFormatCommitDetails!: string;
 	private gitFormatLog!: string;
@@ -64,14 +65,17 @@ export class DataSource extends Disposable {
 
 	/**
 	 * Creates the Commits Data Source.
-	 * @param gitExecutable The Git executable available to Commits at startup.
+	 * @param whenGitExecutableResolved Settles once Git executable discovery has finished (the
+	 * executable itself arrives via `onDidChangeGitExecutable`). Git calls made before then are
+	 * held on this barrier instead of failing, so activation doesn't have to await discovery.
 	 * @param onDidChangeGitExecutable The Event emitting the Git executable for Commits to use.
 	 * @param logger The Commits Logger instance.
 	 */
-	constructor(gitExecutable: GitExecutable | null, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, onDidChangeGitExecutable: Event<GitExecutable>, logger: Logger) {
+	constructor(whenGitExecutableResolved: Promise<unknown>, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, onDidChangeGitExecutable: Event<GitExecutable>, logger: Logger) {
 		super();
 		this.logger = logger;
-		this.setGitExecutable(gitExecutable);
+		this.whenGitExecutableResolved = whenGitExecutableResolved.catch(() => null);
+		this.setGitExecutable(null);
 
 		const askpassManager = new AskpassManager();
 		const gitEditorManager = new GitEditorManager();
@@ -1299,6 +1303,37 @@ export class DataSource extends Disposable {
 		}).catch((errorMessage) => ({ changes: [], error: errorMessage }));
 	}
 
+	/**
+	 * Gets working-tree change counts for the given repository. Mirrors `getWorkingTreeChanges`'
+	 * row construction (staged and unstaged entries counted separately) so counts always match
+	 * the sidebar's changes tree, without that method's extra numstat / submodule-head spawns.
+	 * @param repo The path of the repository.
+	 * @returns The counts, or NULL if the status could not be read.
+	 */
+	public getStatusCounts(repo: string): Promise<GitChangeCounts | null> {
+		return this.spawnGit(['status', '--porcelain=v2', '-z', '--untracked-files=all'], repo, (stdout) => {
+			const records = parseWorkingTreeStatusOutput(stdout);
+			let modified = 0, deleted = 0;
+			for (let i = 0; i < records.length; i++) {
+				const record = records[i];
+				if (record.indexStatus === '?') {
+					modified++;
+					continue;
+				}
+				if (record.indexStatus !== '.' && record.indexStatus !== '?') {
+					if (record.indexStatus === 'D') deleted++;
+					else modified++;
+				}
+				const hasWorktreeChange = record.workTreeStatus !== '.' || (record.submodule !== null && (record.submodule.commitChanged || record.submodule.trackedChanges || record.submodule.untrackedChanges));
+				if (hasWorktreeChange && record.indexStatus !== '?') {
+					if (record.workTreeStatus === 'D') deleted++;
+					else modified++;
+				}
+			}
+			return { modified, deleted };
+		}).catch((): null => null);
+	}
+
 	/** Gets the checked-out commit of an initialised submodule. */
 	private getSubmoduleHead(repo: string, filePath: string): Promise<string | null> {
 		return this.spawnGit(['-C', filePath, 'rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch(() => null);
@@ -1731,7 +1766,7 @@ export class DataSource extends Disposable {
 		// Hash matching uses startsWith-style checks to handle git's variable abbreviation length.
 		const transformJson = JSON.stringify(opts.transform);
 		fs.writeFileSync(seqScript, [
-			"var fs = require('fs');",
+			'var fs = require(\'fs\');',
 			'var data = ' + transformJson + ';',
 			'var file = process.argv[process.argv.length - 1];',
 			'var lines = fs.readFileSync(file, "utf8").split(/\\r?\\n/);',
@@ -1768,7 +1803,7 @@ export class DataSource extends Disposable {
 		if (opts.commitMessage !== undefined) {
 			const escapedMsg = JSON.stringify(opts.commitMessage);
 			fs.writeFileSync(msgScript, [
-				"var fs = require('fs');",
+				'var fs = require(\'fs\');',
 				'fs.writeFileSync(process.argv[process.argv.length - 1], ' + escapedMsg + ');'
 			].join('\n'));
 			env['GIT_EDITOR'] = this.shQuotePath(nodeExe) + ' ' + this.shQuotePath(msgScript);
@@ -2748,7 +2783,12 @@ export class DataSource extends Disposable {
 	 * @param ignoreExitCode Ignore the exit code returned by Git (default: `FALSE`).
 	 * @param cancellationToken Cancels the child process when requested.
 	 */
-	private _spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: Buffer, stderr: string): T }, ignoreExitCode: boolean = false, cancellationToken?: vscode.CancellationToken) {
+	private async _spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: Buffer, stderr: string): T }, ignoreExitCode: boolean = false, cancellationToken?: vscode.CancellationToken) {
+		if (this.gitExecutable === null) {
+			// Executable discovery may still be in flight (activation doesn't await it) - hold the
+			// call until it settles; if discovery failed, gitExecutable stays null and we reject.
+			await this.whenGitExecutableResolved;
+		}
 		return new Promise<T>((resolve, reject) => {
 			if (this.gitExecutable === null) {
 				return reject(UNABLE_TO_FIND_GIT_MSG);
@@ -2777,7 +2817,7 @@ export class DataSource extends Disposable {
 	}
 }
 
-export type { BlameLineInfo, GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, HeadInfo } from './data-source/models';
+export type { BlameLineInfo, GitChangeCounts, GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, HeadInfo } from './data-source/models';
 
 export interface CommitDisplayInfo {
 	readonly hash: string;

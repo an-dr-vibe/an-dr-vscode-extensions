@@ -1,23 +1,18 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getConfig } from '../../config';
-import { DataSource, GitWorkingTreeChange, HeadInfo } from '../../dataSource';
+import { DataSource, GitChangeCounts, GitWorkingTreeChange, HeadInfo } from '../../dataSource';
 import { ExtensionState } from '../../extensionState';
+import { GitStatusMonitor } from '../../gitStatusMonitor';
 import { RepoManager } from '../../repoManager';
 import { ErrorInfo, GitFileStatus, GitPushBranchMode, GitResetMode, UiDensity } from '../../types';
-import { UNCOMMITTED, getSortedRepositoryPaths, viewDiff, viewSubmoduleDiff } from '../../utils';
+import { UNCOMMITTED, viewDiff, viewSubmoduleDiff } from '../../utils';
 import { Event } from '../../utils/event';
-import {
-	GitChangeCounts,
-	countChanges, getRepoRoot
-} from './gitUtils';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph } from './miniGraph';
 import { renderHtml, renderLoadingHtml } from './html';
 import { RepoSelectionEvent } from '../common/repoSelection';
 import { SidebarGraphState, SidebarInitialState } from '../../types/sidebar-state';
 import { SidebarRequestMessage, SidebarResponseMessage } from '../../types/sidebar-protocol';
-
-export { GitActivityChange, GitChangeCounts, getWorkingTreeChanges, countChanges, countWorkingTreeChanges } from './gitUtils';
 
 function resetModeLabel(mode: GitResetMode): string {
 	switch (mode) {
@@ -40,40 +35,46 @@ export class SidebarView implements vscode.Disposable {
 	private readonly dataSource: DataSource;
 	private readonly extensionState: ExtensionState;
 	private readonly repoManager: RepoManager;
+	private readonly statusMonitor: GitStatusMonitor;
 	private readonly extensionPath: string;
 	private readonly emitRepoSelection: (event: RepoSelectionEvent) => void;
 	private readonly _disposables: vscode.Disposable[] = [];
-	private readonly _fileWatchers = new Map<string, vscode.Disposable>();
-	private _api: any = null;
 	private _view: any = null;
 	private _currentRepo: string | null = null;
-	private _pinnedRepo: string | null = null;
 	private _changes: GitWorkingTreeChange[] = [];
 	private _refreshSeq = 0;
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private _miniGraphLimit = MINI_GRAPH_LIMIT;
 	private _hasRenderedOnce = false;
 
-	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void) {
+	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, statusMonitor: GitStatusMonitor, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void, registerProvider: boolean = true) {
 		this.dataSource = dataSource;
 		this.extensionState = extensionState;
 		this.repoManager = repoManager;
+		this.statusMonitor = statusMonitor;
 		this.extensionPath = context.extensionPath;
 		this.emitRepoSelection = emitRepoSelection;
-		this._pinnedRepo = extensionState.getLastActiveRepo();
 
 		const registerWebviewViewProvider = (vscode.window as any).registerWebviewViewProvider;
-		if (typeof registerWebviewViewProvider === 'function') {
+		if (registerProvider && typeof registerWebviewViewProvider === 'function') {
 			context.subscriptions.push(registerWebviewViewProvider.call(vscode.window, 'an-dr-commits.activityView', this, {
 				webviewOptions: { retainContextWhenHidden: true }
 			}));
 		}
+		// Repo pinning lives in the GitStatusMonitor (it subscribes to the same selection events);
+		// this view only needs to re-render when the selection changes from the tab's side.
 		this._disposables.push(onDidChangeRepoSelection((event) => {
 			if (event.source === 'activity') return;
-			this._pinRepoFromSharedSelection(event.repo);
+			this._updateBadge();
+			void this._refreshPanel();
 		}));
 		this._disposables.push(repoManager.onDidChangeRepos(() => {
-			this._syncRepoWatchers();
+			this._scheduleRefresh();
+		}));
+		// The monitor's watcher covers the active repo's working tree and .git metadata, so this
+		// replaces both the former vscode.git state events and this view's own .git/** watchers.
+		this._disposables.push(statusMonitor.onDidChangeStatus(() => {
+			this._updateBadge();
 			this._scheduleRefresh();
 		}));
 		if (typeof vscode.workspace.onDidChangeConfiguration === 'function') {
@@ -83,8 +84,6 @@ export class SidebarView implements vscode.Disposable {
 				void this._refreshPanel();
 			}));
 		}
-		this._syncRepoWatchers();
-		this._subscribeToGitApi();
 	}
 
 	public resolveWebviewView(webviewView: any) {
@@ -109,96 +108,12 @@ export class SidebarView implements vscode.Disposable {
 		}, 500);
 	}
 
-	private _watchRepo(repoPath: string) {
-		if (this._fileWatchers.has(repoPath)) return;
-		const watcher = vscode.workspace.createFileSystemWatcher(repoPath + '/.git/**');
-		const onEvent = () => this._scheduleRefresh();
-		watcher.onDidCreate(onEvent);
-		watcher.onDidChange(onEvent);
-		watcher.onDidDelete(onEvent);
-		this._fileWatchers.set(repoPath, watcher);
-	}
-
 	/**
-	 * Keeps the `.git/**` file watchers in sync with RepoManager's known repos (the sidebar's
-	 * repo source of truth, see ADR-005's follow-up) - added when a repo is discovered, disposed
-	 * when it's removed. Idempotent, so it's safe to call on every `onDidChangeRepos` event.
-	 */
-	private _syncRepoWatchers() {
-		const knownPaths = new Set(Object.keys(this.repoManager.getRepos()));
-		for (const [repoPath, watcher] of this._fileWatchers) {
-			if (!knownPaths.has(repoPath)) {
-				watcher.dispose();
-				this._fileWatchers.delete(repoPath);
-			}
-		}
-		for (const repoPath of knownPaths) {
-			this._watchRepo(repoPath);
-		}
-	}
-
-	/**
-	 * Keeps `this._api` pointed at the native VS Code Git extension - used for the working-tree
-	 * badge's instant fast-path (`countChanges`) and as a live-refresh signal. Head/branch/remote
-	 * resolution (Pull/Push/Reset) and the mini graph no longer depend on it (see
-	 * `DataSource.getHeadInfo`), nor does repo enumeration / watching (see
-	 * `_getRepoPaths`/`_syncRepoWatchers`) - RepoManager can know about repos this API hasn't
-	 * opened.
-	 */
-	private _subscribeToGitApi() {
-		const gitExt = vscode.extensions.getExtension('vscode.git');
-		if (!gitExt) { return; }
-
-		const attach = (api: any) => {
-			this._api = api;
-			// Badge updates instantly (native API state, no git spawn); the panel's own git
-			// fetches go through _scheduleRefresh so rapid events (editor switches, vscode.git
-			// state churn) coalesce instead of spawning git per event.
-			const update = () => {
-				this._updateBadge();
-				this._scheduleRefresh();
-			};
-
-			for (const repo of api.repositories) {
-				this._disposables.push(repo.state.onDidChange(update));
-			}
-			this._disposables.push(
-				api.onDidOpenRepository((r: any) => {
-					this._disposables.push(r.state.onDidChange(update));
-					update();
-				}),
-				vscode.window.onDidChangeActiveTextEditor(update)
-			);
-			update();
-		};
-
-		if (gitExt.isActive) {
-			attach(gitExt.exports.getAPI(1));
-		} else {
-			gitExt.activate().then(() => attach(gitExt.exports.getAPI(1)));
-		}
-	}
-
-	/**
-	 * Resolves which repo is active: the pinned repo if still known, else whichever known repo
-	 * contains the active editor's file, else the first repo in dropdown order (starred repos
-	 * first, then the configured `repositoryDropdownOrder`) - mirrors the tab's own default-repo
-	 * fallback (`web/main/loadProcessing.ts`). Sourced entirely from RepoManager (see
-	 * `_getRepoPaths`) rather than the native VS Code Git API, so this resolves correctly even
-	 * for repos that API hasn't opened.
+	 * Resolves which repo is active - delegated to the GitStatusMonitor, the single authority
+	 * for the pinned/active repository shared with the status bar and commands (see ADR-022).
 	 */
 	private _resolveActiveRepoPath(): string | null {
-		const repos = this.repoManager.getRepos();
-		if (Object.keys(repos).length === 0) return null;
-		if (this._pinnedRepo !== null) {
-			const known = this.repoManager.findKnownRepoPath(this._pinnedRepo);
-			if (known !== null) return known;
-			this._pinnedRepo = null;
-		}
-		const activeUri = vscode.window.activeTextEditor?.document.uri;
-		const fileRepo = activeUri ? this.repoManager.getRepoContainingFile(activeUri.fsPath) : null;
-		if (fileRepo !== null) return fileRepo;
-		return getSortedRepositoryPaths(repos, getConfig().repoDropdownOrder)[0];
+		return this.statusMonitor.getActiveRepoPath();
 	}
 
 	/** The sidebar's repo dropdown source of truth - RepoManager's own workspace-wide discovery (see ADR-005's follow-up), not the native VS Code Git API's (narrower) auto-detected repo list. */
@@ -206,42 +121,23 @@ export class SidebarView implements vscode.Disposable {
 		return Object.keys(this.repoManager.getRepos());
 	}
 
-	private _pathsEqual(a: string, b: string) {
-		const left = path.resolve(a);
-		const right = path.resolve(b);
-		return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
-	}
-
-	private _pinRepoFromSharedSelection(repoPath: string) {
-		const selected = this.repoManager.findKnownRepoPath(repoPath) ?? repoPath;
-		if (this._pinnedRepo !== null && this._pathsEqual(this._pinnedRepo, selected)) return;
-		this._pinnedRepo = selected;
-		this.extensionState.setLastActiveRepo(selected);
-		this._updateBadge();
-		void this._refreshPanel();
-	}
-
 	/**
 	 * Badge reflects only the currently selected repository's changes - not every repository in
 	 * the workspace summed together - matching what the sidebar's own changes tree shows.
-	 * Prefers the native Git extension's live state (instant, no git spawn); if the active repo
-	 * isn't tracked there (RepoManager can know about repos that API hasn't opened), falls back
-	 * to this view's own last-fetched working tree changes for that same repo.
+	 * Prefers the GitStatusMonitor's counts (kept fresh by its own watcher, and computed with
+	 * the same row semantics as the changes tree); if the monitor tracks a different repo,
+	 * falls back to this view's own last-fetched working tree changes for that same repo.
 	 *
 	 * Called both eagerly (for instant feedback before a refresh's async git calls resolve) and
-	 * again from `_refreshPanel` once `this._changes` actually reflects the just-fetched data -
-	 * the eager call alone left the badge always one refresh behind whenever the vscode.git fast
-	 * path wasn't available for the active repo.
+	 * again from `_refreshPanel` once `this._changes` actually reflects the just-fetched data.
 	 */
 	private _updateBadge() {
 		if (this._view === null) return;
 		const activePath = this._resolveActiveRepoPath();
-		const activeApiRepo = activePath !== null && this._api !== null
-			? (this._api.repositories as any[]).find((r) => this._pathsEqual(getRepoRoot(r), activePath))
-			: undefined;
+		const status = this.statusMonitor.getStatus();
 		let counts: GitChangeCounts = { modified: 0, deleted: 0 };
-		if (activeApiRepo) {
-			counts = countChanges(activeApiRepo);
+		if (activePath !== null && status.repo === activePath) {
+			counts = status.counts;
 		} else if (activePath !== null && activePath === this._currentRepo) {
 			counts = {
 				modified: this._changes.filter((c) => c.status !== 'D').length,
@@ -358,13 +254,14 @@ export class SidebarView implements vscode.Disposable {
 					await this._sendMessage({ command: 'updateGraph', graph });
 				}
 				return;
-			case 'selectRepo':
-				this._pinnedRepo = this.repoManager.findKnownRepoPath(msg.filePath) ?? msg.filePath;
-				this.extensionState.setLastActiveRepo(this._pinnedRepo);
-				this.emitRepoSelection({ repo: this._pinnedRepo, source: 'activity' });
+			case 'selectRepo': {
+				// The GitStatusMonitor receives this event too - it pins the repo and persists it.
+				const selected = this.repoManager.findKnownRepoPath(msg.filePath) ?? msg.filePath;
+				this.emitRepoSelection({ repo: selected, source: 'activity' });
 				this._updateBadge();
 				await this._refreshPanel();
 				return;
+			}
 			case 'setRepoStarred':
 				this.repoManager.setRepoStarred(msg.filePath, msg.starred);
 				await this._refreshPanel();
@@ -522,9 +419,8 @@ export class SidebarView implements vscode.Disposable {
 		return GitFileStatus.Modified;
 	}
 
-	dispose() {
+	public dispose() {
 		this._disposables.forEach(d => d.dispose());
-		this._fileWatchers.forEach((watcher) => watcher.dispose());
 		if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
 	}
 }

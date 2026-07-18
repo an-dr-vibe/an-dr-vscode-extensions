@@ -57,16 +57,20 @@ Bundling scripts: `.vscode/package-web.js` (CSS + JS concatenation/minification 
 
 After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm run compile-web` and reload the extension window.
 
+`.gitattributes` keeps TypeScript working-tree files on CRLF, matching the extension's ESLint policy on every supported platform.
+
 ---
 
 ## Backend file map (`src/`)
 
 | File | Purpose |
 |---|---|
-| `extension.ts` | Activation, registers all commands, wires up managers |
+| `extension.ts` | Lightweight activation shell: permanent command/view/document delegates and persisted-state status icon (ADR-023) |
+| `core.ts` | Lazily constructs and wires Git-backed managers after first use or the idle fallback (ADR-023) |
+| `commandIds.ts` | Dependency-free command ID list shared by the activation shell and `CommandManager` |
 | `dataSource.ts` | **All git commands** — spawns git, parses output. Repository loads share a one-use `for-each-ref` snapshot (ADR-014), cache exact graph projections, and prewarm up to twelve individual refs after a show-all load (ADR-015). Key methods: `getCommits()`, `getRepoInfo()`, `getLog()` |
 | `repositoryGraphCache.ts` | Bounded per-repository immutable commit pool and exact graph-projection LRU with generation-based staleness (ADR-015) |
-| `repoManager.ts` | Discovers `.git` repos in the workspace, tracks them |
+| `repoManager.ts` | Discovers `.git` repos in the workspace and tracks them; reconciliation is guarded by one deferred `ensureReady()` promise (ADR-023) |
 | `commands.ts` | Handlers for every Git action (checkout, merge, push, tag, etc.) |
 | `config.ts` | Reads VS Code settings into typed config objects |
 | `extensionState.ts` | Persists view state across sessions |
@@ -77,6 +81,7 @@ After any change to `web/` or `web/styles/` (or `web/sidebar/styles/`), run `npm
 | `views/sidebar/` | The Activity Bar sidebar webview, class `SidebarView` — see below |
 | `views/common/` | Backend code shared between `views/tab/` and `views/sidebar/` — see below |
 | `statusBarItem.ts` | The status bar button that opens the graph |
+| `gitStatusMonitor.ts` | Active-repository, branch, and dirty-count authority; uses the extension's own watcher and Git spawns (ADR-022) |
 | `inlineBlame.ts` | Active editor inline blame backed by a cancellable per-document-version incremental blame cache (ADR-013) |
 | `diffDocProvider.ts` | Virtual document provider for diff views |
 | `repoFileWatcher.ts` | Watches `.git` for changes, triggers refresh |
@@ -97,7 +102,7 @@ At `maxDepthOfRepoSearch === 0`, the workspace creation watcher drops ordinary p
 
 | File | Purpose |
 |---|---|
-| `tabView.ts` | **Core class `TabView`** — panel lifecycle, HTML rendering, native-SCM-extension watcher, `respondToMessage` dispatch switch |
+| `tabView.ts` | **Core class `TabView`** — panel lifecycle, HTML rendering, repository watcher, `respondToMessage` dispatch switch |
 | `webviewHtml.ts` | Tab webview HTML + CSP rendering (`renderCommitsWebviewHtml`) |
 | `repoLifecycleActions.ts` | `loadRepos`/`loadRepoInfo`/`loadCommits`/`loadConfig`/`rescanForRepos`/`setRepoState`/`exportRepoConfig`/`setGlobalViewState`/`setWorkspaceViewState`/`setColumnVisibility`/`repoInProgressAction` |
 | `branchRemoteActions.ts` | Branch and remote management (checkout/create/delete/rename/push/pull/fetch/merge/rebase/create-PR/…) |
@@ -114,9 +119,8 @@ At `maxDepthOfRepoSearch === 0`, the workspace creation watcher drops ordinary p
 
 | File | Purpose |
 |---|---|
-| `sidebarView.ts` | **Core class `SidebarView`** (webview view type `an-dr-commits.activityView`) — repository selection sync, message dispatch. Its repo dropdown list, active-repo resolution, and file watching are sourced from `RepoManager` (not the native VS Code Git API — see ADR-006), including starred-repo sync (ADR-005). The native Git API (`this._api`) is still used for branch/remote resolution (Pull/Push/Reset), the mini graph, and as a fast path for the activity badge. The badge (`_updateBadge()`) reflects only the currently selected repo's changes, not every repo in the workspace summed together. |
+| `sidebarView.ts` | **Core class `SidebarView`** (webview view type `an-dr-commits.activityView`) — repository selection sync and message dispatch. Repo list comes from `RepoManager`; active-repo resolution and badge status come from `GitStatusMonitor` (ADR-022). |
 | `html.ts` | Renders the static webview shell only (meta tags, `sidebarInitialState` JSON, `sidebar.min.js`/`sidebar.min.css` tags) — no server-rendered content HTML |
-| `gitUtils.ts` | Git API working-tree helpers (`getHeadInfo`, `getWorkingTreeChanges`, `countChanges`, …) |
 | `miniGraph.ts` | Fetches the current branch/upstream mini-graph's raw commit data (`fetchMiniGraph`); reachable-set computation and rendering both live client-side in `web/sidebar/miniGraph.ts` |
 | `ui.ts` | Server-rendered chrome only: `codicon`, refresh button, open-commits button, actions row |
 
@@ -216,17 +220,17 @@ fast path, since all three call through the same `render()` site.
 ## Key data flows
 
 ### Opening the graph
-`extension.ts:activate` → `TabView.createOrShow()` → `getHtmlForWebview()` injects `initialState` JSON → webview `main.ts` constructor reads it → calls `requestLoadRepoInfoAndCommits()`.
+`extension.ts:activate` registers the lightweight delegate → first view command loads `core.ts` and awaits repository reconciliation → `TabView.createOrShow()` → `getHtmlForWebview()` injects `initialState` JSON → webview `main.ts` constructor reads it → calls `requestLoadRepoInfoAndCommits()` (ADR-023).
 
 Window reload restoration is owned exclusively by VS Code's registered webview serializer. The serializer passes the persisted webview state into `TabView.revive()`, which injects it as `restoredState`; frontend bootstrap consumes it directly without reopen flags or retry timers (ADR-012).
 
 ### Loading commits
 Webview sends `loadRepoInfo` / `loadCommits` messages → `TabView.respondToMessage` receives → dispatches to `views/tab/repoLifecycleActions.ts`'s `handleLoadRepoInfo`/`handleLoadCommits` → these call `dataSource.getRepoInfo()` + `dataSource.getCommits()` → send back `loadRepoInfo` / `loadCommits` responses → webview `loadRepoInfo()` / `loadCommits()` update state → `render()`.
 
-`RepoFileWatcher` classifies Git metadata changes as full refreshes and ordinary working-tree events as lightweight refreshes. The latter runs only `DataSource.getWorkingTreeChangeCount()` and sends `refreshWorkingTree`; `web/main/loadProcessing.ts` updates the uncommitted graph node without reloading refs or history (ADR-010).
+`RepoFileWatcher` classifies Git metadata changes as full refreshes and ordinary working-tree events as lightweight refreshes. For linked worktrees and submodules it also watches the redirected per-worktree Git directory and any shared `commondir`, so external `HEAD`, index, and ref changes are not missed. Lightweight refreshes run only `DataSource.getWorkingTreeChangeCount()` and send `refreshWorkingTree`; `web/main/loadProcessing.ts` updates the uncommitted graph node without reloading refs or history (ADR-010).
 
-### Following Source Control selection
-`TabView` subscribes to the built-in Git extension API on startup (`setupNativeScmWatcher()`). When a repository's `ui.selected` state changes in VS Code Source Control, Commits resolves the selected Git API repository back to a known Commits repo via `repoManager.getKnownRepo()`, sends `loadRepos` with `loadViewTo`, then triggers a refresh so the webview reloads the newly selected repository. The tab and sidebar also sync repo selection with each other directly, independent of VS Code's own SCM selection — see `views/common/repoSelection.ts` and `TabView.configureRepoSelectionSync()`.
+### Repository selection and live status
+The tab and sidebar sync selection through `views/common/repoSelection.ts` and `TabView.configureRepoSelectionSync()`. `GitStatusMonitor` persists that selection, falls back to the active editor's repository and dropdown order, then supplies branch and dirty-count updates to the status bar, sidebar, and commands without activating or reading the built-in Git extension (ADR-022).
 
 ### Branch filter
 `BranchPanel.changeCallback` → `main/constructorInit.ts` sets `currentBranches` → requests a soft commit projection without clearing the current graph (ADR-015) → backend `dataSource.getCommits()` returns a cached exact projection or runs `git log <branch>`. `null` means show all (`--branches --tags --remotes`). Tag names work as valid git refs.

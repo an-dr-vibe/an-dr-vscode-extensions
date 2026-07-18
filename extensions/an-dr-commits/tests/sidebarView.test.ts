@@ -1,38 +1,10 @@
 import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
 
-import { SidebarView, countChanges, getWorkingTreeChanges } from '../src/views/sidebar/sidebarView';
+import { GitChangeCounts } from '../src/dataSource';
+import { SidebarView } from '../src/views/sidebar/sidebarView';
 import { EventEmitter } from '../src/utils/event';
 import { UiDensity } from '../src/types';
-
-function mockRepo(root: string, workingTreeChanges: any[] = [], indexChanges: any[] = [], mergeChanges: any[] = []) {
-	return {
-		rootUri: vscode.Uri.file(root),
-		state: {
-			workingTreeChanges,
-			indexChanges,
-			mergeChanges,
-			onDidChange: jest.fn(() => ({ dispose: jest.fn() }))
-		}
-	};
-}
-
-function gitChange(filePath: string, status: number) {
-	return { uri: vscode.Uri.file(filePath), status };
-}
-
-function mockGitApi(repo: any) {
-	const api = {
-		repositories: [repo],
-		getRepository: jest.fn(() => repo),
-		onDidOpenRepository: jest.fn(() => ({ dispose: jest.fn() }))
-	};
-	vscode.mockExtension('vscode.git', {
-		isActive: true,
-		exports: { getAPI: () => api }
-	});
-	return api;
-}
 
 function mockDataSource(changes: any[]) {
 	return {
@@ -45,8 +17,9 @@ function mockDataSource(changes: any[]) {
 	};
 }
 
-function createSidebarView(dataSource: any) {
+function createSidebarView(dataSource: any, counts: GitChangeCounts = { modified: 0, deleted: 0 }) {
 	const repoSelection = new EventEmitter<any>();
+	const statusChanges = new EventEmitter<any>();
 	const extensionState = {
 		getLastActiveRepo: jest.fn(() => null),
 		setLastActiveRepo: jest.fn(),
@@ -60,7 +33,12 @@ function createSidebarView(dataSource: any) {
 		isRepoStarred: jest.fn(() => false),
 		onDidChangeRepos: jest.fn(() => ({ dispose: jest.fn() }))
 	};
-	return new SidebarView(vscode.mocks.extensionContext as any, dataSource, extensionState as any, repoManager as any, repoSelection.subscribe, jest.fn());
+	const statusMonitor = {
+		getActiveRepoPath: jest.fn(() => '/repo'),
+		getStatus: jest.fn(() => ({ repo: '/repo', branchName: 'main', counts })),
+		onDidChangeStatus: statusChanges.subscribe
+	};
+	return new SidebarView(vscode.mocks.extensionContext as any, dataSource, extensionState as any, repoManager as any, statusMonitor as any, repoSelection.subscribe, jest.fn());
 }
 
 async function flushPromises() {
@@ -85,29 +63,7 @@ describe('SidebarView', () => {
 		view.dispose();
 	});
 
-	it('Should collect deduped uncommitted files for badge counts', () => {
-		const repo = mockRepo('/repo', [
-			gitChange('/repo/src/modified.ts', 5),
-			gitChange('/repo/src/deleted.ts', 6),
-			gitChange('/repo/ignored.log', 8)
-		], [
-			gitChange('/repo/src/modified.ts', 0),
-			gitChange('/repo/src/staged.ts', 0)
-		]);
-
-		const changes = getWorkingTreeChanges(repo);
-
-		expect(changes.map((change) => change.relativePath)).toStrictEqual([
-			'src/deleted.ts',
-			'src/modified.ts',
-			'src/staged.ts'
-		]);
-		expect(countChanges(repo)).toStrictEqual({ modified: 2, deleted: 1 });
-	});
-
 	it('Should serialize Open Commits and a clean working tree for client-side rendering', async () => {
-		const repo = mockRepo('/repo');
-		mockGitApi(repo);
 		const dataSource = mockDataSource([]);
 		const view = createSidebarView(dataSource);
 		const webviewView = vscode.createWebviewView();
@@ -126,17 +82,12 @@ describe('SidebarView', () => {
 	});
 
 	it('Should serialize uncommitted changes for the activity webview', async () => {
-		const repo = mockRepo('/repo', [
-			gitChange('/repo/src/modified.ts', 5),
-			gitChange('/repo/src/deleted.ts', 6)
-		]);
-		mockGitApi(repo);
 		const dataSource = mockDataSource([
 			{ path: 'src/staged.ts', status: 'M', staged: true, additions: 3, deletions: 1 },
 			{ path: 'src/modified.ts', status: 'M', staged: false, additions: 8, deletions: 2 },
 			{ path: 'src/new.ts', status: 'U', staged: false, additions: null, deletions: null }
 		]);
-		const view = createSidebarView(dataSource);
+		const view = createSidebarView(dataSource, { modified: 1, deleted: 1 });
 		const webviewView = vscode.createWebviewView();
 
 		vscode.mocks.webviewViewProviders[0].resolveWebviewView(webviewView);

@@ -1,10 +1,12 @@
 import * as os from 'os';
 import * as vscode from 'vscode';
 import { AvatarManager } from './avatarManager';
+import { COMMAND_IDS, CommandId } from './commandIds';
 import { getConfig } from './config';
 import { DataSource } from './dataSource';
 import { DiffDocProvider, decodeDiffDocUri } from './diffDocProvider';
 import { ExtensionState } from './extensionState';
+import { GitStatusMonitor } from './gitStatusMonitor';
 import { TabView } from './views/tab/tabView';
 import { Logger } from './logger';
 import { RepoManager } from './repoManager';
@@ -22,6 +24,7 @@ export class CommandManager extends Disposable {
 	private readonly extensionState: ExtensionState;
 	private readonly logger: Logger;
 	private readonly repoManager: RepoManager;
+	private readonly statusMonitor: GitStatusMonitor;
 	private gitExecutable: GitExecutable | null;
 
 	/**
@@ -31,11 +34,13 @@ export class CommandManager extends Disposable {
 	 * @param dataSource The Commits DataSource instance.
 	 * @param extensionState The Commits ExtensionState instance.
 	 * @param repoManager The Commits RepoManager instance.
+	 * @param statusMonitor The Commits GitStatusMonitor instance (the active-repo authority).
 	 * @param gitExecutable The Git executable available to Commits at startup.
 	 * @param onDidChangeGitExecutable The Event emitting the Git executable for Commits to use.
 	 * @param logger The Commits Logger instance.
+	 * @param registerCommands Whether this manager should register handlers itself (the lazy core delegates instead).
 	 */
-	constructor(context: vscode.ExtensionContext, avatarManger: AvatarManager, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, gitExecutable: GitExecutable | null, onDidChangeGitExecutable: Event<GitExecutable>, logger: Logger) {
+	constructor(context: vscode.ExtensionContext, avatarManger: AvatarManager, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, statusMonitor: GitStatusMonitor, gitExecutable: GitExecutable | null, onDidChangeGitExecutable: Event<GitExecutable>, logger: Logger, registerCommands: boolean = true) {
 		super();
 		this.context = context;
 		this.avatarManager = avatarManger;
@@ -43,20 +48,12 @@ export class CommandManager extends Disposable {
 		this.extensionState = extensionState;
 		this.logger = logger;
 		this.repoManager = repoManager;
+		this.statusMonitor = statusMonitor;
 		this.gitExecutable = gitExecutable;
 
-		// Register Extension Commands
-		this.registerCommand('an-dr-commits.view', (arg) => this.view(arg));
-		this.registerCommand('an-dr-commits.viewFromStatusBar', (arg) => this.viewFromStatusBar(arg));
-		this.registerCommand('an-dr-commits.addGitRepository', () => this.addGitRepository());
-		this.registerCommand('an-dr-commits.removeGitRepository', () => this.removeGitRepository());
-		this.registerCommand('an-dr-commits.clearAvatarCache', () => this.clearAvatarCache());
-		this.registerCommand('an-dr-commits.fetch', () => this.fetch());
-		this.registerCommand('an-dr-commits.pull', () => this.pullFromScm());
-		this.registerCommand('an-dr-commits.push', () => this.pushFromScm());
-		this.registerCommand('an-dr-commits.version', () => this.version());
-		this.registerCommand('an-dr-commits.openFile', (arg) => this.openFile(arg));
-		this.registerCommand('an-dr-commits.revealCommitInGraph', (arg) => this.revealCommitInGraph(arg));
+		if (registerCommands) {
+			COMMAND_IDS.forEach((command) => this.registerCommand(command));
+		}
 
 		this.registerDisposable(
 			onDidChangeGitExecutable((gitExecutable) => {
@@ -77,13 +74,30 @@ export class CommandManager extends Disposable {
 	 * @param command A unique identifier for the command.
 	 * @param callback A command handler function.
 	 */
-	private registerCommand(command: string, callback: (...args: any[]) => any) {
+	private registerCommand(command: CommandId) {
 		this.registerDisposable(
 			vscode.commands.registerCommand(command, (...args: any[]) => {
 				this.logger.logDebug('Command Invoked: ' + command);
-				callback(...args);
+				return this.execute(command, ...args);
 			})
 		);
+	}
+
+	/** Execute a command after the lazy extension core has loaded. */
+	public execute(command: CommandId, ...args: any[]): any {
+		switch (command) {
+			case 'an-dr-commits.view': return this.view(args[0]);
+			case 'an-dr-commits.viewFromStatusBar': return this.viewFromStatusBar(args[0]);
+			case 'an-dr-commits.addGitRepository': return this.addGitRepository();
+			case 'an-dr-commits.removeGitRepository': return this.removeGitRepository();
+			case 'an-dr-commits.clearAvatarCache': return this.clearAvatarCache();
+			case 'an-dr-commits.fetch': return this.fetch();
+			case 'an-dr-commits.pull': return this.pullFromScm();
+			case 'an-dr-commits.push': return this.pushFromScm();
+			case 'an-dr-commits.version': return this.version();
+			case 'an-dr-commits.openFile': return this.openFile(args[0]);
+			case 'an-dr-commits.revealCommitInGraph': return this.revealCommitInGraph(args[0]);
+		}
 	}
 
 	/**
@@ -123,7 +137,7 @@ export class CommandManager extends Disposable {
 				loadRepo = (await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), true)).root;
 			}
 		} else {
-			loadRepo = await this.getSelectedSourceControlRepo();
+			loadRepo = this.getActiveRepo();
 		}
 
 		if (loadRepo === null && getConfig().openToTheRepoOfTheActiveTextEditorDocument && vscode.window.activeTextEditor) {
@@ -143,7 +157,7 @@ export class CommandManager extends Disposable {
 				loadRepo = (await this.repoManager.registerRepo(await resolveToSymbolicPath(repoPath), true)).root;
 			}
 		} else {
-			loadRepo = await this.getSelectedSourceControlRepo();
+			loadRepo = this.getActiveRepo();
 		}
 		if (loadRepo === null && getConfig().openToTheRepoOfTheActiveTextEditorDocument && vscode.window.activeTextEditor) {
 			loadRepo = await this.repoManager.resolveRepoContainingFile(getPathFromUri(vscode.window.activeTextEditor.document.uri), true);
@@ -250,7 +264,7 @@ export class CommandManager extends Disposable {
 	 * The method run when the `an-dr-commits.fetch` command is invoked.
 	 */
 	private async fetch() {
-		const selectedRepo = await this.getSelectedSourceControlRepo();
+		const selectedRepo = this.getActiveRepo();
 		if (selectedRepo !== null) {
 			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: selectedRepo,
@@ -318,7 +332,7 @@ export class CommandManager extends Disposable {
 	 * Helper: opens the Commits view for a single-repo or lets the user pick, then fires a command on load.
 	 */
 	private async openViewWithCommand(command: 'pull' | 'push', actionLabel: string) {
-		const selectedRepo = await this.getSelectedSourceControlRepo();
+		const selectedRepo = this.getActiveRepo();
 		if (selectedRepo !== null) {
 			TabView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, {
 				repo: selectedRepo,
@@ -365,23 +379,13 @@ export class CommandManager extends Disposable {
 		}
 	}
 
-	private async getSelectedSourceControlRepo() {
-		const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
-		if (!gitExtension) return null;
-
-		const api = gitExtension.isActive ? gitExtension.exports.getAPI(1) : (await gitExtension.activate()).getAPI(1);
-		if (!api || !Array.isArray(api.repositories)) return null;
-
-		const selectedRepoPath = api.repositories.find((repo: any) => repo?.ui?.selected)?.rootUri?.fsPath;
-		if (typeof selectedRepoPath !== 'string' || selectedRepoPath.length === 0) return null;
-
-		let knownRepo = await this.repoManager.getKnownRepo(selectedRepoPath);
-		if (knownRepo === null && isPathInWorkspace(selectedRepoPath)) {
-			const registerResult = await this.repoManager.registerRepo(await resolveToSymbolicPath(selectedRepoPath), false);
-			knownRepo = registerResult.root;
-		}
-
-		return knownRepo;
+	/**
+	 * Gets the repository Commits currently considers active - the same repo the status bar and
+	 * sidebar display. Replaces the former lookup of the native SCM view's selected repository
+	 * (see ADR-022).
+	 */
+	private getActiveRepo(): string | null {
+		return this.statusMonitor.getActiveRepoPath();
 	}
 
 	/**
@@ -424,6 +428,4 @@ export class CommandManager extends Disposable {
 			return showErrorMessage('Unable to Open File: The command was not called with the required arguments.');
 		}
 	}
-
-
 }

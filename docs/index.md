@@ -14,3 +14,7 @@ its own `extensions/<name>/docs/adr/`.
 - [an-dr-code-analysis](../extensions/an-dr-code-analysis/docs/adr/)
 - [an-dr-sync](../extensions/an-dr-sync/docs/adr/)
 - [an-dr-extensions](../extensions/an-dr-extensions/docs/adr/)
+
+## Reviews
+
+- [2026-07-18: decouple-vscode-git](reviews/2026-07-18-decouple-vscode-git.md)

@@ -141,7 +141,8 @@ afterAll(() => {
 describe('DataSource', () => {
 	let dataSource: DataSource;
 	beforeEach(() => {
-		dataSource = new DataSource({ path: '/path/to/git', version: '2.25.0' }, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+		dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+		onDidChangeGitExecutable.emit({ path: '/path/to/git', version: '2.25.0' });
 	});
 	afterEach(() => {
 		dataSource.dispose();
@@ -204,6 +205,23 @@ describe('DataSource', () => {
 	});
 
 	describe('isGitExecutableUnknown', () => {
+		it('Should hold early Git calls until executable discovery settles', async () => {
+			let resolveDiscovery!: () => void;
+			const discovery = new Promise<void>((resolve) => resolveDiscovery = resolve);
+			dataSource.dispose();
+			dataSource = new DataSource(discovery, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			mockGitSuccessOnce('');
+
+			const result = dataSource.getStatusCounts('/path/to/repo');
+			await Promise.resolve();
+			expect(spyOnSpawn).not.toHaveBeenCalled();
+
+			onDidChangeGitExecutable.emit({ path: '/path/to/git', version: '2.25.0' });
+			resolveDiscovery();
+			expect(await result).toStrictEqual({ modified: 0, deleted: 0 });
+			expect(spyOnSpawn).toHaveBeenCalledWith('/path/to/git', ['status', '--porcelain=v2', '-z', '--untracked-files=all'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+
 		it('Should return FALSE when the Git executable is known', () => {
 			// Run
 			const result = dataSource.isGitExecutableUnknown();
@@ -215,7 +233,7 @@ describe('DataSource', () => {
 		it('Should return TRUE when the Git executable is unknown', () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result = dataSource.isGitExecutableUnknown();
@@ -227,7 +245,7 @@ describe('DataSource', () => {
 		it('Should return TRUE after a Git executable becomes known', () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result1 = dataSource.isGitExecutableUnknown();
@@ -249,7 +267,7 @@ describe('DataSource', () => {
 		it('Should set gitExecutableSupportsGpgInfo to FALSE when there is no Git executable', () => {
 			// Run
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Assert
 			expect(dataSource['gitExecutableSupportsGpgInfo']).toBe(false);
@@ -2938,6 +2956,29 @@ describe('DataSource', () => {
 		});
 	});
 
+	describe('getStatusCounts', () => {
+		it('Should count staged, unstaged, deleted, and untracked rows', async () => {
+			mockGitSuccessOnce([
+				'1 M. N... 100644 100644 100644 a b staged.txt',
+				'1 .D N... 100644 100644 000000 a b deleted.txt',
+				'1 MM N... 100644 100644 100644 a b both.txt',
+				'? untracked.txt',
+				''
+			].join('\0'));
+
+			const result = await dataSource.getStatusCounts('/path/to/repo');
+
+			expect(result).toStrictEqual({ modified: 4, deleted: 1 });
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '--porcelain=v2', '-z', '--untracked-files=all'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+
+		it('Should return NULL when status cannot be read', async () => {
+			mockGitThrowingErrorOnce();
+
+			expect(await dataSource.getStatusCounts('/path/to/repo')).toBe(null);
+		});
+	});
+
 	describe('getCommitDetails', () => {
 		it('Should return the commit details', async () => {
 			// Setup
@@ -4296,7 +4337,7 @@ describe('DataSource', () => {
 		it('Should return the "Unable to Find Git" error message when no Git executable is known', async () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result = await dataSource.getTagDetails('/path/to/repo', 'tag-name');
@@ -5181,7 +5222,7 @@ describe('DataSource', () => {
 		it('Should return an error message when pruning tags when no Git executable is known', async () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result = await dataSource.fetch('/path/to/repo', null, true, true);
@@ -6305,7 +6346,7 @@ describe('DataSource', () => {
 		it('Should return the "Unable to Find Git" error message when no git executable is known', async () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 			vscode.mockExtensionSettingReturnValue('repository.sign.commits', false);
 
 			// Run
@@ -7008,7 +7049,7 @@ describe('DataSource', () => {
 		it('Should return the "Unable to Find Git" error message when no git executable is known', async () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result = await dataSource.pushStash('/path/to/repo', '', false);
@@ -7147,7 +7188,7 @@ describe('DataSource', () => {
 		it('Should return the "Unable to Find Git" error message when no git executable is known', async () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result = await dataSource.openExternalDirDiff('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c', true);
@@ -7204,7 +7245,7 @@ describe('DataSource', () => {
 		it('Should return the "Unable to Find Git" error message when no git executable is known', async () => {
 			// Setup
 			dataSource.dispose();
-			dataSource = new DataSource(null, onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
+			dataSource = new DataSource(Promise.resolve(), onDidChangeConfiguration.subscribe, onDidChangeGitExecutable.subscribe, logger);
 
 			// Run
 			const result = await dataSource.checkoutCommit('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b');

@@ -204,6 +204,11 @@ with the main Commits tab and shows a compact current-branch graph below the com
 Submodule full diffs show old/new commit details in Unified or Split view, while Raw shows Git's
 semantic submodule log.
 
+Fully self-contained: no dependency on VS Code's built-in Git extension (repo discovery,
+branch/dirty status, and refresh detection use its own git spawns and file watchers).
+Startup registers a lightweight shell; the Git-backed core loads on first use or after the
+startup-critical window, and workspace reconciliation is deferred until interaction or idle.
+
 **Config** (`an-dr-commits.*`):
 
 |Setting|Default|Description|

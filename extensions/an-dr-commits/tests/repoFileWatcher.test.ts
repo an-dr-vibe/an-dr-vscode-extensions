@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as date from './mocks/date';
 import * as vscode from './mocks/vscode';
 jest.mock('vscode', () => vscode, { virtual: true });
@@ -53,6 +55,25 @@ describe('RepoFileWatcher', () => {
 		onDidChange(vscode.Uri.file('/path/to/repo/.git/refs/heads/main'));
 		jest.runOnlyPendingTimers();
 
+		expect(callback).toHaveBeenCalledWith('full');
+	});
+
+	it('Should watch metadata in a redirected Git directory', () => {
+		jest.spyOn(fs, 'statSync').mockReturnValueOnce({ isFile: () => true } as any);
+		jest.spyOn(fs, 'readFileSync')
+			.mockReturnValueOnce('gitdir: ../main/.git/worktrees/repo' as any)
+			.mockReturnValueOnce('../..' as any);
+		const gitDir = path.resolve('/path/to/repo', '../main/.git/worktrees/repo').replace(/\\/g, '/');
+		const commonDir = path.resolve(gitDir, '../..').replace(/\\/g, '/');
+
+		repoFileWatcher.start('/path/to/repo');
+		const watcher = repoFileWatcher['gitDirWatchers'][0];
+		const onDidChange = (<jest.Mock<any, any>>watcher.onDidChange).mock.calls[0][0];
+		onDidChange(vscode.Uri.file(gitDir + '/HEAD'));
+		jest.runOnlyPendingTimers();
+
+		expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith(gitDir + '/**');
+		expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith(commonDir + '/**');
 		expect(callback).toHaveBeenCalledWith('full');
 	});
 

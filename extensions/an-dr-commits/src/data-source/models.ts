@@ -69,6 +69,12 @@ export interface GitWorkingTreeChangesData {
 	error: ErrorInfo;
 }
 
+/** Working-tree change counts, split the way the sidebar badge displays them. */
+export interface GitChangeCounts {
+	readonly modified: number;
+	readonly deleted: number;
+}
+
 export interface GitRef {
 	hash: string;
 	name: string;

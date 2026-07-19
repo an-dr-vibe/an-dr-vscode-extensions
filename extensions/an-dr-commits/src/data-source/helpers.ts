@@ -30,7 +30,7 @@ export type GitConfigSet = { [key: string]: string };
 /**
  * Generates the file changes from the diff output and status information.
  */
-export function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], numStatRecords: DiffNumStatRecord[], status: GitStatusFiles | null): Writeable<GitFileChange>[] {
+export function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], numStatRecords: DiffNumStatRecord[], status: GitStatusFiles | null, untrackedStats: { [filePath: string]: { additions: number | null; deletions: number | null } } = {}): Writeable<GitFileChange>[] {
 	let fileChanges: Writeable<GitFileChange>[] = [], fileLookup: { [file: string]: number } = {}, i = 0;
 
 	for (i = 0; i < nameStatusRecords.length; i++) {
@@ -64,7 +64,8 @@ export function generateFileChanges(nameStatusRecords: DiffNameStatusRecord[], n
 		}
 		for (i = 0; i < status.untracked.length; i++) {
 			filePath = getPathFromStr(status.untracked[i]);
-			fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Untracked, additions: null, deletions: null, submodule: null });
+			const stats = untrackedStats[filePath] || { additions: null, deletions: null };
+			fileChanges.push({ oldFilePath: filePath, newFilePath: filePath, type: GitFileStatus.Untracked, additions: stats.additions, deletions: stats.deletions, submodule: null });
 		}
 	}
 

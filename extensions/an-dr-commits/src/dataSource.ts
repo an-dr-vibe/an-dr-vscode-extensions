@@ -578,13 +578,14 @@ export class DataSource extends Disposable {
 			this.getDiffFileChanges(repo, 'HEAD', ''),
 			this.getDiffNumStat(repo, 'HEAD', ''),
 			this.getStatus(repo)
-		]).then((results) => {
+		]).then(async (results) => {
+			const untrackedStats = await this.getUntrackedFileStats(repo, results[2].untracked);
 			return {
 				commitDetails: {
 					hash: UNCOMMITTED, parents: [],
 					author: '', authorEmail: '', authorDate: 0,
 					committer: '', committerEmail: '', committerDate: 0, signature: null,
-					body: '', fileChanges: generateFileChanges(results[0], results[1], results[2])
+					body: '', fileChanges: generateFileChanges(results[0], results[1], results[2], untrackedStats)
 				},
 				error: null
 			};
@@ -605,9 +606,10 @@ export class DataSource extends Disposable {
 			this.getDiffFileChanges(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
 			this.getDiffNumStat(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
 			toHash === UNCOMMITTED ? this.getStatus(repo) : Promise.resolve(null)
-		]).then((results) => {
+		]).then(async (results) => {
+			const untrackedStats = results[2] !== null ? await this.getUntrackedFileStats(repo, results[2].untracked) : {};
 			return {
-				fileChanges: generateFileChanges(results[0], results[1], results[2]),
+				fileChanges: generateFileChanges(results[0], results[1], results[2], untrackedStats),
 				error: null
 			};
 		}).catch((errorMessage) => {

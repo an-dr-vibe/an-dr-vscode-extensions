@@ -3759,6 +3759,12 @@ describe('DataSource', () => {
 			mockGitSuccessOnce(['D', 'dir/deleted.txt', 'M', 'dir/modified.txt', 'R100', 'dir/renamed-old.txt', 'dir/renamed-new.txt', ''].join('\0'));
 			mockGitSuccessOnce(['0	0	dir/deleted.txt', '1	1	dir/modified.txt', '2	3	', 'dir/renamed-old.txt', 'dir/renamed-new.txt', ''].join('\0'));
 			mockGitSuccessOnce([' D dir/deleted.txt', 'M  dir/modified.txt', 'R  dir/renamed-new.txt', 'dir/renamed-old.txt', '?? untracked.txt'].join('\0'));
+			mockSpyOnSpawn(spyOnSpawn, (onCallbacks, stderrOnCallbacks, stdoutOnCallbacks) => {
+				stdoutOnCallbacks['data'](Buffer.from('4\t0\tuntracked.txt\n'));
+				stdoutOnCallbacks['close']();
+				stderrOnCallbacks['close']();
+				onCallbacks['exit'](1);
+			});
 			vscode.mockExtensionSettingReturnValue('repository.showUntrackedFiles', true);
 
 			// Run
@@ -3803,8 +3809,8 @@ describe('DataSource', () => {
 							type: 'R'
 						},
 						{
-							additions: null,
-							deletions: null,
+							additions: 4,
+							deletions: 0,
 							newFilePath: 'untracked.txt',
 							oldFilePath: 'untracked.txt',
 							submodule: null,
@@ -3814,10 +3820,11 @@ describe('DataSource', () => {
 				},
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledTimes(3);
+			expect(spyOnSpawn).toBeCalledTimes(4);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['diff', '--raw', '--no-abbrev', '--find-renames', '--diff-filter=AMDRT', '-z', 'HEAD'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['diff', '--numstat', '--find-renames', '--diff-filter=AMDR', '-z', 'HEAD'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '-s', '--untracked-files=all', '--porcelain', '-z'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['diff', '--no-index', '--numstat', '--', '/dev/null', 'untracked.txt'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
 
 		it('Should return the uncommitted changes (showUntrackedFiles === FALSE)', async () => {
@@ -3981,6 +3988,12 @@ describe('DataSource', () => {
 			mockGitSuccessOnce(['M', 'dir/modified.txt', 'R051', 'dir/renamed-old.txt', 'dir/renamed-new.txt', 'A', 'added.txt', ''].join('\0'));
 			mockGitSuccessOnce(['1	1	dir/modified.txt', '1	2	', 'dir/renamed-old.txt', 'dir/renamed-new.txt', '2	0	added.txt', ''].join('\0'));
 			mockGitSuccessOnce(['MM dir/modified.txt', 'A  added.txt', '?? untracked.txt'].join('\0'));
+			mockSpyOnSpawn(spyOnSpawn, (onCallbacks, stderrOnCallbacks, stdoutOnCallbacks) => {
+				stdoutOnCallbacks['data'](Buffer.from('5\t0\tuntracked.txt\n'));
+				stdoutOnCallbacks['close']();
+				stderrOnCallbacks['close']();
+				onCallbacks['exit'](1);
+			});
 			vscode.mockExtensionSettingReturnValue('repository.showUntrackedFiles', true);
 
 			// Run
@@ -4014,8 +4027,8 @@ describe('DataSource', () => {
 						type: 'A'
 					},
 					{
-						additions: null,
-						deletions: null,
+						additions: 5,
+						deletions: 0,
 						newFilePath: 'untracked.txt',
 						oldFilePath: 'untracked.txt',
 						submodule: null,
@@ -4024,10 +4037,11 @@ describe('DataSource', () => {
 				],
 				error: null
 			});
-			expect(spyOnSpawn).toBeCalledTimes(3);
+			expect(spyOnSpawn).toBeCalledTimes(4);
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['diff', '--raw', '--no-abbrev', '--find-renames', '--diff-filter=AMDRT', '-z', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['diff', '--numstat', '--find-renames', '--diff-filter=AMDR', '-z', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b'], expect.objectContaining({ cwd: '/path/to/repo' }));
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['status', '-s', '--untracked-files=all', '--porcelain', '-z'], expect.objectContaining({ cwd: '/path/to/repo' }));
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['diff', '--no-index', '--numstat', '--', '/dev/null', 'untracked.txt'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
 
 		it('Should return the commit comparison (between two commits)', async () => {

@@ -182,6 +182,28 @@ describe('DataSource', () => {
 		});
 	});
 
+	describe('getWorkingTreeChanges', () => {
+		it('Should report addition/deletion counts for untracked files', async () => {
+			mockGitSuccessOnce(['? new.txt', ''].join('\0'));
+			mockGitSuccessOnce('');
+			mockGitSuccessOnce('');
+			mockSpyOnSpawn(spyOnSpawn, (onCallbacks, stderrOnCallbacks, stdoutOnCallbacks) => {
+				stdoutOnCallbacks['data'](Buffer.from('3\t0\tnew.txt\n'));
+				stdoutOnCallbacks['close']();
+				stderrOnCallbacks['close']();
+				onCallbacks['exit'](1);
+			});
+
+			const result = await dataSource.getWorkingTreeChanges('/path/to/repo');
+
+			expect(result.error).toBe(null);
+			expect(result.changes).toStrictEqual([
+				expect.objectContaining({ path: 'new.txt', status: 'U', additions: 3, deletions: 0 })
+			]);
+			expect(spyOnSpawn).toHaveBeenCalledWith('/path/to/git', ['diff', '--no-index', '--numstat', '--', '/dev/null', 'new.txt'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+	});
+
 	describe('getBlameFile', () => {
 		it('Should parse incremental blame for the entire file', async () => {
 			const hash = '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b';

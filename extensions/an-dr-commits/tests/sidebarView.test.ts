@@ -13,7 +13,8 @@ function mockDataSource(changes: any[]) {
 		stageFiles: jest.fn(() => Promise.resolve(null)),
 		unstageFiles: jest.fn(() => Promise.resolve(null)),
 		discardFileChanges: jest.fn(() => Promise.resolve(null)),
-		commitChanges: jest.fn(() => Promise.resolve(null))
+		commitChanges: jest.fn(() => Promise.resolve(null)),
+		onDidAdvanceGraphGeneration: jest.fn(() => ({ dispose: jest.fn() }))
 	};
 }
 

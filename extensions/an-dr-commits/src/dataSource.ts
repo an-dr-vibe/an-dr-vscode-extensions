@@ -19,7 +19,7 @@ import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, Git
 import { GitEditorManager } from './gitEditor/gitEditorManager';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
-import { Event } from './utils/event';
+import { Event, EventEmitter } from './utils/event';
 
 const DRIVE_LETTER_PATH_REGEX = /^[a-z]:\//;
 const EOL_REGEX = /\r\n|\r|\n/g;
@@ -62,6 +62,7 @@ export class DataSource extends Disposable {
 	private readonly pendingGraphProjections = new Map<string, Promise<GitCommitData>>();
 	private readonly refFingerprints = new Map<string, string>();
 	private readonly graphWarmupTimers = new Map<string, NodeJS.Timer>();
+	private readonly graphGenerationEmitter = new EventEmitter<string>();
 
 	/**
 	 * Creates the Commits Data Source.
@@ -95,7 +96,8 @@ export class DataSource extends Disposable {
 				this.setGitExecutable(gitExecutable);
 			}),
 			askpassManager,
-			gitEditorManager
+			gitEditorManager,
+			this.graphGenerationEmitter
 		);
 		this.registerDisposable({ dispose: () => this.graphWarmupTimers.forEach((timer) => clearTimeout(timer)) });
 	}
@@ -256,9 +258,15 @@ export class DataSource extends Disposable {
 		return pending;
 	}
 
-	/** Marks graph projections stale while retaining immutable commit records. */
+	/** Marks graph projections stale while retaining immutable commit records, and notifies subscribers (e.g. the sidebar) that repo's graph data may have changed. */
 	public advanceGraphGeneration(repo: string): void {
 		this.graphCache.advanceGeneration(repo);
+		this.graphGenerationEmitter.emit(repo);
+	}
+
+	/** An Event emitting the repo path whenever its graph data may have changed (see `advanceGraphGeneration`). */
+	get onDidAdvanceGraphGeneration(): Event<string> {
+		return this.graphGenerationEmitter.subscribe;
 	}
 
 	private loadCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
@@ -1275,9 +1283,10 @@ export class DataSource extends Disposable {
 		]).then(async (results) => {
 			const stagedStats = results[1];
 			const unstagedStats = results[2];
-			const changes: GitWorkingTreeChange[] = [];
-			const getStats = (filePath: string, staged: boolean) => (staged ? stagedStats[filePath] : unstagedStats[filePath]) || { additions: null, deletions: null };
 			const records = parseWorkingTreeStatusOutput(results[0]);
+			const untrackedStats = await this.getUntrackedFileStats(repo, records.filter((r) => r.workTreeStatus === '?').map((r) => r.path));
+			const changes: GitWorkingTreeChange[] = [];
+			const getStats = (filePath: string, staged: boolean) => (staged ? stagedStats[filePath] : unstagedStats[filePath]) || untrackedStats[filePath] || { additions: null, deletions: null };
 			for (let i = 0; i < records.length; i++) {
 				const record = records[i];
 				const worktreeSha = record.submodule !== null && record.submodule.commitChanged
@@ -1337,6 +1346,28 @@ export class DataSource extends Disposable {
 	/** Gets the checked-out commit of an initialised submodule. */
 	private getSubmoduleHead(repo: string, filePath: string): Promise<string | null> {
 		return this.spawnGit(['-C', filePath, 'rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch(() => null);
+	}
+
+	/**
+	 * Gets addition/deletion counts for untracked files, which `git diff --numstat` never
+	 * reports since they aren't part of any diff. Diffs each file against `/dev/null` instead;
+	 * `--no-index` always exits 1 when a difference is found, so exit code is ignored here.
+	 */
+	private async getUntrackedFileStats(repo: string, filePaths: string[]): Promise<{ [filePath: string]: { additions: number | null; deletions: number | null } }> {
+		const lookup: { [filePath: string]: { additions: number | null; deletions: number | null } } = {};
+		await Promise.all(filePaths.map((filePath) => this._spawnGit(
+			['diff', '--no-index', '--numstat', '--', '/dev/null', filePath], repo,
+			(stdout) => stdout.toString(), true
+		).then((stdout) => {
+			const record = parseDiffNumStatOutput(stdout.split('\0'))[0];
+			lookup[filePath] = {
+				additions: record !== undefined && Number.isFinite(record.additions) ? record.additions : null,
+				deletions: record !== undefined && Number.isFinite(record.deletions) ? record.deletions : null
+			};
+		}, () => {
+			lookup[filePath] = { additions: null, deletions: null };
+		})));
+		return lookup;
 	}
 
 	public stageFiles(repo: string, files: string[]): Promise<ErrorInfo> {

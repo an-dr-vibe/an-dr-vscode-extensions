@@ -77,6 +77,13 @@ export class SidebarView implements vscode.Disposable {
 			this._updateBadge();
 			this._scheduleRefresh();
 		}));
+		// Graph data (e.g. from a mutating action performed in the tab) can change without the
+		// monitor's own watcher noticing yet - react directly so the sidebar stays in sync with
+		// whichever view invalidated the shared graph cache first.
+		this._disposables.push(dataSource.onDidAdvanceGraphGeneration((repo) => {
+			if (repo !== this._currentRepo) return;
+			this._scheduleRefresh();
+		}));
 		if (typeof vscode.workspace.onDidChangeConfiguration === 'function') {
 			this._disposables.push(vscode.workspace.onDidChangeConfiguration((event) => {
 				if (!event.affectsConfiguration('an-dr-commits.uiDensity')) return;

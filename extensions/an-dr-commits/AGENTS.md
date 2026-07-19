@@ -197,6 +197,10 @@ Each CSS file corresponds 1:1 to its component. All get concatenated into `media
 `commitsLoadCommits()` render - covers first load, repo switch, and the prevState-restore
 fast path, since all three call through the same `render()` site.
 
+The splash, shared table/footer loaders, and Files Panel preview placeholder delay their
+visible feedback by one second. Fast requests therefore finish without a loading-message
+flash; slow requests still receive clear progress feedback.
+
 ```
 #view
 ├── #controls (41px, fixed top bar)

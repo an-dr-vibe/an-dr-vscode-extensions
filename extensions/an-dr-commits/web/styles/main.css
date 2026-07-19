@@ -197,6 +197,8 @@ body #view{
 	gap:8px;
 	background-color:var(--vscode-editor-background);
 	color:var(--vscode-descriptionForeground);
+	visibility:hidden;
+	animation:commitsRevealLoadingFeedback 0s linear 1s forwards;
 }
 body.commitsLoaded #initialLoadSplash{
 	display:none;
@@ -1449,6 +1451,12 @@ body.tagLabelsRightAligned .gitRef.compact.tag{
 #loadingHeader{
 	text-align:center;
 	line-height:32px;
+	visibility:hidden;
+	animation:commitsRevealLoadingFeedback 0s linear 1s forwards;
+}
+
+@keyframes commitsRevealLoadingFeedback{
+	to{ visibility:visible; }
 }
 #loadingHeader .codicon{
 	display:inline-block;
@@ -1898,6 +1906,10 @@ body.filesPanelHidden #filesPanel{
 	opacity:0.55;
 	font-style:italic;
 	user-select:none;
+}
+.delayedLoadingFeedback{
+	visibility:hidden;
+	animation:commitsRevealLoadingFeedback 0s linear 1s forwards;
 }
 .uncommittedHint{
 	opacity:0.55;

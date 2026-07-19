@@ -121,7 +121,7 @@ class FilesPanel {
 	}
 
 	public setContentLoading() {
-		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder">Loading...</div>';
+		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder delayedLoadingFeedback">Loading...</div>';
 	}
 
 	private showPlaceholder() {

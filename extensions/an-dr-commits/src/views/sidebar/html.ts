@@ -10,7 +10,7 @@ function renderFooter() {
 		`<button id="cpReplaceMessageBtn" class="hidden" type="button">Replace message with previous commit</button>` +
 		`<div id="cpCommitRow">` +
 		`<button id="cpCommitBtn" disabled>${codicon('check')}&nbsp;Commit</button>` +
-		`<button id="cpAmendToggle" aria-pressed="false" title="Amend Previous Commit">${codicon('git-commit')}</button>` +
+		`<button id="cpAmendToggle" aria-pressed="false" title="Amend Previous Commit">${codicon('history')}</button>` +
 		`</div>` +
 		`</div>`;
 }

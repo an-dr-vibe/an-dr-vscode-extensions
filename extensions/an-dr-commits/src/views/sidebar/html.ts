@@ -7,12 +7,10 @@ import { SidebarInitialState } from '../../types/sidebar-state';
 function renderFooter() {
 	return `<div id="cpFooter">` +
 		`<textarea id="cpMessage" placeholder="Message (Ctrl+Enter to commit)" rows="3"></textarea>` +
+		`<button id="cpReplaceMessageBtn" class="hidden" type="button">Replace message with previous commit</button>` +
 		`<div id="cpCommitRow">` +
 		`<button id="cpCommitBtn" disabled>${codicon('check')}&nbsp;Commit</button>` +
-		`<button id="cpCommitArrow" disabled title="More commit options">&#9660;</button>` +
-		`<div id="cpCommitMenu" class="hidden">` +
-		`<button id="cpAmendBtn">Amend Previous Commit</button>` +
-		`</div>` +
+		`<button id="cpAmendToggle" aria-pressed="false" title="Amend Previous Commit">${codicon('git-commit')}</button>` +
 		`</div>` +
 		`</div>`;
 }

@@ -286,6 +286,17 @@ export class SidebarView implements vscode.Disposable {
 
 		let error: ErrorInfo = null;
 		switch (msg.command) {
+			case 'loadPreviousCommitMessage': {
+				const previousCommitMessage = await this.dataSource.getPreviousCommitMessage(repo);
+				await this._sendMessage({
+					command: 'loadPreviousCommitMessage',
+					repo,
+					requestId: msg.requestId,
+					message: previousCommitMessage.message,
+					error: previousCommitMessage.error
+				});
+				return;
+			}
 			case 'stage':
 				error = await this.dataSource.stageFiles(repo, [msg.filePath]);
 				break;
@@ -312,6 +323,7 @@ export class SidebarView implements vscode.Disposable {
 				break;
 			case 'commit':
 				error = await this._commit(repo, msg.message, msg.amend);
+				await this._sendMessage({ command: 'commit', error });
 				break;
 			case 'openChanges': {
 				const change = this._changes.find((c) => c.path === msg.filePath);
@@ -397,7 +409,7 @@ export class SidebarView implements vscode.Disposable {
 
 	private async _commit(repo: string, message: string, amend: boolean): Promise<ErrorInfo> {
 		let commitMessage = message.trim();
-		if (!commitMessage && getConfig().defaultCommitMessage) {
+		if (!commitMessage && !amend && getConfig().defaultCommitMessage) {
 			commitMessage = getConfig().defaultCommitMessage + ' (' + this._timestamp() + ')';
 		}
 		if (!commitMessage && !amend) return 'Commit message is required.';

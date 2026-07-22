@@ -15,8 +15,13 @@
 
 let _cpChanges: GG.GitWorkingTreeChangeMsg[] = [];
 let _cpActive = false;   // true while uncommitted row is expanded
-let _cpCloseMenuListener: (() => void) | null = null;
 let _cpPendingCommit: { msg: string; amend: boolean } | null = null;
+let _cpAmendEnabled = false;
+let _cpPreviousCommitMessage: string | null = null;
+let _cpPreviousCommitMessageRepo: string | null = null;
+let _cpPreviousCommitMessageRequestId = 0;
+let _cpPendingPreviousCommitMessageAction: 'fill' | 'replace' | null = null;
+let _cpShowReplacePreviousMessage = false;
 
 type CpTreeFolder = {
 	folders: { [name: string]: CpTreeFolder };
@@ -113,14 +118,14 @@ function _cpRenderSection(title: string, files: GG.GitWorkingTreeChangeMsg[], is
 
 /** Render footer HTML (commit message area). Attached to filesPanel.footerElem. */
 function changesPanelGetFooterHtml(): string {
-	return `<div id="cpFooter">` +
+	const replaceClass = _cpShowReplacePreviousMessage ? '' : ' hidden';
+	const amendPressed = _cpAmendEnabled ? 'true' : 'false';
+	return `<div id="cpFooter" class="${_cpShowReplacePreviousMessage ? 'cpReplaceVisible' : ''}">` +
 		`<textarea id="cpMessage" placeholder="Message (Ctrl+Enter to commit)" rows="3"></textarea>` +
+		`<button id="cpReplaceMessageBtn" class="${replaceClass}" type="button">Replace message with previous commit</button>` +
 		`<div id="cpCommitRow">` +
 		`<button id="cpCommitBtn" disabled>&#10003;&nbsp;Commit</button>` +
-		`<button id="cpCommitArrow" disabled title="More commit options">&#9660;</button>` +
-		`<div id="cpCommitMenu" class="hidden">` +
-		`<button id="cpAmendBtn">Amend Previous Commit</button>` +
-		`</div>` +
+		`<button id="cpAmendToggle" aria-pressed="${amendPressed}" title="Amend Previous Commit">${ICONS.amend}</button>` +
 		`</div>` +
 		`</div>`;
 }
@@ -145,19 +150,79 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 	setTimeout(() => commits.filesPanel.syncContentTop(), 0);
 	const msgEl = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
 	const commitBtn = footerElem.querySelector<HTMLButtonElement>('#cpCommitBtn');
+	const amendToggle = footerElem.querySelector<HTMLButtonElement>('#cpAmendToggle');
+	const replaceMessageBtn = footerElem.querySelector<HTMLButtonElement>('#cpReplaceMessageBtn');
 
-	function updateCommitBtn() {
+	function syncCommitControls() {
 		if (!commitBtn) return;
 		const hasMessage = !!(msgEl && msgEl.value.trim());
 		const hasDefault = !!(initialState.config.defaultCommitMessage);
-		const canCommit = _cpChanges.some((c) => c.staged || _cpCanStage(c)) && (hasMessage || hasDefault);
+		const canCommit = _cpChanges.some((c) => c.staged || _cpCanStage(c)) && (hasMessage || (!_cpAmendEnabled && hasDefault));
 		commitBtn.disabled = !canCommit;
-		const arrow = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
-		if (arrow) arrow.disabled = !canCommit;
+		if (amendToggle) {
+			amendToggle.classList.toggle('active', _cpAmendEnabled);
+			amendToggle.setAttribute('aria-pressed', _cpAmendEnabled ? 'true' : 'false');
+		}
+		if (replaceMessageBtn) {
+			replaceMessageBtn.classList.toggle('hidden', !_cpShowReplacePreviousMessage);
+		}
+		footerElem.querySelector('#cpFooter')?.classList.toggle('cpReplaceVisible', _cpShowReplacePreviousMessage);
+		setTimeout(() => commits.filesPanel.syncContentTop(), 0);
+	}
+
+	function hideReplacePreviousMessage() {
+		if (!_cpShowReplacePreviousMessage) return;
+		_cpShowReplacePreviousMessage = false;
+		syncCommitControls();
+	}
+
+	function requestPreviousCommitMessage(action: 'fill' | 'replace' | null) {
+		const repo = commits.getCurrentRepo();
+		if (!repo) return;
+		if (_cpPreviousCommitMessageRepo !== repo) {
+			_cpPreviousCommitMessage = null;
+			_cpPreviousCommitMessageRepo = repo;
+		}
+		_cpPendingPreviousCommitMessageAction = action;
+		sendMessage({ command: 'loadPreviousCommitMessage', repo, requestId: ++_cpPreviousCommitMessageRequestId });
+	}
+
+	function applyPreviousCommitMessage(action: 'fill' | 'replace') {
+		if (!msgEl) return;
+		const repo = commits.getCurrentRepo();
+		if (_cpPreviousCommitMessage === null || _cpPreviousCommitMessageRepo !== repo) {
+			requestPreviousCommitMessage(action);
+			return;
+		}
+		msgEl.value = _cpPreviousCommitMessage.trim();
+		_cpShowReplacePreviousMessage = false;
+		syncCommitControls();
+		msgEl.focus();
+	}
+
+	function setAmendEnabled(enabled: boolean) {
+		_cpAmendEnabled = enabled;
+		if (!enabled) {
+			_cpShowReplacePreviousMessage = false;
+			_cpPendingPreviousCommitMessageAction = null;
+			syncCommitControls();
+			return;
+		}
+		const hasMessage = !!(msgEl && msgEl.value.trim());
+		if (hasMessage) {
+			_cpShowReplacePreviousMessage = true;
+			syncCommitControls();
+			return;
+		}
+		applyPreviousCommitMessage('fill');
 	}
 
 	if (msgEl) {
-		msgEl.addEventListener('input', updateCommitBtn);
+		msgEl.addEventListener('focus', hideReplacePreviousMessage);
+		msgEl.addEventListener('input', () => {
+			hideReplacePreviousMessage();
+			syncCommitControls();
+		});
 		msgEl.addEventListener('keydown', (e) => {
 			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
 				if (commitBtn && !commitBtn.disabled) commitBtn.click();
@@ -165,19 +230,11 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 		});
 	}
 
-	const arrowBtn = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
-	const commitMenu = footerElem.querySelector<HTMLElement>('#cpCommitMenu');
-	const amendBtn = footerElem.querySelector<HTMLButtonElement>('#cpAmendBtn');
-
-	function closeMenu() {
-		commitMenu?.classList.add('hidden');
-	}
-
 	if (commitBtn) {
-		updateCommitBtn();
+		syncCommitControls();
 		commitBtn.addEventListener('click', () => {
 			let msg = msgEl ? msgEl.value.trim() : '';
-			if (!msg && initialState.config.defaultCommitMessage) {
+			if (!msg && !_cpAmendEnabled && initialState.config.defaultCommitMessage) {
 				const now = new Date();
 				const pad = (n: number) => String(n).padStart(2, '0');
 				const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) +
@@ -190,37 +247,27 @@ function changesPanelAttachListeners(footerElem: HTMLElement, contentElem: HTMLE
 			if (!hasStagedChanges) {
 				const files = _cpChanges.filter(_cpCanStage).map((c) => c.path);
 				if (!files.length) return;
-				_cpPendingCommit = { msg, amend: false };
+				_cpPendingCommit = { msg, amend: _cpAmendEnabled };
 				sendMessage({ command: 'stageFiles', repo, files });
 				return;
 			}
-			runAction({ command: 'commitChanges', repo, message: msg, amend: false }, 'Committing Changes');
+			runAction({ command: 'commitChanges', repo, message: msg, amend: _cpAmendEnabled }, _cpAmendEnabled ? 'Amending Previous Commit' : 'Committing Changes');
 		});
 	}
 
-	if (arrowBtn && commitMenu) {
-		arrowBtn.addEventListener('click', (e) => {
+	if (amendToggle) {
+		amendToggle.addEventListener('click', (e) => {
 			e.stopPropagation();
-			commitMenu.classList.toggle('hidden');
+			setAmendEnabled(!_cpAmendEnabled);
 		});
 	}
 
-	if (amendBtn) {
-		amendBtn.addEventListener('click', () => {
-			const msg = msgEl ? msgEl.value.trim() : '';
-			const repo = commits.getCurrentRepo();
-			if (!repo) return;
-			closeMenu();
-			runAction({ command: 'commitChanges', repo, message: msg, amend: true }, 'Amending Previous Commit');
+	if (replaceMessageBtn) {
+		replaceMessageBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			applyPreviousCommitMessage('replace');
 		});
 	}
-
-	// Close menu when clicking outside — remove the previous listener first
-	if (_cpCloseMenuListener) {
-		document.removeEventListener('click', _cpCloseMenuListener);
-	}
-	_cpCloseMenuListener = () => closeMenu();
-	document.addEventListener('click', _cpCloseMenuListener);
 
 	// Section collapse toggle
 	contentElem.querySelectorAll('.cpSectionHeader').forEach((hdr) => {
@@ -390,6 +437,10 @@ function changesPanelActivate() {
 function changesPanelDeactivate() {
 	_cpActive = false;
 	_cpChanges = [];
+	_cpPendingCommit = null;
+	_cpAmendEnabled = false;
+	_cpShowReplacePreviousMessage = false;
+	_cpPendingPreviousCommitMessageAction = null;
 }
 
 /* ── response handlers (called from bootstrap.ts) ───────────────────────── */
@@ -422,14 +473,19 @@ function filesPanelHandleWorkingTreeChanges(changes: GG.GitWorkingTreeChangeMsg[
 
 	// Re-evaluate commit button state after restoring message
 	const commitBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpCommitBtn');
-	const arrowBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpCommitArrow');
+	const amendToggle2 = footerElem.querySelector<HTMLButtonElement>('#cpAmendToggle');
+	const replaceMessageBtn2 = footerElem.querySelector<HTMLButtonElement>('#cpReplaceMessageBtn');
 	if (commitBtn2) {
 		const msgEl2 = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
 		const hasMessage2 = !!(msgEl2 && msgEl2.value.trim());
 		const hasDefault2 = !!(initialState.config.defaultCommitMessage);
-		const canCommit = _cpChanges.some((c) => c.staged || _cpCanStage(c)) && (hasMessage2 || hasDefault2);
+		const canCommit = _cpChanges.some((c) => c.staged || _cpCanStage(c)) && (hasMessage2 || (!_cpAmendEnabled && hasDefault2));
 		commitBtn2.disabled = !canCommit;
-		if (arrowBtn2) arrowBtn2.disabled = !canCommit;
+		if (amendToggle2) {
+			amendToggle2.classList.toggle('active', _cpAmendEnabled);
+			amendToggle2.setAttribute('aria-pressed', _cpAmendEnabled ? 'true' : 'false');
+		}
+		if (replaceMessageBtn2) replaceMessageBtn2.classList.toggle('hidden', !_cpShowReplacePreviousMessage);
 	}
 
 	if (_cpPendingCommit !== null) {
@@ -437,9 +493,38 @@ function filesPanelHandleWorkingTreeChanges(changes: GG.GitWorkingTreeChangeMsg[
 		_cpPendingCommit = null;
 		const repo = commits.getCurrentRepo();
 		if (repo) {
-			runAction({ command: 'commitChanges', repo, message: pending.msg, amend: pending.amend }, 'Committing Changes');
+			runAction({ command: 'commitChanges', repo, message: pending.msg, amend: pending.amend }, pending.amend ? 'Amending Previous Commit' : 'Committing Changes');
 		}
 	}
+}
+
+function filesPanelHandlePreviousCommitMessage(repo: string, requestId: number, message: string | null, error: GG.ErrorInfo) {
+	if (requestId !== _cpPreviousCommitMessageRequestId) return;
+	if (commits.getCurrentRepo() !== repo) return;
+	if (error !== null) {
+		_cpPendingPreviousCommitMessageAction = null;
+		dialog.showError('Unable to Load Previous Commit Message', error, null, null);
+		return;
+	}
+	_cpPreviousCommitMessageRepo = repo;
+	_cpPreviousCommitMessage = message === null ? '' : message;
+	const action = _cpPendingPreviousCommitMessageAction;
+	_cpPendingPreviousCommitMessageAction = null;
+	if (action === null) return;
+
+	const footerElem = commits.filesPanel.getFooterElem();
+	const msgEl = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
+	const commitBtn = footerElem.querySelector<HTMLButtonElement>('#cpCommitBtn');
+	const replaceMessageBtn = footerElem.querySelector<HTMLButtonElement>('#cpReplaceMessageBtn');
+	if (msgEl) {
+		msgEl.value = _cpPreviousCommitMessage.trim();
+		msgEl.focus();
+	}
+	_cpShowReplacePreviousMessage = false;
+	footerElem.querySelector('#cpFooter')?.classList.remove('cpReplaceVisible');
+	if (replaceMessageBtn) replaceMessageBtn.classList.add('hidden');
+	if (commitBtn) commitBtn.disabled = !_cpChanges.some((c) => c.staged || _cpCanStage(c)) || !(msgEl && msgEl.value.trim());
+	setTimeout(() => commits.filesPanel.syncContentTop(), 0);
 }
 
 function filesPanelHandleStageUnstageResponse(error: GG.ErrorInfo) {
@@ -514,6 +599,17 @@ function filesPanelHandleCommitResponse(error: GG.ErrorInfo) {
 	// Clear message and refresh — the commit graph refresh is triggered by backend
 	const footerElem = commits.filesPanel.getFooterElem();
 	const msgEl = footerElem.querySelector<HTMLTextAreaElement>('#cpMessage');
+	const amendToggle = footerElem.querySelector<HTMLButtonElement>('#cpAmendToggle');
+	const replaceMessageBtn = footerElem.querySelector<HTMLButtonElement>('#cpReplaceMessageBtn');
 	if (msgEl) msgEl.value = '';
+	_cpAmendEnabled = false;
+	_cpShowReplacePreviousMessage = false;
+	_cpPendingPreviousCommitMessageAction = null;
+	footerElem.querySelector('#cpFooter')?.classList.remove('cpReplaceVisible');
+	if (amendToggle) {
+		amendToggle.classList.remove('active');
+		amendToggle.setAttribute('aria-pressed', 'false');
+	}
+	if (replaceMessageBtn) replaceMessageBtn.classList.add('hidden');
 	if (_cpActive) changesPanelRequestRefresh();
 }

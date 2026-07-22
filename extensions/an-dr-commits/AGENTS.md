@@ -148,7 +148,7 @@ At `maxDepthOfRepoSearch === 0`, the workspace creation watcher drops ordinary p
 | `findWidget.ts` | Ctrl+F find bar |
 | `settingsWidget.ts` | Repository settings panel |
 | `settingsWidgetDialogs.ts` | Settings widget issue-linking and pull-request dialog flows |
-| `changesPanel.ts` | Uncommitted-changes mode for the Files Panel: staged/unstaged sections, commit message textarea, stage/unstage/discard/commit actions — shown in `#filesPanel` when the uncommitted row is selected |
+| `changesPanel.ts` | Uncommitted-changes mode for the Files Panel: staged/unstaged sections, commit message textarea, inline amend toggle with previous-message replacement, stage/unstage/discard/commit actions — shown in `#filesPanel` when the uncommitted row is selected |
 | `textFormatter.ts` | Commit message formatting (issue links, etc.) |
 | `utils.ts` | Frontend globals: `ICONS` object, `VSCODE_API`, table/graph/column-width constants. Cross-view helpers (`escapeHtml`, `codicon`, tag pills, `Dropdown`, …) moved to `web/common/`, see below |
 | `branchPanelRender.ts` | Branch panel tree building and HTML rendering helpers |
@@ -163,7 +163,7 @@ Compiles into the separate `sidebar.min.js`/`sidebar.min.css` bundle (see "Build
 
 | File | Purpose |
 |---|---|
-| `main.ts` | **Core class `SidebarView`** (frontend-only; distinct from the backend `SidebarView` in `src/views/sidebar/sidebarView.ts`) — wires the repo dropdown, action buttons, changes-tree interactions, commit footer, mini-graph, resize handle. `sidebarBootstrap()` is the entry point (renamed from a plain `bootstrap()` to avoid colliding with `web/main.ts`'s own `bootstrap()` in the shared global scope — the tab bundle isn't loaded here, but naming stays collision-safe project-wide) |
+| `main.ts` | **Core class `SidebarView`** (frontend-only; distinct from the backend `SidebarView` in `src/views/sidebar/sidebarView.ts`) — wires the repo dropdown, action buttons, changes-tree interactions, commit footer with inline amend toggle, mini-graph, resize handle. `sidebarBootstrap()` is the entry point (renamed from a plain `bootstrap()` to avoid colliding with `web/main.ts`'s own `bootstrap()` in the shared global scope — the tab bundle isn't loaded here, but naming stays collision-safe project-wide) |
 | `changesTree.ts` | Pure client-side rendering of the working-tree changes tree (staged/unstaged sections, folders, file rows) |
 | `miniGraph.ts` | Pure client-side mini-graph rendering, including the `Set`-based reachable-commit computation (ported from the old server-side `activityBarView/miniGraph.ts`) |
 | `styles/main.css` | Sidebar-only CSS, bundled into `sidebar.min.css` |
@@ -241,6 +241,8 @@ The tab and sidebar sync selection through `views/common/repoSelection.ts` and `
 
 ### Git operations
 User right-clicks commit → `contextMenu.ts` → click handler in `main.ts` → `sendMessage({command: 'someAction', ...})` → `TabView.respondToMessage` dispatches to the matching `views/tab/*Actions.ts` handler → `commands.ts` (or `dataSource.ts` directly) runs git → response sent back to webview.
+
+In the uncommitted-changes Files Panel, `changesPanel.ts` owns the Commit/amend footer. The inline amend toggle sends `commitChanges` with `amend: true`; when it needs the full previous commit message it sends `loadPreviousCommitMessage`, which is handled by `views/tab/workingTreeActions.ts` via `DataSource.getPreviousCommitMessage()`. The Activity Bar sidebar has the same footer behavior through its own sidebar protocol and `views/sidebar/sidebarView.ts`.
 
 ### Sending commit ranges to Code Review
 `web/main.ts` sends `sendToCodeReview` with `repo`, `from`, and `to`. `TabView.respondToMessage` dispatches to `views/tab/miscActions.ts`'s `handleSendToCodeReview`, which forwards all three values to `an-dr-code-review.setCommitRange`; Code Review uses the repository root to switch to the matching Git API repository before diffing the pinned commit range. Keep this repo argument when changing the contract so submodule and multi-root workspaces do not diff the wrong repository.

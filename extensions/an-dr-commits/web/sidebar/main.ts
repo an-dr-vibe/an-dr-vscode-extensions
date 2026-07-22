@@ -11,8 +11,8 @@
  * Fetch, Pull, Push, Force Push) is likewise always present, visibility toggled on whether a
  * repository is selected. #activityContent is an empty container this class renders into.
  * #activityFooter contains the static (data-independent) commit UI: #cpMessage,
- * #cpCommitBtn/#cpCommitArrow/#cpCommitMenu/#cpAmendBtn - all pre-rendered by the shell rather
- * than by this class, since none of it depends on the changes/error/repo state. #activityGraph
+ * #cpCommitBtn/#cpAmendToggle/#cpReplaceMessageBtn - all pre-rendered by the shell rather
+ * than by this class, since the elements exist independently of the changes/error/repo state. #activityGraph
  * (data-more attribute reflects whether more commits are available to page in) and
  * #activityGraphResizeHandle are a pair, both empty/static, visibility toggled together based on
  * whether there's a mini graph to show.
@@ -61,6 +61,12 @@ class SidebarView {
 	private graph: GG.SidebarGraphState;
 	private readonly graphConfig: GG.SidebarGraphConfig;
 	private graphLoading: boolean = false;
+	private amendEnabled = false;
+	private previousCommitMessage: string | null = null;
+	private previousCommitMessageRepo: string | null = null;
+	private previousCommitMessageRequestId = 0;
+	private pendingPreviousCommitMessageAction: 'fill' | 'replace' | null = null;
+	private showReplacePreviousMessage = false;
 
 	private readonly repoDropdown: Dropdown;
 
@@ -197,35 +203,101 @@ class SidebarView {
 		}
 	}
 
-	/** Wires the commit message textarea, commit button, amend menu, and their enabled/disabled state. */
+	/** Wires the commit message textarea, commit button, amend toggle, and their enabled/disabled state. */
 	private wireCommitFooter() {
 		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
 		const commitBtn = document.getElementById('cpCommitBtn') as HTMLButtonElement | null;
-		const commitArrow = document.getElementById('cpCommitArrow') as HTMLButtonElement | null;
-		const commitMenu = document.getElementById('cpCommitMenu');
+		const amendToggle = document.getElementById('cpAmendToggle') as HTMLButtonElement | null;
+		const replaceMessageBtn = document.getElementById('cpReplaceMessageBtn') as HTMLButtonElement | null;
 
-		message?.addEventListener('input', () => this.updateCommitButtonState());
+		message?.addEventListener('focus', () => this.hideReplacePreviousMessage());
+		message?.addEventListener('input', () => {
+			this.hideReplacePreviousMessage();
+			this.updateCommitButtonState();
+		});
 		message?.addEventListener('keydown', (e) => {
 			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && commitBtn && !commitBtn.disabled) {
-				sidebarSendMessage({ command: 'commit', message: message.value, amend: false });
+				this.commitFromFooter();
 			}
 		});
-		commitBtn?.addEventListener('click', () => sidebarSendMessage({ command: 'commit', message: message ? message.value : '', amend: false }));
-		commitArrow?.addEventListener('click', (e) => { e.stopPropagation(); commitMenu?.classList.toggle('hidden'); });
-		document.getElementById('cpAmendBtn')?.addEventListener('click', () => sidebarSendMessage({ command: 'commit', message: message ? message.value : '', amend: true }));
-		document.addEventListener('click', () => commitMenu?.classList.add('hidden'));
+		commitBtn?.addEventListener('click', () => this.commitFromFooter());
+		amendToggle?.addEventListener('click', (e) => {
+			e.stopPropagation();
+			this.setAmendEnabled(!this.amendEnabled);
+		});
+		replaceMessageBtn?.addEventListener('click', (e) => {
+			e.stopPropagation();
+			this.applyPreviousCommitMessage('replace');
+		});
 	}
 
-	/** Enables/disables the commit button and its options-menu arrow based on staged/unstaged state and message text. */
+	private commitFromFooter() {
+		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
+		sidebarSendMessage({ command: 'commit', message: message ? message.value : '', amend: this.amendEnabled });
+	}
+
+	private hideReplacePreviousMessage() {
+		if (!this.showReplacePreviousMessage) return;
+		this.showReplacePreviousMessage = false;
+		this.updateCommitButtonState();
+	}
+
+	private setAmendEnabled(enabled: boolean) {
+		this.amendEnabled = enabled;
+		if (!enabled) {
+			this.showReplacePreviousMessage = false;
+			this.pendingPreviousCommitMessageAction = null;
+			this.updateCommitButtonState();
+			return;
+		}
+		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
+		if (message && message.value.trim()) {
+			this.showReplacePreviousMessage = true;
+			this.updateCommitButtonState();
+			return;
+		}
+		this.applyPreviousCommitMessage('fill');
+	}
+
+	private applyPreviousCommitMessage(action: 'fill' | 'replace') {
+		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
+		if (message === null) return;
+		if (this.previousCommitMessage === null || this.previousCommitMessageRepo !== this.repo) {
+			this.requestPreviousCommitMessage(action);
+			return;
+		}
+		message.value = this.previousCommitMessage.trim();
+		this.showReplacePreviousMessage = false;
+		this.updateCommitButtonState();
+		message.focus();
+	}
+
+	private requestPreviousCommitMessage(action: 'fill' | 'replace') {
+		if (this.repo === null) return;
+		if (this.previousCommitMessageRepo !== this.repo) {
+			this.previousCommitMessage = null;
+			this.previousCommitMessageRepo = this.repo;
+		}
+		this.pendingPreviousCommitMessageAction = action;
+		sidebarSendMessage({ command: 'loadPreviousCommitMessage', requestId: ++this.previousCommitMessageRequestId });
+	}
+
+	/** Enables/disables the commit button based on staged/unstaged state and message text. */
 	private updateCommitButtonState() {
 		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
 		const commitBtn = document.getElementById('cpCommitBtn') as HTMLButtonElement | null;
-		const commitArrow = document.getElementById('cpCommitArrow') as HTMLButtonElement | null;
+		const amendToggle = document.getElementById('cpAmendToggle') as HTMLButtonElement | null;
+		const replaceMessageBtn = document.getElementById('cpReplaceMessageBtn') as HTMLButtonElement | null;
+		const footer = document.getElementById('cpFooter');
 		const hasChanges = this.error === null && this.changes.some((change) => change.staged || sidebarCanStage(change));
 		const hasMessage = !!(message && message.value.trim());
-		const enabled = hasChanges && hasMessage;
-		if (commitBtn) commitBtn.disabled = !enabled && !hasChanges;
-		if (commitArrow) commitArrow.disabled = !hasChanges;
+		if (commitBtn) commitBtn.disabled = !hasChanges || (this.amendEnabled && !hasMessage);
+		if (amendToggle) {
+			amendToggle.classList.toggle('active', this.amendEnabled);
+			amendToggle.setAttribute('aria-pressed', this.amendEnabled ? 'true' : 'false');
+		}
+		if (replaceMessageBtn) replaceMessageBtn.classList.toggle('hidden', !this.showReplacePreviousMessage);
+		if (footer) footer.classList.toggle('cpReplaceVisible', this.showReplacePreviousMessage);
 	}
 
 	/**
@@ -377,16 +449,53 @@ class SidebarView {
 	 * repo is selected).
 	 */
 	public applyDataUpdate(data: GG.SidebarResponseUpdateContent) {
+		const repoChanged = this.repo !== data.repo;
 		this.repo = data.repo;
 		this.repoPaths = data.repoPaths;
 		this.starredRepos = data.starredRepos;
 		this.changes = data.changes;
 		this.error = data.error;
+		if (repoChanged) {
+			this.amendEnabled = false;
+			this.showReplacePreviousMessage = false;
+			this.pendingPreviousCommitMessageAction = null;
+		}
 
 		this.renderRepoSelector();
 		this.updateActionsRowVisibility();
 		this.renderChangesTree();
 		this.renderMiniGraph();
+		this.updateCommitButtonState();
+	}
+
+	public applyPreviousCommitMessageResponse(data: GG.SidebarResponseLoadPreviousCommitMessage) {
+		if (data.requestId !== this.previousCommitMessageRequestId || data.repo !== this.repo) return;
+		if (data.error !== null) {
+			this.pendingPreviousCommitMessageAction = null;
+			alert('Unable to load previous commit message: ' + data.error);
+			return;
+		}
+		this.previousCommitMessageRepo = data.repo;
+		this.previousCommitMessage = data.message === null ? '' : data.message;
+		if (this.pendingPreviousCommitMessageAction === null) return;
+		this.pendingPreviousCommitMessageAction = null;
+		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
+		if (message !== null) {
+			message.value = this.previousCommitMessage.trim();
+			message.focus();
+		}
+		this.showReplacePreviousMessage = false;
+		this.updateCommitButtonState();
+	}
+
+	public applyCommitResponse(data: GG.SidebarResponseCommit) {
+		if (data.error !== null) return;
+		const message = document.getElementById('cpMessage') as HTMLTextAreaElement | null;
+		if (message !== null) message.value = '';
+		this.amendEnabled = false;
+		this.showReplacePreviousMessage = false;
+		this.pendingPreviousCommitMessageAction = null;
+		this.updateCommitButtonState();
 	}
 
 	/** Applies the graph's current load state, pushed independently of 'updateContent' - both the initial post-shell fetch and 'loadMoreGraph' pagination arrive this way. */
@@ -410,6 +519,12 @@ function sidebarRegisterMessageHandler(view: SidebarView) {
 				break;
 			case 'updateGraph':
 				view.applyGraphUpdate(msg.graph);
+				break;
+			case 'loadPreviousCommitMessage':
+				view.applyPreviousCommitMessageResponse(msg);
+				break;
+			case 'commit':
+				view.applyCommitResponse(msg);
 				break;
 		}
 	});

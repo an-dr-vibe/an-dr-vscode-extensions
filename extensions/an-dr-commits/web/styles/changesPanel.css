@@ -31,6 +31,32 @@
 	border-color:var(--vscode-focusBorder, rgba(0,120,215,0.6));
 }
 
+#cpFooter.cpReplaceVisible #cpMessage{
+	min-height:36px;
+}
+
+#cpReplaceMessageBtn{
+	width:100%;
+	padding:3px 7px;
+	box-sizing:border-box;
+	background:var(--vscode-button-secondaryBackground, var(--vscode-input-background, rgba(128,128,128,0.1)));
+	color:var(--vscode-button-secondaryForeground, var(--vscode-input-foreground, inherit));
+	border:1px solid var(--vscode-button-border, var(--vscode-input-border, rgba(128,128,128,0.3)));
+	border-radius:2px;
+	font-size:11px;
+	font-family:inherit;
+	text-align:left;
+	cursor:pointer;
+}
+
+#cpReplaceMessageBtn:hover{
+	background:var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2)));
+}
+
+#cpReplaceMessageBtn.hidden{
+	display:none;
+}
+
 #cpCommitRow{
 	display:flex;
 	position:relative;
@@ -57,60 +83,32 @@
 	cursor:not-allowed;
 }
 
-#cpCommitArrow{
+#cpAmendToggle{
+	width:30px;
 	padding:4px 7px;
 	border:none;
 	border-left:1px solid var(--vscode-button-foreground, rgba(255,255,255,0.3));
 	border-radius:0 2px 2px 0;
 	background:var(--vscode-button-background, rgba(14,99,156,0.85));
 	color:var(--vscode-button-foreground, #fff);
-	font-size:10px;
 	cursor:pointer;
 	flex-shrink:0;
+	display:flex;
+	align-items:center;
+	justify-content:center;
 }
 
-#cpCommitArrow:hover:not(:disabled){
+#cpAmendToggle:hover{
 	background:var(--vscode-button-hoverBackground, rgba(14,99,156,1));
 }
 
-#cpCommitArrow:disabled{
-	opacity:0.4;
-	cursor:not-allowed;
+#cpAmendToggle.active{
+	background:var(--vscode-button-hoverBackground, rgba(14,99,156,1));
+	box-shadow:inset 0 0 0 1px var(--vscode-focusBorder, rgba(255,255,255,0.45));
 }
 
-#cpCommitMenu{
-	position:absolute;
-	bottom:calc(100% + 2px);
-	right:0;
-	background:var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526));
-	border:1px solid var(--vscode-menu-border, var(--vscode-widget-border, rgba(128,128,128,0.35)));
-	border-radius:2px;
-	z-index:100;
-	min-width:180px;
-	box-shadow:0 2px 8px rgba(0,0,0,0.3);
-}
-
-#cpCommitMenu.hidden{
-	display:none;
-}
-
-#cpAmendBtn{
-	display:block;
-	width:100%;
-	padding:6px 12px;
-	background:none;
-	border:none;
-	color:var(--vscode-menu-foreground, inherit);
-	font-size:12px;
-	font-family:inherit;
-	text-align:left;
-	cursor:pointer;
-	white-space:nowrap;
-}
-
-#cpAmendBtn:hover{
-	background:var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground, rgba(14,99,156,0.5)));
-	color:var(--vscode-menu-selectionForeground, inherit);
+#cpAmendToggle .codicon{
+	font-size:14px;
 }
 
 /* Content: sections */

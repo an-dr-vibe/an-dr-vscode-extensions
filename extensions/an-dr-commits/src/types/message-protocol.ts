@@ -889,6 +889,18 @@ export interface ResponseLoadWorkingTreeChanges {
 	readonly error: ErrorInfo;
 }
 
+export interface RequestLoadPreviousCommitMessage extends RepoRequest {
+	readonly command: 'loadPreviousCommitMessage';
+	readonly requestId: number;
+}
+export interface ResponseLoadPreviousCommitMessage {
+	readonly command: 'loadPreviousCommitMessage';
+	readonly repo: string;
+	readonly requestId: number;
+	readonly message: string | null;
+	readonly error: ErrorInfo;
+}
+
 export interface RequestStageFiles extends RepoRequest {
 	readonly command: 'stageFiles';
 	readonly files: string[];
@@ -1031,6 +1043,7 @@ export type RequestMessage =
 	| RequestViewFileAtRevision
 	| RequestViewScm
 	| RequestLoadWorkingTreeChanges
+	| RequestLoadPreviousCommitMessage
 	| RequestStageFiles
 	| RequestUnstageFiles
 	| RequestCommitChanges
@@ -1113,6 +1126,7 @@ export type ResponseMessage =
 	| ResponseViewFileAtRevision
 	| ResponseViewScm
 	| ResponseLoadWorkingTreeChanges
+	| ResponseLoadPreviousCommitMessage
 	| ResponseStageFiles
 	| ResponseUnstageFiles
 	| ResponseCommitChanges

@@ -1,6 +1,6 @@
 import { DataSource } from '../../dataSource';
 import { RepoManager } from '../../repoManager';
-import { GitRepoSet, LoadCommitsViewTo, RequestCleanUntrackedFiles, RequestCommitChanges, RequestDiscardFileChanges, RequestDiscardSubmoduleChanges, RequestLoadWorkingTreeChanges, RequestStageFiles, RequestUnstageFiles, ResponseMessage } from '../../types';
+import { GitRepoSet, LoadCommitsViewTo, RequestCleanUntrackedFiles, RequestCommitChanges, RequestDiscardFileChanges, RequestDiscardSubmoduleChanges, RequestLoadPreviousCommitMessage, RequestLoadWorkingTreeChanges, RequestStageFiles, RequestUnstageFiles, ResponseMessage } from '../../types';
 
 /**
  * The subset of TabView's dependencies needed to handle working-tree
@@ -26,6 +26,17 @@ export async function handleLoadWorkingTreeChanges(ctx: WorkingTreeActionContext
 		command: 'loadWorkingTreeChanges',
 		changes: wtData.changes,
 		error: wtData.error
+	});
+}
+
+export async function handleLoadPreviousCommitMessage(ctx: WorkingTreeActionContext, msg: RequestLoadPreviousCommitMessage): Promise<void> {
+	const previousCommitMessage = await ctx.dataSource.getPreviousCommitMessage(msg.repo);
+	ctx.sendMessage({
+		command: 'loadPreviousCommitMessage',
+		repo: msg.repo,
+		requestId: msg.requestId,
+		message: previousCommitMessage.message,
+		error: previousCommitMessage.error
 	});
 }
 

@@ -3,6 +3,7 @@ const VSCODE_API = acquireVsCodeApi<GG.RequestMessage, WebViewState>();
 
 const ICONS = {
 	alert: codicon('warning'),
+	amend: codicon('git-commit'),
 	branch: codicon('git-branch'),
 	check: codicon('check'),
 	commit: codicon('git-commit'),

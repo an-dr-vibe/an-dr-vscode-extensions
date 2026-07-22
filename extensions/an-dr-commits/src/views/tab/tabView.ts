@@ -19,7 +19,7 @@ import { BranchRemoteActionContext, handleAddRemote, handleCheckoutBranch, handl
 import { TagStashActionContext, handleAddTag, handleApplyStash, handleBranchFromStash, handleDeleteTag, handleDropStash, handlePopStash, handlePushStash, handlePushTag, handleResolveSidebarTagContext, handleTagDetails } from './tagStashActions';
 import { CommitGraphActionContext, handleCheckoutCommit, handleCherrypickCommit, handleCommitDetails, handleCompareCommits, handleDropCommit, handleEditCommitAuthor, handleResetToCommit, handleResetToHead, handleRevertCommit, handleRewordCommit, handleSidebarBatchRefAction, handleSquashCommits } from './commitGraphActions';
 import { DiffFileContentActionContext, handleAddToGitignore, handleCopyFilePath, handleCopyToClipboard, handleCreateArchive, handleGetFileDiff, handleGetFullDiffContent, handleOpenExternalDirDiff, handleOpenFile, handleResetFileToRevision, handleViewDiff, handleViewDiffWithWorkingFile, handleViewFileAtRevision } from './diffFileContentActions';
-import { WorkingTreeActionContext, handleCleanUntrackedFiles, handleCommitChanges, handleDiscardFileChanges, handleDiscardSubmoduleChanges, handleLoadWorkingTreeChanges, handleStageFiles, handleUnstageFiles } from './workingTreeActions';
+import { WorkingTreeActionContext, handleCleanUntrackedFiles, handleCommitChanges, handleDiscardFileChanges, handleDiscardSubmoduleChanges, handleLoadPreviousCommitMessage, handleLoadWorkingTreeChanges, handleStageFiles, handleUnstageFiles } from './workingTreeActions';
 import { MiscActionContext, handleDeleteUserDetails, handleEditUserDetails, handleFetchAvatar, handleOpenExtensionSettings, handleOpenExternalUrl, handleSendToCodeReview, handleShowErrorMessage, handleViewScm } from './miscActions';
 import { loadFileIcons } from './fileIcons';
 
@@ -70,7 +70,7 @@ export class TabView extends Disposable {
 	private static readonly READ_ONLY_COMMANDS: ReadonlySet<RequestMessage['command']> = new Set<RequestMessage['command']>([
 		'commitDetails', 'compareCommits', 'copyFilePath', 'copyToClipboard', 'createPullRequest',
 		'fetchAvatar', 'getFileDiff', 'getFullDiffContent', 'loadCommits', 'loadConfig',
-		'loadRepoInfo', 'loadRepos', 'loadWorkingTreeChanges', 'openExtensionSettings',
+		'loadPreviousCommitMessage', 'loadRepoInfo', 'loadRepos', 'loadWorkingTreeChanges', 'openExtensionSettings',
 		'openExternalUrl', 'openFile', 'rescanForRepos', 'resolveSidebarTagContext',
 		'sendToCodeReview', 'setColumnVisibility', 'setGlobalViewState', 'setRepoState',
 		'setRepoStarred', 'setWorkspaceViewState', 'showErrorMessage', 'tagDetails',
@@ -598,6 +598,9 @@ export class TabView extends Disposable {
 				break;
 			case 'loadWorkingTreeChanges':
 				await handleLoadWorkingTreeChanges(this.workingTreeCtx, msg);
+				break;
+			case 'loadPreviousCommitMessage':
+				await handleLoadPreviousCommitMessage(this.workingTreeCtx, msg);
 				break;
 			case 'stageFiles':
 				await handleStageFiles(this.workingTreeCtx, msg);

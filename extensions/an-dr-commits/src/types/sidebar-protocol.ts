@@ -80,6 +80,11 @@ export interface SidebarRequestCommit extends BaseMessage {
 	readonly amend: boolean;
 }
 
+export interface SidebarRequestLoadPreviousCommitMessage extends BaseMessage {
+	readonly command: 'loadPreviousCommitMessage';
+	readonly requestId: number;
+}
+
 export interface SidebarRequestOpenChanges extends BaseMessage {
 	readonly command: 'openChanges';
 	readonly filePath: string;
@@ -119,6 +124,7 @@ export type SidebarRequestMessage =
 	| SidebarRequestDiscard
 	| SidebarRequestDiscardSubmodule
 	| SidebarRequestCommit
+	| SidebarRequestLoadPreviousCommitMessage
 	| SidebarRequestOpenChanges
 	| SidebarRequestGitFetch
 	| SidebarRequestGitPull
@@ -148,4 +154,21 @@ export interface SidebarResponseUpdateGraph extends BaseMessage {
 	readonly graph: SidebarGraphState;
 }
 
-export type SidebarResponseMessage = SidebarResponseUpdateContent | SidebarResponseUpdateGraph;
+export interface SidebarResponseLoadPreviousCommitMessage extends BaseMessage {
+	readonly command: 'loadPreviousCommitMessage';
+	readonly repo: string;
+	readonly requestId: number;
+	readonly message: string | null;
+	readonly error: ErrorInfo;
+}
+
+export interface SidebarResponseCommit extends BaseMessage {
+	readonly command: 'commit';
+	readonly error: ErrorInfo;
+}
+
+export type SidebarResponseMessage =
+	| SidebarResponseUpdateContent
+	| SidebarResponseUpdateGraph
+	| SidebarResponseLoadPreviousCommitMessage
+	| SidebarResponseCommit;

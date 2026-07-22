@@ -1380,6 +1380,20 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['reset', 'HEAD', '--', ...files], repo);
 	}
 
+	public async getPreviousCommitMessage(repo: string): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			return {
+				message: await this.getCommitMessage(repo, 'HEAD'),
+				error: null
+			};
+		} catch (error) {
+			return {
+				message: null,
+				error: typeof error === 'string' ? error : 'Unable to read the previous commit message.'
+			};
+		}
+	}
+
 	public commitChanges(repo: string, message: string, amend: boolean): Promise<ErrorInfo> {
 		const args = ['commit'];
 		if (amend) args.push('--amend');

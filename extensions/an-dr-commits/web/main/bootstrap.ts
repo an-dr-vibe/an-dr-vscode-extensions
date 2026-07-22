@@ -283,6 +283,9 @@ function commitsRegisterMessageHandler(commits: CommitsView) {
 			case 'loadWorkingTreeChanges':
 				filesPanelHandleWorkingTreeChanges(msg.changes, msg.error);
 				break;
+			case 'loadPreviousCommitMessage':
+				filesPanelHandlePreviousCommitMessage(msg.repo, msg.requestId, msg.message, msg.error);
+				break;
 			case 'stageFiles':
 			case 'unstageFiles':
 			case 'discardFileChanges':

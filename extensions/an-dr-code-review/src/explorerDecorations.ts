@@ -2,6 +2,30 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getCommentCountByFile, loadReviewData, onDidChangeReviewData, relativeFilePath } from './reviewStore';
 
+const CHANGE_DECORATION_SCHEME = 'an-dr-code-review-change';
+
+/**
+ * Creates a resource URI carrying the branch-relative Git status for tree coloring.
+ */
+export function changeDecorationUri(filePath: string, status: string): vscode.Uri {
+    return vscode.Uri.file(filePath).with({
+        scheme: CHANGE_DECORATION_SCHEME,
+        query: status,
+    });
+}
+
+/**
+ * Returns the VS Code Git theme color used for a branch-relative file status.
+ */
+export function changeThemeColor(status: string): vscode.ThemeColor {
+    const color = status === 'A' || status === 'U'
+        ? 'gitDecoration.addedResourceForeground'
+        : status === 'D'
+            ? 'gitDecoration.deletedResourceForeground'
+            : 'gitDecoration.modifiedResourceForeground';
+    return new vscode.ThemeColor(color);
+}
+
 export class CodeReviewFileDecorationProvider implements vscode.FileDecorationProvider, vscode.Disposable {
     private readonly onDidChangeFileDecorationsEmitter = new vscode.EventEmitter<vscode.Uri | vscode.Uri[] | undefined>();
     readonly onDidChangeFileDecorations = this.onDidChangeFileDecorationsEmitter.event;
@@ -22,6 +46,9 @@ export class CodeReviewFileDecorationProvider implements vscode.FileDecorationPr
     }
 
     provideFileDecoration(uri: vscode.Uri): vscode.ProviderResult<vscode.FileDecoration> {
+        if (uri.scheme === CHANGE_DECORATION_SCHEME) {
+            return this.getChangeDecoration(uri.query);
+        }
         if (uri.scheme !== 'file') {
             return undefined;
         }
@@ -36,6 +63,10 @@ export class CodeReviewFileDecorationProvider implements vscode.FileDecorationPr
         const decoration = new vscode.FileDecoration(badge, label, new vscode.ThemeColor('charts.yellow'));
         decoration.propagate = true;
         return decoration;
+    }
+
+    private getChangeDecoration(status: string): vscode.FileDecoration {
+        return new vscode.FileDecoration(undefined, undefined, changeThemeColor(status));
     }
 
     private getCountForUri(uri: vscode.Uri): number {

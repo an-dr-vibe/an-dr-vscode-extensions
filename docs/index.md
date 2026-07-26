@@ -11,6 +11,7 @@ its own `extensions/<name>/docs/adr/`.
 ### Per-extension ADRs
 
 - [an-dr-commits](../extensions/an-dr-commits/docs/adr/)
+- [an-dr-code-review](../extensions/an-dr-code-review/docs/adr/)
 - [an-dr-code-analysis](../extensions/an-dr-code-analysis/docs/adr/)
 - [an-dr-sync](../extensions/an-dr-sync/docs/adr/)
 - [an-dr-extensions](../extensions/an-dr-extensions/docs/adr/)

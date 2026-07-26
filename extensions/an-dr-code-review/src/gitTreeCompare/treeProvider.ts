@@ -18,6 +18,7 @@ import { normalizePath } from './fsUtils';
 import { API as GitAPI, Repository as GitAPIRepository } from './typings/git';
 import { FileCommentEntry, ReviewedFileState, getCommentCountByFile, loadReviewData, loadReviewedFilesData, onDidChangeReviewData, relativeFilePath, saveReviewedFilesData } from '../reviewStore';
 import { CommentsSelection } from '../commentsView';
+import { changeDecorationUri } from '../explorerDecorations';
 
 
 type SortOrder = 'name' | 'path' | 'status' | 'recentlyModified';
@@ -1766,7 +1767,9 @@ function toTreeItem(element: Element, openChangesOnSelect: boolean, iconsMinimal
         }
         item.contextValue = element.isSubmodule ? 'submodule' : 'file';
         item.id = element.dstAbsPath;
-        if (fileIconsPath) {
+        item.resourceUri = changeDecorationUri(element.dstAbsPath, element.status);
+        const decorationColorsEnabled = workspace.getConfiguration('explorer').get<boolean>('decorations.colors', true);
+        if (decorationColorsEnabled && fileIconsPath) {
             item.iconPath = path.join(fileIconsPath, 'fileicons', 'icons', getFileIconName(element.dstRelPath));
         } else {
             item.iconPath = path.join(gitIconRoot, toIconName(element) + '.svg');

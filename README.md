@@ -167,6 +167,11 @@ Keeps the Activity Bar layout consistent across machines. Stores visibility and 
 Combines inline review comments with a dedicated changed-files tree for branch review.
 The tree supports comparing against branches, tags, and commits, with tree/list
 view, filtering, checkboxes, base switching, and diff opening directly from the review sidebar.
+The changed-files tree uses the active theme's native Git colors: green for added
+and untracked files, red for deleted files, and the modified color for other changes.
+If Explorer decoration colors are disabled, colored file icons provide the same
+status distinction without overriding that global preference. These become explicit
+colored `A`, `D`, `M`, and other Git status badges when label colors are unavailable.
 
 **Config** (`codeReview.*`):
 

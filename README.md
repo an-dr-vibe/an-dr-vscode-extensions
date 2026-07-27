@@ -348,3 +348,14 @@ Then **Ctrl+Shift+P** → `Developer: Reload Window` in VS Code.
 
 - **Windows**: creates NTFS junctions — no admin rights needed.
 - **Linux/macOS**: creates symlinks — no admin rights needed.
+
+### When a build fails
+
+If an extension's `npm install` or `npm run compile` fails — or the build finishes but the
+entry point named by its `package.json` `main` is missing — `install.ps1` prints a red
+`BUILD FAILED` line, marks the extension `linked (BROKEN BUILD)`, and carries on with the
+rest. At the end it lists every failed extension and **exits with code 1**.
+
+A failed extension is still linked (the junction points at live source, so fixing the build
+is enough — no re-link needed), but its build stamp is *not* written, so the next run
+rebuilds it instead of reporting `(up to date)`.

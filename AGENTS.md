@@ -28,6 +28,11 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 - No monorepo tooling. Each extension under `extensions/` is fully self-contained with its
   own `package.json`, `tsconfig.json`, `node_modules/`, and `out/`.
 - `install.ps1` picks up new extensions automatically — just add a dir under `extensions/`.
+- `install.ps1` never reports a failed build as a success: it checks `$LASTEXITCODE` after
+  `npm install` / `npm run compile` (a non-zero native exit is *not* a PowerShell
+  terminating error, so `$ErrorActionPreference = 'Stop'` does not catch it), verifies the
+  `main` entry point exists afterwards, skips the build stamp on failure so the next run
+  retries, and exits 1. See `docs/adr/ADR-002-install-fails-loudly-on-build-failure.md`.
 - `install.ps1` marks every linked `an-dr.*` extension as application-scoped
   (`metadata.isApplicationScoped = true` in `~/.vscode/extensions/extensions.json`) so they
   stay installed across every VS Code Profile, not just the one that first discovered them.

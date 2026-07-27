@@ -7,6 +7,7 @@ extension (e.g. shared install tooling). Each extension keeps its own ADR histor
 its own `extensions/<name>/docs/adr/`.
 
 - [ADR-001: install.ps1 marks an-dr extensions as application-scoped](adr/ADR-001-install-application-scoped-extensions.md)
+- [ADR-002: install.ps1 fails loudly on a failed extension build](adr/ADR-002-install-fails-loudly-on-build-failure.md)
 
 ### Per-extension ADRs
 

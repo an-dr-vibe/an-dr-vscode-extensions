@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { Avatar, AvatarCache } from './avatarManager';
 import { getConfig } from './config';
-import { BooleanOverride, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, LastCommitsRequest, LastCommitsRequestSet, RepoCommitOrdering } from './types';
+import { BooleanOverride, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, LastCommitsRequest, LastRepoInfoRequest, LastRepoRequestSet, LastRepoRequests, RepoCommitOrdering } from './types';
 import { GitExecutable, getPathFromStr } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -247,31 +247,47 @@ export class ExtensionState extends Disposable {
 		this.updateWorkspaceState(LAST_ACTIVE_REPO, repo);
 	}
 
-	/* Last Commits Request */
+	/* Last Repository Requests */
 
 	/**
-	 * Get the parameters of the commits load a repository was last viewed with, used to warm the
-	 * cache with the request the tab is about to make (see ADR-026).
+	 * Get how a repository was last loaded, used to warm the cache with the requests the tab is
+	 * about to make (see ADR-026).
 	 * @param repo The path of the repository.
-	 * @returns The recorded request, or NULL if the repository has not been loaded before.
+	 * @returns The recorded requests, or NULL if the repository has not been loaded before.
 	 */
-	public getLastCommitsRequest(repo: string): LastCommitsRequest | null {
-		return this.workspaceState.get<LastCommitsRequestSet>(LAST_COMMITS_REQUESTS, {})[repo] ?? null;
+	public getLastRepoRequests(repo: string): LastRepoRequests | null {
+		return this.workspaceState.get<LastRepoRequestSet>(LAST_COMMITS_REQUESTS, {})[repo] ?? null;
 	}
 
 	/**
-	 * Record the parameters of a successful commits load. Re-inserting the repository keeps
-	 * insertion order meaningful, so trimming drops the least recently loaded repositories.
+	 * Record the parameters of a successful repo-info load.
+	 * @param repo The path of the repository.
+	 * @param request The request parameters to record.
+	 */
+	public setLastRepoInfoRequest(repo: string, request: LastRepoInfoRequest) {
+		return this.updateLastRepoRequests(repo, (existing) => ({ repoInfo: request, commits: existing?.commits ?? null }));
+	}
+
+	/**
+	 * Record the parameters of a successful commits load.
 	 * @param repo The path of the repository.
 	 * @param request The request parameters to record.
 	 */
 	public setLastCommitsRequest(repo: string, request: LastCommitsRequest) {
-		const existing = this.workspaceState.get<LastCommitsRequestSet>(LAST_COMMITS_REQUESTS, {});
-		const updated: LastCommitsRequestSet = {};
+		return this.updateLastRepoRequests(repo, (existing) => ({ repoInfo: existing?.repoInfo ?? null, commits: request }));
+	}
+
+	/**
+	 * Merges a change into a repository's recorded requests. Re-inserting the repository keeps
+	 * insertion order meaningful, so trimming drops the least recently loaded repositories.
+	 */
+	private updateLastRepoRequests(repo: string, change: (existing: LastRepoRequests | null) => LastRepoRequests) {
+		const existing = this.workspaceState.get<LastRepoRequestSet>(LAST_COMMITS_REQUESTS, {});
+		const updated: LastRepoRequestSet = {};
 		for (const key of Object.keys(existing)) {
 			if (key !== repo) updated[key] = existing[key];
 		}
-		updated[repo] = request;
+		updated[repo] = change(existing[repo] ?? null);
 
 		const keys = Object.keys(updated);
 		for (const key of keys.slice(0, Math.max(0, keys.length - MAX_LAST_COMMITS_REQUESTS))) {

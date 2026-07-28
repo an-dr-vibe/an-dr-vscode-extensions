@@ -15,6 +15,7 @@ import { StatusBarItem } from './statusBarItem';
 import { GitExecutable, UNABLE_TO_FIND_GIT_MSG, findGit, getGitExecutableFromPaths, showErrorMessage, showInformationMessage } from './utils';
 import { EventEmitter } from './utils/event';
 import { RepoSelectionEvent } from './views/common/repoSelection';
+import { RepoWarmer } from './views/common/repoWarmer';
 import { SidebarView } from './views/sidebar/sidebarView';
 import { TabView } from './views/tab/tabView';
 
@@ -50,7 +51,8 @@ export function activateCore(context: vscode.ExtensionContext): ActivatedCore {
 	const statusMonitor = new GitStatusMonitor(dataSource, extensionState, repoManager, repoSelectionEmitter.subscribe, logger);
 	const statusBarItem = new StatusBarItem(repoManager.getNumRepos(), repoManager.onDidChangeRepos, statusMonitor, onDidChangeConfiguration, logger);
 	TabView.configureRepoSelectionSync(repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event));
-	const sidebarView = new SidebarView(context, dataSource, extensionState, repoManager, statusMonitor, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event), false);
+	const repoWarmer = new RepoWarmer(dataSource, extensionState, logger);
+	const sidebarView = new SidebarView(context, dataSource, extensionState, repoManager, statusMonitor, repoSelectionEmitter.subscribe, (event) => repoSelectionEmitter.emit(event), false, repoWarmer);
 	const inlineBlameController = new InlineBlameController(dataSource, repoManager, statusBarItem, onDidChangeConfiguration, logger);
 	const commandManager = new CommandManager(context, avatarManager, dataSource, extensionState, repoManager, statusMonitor, null, onDidChangeGitExecutable, logger, false);
 	const diffDocProvider = new DiffDocProvider(dataSource);
@@ -76,7 +78,7 @@ export function activateCore(context: vscode.ExtensionContext): ActivatedCore {
 			}
 		}),
 		diffDocProvider, commandManager, statusBarItem, statusMonitor, repoSelectionEmitter,
-		sidebarView, inlineBlameController, repoManager, avatarManager, dataSource,
+		sidebarView, repoWarmer, inlineBlameController, repoManager, avatarManager, dataSource,
 		configurationEmitter, extensionState, gitExecutableEmitter, logger
 	);
 

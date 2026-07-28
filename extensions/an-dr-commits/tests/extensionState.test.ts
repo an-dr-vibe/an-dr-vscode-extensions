@@ -714,31 +714,32 @@ describe('ExtensionState', () => {
 		});
 	});
 
-	describe('getLastCommitsRequest', () => {
-		const request = {
+	describe('getLastRepoRequests', () => {
+		const commits = {
 			branches: ['develop'], maxCommits: 300, showTags: true, showRemoteBranches: true,
 			includeCommitsMentionedByReflogs: false, onlyFollowFirstParent: false,
 			commitOrdering: CommitOrdering.Date, hideRemotes: []
 		};
+		const entry = { repoInfo: { showRemoteBranches: true, showStashes: true, hideRemotes: [] }, commits };
 
-		it('Should return the recorded request for the repository', () => {
+		it('Should return the recorded requests for the repository', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': request });
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': entry });
 
 			// Run
-			const result = extensionState.getLastCommitsRequest('/path/to/repo');
+			const result = extensionState.getLastRepoRequests('/path/to/repo');
 
 			// Assert
 			expect(extensionContext.workspaceState.get).toHaveBeenCalledWith('lastCommitsRequests', {});
-			expect(result).toStrictEqual(request);
+			expect(result).toStrictEqual(entry);
 		});
 
 		it('Should return NULL for a repository that has not been loaded before', () => {
 			// Setup
-			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/other': request });
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/other': entry });
 
 			// Run / Assert
-			expect(extensionState.getLastCommitsRequest('/path/to/repo')).toBe(null);
+			expect(extensionState.getLastRepoRequests('/path/to/repo')).toBe(null);
 		});
 
 		it('Should return NULL when nothing has been recorded', () => {
@@ -746,59 +747,83 @@ describe('ExtensionState', () => {
 			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
 
 			// Run / Assert
-			expect(extensionState.getLastCommitsRequest('/path/to/repo')).toBe(null);
+			expect(extensionState.getLastRepoRequests('/path/to/repo')).toBe(null);
 		});
 	});
 
-	describe('setLastCommitsRequest', () => {
-		const request = {
+	describe('setLastCommitsRequest / setLastRepoInfoRequest', () => {
+		const commits = {
 			branches: null, maxCommits: 300, showTags: true, showRemoteBranches: true,
 			includeCommitsMentionedByReflogs: false, onlyFollowFirstParent: false,
 			commitOrdering: CommitOrdering.Date, hideRemotes: []
 		};
+		const repoInfo = { showRemoteBranches: true, showStashes: true, hideRemotes: [] };
 
-		it('Should record the request for the repository', () => {
+		it('Should record the commits request for the repository', () => {
 			// Setup
 			extensionContext.workspaceState.get.mockReturnValueOnce({});
 			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
 
 			// Run
-			extensionState.setLastCommitsRequest('/path/to/repo', request);
+			extensionState.setLastCommitsRequest('/path/to/repo', commits);
 
 			// Assert
-			expect(extensionContext.workspaceState.update).toHaveBeenCalledWith('lastCommitsRequests', { '/path/to/repo': request });
+			expect(extensionContext.workspaceState.update).toHaveBeenCalledWith('lastCommitsRequests', { '/path/to/repo': { repoInfo: null, commits } });
+		});
+
+		it('Should record the repo-info request for the repository', () => {
+			// Setup
+			extensionContext.workspaceState.get.mockReturnValueOnce({});
+			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
+
+			// Run
+			extensionState.setLastRepoInfoRequest('/path/to/repo', repoInfo);
+
+			// Assert
+			expect(extensionContext.workspaceState.update).toHaveBeenCalledWith('lastCommitsRequests', { '/path/to/repo': { repoInfo, commits: null } });
+		});
+
+		it('Should preserve the other half of the record when only one is updated', () => {
+			// Setup
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': { repoInfo, commits: null } });
+			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
+
+			// Run
+			extensionState.setLastCommitsRequest('/path/to/repo', commits);
+
+			// Assert
+			expect(extensionContext.workspaceState.update).toHaveBeenCalledWith('lastCommitsRequests', { '/path/to/repo': { repoInfo, commits } });
 		});
 
 		it('Should move a re-recorded repository to the most recent position', () => {
 			// Setup
-			const older = { ...request, maxCommits: 100 };
-			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': older, '/path/to/other': older });
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': { repoInfo, commits: null }, '/path/to/other': { repoInfo, commits: null } });
 			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
 
 			// Run
-			extensionState.setLastCommitsRequest('/path/to/repo', request);
+			extensionState.setLastCommitsRequest('/path/to/repo', commits);
 
 			// Assert
 			const stored = extensionContext.workspaceState.update.mock.calls[0][1];
 			expect(Object.keys(stored)).toStrictEqual(['/path/to/other', '/path/to/repo']);
-			expect(stored['/path/to/repo']).toStrictEqual(request);
+			expect(stored['/path/to/repo']).toStrictEqual({ repoInfo, commits });
 		});
 
 		it('Should drop the least recently loaded repositories beyond the cap', () => {
 			// Setup
-			const existing: { [repo: string]: typeof request } = {};
-			for (let i = 0; i < 50; i++) existing['/path/to/repo' + i] = request;
+			const existing: { [repo: string]: { repoInfo: typeof repoInfo, commits: null } } = {};
+			for (let i = 0; i < 50; i++) existing['/path/to/repo' + i] = { repoInfo, commits: null };
 			extensionContext.workspaceState.get.mockReturnValueOnce(existing);
 			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
 
 			// Run
-			extensionState.setLastCommitsRequest('/path/to/new', request);
+			extensionState.setLastCommitsRequest('/path/to/new', commits);
 
 			// Assert
 			const stored = extensionContext.workspaceState.update.mock.calls[0][1];
 			expect(Object.keys(stored).length).toBe(50);
 			expect(stored['/path/to/repo0']).toBeUndefined();
-			expect(stored['/path/to/new']).toStrictEqual(request);
+			expect(stored['/path/to/new']).toStrictEqual({ repoInfo: null, commits });
 		});
 	});
 

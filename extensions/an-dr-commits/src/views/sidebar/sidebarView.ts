@@ -11,6 +11,7 @@ import { Event } from '../../utils/event';
 import { MINI_GRAPH_LIMIT, fetchMiniGraph } from './miniGraph';
 import { renderHtml, renderLoadingHtml } from './html';
 import { RepoSelectionEvent } from '../common/repoSelection';
+import { RepoWarmer } from '../common/repoWarmer';
 import { SidebarGraphState, SidebarInitialState } from '../../types/sidebar-state';
 import { SidebarRequestMessage, SidebarResponseMessage } from '../../types/sidebar-protocol';
 
@@ -36,6 +37,7 @@ export class SidebarView implements vscode.Disposable {
 	private readonly extensionState: ExtensionState;
 	private readonly repoManager: RepoManager;
 	private readonly statusMonitor: GitStatusMonitor;
+	private readonly repoWarmer: RepoWarmer | null;
 	private readonly extensionPath: string;
 	private readonly emitRepoSelection: (event: RepoSelectionEvent) => void;
 	private readonly _disposables: vscode.Disposable[] = [];
@@ -47,7 +49,8 @@ export class SidebarView implements vscode.Disposable {
 	private _miniGraphLimit = MINI_GRAPH_LIMIT;
 	private _hasRenderedOnce = false;
 
-	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, statusMonitor: GitStatusMonitor, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void, registerProvider: boolean = true) {
+	constructor(context: vscode.ExtensionContext, dataSource: DataSource, extensionState: ExtensionState, repoManager: RepoManager, statusMonitor: GitStatusMonitor, onDidChangeRepoSelection: Event<RepoSelectionEvent>, emitRepoSelection: (event: RepoSelectionEvent) => void, registerProvider: boolean = true, repoWarmer: RepoWarmer | null = null) {
+		this.repoWarmer = repoWarmer;
 		this.dataSource = dataSource;
 		this.extensionState = extensionState;
 		this.repoManager = repoManager;
@@ -246,6 +249,11 @@ export class SidebarView implements vscode.Disposable {
 		const graph = await graphPromise;
 		if (seq !== this._refreshSeq) return;
 		await this._sendMessage({ command: 'updateGraph', graph });
+
+		// The sidebar is effectively always open, so warming here is what makes the tab open
+		// instantly even in a session where it hasn't been opened yet (see ADR-026). Deferred and
+		// deduplicated inside the warmer, so a burst of refreshes collapses into one run.
+		if (this.repoWarmer !== null) this.repoWarmer.warm(repo);
 	}
 
 	private async _handleMessage(msg: SidebarRequestMessage) {

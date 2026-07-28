@@ -53,6 +53,13 @@ export async function handleLoadRepoInfo(ctx: RepoLifecycleActionContext, msg: R
 		isRepo = root !== null;
 		if (!isRepo) repoInfo.error = null; // If the error is caused by the repo no longer existing, clear the error message
 	}
+	if (repoInfo.error === null) {
+		ctx.extensionState.setLastRepoInfoRequest(msg.repo, {
+			showRemoteBranches: msg.showRemoteBranches,
+			showStashes: msg.showStashes,
+			hideRemotes: msg.hideRemotes
+		});
+	}
 	ctx.sendMessage({
 		command: 'loadRepoInfo',
 		refreshId: msg.refreshId,

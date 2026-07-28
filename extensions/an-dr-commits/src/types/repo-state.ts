@@ -23,7 +23,25 @@ export interface LastCommitsRequest {
 	readonly hideRemotes: ReadonlyArray<string>;
 }
 
-export type LastCommitsRequestSet = { [repo: string]: LastCommitsRequest };
+/**
+ * The parameters of the repo-info load a repository was last viewed with. Recorded separately
+ * from the commits request because it arrives as its own message, and because the flags it
+ * carries decide the stashes that in turn form part of the commits request's cache key - warming
+ * with the wrong ones would populate an entry the tab never asks for.
+ */
+export interface LastRepoInfoRequest {
+	readonly showRemoteBranches: boolean;
+	readonly showStashes: boolean;
+	readonly hideRemotes: ReadonlyArray<string>;
+}
+
+/** Everything recorded about how a repository was last loaded, used to warm the cache (ADR-026). */
+export interface LastRepoRequests {
+	readonly repoInfo: LastRepoInfoRequest | null;
+	readonly commits: LastCommitsRequest | null;
+}
+
+export type LastRepoRequestSet = { [repo: string]: LastRepoRequests };
 
 export interface IssueLinkingConfig {
 	readonly issue: string;

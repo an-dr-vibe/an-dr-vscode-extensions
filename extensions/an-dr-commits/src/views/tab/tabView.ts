@@ -198,7 +198,9 @@ export class TabView extends Disposable {
 					if (this.panel.visible) {
 						// The repo file watcher was stopped while hidden, so any cached graph
 						// projection may be stale - invalidate before the refresh reloads it.
-						if (this.currentRepo !== null) this.dataSource.advanceGraphGeneration(this.currentRepo);
+						// Revalidation (ADR-025) then restores it untouched if nothing moved,
+						// which is the common case for a tab that was hidden only briefly.
+						if (this.currentRepo !== null) this.dataSource.invalidateGraph(this.currentRepo);
 						if (this.panel.webview.html.trim().length === 0) {
 							this.update();
 						} else {
@@ -331,7 +333,7 @@ export class TabView extends Disposable {
 
 	/** Refreshes only the data invalidated by a repository file event. */
 	private async respondToRepoChange(kind: RepoRefreshKind) {
-		if (this.currentRepo !== null) this.dataSource.advanceGraphGeneration(this.currentRepo);
+		if (this.currentRepo !== null) this.dataSource.invalidateGraph(this.currentRepo);
 		if (!this.panel.visible) return;
 		if (kind === 'full') {
 			this.sendMessage({ command: 'refresh' });
@@ -357,7 +359,7 @@ export class TabView extends Disposable {
 	 */
 	private async respondToMutatingMessage(msg: RequestMessage) {
 		const repo = (msg as { readonly repo?: unknown }).repo;
-		if (typeof repo === 'string') this.dataSource.advanceGraphGeneration(repo);
+		if (typeof repo === 'string') this.dataSource.invalidateGraph(repo);
 		this.repoFileWatcher.mute();
 		try {
 			await this.respondToMessage(msg);

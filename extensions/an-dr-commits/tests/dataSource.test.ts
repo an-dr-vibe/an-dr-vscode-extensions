@@ -793,23 +793,109 @@ describe('DataSource', () => {
 				const pending = new Promise<typeof projection>((resolve) => { resolveLoad = resolve; });
 				const load = jest.spyOn(dataSource as any, 'loadCommits').mockReturnValue(pending);
 
+				// Concurrent callers get their own promise (getCommits awaits revalidation before
+				// reaching the cache), but share the single underlying load.
 				const first = request(dataSource), second = request(dataSource);
-				expect(first).toBe(second);
 				resolveLoad(projection);
 				expect(await first).toBe(projection);
+				expect(await second).toBe(projection);
 				expect(load).toHaveBeenCalledTimes(1);
 			});
 
-			it('Should reload a projection after its repository generation advances', async () => {
+			it('Should reload a projection when invalidation cannot be confirmed unchanged', async () => {
 				const updated = { ...projection, head: 'updated' };
 				const load = jest.spyOn(dataSource as any, 'loadCommits')
 					.mockResolvedValueOnce(projection)
 					.mockResolvedValueOnce(updated);
+				// No fingerprint has been recorded yet, so the first invalidation cannot be
+				// confirmed and conservatively advances the generation.
+				jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
 
 				expect(await request(dataSource)).toBe(projection);
-				dataSource.advanceGraphGeneration('/path/to/repo');
+				dataSource.invalidateGraph('/path/to/repo');
 				expect(await request(dataSource)).toBe(updated);
 				expect(load).toHaveBeenCalledTimes(2);
+			});
+
+			it('Should restore projections when the fingerprint proves the repository is unchanged', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
+				jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+
+				await request(dataSource);
+				dataSource.invalidateGraph('/path/to/repo'); // records fingerprint 'a', reloads
+				await request(dataSource);
+				expect(load).toHaveBeenCalledTimes(2);
+
+				dataSource.invalidateGraph('/path/to/repo'); // 'a' matches - nothing moved
+				expect(await request(dataSource)).toBe(projection);
+				expect(load).toHaveBeenCalledTimes(2);
+			});
+
+			it('Should discard projections when the fingerprint shows the repository changed', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
+				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+
+				await request(dataSource);
+				dataSource.invalidateGraph('/path/to/repo');
+				await request(dataSource);
+				expect(load).toHaveBeenCalledTimes(2);
+
+				fingerprint.mockResolvedValue('b');
+				dataSource.invalidateGraph('/path/to/repo');
+				await request(dataSource);
+				expect(load).toHaveBeenCalledTimes(3);
+			});
+
+			it('Should discard projections when the fingerprint cannot be read', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
+				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+
+				await request(dataSource);
+				dataSource.invalidateGraph('/path/to/repo');
+				await request(dataSource);
+				expect(load).toHaveBeenCalledTimes(2);
+
+				// An unreadable repository is never confirmed - it falls back to the conservative
+				// discard that invalidation had before revalidation existed.
+				fingerprint.mockResolvedValue(null);
+				dataSource.invalidateGraph('/path/to/repo');
+				await request(dataSource);
+				expect(load).toHaveBeenCalledTimes(3);
+			});
+
+			it('Should not confirm a witness that was overtaken by a later invalidation', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
+				let resolveFingerprint!: (value: string | null) => void;
+				jest.spyOn(dataSource as any, 'computeRepoFingerprint')
+					.mockResolvedValueOnce('a')
+					.mockReturnValueOnce(new Promise<string | null>((resolve) => { resolveFingerprint = resolve; }));
+
+				await request(dataSource);
+				dataSource.invalidateGraph('/path/to/repo'); // records fingerprint 'a'
+				await request(dataSource);
+				expect(load).toHaveBeenCalledTimes(2);
+
+				// The second witness is sampled, then the repository is invalidated again before it
+				// resolves - so even though it reports the same 'a', it cannot rule out the change
+				// that prompted the second invalidation.
+				dataSource.invalidateGraph('/path/to/repo');
+				const overtaken = request(dataSource);
+				dataSource.invalidateGraph('/path/to/repo');
+				resolveFingerprint('a');
+
+				await overtaken;
+				expect(load).toHaveBeenCalledTimes(3);
+			});
+
+			it('Should deduplicate concurrent revalidations', async () => {
+				jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
+				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+
+				await request(dataSource);
+				fingerprint.mockClear();
+				dataSource.invalidateGraph('/path/to/repo');
+				await Promise.all([request(dataSource), request(dataSource)]);
+				expect(fingerprint).toHaveBeenCalledTimes(1);
 			});
 
 			it('Should not cache failed graph projections', async () => {

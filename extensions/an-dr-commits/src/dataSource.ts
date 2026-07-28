@@ -60,7 +60,11 @@ export class DataSource extends Disposable {
 	private readonly pendingRefSnapshots = new Map<string, GitRefData>();
 	private readonly graphCache = new RepositoryGraphCache<GitCommit, GitCommitData>();
 	private readonly pendingGraphProjections = new Map<string, Promise<GitCommitData>>();
-	private readonly refFingerprints = new Map<string, string>();
+	/** Canonical per-repo witness of what cached projections depend on (see ADR-025). */
+	private readonly repoFingerprints = new Map<string, string>();
+	private readonly pendingRevalidations = new Map<string, Promise<void>>();
+	/** Counts invalidations per repo, so a revalidation can detect that its witness was overtaken. */
+	private readonly invalidationEpochs = new Map<string, number>();
 	private readonly graphWarmupTimers = new Map<string, NodeJS.Timer>();
 	private readonly graphGenerationEmitter = new EventEmitter<string>();
 
@@ -169,7 +173,9 @@ export class DataSource extends Disposable {
 			// names first) so repo-info loads don't pay a serial git round-trip.
 			this.getRemoteUrls(repo).catch((): { [remoteName: string]: string } => ({}))
 		]).then((results) => {
-			this.updateGraphGeneration(repo, results[0].refs);
+			// Detecting real repository change is no longer this method's job - revalidation owns
+			// the fingerprint now (ADR-025), computed from an unfiltered snapshot so it doesn't
+			// depend on which flags a particular caller happened to pass.
 			this.pendingRefSnapshots.set(this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes), results[0].refs);
 			const remotes: string[] = results[1];
 			const fetchedUrls = results[4];
@@ -227,7 +233,10 @@ export class DataSource extends Disposable {
 	 * @param stashes An array of all stashes in the repository.
 	 * @returns The commits in the repository.
 	 */
-	public getCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
+	public async getCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
+		// Resolves an outstanding invalidation before the cache is consulted, so a repository the
+		// watcher merely *suspected* had changed can still serve its retained projections.
+		await this.ensureVerified(repo);
 		const key = this.createCommitProjectionKey({
 			branches, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs,
 			onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes
@@ -258,15 +267,89 @@ export class DataSource extends Disposable {
 		return pending;
 	}
 
-	/** Marks graph projections stale while retaining immutable commit records, and notifies subscribers (e.g. the sidebar) that repo's graph data may have changed. */
-	public advanceGraphGeneration(repo: string): void {
-		this.graphCache.advanceGeneration(repo);
+	/**
+	 * Records that a repository's graph data *may* have changed, and notifies subscribers (e.g. the
+	 * sidebar). Callers fire this on suspicion - a watcher event, the tab regaining visibility, a
+	 * mutating action - so it deliberately does not discard anything: projections are retained and
+	 * marked unverified, and the next read revalidates them against the repository (see ADR-025).
+	 * @param repo The path of the repository.
+	 */
+	public invalidateGraph(repo: string): void {
+		this.invalidationEpochs.set(repo, (this.invalidationEpochs.get(repo) ?? 0) + 1);
+		this.graphCache.markUnverified(repo);
 		this.graphGenerationEmitter.emit(repo);
 	}
 
-	/** An Event emitting the repo path whenever its graph data may have changed (see `advanceGraphGeneration`). */
-	get onDidAdvanceGraphGeneration(): Event<string> {
+	/** An Event emitting the repo path whenever its graph data may have changed (see `invalidateGraph`). */
+	get onDidInvalidateGraph(): Event<string> {
 		return this.graphGenerationEmitter.subscribe;
+	}
+
+	/**
+	 * Settles any outstanding invalidation for a repository before its cache is read.
+	 *
+	 * Recomputes the repository fingerprint and compares it with the one recorded when the
+	 * projections were stored: an identical fingerprint restores them as current (no `git log`),
+	 * a differing one advances the generation and discards them exactly as before. A repository
+	 * with no recorded fingerprint yet cannot be confirmed, so it advances - this costs one
+	 * reload on the first invalidation after a cold start, and revalidates cheaply thereafter.
+	 *
+	 * Concurrent callers share one in-flight revalidation, so the sidebar and the tab reacting to
+	 * the same watcher event don't each spawn their own.
+	 *
+	 * A witness is only trusted if no further invalidation arrived while it was being read - a
+	 * fingerprint sampled at the start of the read cannot rule out a change that happened during
+	 * it. When overtaken, the repository stays unverified (so this read still loads from Git) and
+	 * the next read revalidates against a fresh witness once the churn settles.
+	 * @param repo The path of the repository.
+	 */
+	private ensureVerified(repo: string): Promise<void> {
+		if (!this.graphCache.isUnverified(repo)) return Promise.resolve();
+
+		const existing = this.pendingRevalidations.get(repo);
+		if (existing) return existing;
+
+		const epoch = this.invalidationEpochs.get(repo) ?? 0;
+		const settle = (fingerprint: string | null) => {
+			this.pendingRevalidations.delete(repo);
+			if ((this.invalidationEpochs.get(repo) ?? 0) !== epoch) return;
+
+			// A failed witness must never confirm: fall through to advancing the generation, which
+			// is the same conservative outcome invalidation had before revalidation existed.
+			const previous = this.repoFingerprints.get(repo);
+			if (fingerprint !== null && typeof previous !== 'undefined' && previous === fingerprint) {
+				this.graphCache.confirmVerified(repo);
+			} else {
+				this.graphCache.advanceGeneration(repo);
+			}
+			if (fingerprint !== null) this.repoFingerprints.set(repo, fingerprint);
+			else this.repoFingerprints.delete(repo);
+		};
+
+		const pending = this.computeRepoFingerprint(repo).then(settle, () => settle(null));
+		this.pendingRevalidations.set(repo, pending);
+		return pending;
+	}
+
+	/**
+	 * Computes the canonical witness of everything cached projections depend on: the repository's
+	 * refs and its uncommitted-change count - the latter because `loadCommits` splices an
+	 * "Uncommitted Changes (N)" row into the projection, so refs alone are not a sufficient
+	 * witness (staging a file leaves refs byte-identical).
+	 *
+	 * The ref snapshot is deliberately taken unfiltered, so the fingerprint describes the
+	 * repository rather than whichever display flags the calling surface happened to pass.
+	 * @param repo The path of the repository.
+	 * @returns The fingerprint, or NULL if the repository could not be read.
+	 */
+	private computeRepoFingerprint(repo: string): Promise<string | null> {
+		return Promise.all([
+			this.getRefSnapshot(repo, true, true, []).then((snapshot) => snapshot.refs, (): null => null),
+			this.getWorkingTreeChangeCount(repo).catch((): null => null)
+		]).then(([refs, changeCount]) => {
+			if (refs === null || changeCount === null) return null;
+			return JSON.stringify([refs.head, refs.heads, refs.tags, refs.remotes, changeCount]);
+		});
 	}
 
 	private loadCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
@@ -472,13 +555,6 @@ export class DataSource extends Disposable {
 			commitOrdering: input.commitOrdering,
 			stashKeys: input.stashes.map((stash) => [stash.selector, stash.hash, stash.baseHash, stash.untrackedFilesHash, stash.date, stash.message].join('\0'))
 		});
-	}
-
-	private updateGraphGeneration(repo: string, refs: GitRefData): void {
-		const fingerprint = JSON.stringify([refs.head, refs.heads, refs.tags, refs.remotes]);
-		const previous = this.refFingerprints.get(repo);
-		if (typeof previous !== 'undefined' && previous !== fingerprint) this.graphCache.advanceGeneration(repo);
-		this.refFingerprints.set(repo, fingerprint);
 	}
 
 	private scheduleGraphWarmup(repo: string, projection: GitCommitData, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>, generation: number): void {

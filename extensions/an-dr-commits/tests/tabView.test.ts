@@ -468,7 +468,7 @@ describe('TabView', () => {
 		describe('RepoFileWatcher.repoChangeCallback', () => {
 			it('Should refresh the view when it\'s visible', () => {
 				// Setup
-				const spyOnAdvanceGraphGeneration = jest.spyOn(dataSource, 'advanceGraphGeneration').mockClear();
+				const spyOnInvalidateGraph = jest.spyOn(dataSource, 'invalidateGraph').mockClear();
 				TabView.createOrShow('/path/to/extension', dataSource, extensionState, avatarManager, repoManager, logger, null);
 				TabView.currentPanel!['currentRepo'] = '/path/to/repo';
 
@@ -482,7 +482,7 @@ describe('TabView', () => {
 						command: 'refresh'
 					}
 				]);
-				expect(spyOnAdvanceGraphGeneration).toHaveBeenCalledWith('/path/to/repo');
+				expect(spyOnInvalidateGraph).toHaveBeenCalledWith('/path/to/repo');
 			});
 
 			it('Should refresh only working-tree state for ordinary file changes', async () => {
@@ -538,7 +538,7 @@ describe('TabView', () => {
 			it('Should mute the file watcher while handling a repository-mutating message, and unmute it afterwards', async () => {
 				// Setup
 				const spyOnAddRemote = jest.spyOn(dataSource, 'addRemote');
-				const spyOnAdvanceGraphGeneration = jest.spyOn(dataSource, 'advanceGraphGeneration').mockClear();
+				const spyOnInvalidateGraph = jest.spyOn(dataSource, 'invalidateGraph').mockClear();
 				spyOnAddRemote.mockResolvedValueOnce(null);
 
 				// Run
@@ -553,7 +553,7 @@ describe('TabView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnAdvanceGraphGeneration).toHaveBeenCalledWith('/path/to/repo');
+					expect(spyOnInvalidateGraph).toHaveBeenCalledWith('/path/to/repo');
 					expect(spyOnRepoFileWatcherMute).toHaveBeenCalledWith();
 					expect(spyOnRepoFileWatcherUnmute).toHaveBeenCalledWith();
 				});

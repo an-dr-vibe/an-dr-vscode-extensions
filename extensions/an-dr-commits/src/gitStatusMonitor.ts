@@ -120,7 +120,7 @@ export class GitStatusMonitor extends Disposable {
 	private async refresh(kind: RepoRefreshKind) {
 		const repo = this.activeRepo;
 		if (repo === null) return;
-		this.dataSource.advanceGraphGeneration(repo);
+		this.dataSource.invalidateGraph(repo);
 		const seq = ++this.refreshSeq;
 		if (kind === 'full') {
 			const branchName = await readHeadBranchName(repo);

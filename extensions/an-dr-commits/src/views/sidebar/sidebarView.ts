@@ -80,7 +80,7 @@ export class SidebarView implements vscode.Disposable {
 		// Graph data (e.g. from a mutating action performed in the tab) can change without the
 		// monitor's own watcher noticing yet - react directly so the sidebar stays in sync with
 		// whichever view invalidated the shared graph cache first.
-		this._disposables.push(dataSource.onDidAdvanceGraphGeneration((repo) => {
+		this._disposables.push(dataSource.onDidInvalidateGraph((repo) => {
 			if (repo !== this._currentRepo) return;
 			this._scheduleRefresh();
 		}));

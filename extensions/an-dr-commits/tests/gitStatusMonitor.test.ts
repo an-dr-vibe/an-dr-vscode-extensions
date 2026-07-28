@@ -43,7 +43,7 @@ describe('GitStatusMonitor', () => {
 			getStatusCounts: jest.fn((repo: string) => Promise.resolve(repo === repo1
 				? { modified: 2, deleted: 1 }
 				: { modified: 0, deleted: 3 })),
-			advanceGraphGeneration: jest.fn()
+			invalidateGraph: jest.fn()
 		};
 
 		const monitor = new GitStatusMonitor(dataSource as any, extensionState as any, repoManager as any, repoSelections.subscribe, logger);

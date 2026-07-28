@@ -30,6 +30,13 @@ interface ProjectionEntry<TProjection> {
 
 interface RepositoryCache<TCommit, TProjection> {
 	generation: number;
+	/**
+	 * Set when something *may* have changed the repository, before any witness has confirmed it
+	 * (see ADR-025). Projections are retained while unverified, but never served as current -
+	 * `getProjection` reports them stale until `confirmVerified` or `advanceGeneration` resolves
+	 * which they are.
+	 */
+	unverified: boolean;
 	readonly commits: Map<string, TCommit>;
 	readonly projections: Map<string, ProjectionEntry<TProjection>>;
 }
@@ -59,14 +66,18 @@ export class RepositoryGraphCache<TCommit extends CacheableGraphCommit, TProject
 		private readonly maxProjectionsPerRepository: number = 24
 	) { }
 
-	/** Returns a cached projection, including stale projections suitable for immediate display. */
+	/**
+	 * Returns a cached projection, including stale projections suitable for immediate display.
+	 * A projection belonging to an unverified repository is always reported stale, so a caller
+	 * that skipped revalidation can never be handed unconfirmed data as current.
+	 */
 	public getProjection(repo: string, key: string): CachedGraphProjection<TProjection> | null {
 		const cache = this.repositories.get(repo);
 		const entry = cache?.projections.get(key);
 		if (!cache || !entry) return null;
 		cache.projections.delete(key);
 		cache.projections.set(key, entry);
-		return { projection: entry.projection, stale: entry.generation !== cache.generation };
+		return { projection: entry.projection, stale: cache.unverified || entry.generation !== cache.generation };
 	}
 
 	/** Stores an exact projection and the immutable commits learned while producing it. */
@@ -99,9 +110,32 @@ export class RepositoryGraphCache<TCommit extends CacheableGraphCommit, TProject
 		return commit;
 	}
 
+	/**
+	 * Marks the repository as possibly changed, retaining its projections pending revalidation.
+	 * Until a witness resolves it, every projection reads as stale (see ADR-025).
+	 */
+	public markUnverified(repo: string): void {
+		this.getOrCreateRepository(repo).unverified = true;
+	}
+
+	/** Returns whether the repository is awaiting revalidation. */
+	public isUnverified(repo: string): boolean {
+		return this.getOrCreateRepository(repo).unverified;
+	}
+
+	/**
+	 * Resolves an unverified repository as genuinely unchanged, restoring its retained
+	 * projections as current without re-running Git.
+	 */
+	public confirmVerified(repo: string): void {
+		this.getOrCreateRepository(repo).unverified = false;
+	}
+
 	/** Marks existing projections stale while retaining immutable commit records. */
 	public advanceGeneration(repo: string): void {
-		this.getOrCreateRepository(repo).generation++;
+		const cache = this.getOrCreateRepository(repo);
+		cache.generation++;
+		cache.unverified = false;
 	}
 
 	/** Returns the current repository generation. */
@@ -117,7 +151,7 @@ export class RepositoryGraphCache<TCommit extends CacheableGraphCommit, TProject
 	private getOrCreateRepository(repo: string): RepositoryCache<TCommit, TProjection> {
 		let cache = this.repositories.get(repo);
 		if (!cache) {
-			cache = { generation: 0, commits: new Map(), projections: new Map() };
+			cache = { generation: 0, unverified: false, commits: new Map(), projections: new Map() };
 			this.repositories.set(repo, cache);
 		}
 		return cache;

@@ -5,6 +5,7 @@
 # Whitelist files
 !LICENSE
 !NOTICE.md
+!README.md
 !CHANGELOG.md
 !package.nls*.json
 !out/

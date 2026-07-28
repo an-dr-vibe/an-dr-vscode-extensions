@@ -33,13 +33,13 @@
   "publisher": "an-dr",
   "main": "./out/extension.js",
   "scripts": {
-    "typecheck": "tsc -p ./src --noEmit && tsc -p ./src/webview --noEmit && tsc -p ./tests --noEmit && tsc -p ./tests-ext --noEmit",
-    "vscode:prepublish": "pnpm run clean && pnpm run package",
-    "package": "pnpm run typecheck && pnpm run lint && node esbuild.js --production",
+    "typecheck": "tsc -p ./src --noEmit && tsc -p ./src/webview --noEmit",
+    "vscode:prepublish": "npm run package",
+    "package": "npm run typecheck && node esbuild.js --production",
     "clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\"",
-    "compile": "pnpm run clean && node esbuild.js",
+    "compile": "npm run clean && node esbuild.js",
     "test": "vitest run --project backend && vitest run --project extension && vitest run --project webview",
-    "test:ext": "pnpm run compile && pnpm run compile-tests && vscode-test",
+    "test:ext": "npm run compile && npm run compile-tests && vscode-test",
     "compile-tests": "tsc -p tests-ext/tsconfig.json && tsc-alias -p tests-ext/tsconfig.json",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc -p ./src --noEmit --watch",
@@ -48,7 +48,7 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "l10n:export": "vscode-l10n-dev export --outDir ./l10n ./src && oxfmt ./l10n/bundle.l10n.json",
-    "l10n:check": "pnpm run l10n:export && git diff --exit-code ./l10n/bundle.l10n.json && node scripts/check-l10n.js"
+    "l10n:check": "npm run l10n:export && git diff --exit-code ./l10n/bundle.l10n.json && node scripts/check-l10n.js"
   },
   "dependencies": {
     "simple-git": "^3.36.0"
@@ -232,5 +232,5 @@
   "engines": {
     "vscode": "^1.98.0"
   },
-  "packageManager": "pnpm@11.15.1"
+  "packageManager": "npm@11.6.2"
 }

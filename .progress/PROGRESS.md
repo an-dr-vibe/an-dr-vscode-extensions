@@ -9,8 +9,8 @@
 
 ## Iterations
 
-- [ ] **MIT source foundation** (verified) — Import the current neo-git-graph MIT source, preserve the license and provenance, and establish the an-dr-com-mit-s extension identity.
-- [ ] **Repository build integration** (planned) — Adapt the imported extension to the repository-local npm and TypeScript build contract while retaining graph functionality.
+- [x] **MIT source foundation** (completed) — Import the current neo-git-graph MIT source, preserve the license and provenance, and establish the an-dr-com-mit-s extension identity.
+- [ ] **Repository build integration** (verified) — Adapt the imported extension to the repository-local npm and TypeScript build contract while retaining graph functionality.
 - [ ] **Distribution verification** (planned) — Document the extension, verify its license boundary and build, and validate installation discovery.
 
-_Last updated: 2026-07-28T21:58:59.5049756Z_
+_Last updated: 2026-07-28T22:01:14.3821845Z_

@@ -1,8 +1,29 @@
-import { BooleanOverride, FileViewType, RepoCommitOrdering } from './settings';
+import { BooleanOverride, CommitOrdering, FileViewType, RepoCommitOrdering } from './settings';
 
 export type ColumnWidth = number;
 
 export type GitRepoSet = { [repo: string]: GitRepoState };
+
+/**
+ * The parameters of the commits load a repository was last viewed with, recorded so the cache can
+ * be warmed with the request the tab is about to make (see ADR-026).
+ *
+ * Deliberately excludes `remotes` and `stashes`: both are volatile, and both are recombined at
+ * warm time from the repository info the same generation already holds - persisting them would
+ * make a recorded request go stale the moment a stash is created.
+ */
+export interface LastCommitsRequest {
+	readonly branches: ReadonlyArray<string> | null;
+	readonly maxCommits: number;
+	readonly showTags: boolean;
+	readonly showRemoteBranches: boolean;
+	readonly includeCommitsMentionedByReflogs: boolean;
+	readonly onlyFollowFirstParent: boolean;
+	readonly commitOrdering: CommitOrdering;
+	readonly hideRemotes: ReadonlyArray<string>;
+}
+
+export type LastCommitsRequestSet = { [repo: string]: LastCommitsRequest };
 
 export interface IssueLinkingConfig {
 	readonly issue: string;

@@ -69,11 +69,27 @@ export async function handleLoadRepoInfo(ctx: RepoLifecycleActionContext, msg: R
 
 export async function handleLoadCommits(ctx: RepoLifecycleActionContext, msg: RequestLoadCommits): Promise<void> {
 	ctx.setLoadCommitsRefreshId(msg.refreshId);
+	const commits = await ctx.dataSource.getCommits(msg.repo, msg.branches, msg.maxCommits, msg.showTags, msg.showRemoteBranches, msg.includeCommitsMentionedByReflogs, msg.onlyFollowFirstParent, msg.commitOrdering, msg.remotes, msg.hideRemotes, msg.stashes);
+	if (commits.error === null) {
+		// Recorded from the request the webview actually made, rather than reproduced from config
+		// and repo state in the backend - the branch selection depends on webview-side logic
+		// (`getInitialBranchesOnRepoLoad`) that would otherwise have to exist in two places.
+		ctx.extensionState.setLastCommitsRequest(msg.repo, {
+			branches: msg.branches,
+			maxCommits: msg.maxCommits,
+			showTags: msg.showTags,
+			showRemoteBranches: msg.showRemoteBranches,
+			includeCommitsMentionedByReflogs: msg.includeCommitsMentionedByReflogs,
+			onlyFollowFirstParent: msg.onlyFollowFirstParent,
+			commitOrdering: msg.commitOrdering,
+			hideRemotes: msg.hideRemotes
+		});
+	}
 	ctx.sendMessage({
 		command: 'loadCommits',
 		refreshId: msg.refreshId,
 		onlyFollowFirstParent: msg.onlyFollowFirstParent,
-		...await ctx.dataSource.getCommits(msg.repo, msg.branches, msg.maxCommits, msg.showTags, msg.showRemoteBranches, msg.includeCommitsMentionedByReflogs, msg.onlyFollowFirstParent, msg.commitOrdering, msg.remotes, msg.hideRemotes, msg.stashes)
+		...commits
 	});
 }
 

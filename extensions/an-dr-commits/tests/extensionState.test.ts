@@ -5,7 +5,7 @@ jest.mock('fs');
 
 import * as fs from 'fs';
 import { ExtensionState } from '../src/extensionState';
-import { BooleanOverride, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoState, RepoCommitOrdering } from '../src/types';
+import { BooleanOverride, CommitOrdering, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoState, RepoCommitOrdering } from '../src/types';
 import { GitExecutable } from '../src/utils';
 import { EventEmitter } from '../src/utils/event';
 
@@ -711,6 +711,94 @@ describe('ExtensionState', () => {
 
 			// Assert
 			expect(extensionContext.workspaceState.update).toHaveBeenCalledWith('lastActiveRepo', '/path/to/repo');
+		});
+	});
+
+	describe('getLastCommitsRequest', () => {
+		const request = {
+			branches: ['develop'], maxCommits: 300, showTags: true, showRemoteBranches: true,
+			includeCommitsMentionedByReflogs: false, onlyFollowFirstParent: false,
+			commitOrdering: CommitOrdering.Date, hideRemotes: []
+		};
+
+		it('Should return the recorded request for the repository', () => {
+			// Setup
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': request });
+
+			// Run
+			const result = extensionState.getLastCommitsRequest('/path/to/repo');
+
+			// Assert
+			expect(extensionContext.workspaceState.get).toHaveBeenCalledWith('lastCommitsRequests', {});
+			expect(result).toStrictEqual(request);
+		});
+
+		it('Should return NULL for a repository that has not been loaded before', () => {
+			// Setup
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/other': request });
+
+			// Run / Assert
+			expect(extensionState.getLastCommitsRequest('/path/to/repo')).toBe(null);
+		});
+
+		it('Should return NULL when nothing has been recorded', () => {
+			// Setup
+			extensionContext.workspaceState.get.mockImplementationOnce((_, defaultValue) => defaultValue);
+
+			// Run / Assert
+			expect(extensionState.getLastCommitsRequest('/path/to/repo')).toBe(null);
+		});
+	});
+
+	describe('setLastCommitsRequest', () => {
+		const request = {
+			branches: null, maxCommits: 300, showTags: true, showRemoteBranches: true,
+			includeCommitsMentionedByReflogs: false, onlyFollowFirstParent: false,
+			commitOrdering: CommitOrdering.Date, hideRemotes: []
+		};
+
+		it('Should record the request for the repository', () => {
+			// Setup
+			extensionContext.workspaceState.get.mockReturnValueOnce({});
+			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
+
+			// Run
+			extensionState.setLastCommitsRequest('/path/to/repo', request);
+
+			// Assert
+			expect(extensionContext.workspaceState.update).toHaveBeenCalledWith('lastCommitsRequests', { '/path/to/repo': request });
+		});
+
+		it('Should move a re-recorded repository to the most recent position', () => {
+			// Setup
+			const older = { ...request, maxCommits: 100 };
+			extensionContext.workspaceState.get.mockReturnValueOnce({ '/path/to/repo': older, '/path/to/other': older });
+			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
+
+			// Run
+			extensionState.setLastCommitsRequest('/path/to/repo', request);
+
+			// Assert
+			const stored = extensionContext.workspaceState.update.mock.calls[0][1];
+			expect(Object.keys(stored)).toStrictEqual(['/path/to/other', '/path/to/repo']);
+			expect(stored['/path/to/repo']).toStrictEqual(request);
+		});
+
+		it('Should drop the least recently loaded repositories beyond the cap', () => {
+			// Setup
+			const existing: { [repo: string]: typeof request } = {};
+			for (let i = 0; i < 50; i++) existing['/path/to/repo' + i] = request;
+			extensionContext.workspaceState.get.mockReturnValueOnce(existing);
+			extensionContext.workspaceState.update.mockResolvedValueOnce(null);
+
+			// Run
+			extensionState.setLastCommitsRequest('/path/to/new', request);
+
+			// Assert
+			const stored = extensionContext.workspaceState.update.mock.calls[0][1];
+			expect(Object.keys(stored).length).toBe(50);
+			expect(stored['/path/to/repo0']).toBeUndefined();
+			expect(stored['/path/to/new']).toStrictEqual(request);
 		});
 	});
 

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { Avatar, AvatarCache } from './avatarManager';
 import { getConfig } from './config';
-import { BooleanOverride, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, RepoCommitOrdering } from './types';
+import { BooleanOverride, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, LastCommitsRequest, LastCommitsRequestSet, RepoCommitOrdering } from './types';
 import { GitExecutable, getPathFromStr } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -13,9 +13,13 @@ const AVATAR_CACHE = 'avatarCache';
 const GLOBAL_VIEW_STATE = 'globalViewState';
 const IGNORED_REPOS = 'ignoredRepos';
 const LAST_ACTIVE_REPO = 'lastActiveRepo';
+const LAST_COMMITS_REQUESTS = 'lastCommitsRequests';
 const LAST_KNOWN_GIT_PATH = 'lastKnownGitPath';
 const REPO_STATES = 'repoStates';
 const WORKSPACE_VIEW_STATE = 'workspaceViewState';
+
+/** Caps the recorded commits requests, so a long-lived workspace can't grow the state unboundedly. */
+const MAX_LAST_COMMITS_REQUESTS = 50;
 
 export const DEFAULT_ACTIVITY_GRAPH_HEIGHT = 120;
 
@@ -242,6 +246,40 @@ export class ExtensionState extends Disposable {
 	public setLastActiveRepo(repo: string | null) {
 		this.updateWorkspaceState(LAST_ACTIVE_REPO, repo);
 	}
+
+	/* Last Commits Request */
+
+	/**
+	 * Get the parameters of the commits load a repository was last viewed with, used to warm the
+	 * cache with the request the tab is about to make (see ADR-026).
+	 * @param repo The path of the repository.
+	 * @returns The recorded request, or NULL if the repository has not been loaded before.
+	 */
+	public getLastCommitsRequest(repo: string): LastCommitsRequest | null {
+		return this.workspaceState.get<LastCommitsRequestSet>(LAST_COMMITS_REQUESTS, {})[repo] ?? null;
+	}
+
+	/**
+	 * Record the parameters of a successful commits load. Re-inserting the repository keeps
+	 * insertion order meaningful, so trimming drops the least recently loaded repositories.
+	 * @param repo The path of the repository.
+	 * @param request The request parameters to record.
+	 */
+	public setLastCommitsRequest(repo: string, request: LastCommitsRequest) {
+		const existing = this.workspaceState.get<LastCommitsRequestSet>(LAST_COMMITS_REQUESTS, {});
+		const updated: LastCommitsRequestSet = {};
+		for (const key of Object.keys(existing)) {
+			if (key !== repo) updated[key] = existing[key];
+		}
+		updated[repo] = request;
+
+		const keys = Object.keys(updated);
+		for (const key of keys.slice(0, Math.max(0, keys.length - MAX_LAST_COMMITS_REQUESTS))) {
+			delete updated[key];
+		}
+		return this.updateWorkspaceState(LAST_COMMITS_REQUESTS, updated);
+	}
+
 
 	/* Last Known Git Path */
 

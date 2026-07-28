@@ -10,6 +10,12 @@ body.activityChangesBody{
 	flex-direction:column;
 	overflow:hidden;
 }
+/*
+ * Revealed only once loading has taken long enough to be worth reporting, matching the tab's
+ * #initialLoadSplash - a load served from the shared cache (ADR-026) resolves well inside the
+ * delay, so the panel goes straight to its content instead of flashing a spinner on the way.
+ * The keyframes live in the tab's bundle, which the sidebar webview loads alongside its own.
+ */
 #activityLoading{
 	flex:1 1 auto;
 	display:flex;
@@ -17,6 +23,8 @@ body.activityChangesBody{
 	justify-content:center;
 	gap:8px;
 	color:var(--vscode-descriptionForeground);
+	visibility:hidden;
+	animation:commitsRevealLoadingFeedback 0s linear 1s forwards;
 }
 #activityRepo{
 	padding:5px 10px;

@@ -24,8 +24,9 @@ full architecture writeup and message-protocol data flows.
 | File | Purpose |
 |---|---|
 | `extension.ts` | Activation entry point — registers all commands, wires up every manager |
-| `dataSource.ts` | **All git command execution** — spawns git, parses output. Key methods: `getCommits()`, `getBranches()`, `getRefs()`, `getLog()` |
+| `dataSource.ts` | **All git command execution** — spawns git, parses output. Key methods: `getCommits()`, `getBranches()`, `getRefs()`, `getLog()`. Owns the caches both view surfaces share, and the fingerprint revalidation that keeps them alive across watcher noise (ADR-025 / ADR-026) |
 | `repoManager.ts` | Discovers `.git` repos in the workspace, tracks them |
+| `repositoryGraphCache.ts` | Per-repo store of immutable commits and exact graph projections, with the generation/unverified state `DataSource` revalidates against (ADR-015 / ADR-025) |
 | `commands.ts` | Command Palette / context-menu command handlers (checkout, merge, push, tag, etc.) |
 | `config.ts` | Reads VS Code settings into typed config objects |
 | `extensionState.ts` | Persists view state across sessions |

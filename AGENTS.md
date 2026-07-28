@@ -87,6 +87,26 @@ Each webview loads **only** its own bundle.
 tag/stash, commit-graph, diff/file-content, working-tree, misc) rather than inlining ~70
 case bodies in one class — see `extensions/an-dr-commits/docs/adr/ADR-004-views-reorganization-and-tabview-split.md`.
 
+## Shared view data in an-dr-commits
+
+The sidebar and the tab read through one `DataSource` (created in `core.ts`), so its caches are
+shared by construction — but sharing only pays off because of three things that are easy to
+break. See `src/views/README.md` for the fuller picture, and ADR-025 / ADR-026.
+
+- **`invalidateGraph` does not discard anything.** It marks a repository *unverified*; the next
+  read recomputes a fingerprint and either restores the cache or advances the generation for
+  real. If you add anything a cached projection depends on, it must be in either the projection
+  key or that fingerprint — the fingerprint already covers the working-tree change count because
+  projections embed an "Uncommitted Changes (N)" row. A known pre-existing gap: config values
+  like `showCommitsOnlyReferencedByTags`, mailmap and date type are in neither, so changing them
+  can serve a stale projection.
+- **`getHeadInfo` no longer spawns Git.** It derives from the same canonical unfiltered snapshot
+  `getRepoInfo` and revalidation use. Don't reintroduce direct `symbolic-ref`/`rev-parse` reads
+  for head state.
+- **Warming replays recorded parameters, it does not recompute them.** The tab's branch selection
+  is decided webview-side (`getInitialBranchesOnRepoLoad`), so `RepoWarmer` replays what the
+  webview actually asked for. Resist adding a backend copy of that logic — two copies diverge.
+
 ## Adding a new extension
 
 1. Create `extensions/<name>/` with `package.json`, `tsconfig.json`, `.vscodeignore`,

@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
 
 import { isGitRepository } from "@/backend/utils/git";
 import { evalPromises } from "@/backend/utils/promise";
@@ -10,13 +11,19 @@ async function isDirectory(path: string): Promise<boolean> {
     .catch(() => false);
 }
 
+/** Return true when a directory is a known repository or lies within one. */
+function isKnownRepositoryDirectory(directory: string, knownRepoPath: string): boolean {
+  const relativePath = path.relative(knownRepoPath, directory);
+  return relativePath === "" || (!relativePath.startsWith(`..${path.sep}`) && relativePath !== "..");
+}
+
 export async function searchDirectoryForRepos(
   directory: string,
   maxDepth: number,
   gitPath: string,
   knownRepoPaths: string[]
 ): Promise<string[]> {
-  if (knownRepoPaths.some((r) => directory === r || directory.startsWith(r + "/"))) {
+  if (knownRepoPaths.some((repoPath) => isKnownRepositoryDirectory(directory, repoPath))) {
     return [];
   }
 
@@ -36,8 +43,9 @@ export async function searchDirectoryForRepos(
 
   const dirs: string[] = [];
   for (let i = 0; i < dirContents.length; i++) {
-    if (dirContents[i] !== ".git" && (await isDirectory(directory + "/" + dirContents[i]))) {
-      dirs.push(directory + "/" + dirContents[i]);
+    const childDirectory = path.join(directory, dirContents[i]);
+    if (dirContents[i] !== ".git" && (await isDirectory(childDirectory))) {
+      dirs.push(childDirectory);
     }
   }
 

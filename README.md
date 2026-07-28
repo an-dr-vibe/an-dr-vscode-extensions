@@ -222,6 +222,24 @@ startup-critical window, and workspace reconciliation is deferred until interact
 
 ---
 
+### an-dr: Commits (MIT)
+
+An independently distributable MIT-licensed Git graph based solely on
+[neo-git-graph](https://github.com/asispts/neo-git-graph). It provides visual
+history, commit details, branch/tag actions, diffs, and multi-repository
+selection without using post-MIT Git Graph source.
+
+**Config** (`an-dr-com-mit-s.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`showStatusBarItem`|`true`|Show/hide the graph status-bar button.|
+|`statusBarIconOnly`|`true`|Show only its icon in the status bar.|
+
+Use **an-dr: Commits (MIT): View Git Graph** from the Command Palette.
+
+---
+
 ### an-dr: Extensions Grid
 
 Grid overview of every installed extension (an-dr and third-party alike, enabled or

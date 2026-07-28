@@ -114,3 +114,12 @@ break. See `src/views/README.md` for the fuller picture, and ADR-025 / ADR-026.
 2. Copy `tsconfig.json` and `.vscodeignore` from an existing extension — they are identical.
 3. Run `.\install.ps1` — it handles `npm install`, `tsc`, and junctioning.
 4. Update `README.md` and `AGENTS.md` (this file).
+
+## an-dr-com-mit-s provenance
+
+`an-dr-com-mit-s` is a separately distributed MIT fork based only on
+`asispts/neo-git-graph`. Keep its [NOTICE.md](extensions/an-dr-com-mit-s/NOTICE.md)
+and `LICENSE` intact, and do not copy implementation from `an-dr-commits` or
+post-MIT `mhutchie/vscode-git-graph`. Its standalone webview build retains the
+upstream esbuild step because it bundles browser modules; installation remains
+through the repository's standard `install.ps1` flow.

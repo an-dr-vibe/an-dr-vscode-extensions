@@ -9,7 +9,7 @@ function isPanelOpen() {
 }
 
 async function openPanel() {
-  await vscode.commands.executeCommand("neo-git-graph.view");
+  await vscode.commands.executeCommand("an-dr-com-mit-s.view");
   const deadline = Date.now() + 2000;
   while (!isPanelOpen() && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 50)); // eslint-disable-line no-await-in-loop
@@ -18,7 +18,7 @@ async function openPanel() {
 
 suite("GitGraphPanel", () => {
   suiteSetup(async () => {
-    const ext = vscode.extensions.getExtension("asispts.neo-git-graph");
+    const ext = vscode.extensions.getExtension("an-dr.an-dr-com-mit-s");
     await ext?.activate();
   });
 
@@ -41,7 +41,7 @@ suite("GitGraphPanel", () => {
     assert.ok(isPanelOpen());
 
     const tabsBefore = vscode.window.tabGroups.all.flatMap((g) => g.tabs).length;
-    await vscode.commands.executeCommand("neo-git-graph.view");
+    await vscode.commands.executeCommand("an-dr-com-mit-s.view");
     await new Promise((r) => setTimeout(r, 300));
     const tabsAfter = vscode.window.tabGroups.all.flatMap((g) => g.tabs).length;
 

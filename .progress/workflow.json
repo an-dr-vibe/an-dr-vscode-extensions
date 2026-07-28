@@ -11,8 +11,8 @@
     "done": "A new an-dr-com-mit-s extension exists, has an MIT license and attribution, compiles successfully, and can be installed by install.ps1.",
     "outOfScope": "Marketplace publication, copying restricted Git Graph revisions, and changes to the existing an-dr-commits extension."
   },
-  "currentIncrementId": "cfce077f428543e3b898d7ef36b24459",
-  "commitBaseline": "104cbe879507e5af95129ce55b6a0c1bff007134",
+  "currentIncrementId": "00cc9b1a79204216b1c93c6b2ced9985",
+  "commitBaseline": "43785aac16a173ce35909a1f467f344452634cd6",
   "increments": [
     {
       "id": "0ddf904333c54cd397899b6d1f494a9e",
@@ -24,14 +24,14 @@
     {
       "id": "cfce077f428543e3b898d7ef36b24459",
       "number": 2,
-      "status": "verified",
+      "status": "completed",
       "scope": "Repository build integration",
       "description": "Adapt the imported extension to the repository-local npm and TypeScript build contract while retaining graph functionality."
     },
     {
       "id": "00cc9b1a79204216b1c93c6b2ced9985",
       "number": 3,
-      "status": "planned",
+      "status": "verified",
       "scope": "Distribution verification",
       "description": "Document the extension, verify its license boundary and build, and validate installation discovery."
     }
@@ -102,8 +102,23 @@
       "at": "2026-07-28T22:01:14.3679093Z",
       "action": "advance",
       "detail": "Advanced from VERIFY to COMMIT."
+    },
+    {
+      "at": "2026-07-28T22:01:15.5045169Z",
+      "action": "advance",
+      "detail": "Advanced from COMMIT to BUILD."
+    },
+    {
+      "at": "2026-07-28T22:03:58.5173748Z",
+      "action": "advance",
+      "detail": "Advanced from BUILD to VERIFY."
+    },
+    {
+      "at": "2026-07-28T22:04:02.1227452Z",
+      "action": "advance",
+      "detail": "Advanced from VERIFY to COMMIT."
     }
   ],
   "createdAt": "2026-07-28T21:53:20.1017975Z",
-  "updatedAt": "2026-07-28T22:01:14.3821845Z"
+  "updatedAt": "2026-07-28T22:04:02.1360599Z"
 }

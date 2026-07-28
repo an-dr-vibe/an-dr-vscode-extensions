@@ -44,6 +44,53 @@ const GPG_STATUS_CODE_PARSING_DETAILS: Readonly<{ [statusCode: string]: GpgStatu
 	'REVKEYSIG': { status: GitSignatureStatus.GoodButMadeByRevokedKey, uid: true }
 };
 
+/** A value that is only valid while its repository stays on the generation it was read at. */
+interface GenerationScoped<T> {
+	readonly generation: number;
+	readonly value: T;
+}
+
+/**
+ * The unfiltered repository state every surface derives from: refs read without any display
+ * filtering, plus the repository's remotes. Kept caller-agnostic so one read serves the tab's
+ * repo info, the sidebar's head info, and revalidation's fingerprint alike (see ADR-026).
+ */
+interface CanonicalRepoSnapshot {
+	readonly refs: GitRefSnapshot;
+	readonly remotes: ReadonlyArray<string>;
+}
+
+/** A cached repo-info response, retaining the filtered refs that produced it for ADR-014's handoff. */
+interface CachedRepoInfo {
+	readonly info: GitRepoInfo;
+	readonly refs: GitRefData;
+	readonly refSnapshotKey: string;
+}
+
+/** A freshly-read snapshot and the fingerprint derived from it (see ADR-025). */
+interface RepoWitness {
+	readonly snapshot: CanonicalRepoSnapshot;
+	readonly fingerprint: string;
+}
+
+/**
+ * Resolves which remote an upstream ref belongs to by matching it against the repository's actual
+ * remote names, longest first. Splitting on the first '/' would be wrong for the remote names
+ * containing slashes that Git permits.
+ * @param upstreamRef The upstream ref in short form (e.g. "origin/main"), or NULL.
+ * @param remoteNames The repository's remote names.
+ * @returns The remote name, or NULL if the ref belongs to no known remote.
+ */
+function resolveUpstreamRemote(upstreamRef: string | null, remoteNames: ReadonlyArray<string>): string | null {
+	if (upstreamRef === null) return null;
+	let match: string | null = null;
+	for (const remote of remoteNames) {
+		if (!upstreamRef.startsWith(remote + '/')) continue;
+		if (match === null || remote.length > match.length) match = remote;
+	}
+	return match;
+}
+
 /**
  * Interfaces Commits with the Git executable to provide all Git integrations.
  */
@@ -65,6 +112,11 @@ export class DataSource extends Disposable {
 	private readonly pendingRevalidations = new Map<string, Promise<void>>();
 	/** Counts invalidations per repo, so a revalidation can detect that its witness was overtaken. */
 	private readonly invalidationEpochs = new Map<string, number>();
+	/** Generation-scoped repository snapshots shared by every surface (see ADR-026). */
+	private readonly canonicalSnapshots = new Map<string, GenerationScoped<CanonicalRepoSnapshot>>();
+	private readonly pendingCanonicalSnapshots = new Map<string, Promise<CanonicalRepoSnapshot>>();
+	private readonly repoInfoCache = new Map<string, GenerationScoped<CachedRepoInfo>>();
+	private readonly pendingRepoInfo = new Map<string, Promise<GitRepoInfo>>();
 	private readonly graphWarmupTimers = new Map<string, NodeJS.Timer>();
 	private readonly graphGenerationEmitter = new EventEmitter<string>();
 
@@ -162,8 +214,40 @@ export class DataSource extends Disposable {
 	 * @param hideRemotes An array of hidden remotes.
 	 * @returns The repositories information.
 	 */
-	public getRepoInfo(repo: string, showRemoteBranches: boolean, showStashes: boolean, hideRemotes: ReadonlyArray<string>): Promise<GitRepoInfo> {
+	public async getRepoInfo(repo: string, showRemoteBranches: boolean, showStashes: boolean, hideRemotes: ReadonlyArray<string>): Promise<GitRepoInfo> {
+		await this.ensureVerified(repo);
 		const showRemoteHeads = getConfig().showRemoteHeads;
+		const refSnapshotKey = this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes);
+		const cacheKey = refSnapshotKey + '\0' + (showStashes ? '1' : '0');
+		const generation = this.graphCache.getGeneration(repo);
+
+		const cached = this.repoInfoCache.get(cacheKey);
+		if (cached && cached.generation === generation) {
+			// Re-prime ADR-014's handoff, so a paired commits load that misses its own cache still
+			// avoids re-reading refs that this response already holds.
+			this.pendingRefSnapshots.set(cached.value.refSnapshotKey, cached.value.refs);
+			return cached.value.info;
+		}
+
+		const pendingKey = cacheKey + '\0' + generation;
+		const existingLoad = this.pendingRepoInfo.get(pendingKey);
+		if (existingLoad) return existingLoad;
+
+		const pending = this.loadRepoInfo(repo, showRemoteBranches, showStashes, hideRemotes, showRemoteHeads, refSnapshotKey).then((result) => {
+			this.pendingRepoInfo.delete(pendingKey);
+			if (result.info.error === null && this.graphCache.getGeneration(repo) === generation) {
+				this.repoInfoCache.set(cacheKey, { generation, value: result });
+			}
+			return result.info;
+		}, (error) => {
+			this.pendingRepoInfo.delete(pendingKey);
+			throw error;
+		});
+		this.pendingRepoInfo.set(pendingKey, pending);
+		return pending;
+	}
+
+	private loadRepoInfo(repo: string, showRemoteBranches: boolean, showStashes: boolean, hideRemotes: ReadonlyArray<string>, showRemoteHeads: boolean, refSnapshotKey: string): Promise<CachedRepoInfo> {
 		return Promise.all([
 			this.getRefSnapshot(repo, showRemoteBranches, showRemoteHeads, hideRemotes),
 			this.getRemotes(repo),
@@ -176,7 +260,7 @@ export class DataSource extends Disposable {
 			// Detecting real repository change is no longer this method's job - revalidation owns
 			// the fingerprint now (ADR-025), computed from an unfiltered snapshot so it doesn't
 			// depend on which flags a particular caller happened to pass.
-			this.pendingRefSnapshots.set(this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes), results[0].refs);
+			this.pendingRefSnapshots.set(refSnapshotKey, results[0].refs);
 			const remotes: string[] = results[1];
 			const fetchedUrls = results[4];
 			const remoteUrls: { [remoteName: string]: string | null } = {};
@@ -184,20 +268,26 @@ export class DataSource extends Disposable {
 				remoteUrls[remote] = typeof fetchedUrls[remote] === 'string' ? fetchedUrls[remote] : null;
 			}
 			return {
-				branches: results[0].branches.branches,
-				branchUpstreams: results[0].branches.branchUpstreams,
-				goneUpstreamBranches: results[0].branches.goneUpstreamBranches,
-				remoteHeadTargets: results[0].branches.remoteHeadTargets,
-				head: results[0].branches.head,
-				remotes: remotes,
-				remoteUrls: remoteUrls,
-				stashes: results[2],
-				repoInProgressState: results[3],
-				error: null
+				info: {
+					branches: results[0].branches.branches,
+					branchUpstreams: results[0].branches.branchUpstreams,
+					goneUpstreamBranches: results[0].branches.goneUpstreamBranches,
+					remoteHeadTargets: results[0].branches.remoteHeadTargets,
+					head: results[0].branches.head,
+					remotes: remotes,
+					remoteUrls: remoteUrls,
+					stashes: results[2],
+					repoInProgressState: results[3],
+					error: null
+				},
+				refs: results[0].refs,
+				refSnapshotKey
 			};
-		}).catch((errorMessage) => {
-			return { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], remoteUrls: {}, stashes: [], repoInProgressState: null, error: errorMessage };
-		});
+		}).catch((errorMessage) => ({
+			info: { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], remoteUrls: {}, stashes: [], repoInProgressState: null, error: errorMessage },
+			refs: { head: null, heads: [], tags: [], remotes: [] },
+			refSnapshotKey
+		}));
 	}
 
 	/**
@@ -310,12 +400,13 @@ export class DataSource extends Disposable {
 		if (existing) return existing;
 
 		const epoch = this.invalidationEpochs.get(repo) ?? 0;
-		const settle = (fingerprint: string | null) => {
+		const settle = (witness: RepoWitness | null) => {
 			this.pendingRevalidations.delete(repo);
 			if ((this.invalidationEpochs.get(repo) ?? 0) !== epoch) return;
 
 			// A failed witness must never confirm: fall through to advancing the generation, which
 			// is the same conservative outcome invalidation had before revalidation existed.
+			const fingerprint = witness !== null ? witness.fingerprint : null;
 			const previous = this.repoFingerprints.get(repo);
 			if (fingerprint !== null && typeof previous !== 'undefined' && previous === fingerprint) {
 				this.graphCache.confirmVerified(repo);
@@ -324,32 +415,81 @@ export class DataSource extends Disposable {
 			}
 			if (fingerprint !== null) this.repoFingerprints.set(repo, fingerprint);
 			else this.repoFingerprints.delete(repo);
+
+			// The witness was read fresh, so it describes the repository as of the generation that
+			// was just settled - publishing it here means revalidation and the surfaces' own reads
+			// share one snapshot instead of each paying for their own.
+			if (witness !== null) {
+				this.canonicalSnapshots.set(repo, { generation: this.graphCache.getGeneration(repo), value: witness.snapshot });
+			}
 		};
 
-		const pending = this.computeRepoFingerprint(repo).then(settle, () => settle(null));
+		const pending = this.computeRepoWitness(repo).then(settle, () => settle(null));
 		this.pendingRevalidations.set(repo, pending);
 		return pending;
 	}
 
 	/**
-	 * Computes the canonical witness of everything cached projections depend on: the repository's
-	 * refs and its uncommitted-change count - the latter because `loadCommits` splices an
-	 * "Uncommitted Changes (N)" row into the projection, so refs alone are not a sufficient
-	 * witness (staging a file leaves refs byte-identical).
-	 *
-	 * The ref snapshot is deliberately taken unfiltered, so the fingerprint describes the
-	 * repository rather than whichever display flags the calling surface happened to pass.
+	 * Reads the canonical repository snapshot fresh and derives the witness of everything cached
+	 * projections depend on: the repository's refs and its uncommitted-change count - the latter
+	 * because `loadCommits` splices an "Uncommitted Changes (N)" row into the projection, so refs
+	 * alone are not a sufficient witness (staging a file leaves refs byte-identical).
 	 * @param repo The path of the repository.
-	 * @returns The fingerprint, or NULL if the repository could not be read.
+	 * @returns The witness, or NULL if the repository could not be read.
 	 */
-	private computeRepoFingerprint(repo: string): Promise<string | null> {
+	private computeRepoWitness(repo: string): Promise<RepoWitness | null> {
 		return Promise.all([
-			this.getRefSnapshot(repo, true, true, []).then((snapshot) => snapshot.refs, (): null => null),
+			this.loadCanonicalSnapshot(repo).catch((): null => null),
 			this.getWorkingTreeChangeCount(repo).catch((): null => null)
-		]).then(([refs, changeCount]) => {
-			if (refs === null || changeCount === null) return null;
-			return JSON.stringify([refs.head, refs.heads, refs.tags, refs.remotes, changeCount]);
+		]).then(([snapshot, changeCount]) => {
+			if (snapshot === null || changeCount === null) return null;
+			const refs = snapshot.refs.refs;
+			return {
+				snapshot,
+				fingerprint: JSON.stringify([refs.head, refs.heads, refs.tags, refs.remotes, changeCount])
+			};
 		});
+	}
+
+	/**
+	 * Returns the repository's canonical snapshot, reading it only once per generation. Callers
+	 * must have settled any outstanding invalidation first (`ensureVerified`), so a cached
+	 * snapshot is only ever served for a repository confirmed to be on that generation.
+	 * @param repo The path of the repository.
+	 */
+	private getCanonicalSnapshot(repo: string): Promise<CanonicalRepoSnapshot> {
+		const generation = this.graphCache.getGeneration(repo);
+		const cached = this.canonicalSnapshots.get(repo);
+		if (cached && cached.generation === generation) return Promise.resolve(cached.value);
+
+		const pendingKey = repo + '\0' + generation;
+		const existing = this.pendingCanonicalSnapshots.get(pendingKey);
+		if (existing) return existing;
+
+		const pending = this.loadCanonicalSnapshot(repo).then((snapshot) => {
+			this.pendingCanonicalSnapshots.delete(pendingKey);
+			if (this.graphCache.getGeneration(repo) === generation) {
+				this.canonicalSnapshots.set(repo, { generation, value: snapshot });
+			}
+			return snapshot;
+		}, (error) => {
+			this.pendingCanonicalSnapshots.delete(pendingKey);
+			throw error;
+		});
+		this.pendingCanonicalSnapshots.set(pendingKey, pending);
+		return pending;
+	}
+
+	/**
+	 * Reads the repository's refs unfiltered, alongside its remotes. Unfiltered so the result
+	 * describes the repository rather than whichever display flags a calling surface passed.
+	 * @param repo The path of the repository.
+	 */
+	private loadCanonicalSnapshot(repo: string): Promise<CanonicalRepoSnapshot> {
+		return Promise.all([
+			this.getRefSnapshot(repo, true, true, []),
+			this.getRemotes(repo).catch((): string[] => [])
+		]).then(([refs, remotes]) => ({ refs, remotes }));
 	}
 
 	private loadCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
@@ -2459,36 +2599,32 @@ export class DataSource extends Disposable {
 	}
 
 	/**
-	 * Get the current branch, its HEAD commit, and its upstream (if any) directly from Git,
-	 * without depending on the vscode.git extension's API or its activation lifecycle.
+	 * Get the current branch, its HEAD commit, and its upstream (if any) - derived from the shared
+	 * repository snapshot rather than its own Git processes, so a surface that reads head info
+	 * costs nothing once any surface has read the repository this generation (see ADR-026).
 	 * @param repo The path of the repository.
-	 * @returns The head info, or NULL if HEAD is detached (mirrors vscode.git's `state.HEAD.name`
-	 * being undefined in that case, which callers previously relied on to short-circuit).
+	 * @returns The head info, or NULL if there is no checked out local branch (mirrors vscode.git's
+	 * `state.HEAD.name` being undefined in that case, which callers rely on to short-circuit).
 	 */
-	public getHeadInfo(repo: string): Promise<HeadInfo | null> {
-		return this.spawnGit(['symbolic-ref', '--short', 'HEAD'], repo, (stdout) => stdout.trim())
-			.catch((): null => null)
-			.then((branchName) => {
-				if (branchName === null || branchName === '') return null;
-				return Promise.all([
-					this.spawnGit(['rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch((): null => null),
-					this.spawnGit(
-						['for-each-ref', '--format=%(upstream:short)' + GIT_LOG_SEPARATOR + '%(upstream:remotename)', 'refs/heads/' + branchName],
-						repo,
-						(stdout) => {
-							const [upstreamRef, upstreamRemote] = stdout.trim().split(GIT_LOG_SEPARATOR);
-							return { upstreamRef: upstreamRef || null, upstreamRemote: upstreamRemote || null };
-						}
-					).catch(() => ({ upstreamRef: null, upstreamRemote: null })),
-					this.getRemotes(repo).catch((): string[] => [])
-				]).then(([headHash, upstream, remoteNames]) => ({
-					branchName,
-					headHash,
-					upstreamRemote: upstream.upstreamRemote,
-					upstreamRef: upstream.upstreamRef,
-					remoteNames
-				}));
-			});
+	public async getHeadInfo(repo: string): Promise<HeadInfo | null> {
+		await this.ensureVerified(repo);
+		const snapshot = await this.getCanonicalSnapshot(repo).catch((): null => null);
+		if (snapshot === null) return null;
+
+		// The parser reports a detached HEAD as the 'HEAD' sentinel and an unborn one as NULL -
+		// both are "no checked out local branch", which is what NULL means to every caller here.
+		const branchName = snapshot.refs.branches.head;
+		if (branchName === null || branchName === 'HEAD') return null;
+
+		const remoteNames = [...snapshot.remotes];
+		const upstreamRef = snapshot.refs.branches.branchUpstreams[branchName] ?? null;
+		return {
+			branchName,
+			headHash: snapshot.refs.refs.head,
+			upstreamRemote: resolveUpstreamRemote(upstreamRef, remoteNames),
+			upstreamRef,
+			remoteNames
+		};
 	}
 
 	/**

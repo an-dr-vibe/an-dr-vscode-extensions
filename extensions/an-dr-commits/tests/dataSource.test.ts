@@ -767,6 +767,128 @@ describe('DataSource', () => {
 		});
 	});
 
+	describe('repository snapshot cache', () => {
+		const makeSnapshot = (branches: Partial<{ head: string | null, branchUpstreams: { [b: string]: string } }>, headHash: string | null, remotes: string[]) => ({
+			refs: {
+				branches: {
+					branches: [], goneUpstreamBranches: [], remoteHeadTargets: {}, repoInProgressState: null, error: null,
+					head: null, branchUpstreams: {}, ...branches
+				},
+				refs: { head: headHash, heads: [], tags: [], remotes: [] }
+			},
+			remotes
+		});
+
+		describe('getHeadInfo', () => {
+			it('Should derive head info from the shared repository snapshot', async () => {
+				jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockResolvedValue(
+					makeSnapshot({ head: 'develop', branchUpstreams: { develop: 'origin/develop' } }, '1a2b3c4d', ['origin'])
+				);
+
+				expect(await dataSource.getHeadInfo('/path/to/repo')).toStrictEqual({
+					branchName: 'develop',
+					headHash: '1a2b3c4d',
+					upstreamRef: 'origin/develop',
+					upstreamRemote: 'origin',
+					remoteNames: ['origin']
+				});
+			});
+
+			it('Should return NULL when HEAD is detached', async () => {
+				// The ref parser reports a detached HEAD using the 'HEAD' sentinel.
+				jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockResolvedValue(makeSnapshot({ head: 'HEAD' }, '1a2b3c4d', ['origin']));
+
+				expect(await dataSource.getHeadInfo('/path/to/repo')).toBe(null);
+			});
+
+			it('Should return NULL when HEAD is unborn', async () => {
+				jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockResolvedValue(makeSnapshot({ head: null }, null, []));
+
+				expect(await dataSource.getHeadInfo('/path/to/repo')).toBe(null);
+			});
+
+			it('Should return NULL with no upstream remote when the branch has no upstream', async () => {
+				jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockResolvedValue(makeSnapshot({ head: 'develop' }, '1a2b3c4d', ['origin']));
+
+				expect(await dataSource.getHeadInfo('/path/to/repo')).toMatchObject({ upstreamRef: null, upstreamRemote: null });
+			});
+
+			it('Should resolve the upstream remote for remote names containing a slash', async () => {
+				// Splitting on the first '/' would resolve this to 'team', not 'team/fork'.
+				jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockResolvedValue(
+					makeSnapshot({ head: 'develop', branchUpstreams: { develop: 'team/fork/develop' } }, '1a2b3c4d', ['team', 'team/fork'])
+				);
+
+				expect(await dataSource.getHeadInfo('/path/to/repo')).toMatchObject({ upstreamRemote: 'team/fork' });
+			});
+
+			it('Should return NULL when the repository cannot be read', async () => {
+				jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockRejectedValue('error message');
+
+				expect(await dataSource.getHeadInfo('/path/to/repo')).toBe(null);
+			});
+
+			it('Should read the repository only once per generation', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadCanonicalSnapshot').mockResolvedValue(makeSnapshot({ head: 'develop' }, '1a2b3c4d', []));
+
+				await dataSource.getHeadInfo('/path/to/repo');
+				await dataSource.getHeadInfo('/path/to/repo');
+				await Promise.all([dataSource.getHeadInfo('/path/to/repo'), dataSource.getHeadInfo('/path/to/repo')]);
+				expect(load).toHaveBeenCalledTimes(1);
+			});
+		});
+
+		describe('getRepoInfo', () => {
+			const cached = {
+				info: { branches: ['develop'], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: 'develop', remotes: [], remoteUrls: {}, stashes: [], repoInProgressState: null, error: null },
+				refs: { head: null, heads: [], tags: [], remotes: [] },
+				refSnapshotKey: 'key'
+			};
+
+			it('Should reuse a cached response within a generation', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadRepoInfo').mockResolvedValue(cached);
+
+				expect(await dataSource.getRepoInfo('/path/to/repo', true, true, [])).toBe(cached.info);
+				expect(await dataSource.getRepoInfo('/path/to/repo', true, true, [])).toBe(cached.info);
+				expect(load).toHaveBeenCalledTimes(1);
+			});
+
+			it('Should deduplicate concurrent loads', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadRepoInfo').mockResolvedValue(cached);
+
+				await Promise.all([dataSource.getRepoInfo('/path/to/repo', true, true, []), dataSource.getRepoInfo('/path/to/repo', true, true, [])]);
+				expect(load).toHaveBeenCalledTimes(1);
+			});
+
+			it('Should cache separately per request flags', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadRepoInfo').mockResolvedValue(cached);
+
+				await dataSource.getRepoInfo('/path/to/repo', true, true, []);
+				await dataSource.getRepoInfo('/path/to/repo', true, false, []);
+				expect(load).toHaveBeenCalledTimes(2);
+			});
+
+			it('Should reload after the repository is confirmed changed', async () => {
+				const load = jest.spyOn(dataSource as any, 'loadRepoInfo').mockResolvedValue(cached);
+				jest.spyOn(dataSource as any, 'computeRepoWitness').mockResolvedValue(null);
+
+				await dataSource.getRepoInfo('/path/to/repo', true, true, []);
+				dataSource.invalidateGraph('/path/to/repo');
+				await dataSource.getRepoInfo('/path/to/repo', true, true, []);
+				expect(load).toHaveBeenCalledTimes(2);
+			});
+
+			it('Should not cache a failed response', async () => {
+				const failed = { ...cached, info: { ...cached.info, error: 'error message' } };
+				const load = jest.spyOn(dataSource as any, 'loadRepoInfo').mockResolvedValue(failed);
+
+				await dataSource.getRepoInfo('/path/to/repo', true, true, []);
+				await dataSource.getRepoInfo('/path/to/repo', true, true, []);
+				expect(load).toHaveBeenCalledTimes(2);
+			});
+		});
+	});
+
 	describe('getCommits', () => {
 		beforeEach(() => {
 			mockLegacyCommitRefProvider(dataSource);
@@ -779,6 +901,17 @@ describe('DataSource', () => {
 		describe('graph projection cache', () => {
 			const projection = { commits: [], head: null, tags: [], moreCommitsAvailable: false, error: null };
 			const request = (source: DataSource) => source.getCommits('/path/to/repo', ['main'], 300, true, true, false, false, CommitOrdering.Date, ['origin'], [], []);
+			/** A stubbed revalidation witness - only its fingerprint matters to these tests. */
+			const witness = (fingerprint: string) => ({
+				fingerprint,
+				snapshot: {
+					refs: {
+						branches: { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, repoInProgressState: null, error: null },
+						refs: { head: null, heads: [], tags: [], remotes: [] }
+					},
+					remotes: []
+				}
+			});
 
 			it('Should reuse a successful graph projection', async () => {
 				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
@@ -809,7 +942,7 @@ describe('DataSource', () => {
 					.mockResolvedValueOnce(updated);
 				// No fingerprint has been recorded yet, so the first invalidation cannot be
 				// confirmed and conservatively advances the generation.
-				jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+				jest.spyOn(dataSource as any, 'computeRepoWitness').mockResolvedValue(witness('a'));
 
 				expect(await request(dataSource)).toBe(projection);
 				dataSource.invalidateGraph('/path/to/repo');
@@ -819,7 +952,7 @@ describe('DataSource', () => {
 
 			it('Should restore projections when the fingerprint proves the repository is unchanged', async () => {
 				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
-				jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+				jest.spyOn(dataSource as any, 'computeRepoWitness').mockResolvedValue(witness('a'));
 
 				await request(dataSource);
 				dataSource.invalidateGraph('/path/to/repo'); // records fingerprint 'a', reloads
@@ -833,14 +966,14 @@ describe('DataSource', () => {
 
 			it('Should discard projections when the fingerprint shows the repository changed', async () => {
 				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
-				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoWitness').mockResolvedValue(witness('a'));
 
 				await request(dataSource);
 				dataSource.invalidateGraph('/path/to/repo');
 				await request(dataSource);
 				expect(load).toHaveBeenCalledTimes(2);
 
-				fingerprint.mockResolvedValue('b');
+				fingerprint.mockResolvedValue(witness('b'));
 				dataSource.invalidateGraph('/path/to/repo');
 				await request(dataSource);
 				expect(load).toHaveBeenCalledTimes(3);
@@ -848,7 +981,7 @@ describe('DataSource', () => {
 
 			it('Should discard projections when the fingerprint cannot be read', async () => {
 				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
-				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoWitness').mockResolvedValue(witness('a'));
 
 				await request(dataSource);
 				dataSource.invalidateGraph('/path/to/repo');
@@ -865,10 +998,10 @@ describe('DataSource', () => {
 
 			it('Should not confirm a witness that was overtaken by a later invalidation', async () => {
 				const load = jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
-				let resolveFingerprint!: (value: string | null) => void;
-				jest.spyOn(dataSource as any, 'computeRepoFingerprint')
-					.mockResolvedValueOnce('a')
-					.mockReturnValueOnce(new Promise<string | null>((resolve) => { resolveFingerprint = resolve; }));
+				let resolveFingerprint!: (value: ReturnType<typeof witness> | null) => void;
+				jest.spyOn(dataSource as any, 'computeRepoWitness')
+					.mockResolvedValueOnce(witness('a'))
+					.mockReturnValueOnce(new Promise((resolve) => { resolveFingerprint = resolve; }));
 
 				await request(dataSource);
 				dataSource.invalidateGraph('/path/to/repo'); // records fingerprint 'a'
@@ -881,7 +1014,7 @@ describe('DataSource', () => {
 				dataSource.invalidateGraph('/path/to/repo');
 				const overtaken = request(dataSource);
 				dataSource.invalidateGraph('/path/to/repo');
-				resolveFingerprint('a');
+				resolveFingerprint(witness('a'));
 
 				await overtaken;
 				expect(load).toHaveBeenCalledTimes(3);
@@ -889,7 +1022,7 @@ describe('DataSource', () => {
 
 			it('Should deduplicate concurrent revalidations', async () => {
 				jest.spyOn(dataSource as any, 'loadCommits').mockResolvedValue(projection);
-				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoFingerprint').mockResolvedValue('a');
+				const fingerprint = jest.spyOn(dataSource as any, 'computeRepoWitness').mockResolvedValue(witness('a'));
 
 				await request(dataSource);
 				fingerprint.mockClear();

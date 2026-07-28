@@ -1,0 +1,17 @@
+# Ignore everything
+*
+*/**
+
+# Whitelist files
+!LICENSE
+!NOTICE.md
+!CHANGELOG.md
+!package.nls*.json
+!out/
+!media/
+!l10n/
+
+!resources/icon.png
+!resources/webview-icon.svg
+!resources/webview-icon-dark.svg
+!resources/webview-icon-light.svg

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "flow": "DetailedAuto",
+  "phase": "COMMIT",
+  "baseBranch": "main",
+  "baseCommit": "3d955d4c2d6402ceaff128f2780f7f645c25a564",
+  "featureBranch": "feature/an-dr-com-mit-s",
+  "requirements": {
+    "goal": "Create an an-dr commit-graph extension distributable under MIT terms.",
+    "constraints": "Use only the MIT-licensed neo-git-graph codebase and its dependencies; preserve required notices; retain cross-platform VS Code support; do not reuse restricted-source code; keep the extension self-contained.",
+    "done": "A new an-dr-com-mit-s extension exists, has an MIT license and attribution, compiles successfully, and can be installed by install.ps1.",
+    "outOfScope": "Marketplace publication, copying restricted Git Graph revisions, and changes to the existing an-dr-commits extension."
+  },
+  "currentIncrementId": "0ddf904333c54cd397899b6d1f494a9e",
+  "commitBaseline": "3d955d4c2d6402ceaff128f2780f7f645c25a564",
+  "increments": [
+    {
+      "id": "0ddf904333c54cd397899b6d1f494a9e",
+      "number": 1,
+      "status": "verified",
+      "scope": "MIT source foundation",
+      "description": "Import the current neo-git-graph MIT source, preserve the license and provenance, and establish the an-dr-com-mit-s extension identity."
+    },
+    {
+      "id": "cfce077f428543e3b898d7ef36b24459",
+      "number": 2,
+      "status": "planned",
+      "scope": "Repository build integration",
+      "description": "Adapt the imported extension to the repository-local npm and TypeScript build contract while retaining graph functionality."
+    },
+    {
+      "id": "00cc9b1a79204216b1c93c6b2ced9985",
+      "number": 3,
+      "status": "planned",
+      "scope": "Distribution verification",
+      "description": "Document the extension, verify its license boundary and build, and validate installation discovery."
+    }
+  ],
+  "approvals": [],
+  "history": [
+    {
+      "at": "2026-07-28T21:53:20.1690797Z",
+      "action": "start",
+      "detail": "Started DetailedAuto workflow."
+    },
+    {
+      "at": "2026-07-28T21:53:21.9867697Z",
+      "action": "advance",
+      "detail": "Advanced from START to DESIGN."
+    },
+    {
+      "at": "2026-07-28T21:54:22.0519707Z",
+      "action": "advance",
+      "detail": "Advanced from DESIGN to SPLIT."
+    },
+    {
+      "at": "2026-07-28T21:54:23.0141933Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 1: MIT source foundation"
+    },
+    {
+      "at": "2026-07-28T21:54:23.9576247Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 2: Repository build integration"
+    },
+    {
+      "at": "2026-07-28T21:54:24.842247Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 3: Distribution verification"
+    },
+    {
+      "at": "2026-07-28T21:54:25.4259375Z",
+      "action": "advance",
+      "detail": "Advanced from SPLIT to BRANCH."
+    },
+    {
+      "at": "2026-07-28T21:58:38.3204327Z",
+      "action": "advance",
+      "detail": "Advanced from BRANCH to BUILD."
+    },
+    {
+      "at": "2026-07-28T21:58:46.7137552Z",
+      "action": "advance",
+      "detail": "Advanced from BUILD to VERIFY."
+    },
+    {
+      "at": "2026-07-28T21:58:59.4906035Z",
+      "action": "advance",
+      "detail": "Advanced from VERIFY to COMMIT."
+    }
+  ],
+  "createdAt": "2026-07-28T21:53:20.1017975Z",
+  "updatedAt": "2026-07-28T21:58:59.5049756Z"
+}

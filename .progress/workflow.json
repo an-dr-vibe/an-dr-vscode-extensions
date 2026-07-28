@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "flow": "DetailedAuto",
-  "phase": "COMMIT",
+  "phase": "FINAL_REVIEW",
   "baseBranch": "main",
   "baseCommit": "3d955d4c2d6402ceaff128f2780f7f645c25a564",
   "featureBranch": "feature/an-dr-com-mit-s",
@@ -11,8 +11,8 @@
     "done": "A new an-dr-com-mit-s extension exists, has an MIT license and attribution, compiles successfully, and can be installed by install.ps1.",
     "outOfScope": "Marketplace publication, copying restricted Git Graph revisions, and changes to the existing an-dr-commits extension."
   },
-  "currentIncrementId": "00cc9b1a79204216b1c93c6b2ced9985",
-  "commitBaseline": "43785aac16a173ce35909a1f467f344452634cd6",
+  "currentIncrementId": null,
+  "commitBaseline": null,
   "increments": [
     {
       "id": "0ddf904333c54cd397899b6d1f494a9e",
@@ -31,7 +31,7 @@
     {
       "id": "00cc9b1a79204216b1c93c6b2ced9985",
       "number": 3,
-      "status": "verified",
+      "status": "completed",
       "scope": "Distribution verification",
       "description": "Document the extension, verify its license boundary and build, and validate installation discovery."
     }
@@ -117,8 +117,18 @@
       "at": "2026-07-28T22:04:02.1227452Z",
       "action": "advance",
       "detail": "Advanced from VERIFY to COMMIT."
+    },
+    {
+      "at": "2026-07-28T22:04:03.1855231Z",
+      "action": "advance",
+      "detail": "Advanced from COMMIT to SUMMARY."
+    },
+    {
+      "at": "2026-07-28T22:04:27.4166313Z",
+      "action": "advance",
+      "detail": "Advanced from SUMMARY to FINAL_REVIEW."
     }
   ],
   "createdAt": "2026-07-28T21:53:20.1017975Z",
-  "updatedAt": "2026-07-28T22:04:02.1360599Z"
+  "updatedAt": "2026-07-28T22:04:27.4308283Z"
 }

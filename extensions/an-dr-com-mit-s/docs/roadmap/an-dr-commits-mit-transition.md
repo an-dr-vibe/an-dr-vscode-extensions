@@ -181,7 +181,7 @@ that makes the migration easier, but no current Commits file content moves over.
 | Git credential prompts: `src/askpass/*` | No equivalent | `src/askpass/*` | **94% baseline** — reimplement. Blocks any authenticated fetch/pull/push, see backlog 6. |
 | Git interactive editor: `src/gitEditor/*` | No equivalent | `src/gitEditor/*` | **19% baseline, `REVIEW`** — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 6. |
 | Install/uninstall life cycle: `src/life-cycle/*` | No equivalent | `src/life-cycle/*` | **86% baseline** — reimplement; the `vscode:uninstall` hook must exist before cutover. |
-| Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*` | No equivalent | `src/views/sidebar/*`, `web/sidebar/*` | **0.7% baseline, `YOURS`** across 9 files — relicense and move after tab parity. |
+| Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*` | No equivalent | `src/views/sidebar/*`, `web/sidebar/*` | **0.7% baseline, `YOURS`** across 9 files — relicense and move, ordered by the import graph rather than by feature; see *Porting locally authored code*. |
 | Inline blame: `src/inlineBlame.ts` | No equivalent | `src/inlineBlame.ts` | **0% baseline, `YOURS`** — relicense and move, with its test. |
 | Code review hand-off: `src/views/tab/miscActions.ts` | No equivalent | `src/codeReviewIntegration.ts` | **0% baseline, `YOURS`** — relicense and move. The whole contract is one outbound `executeCommand('an-dr-code-review.setCommitRange', from, to, repo)`; nothing is persisted on this side. |
 
@@ -207,6 +207,99 @@ Before feature work begins, the staging extension must:
 6. Keep all added files traceable to MIT staging files or newly authored code.
 7. Keep browser code in `web/` and extension-host code in `src/` with no
    cross-world imports.
+
+## Porting locally authored code
+
+A `YOURS` verdict means the *expression* is relicensable. It does not mean the
+file compiles once moved. Measured over the 47 `YOURS` source files:
+
+| | Files |
+| --- | ---: |
+| Compile standalone — every relative import is also `YOURS` | 31 |
+| Blocked — at least one import resolves into `BASELINE`/`REVIEW` | 16 |
+
+The blockers concentrate in a handful of modules:
+
+| Blocking module | Files needing it | Verdict |
+| --- | ---: | --- |
+| `src/dataSource.ts` | 9 | BASELINE |
+| `src/utils.ts` | 6 | BASELINE |
+| `src/repoManager.ts` | 5 | BASELINE |
+| `src/config.ts` | 4 | BASELINE |
+| `src/logger.ts` | 4 | BASELINE |
+| `src/utils/event.ts` | 4 | BASELINE (100%) |
+| `src/utils/disposable.ts` | 3 | BASELINE |
+| `src/types/base.ts` | 3 | BASELINE |
+| `src/types/message-protocol.ts` | 3 | BASELINE |
+
+**Port order follows the import graph, not the feature grouping.** Move the 31
+standalone files first; each blocked file becomes portable only once every
+module it imports has an MIT equivalent. Recompute this classification after
+each group lands rather than trusting the snapshot above.
+
+### Symbol mapping
+
+Every symbol the blocked files import from a non-`YOURS` module, and what it
+becomes. "Author it" means no MIT equivalent exists and the replacement is new
+code — never a copy of the baseline original.
+
+| Old import | MIT equivalent |
+| --- | --- |
+| `utils/event` → `Event`, `EventEmitter` | `vscode.EventEmitter` / `vscode.Event` from the VS Code API |
+| `utils/disposable` → `Disposable`, `toDisposable` | `vscode.Disposable` |
+| `logger` → `Logger` | `logger` in `src/extension/utils/logger.ts` |
+| `config` → `getConfig` | the `config` object in `src/config.ts` |
+| `extensionState` → `ExtensionState` | `ExtensionState` in `src/extensionState.ts` |
+| `avatarManager` → `AvatarManager` | `AvatarManager` in `src/avatarManager.ts` |
+| `repoFileWatcher` → `RepoFileWatcher` | `RepoFileWatcher` in `src/repoFileWatcher.ts` |
+| `repoManager` → `RepoManager` | `createRepoManager` in `src/extension/repoManager.ts` — a factory, not a class |
+| `utils` → `abbrevCommit` | `src/backend/utils/string.ts` |
+| `utils` → `getPathFromUri` | `src/backend/utils/path.ts` |
+| `utils` → `copyToClipboard` | `src/extension/utils/clipboard.ts` |
+| `utils` → `viewDiff` | `encodeDiffDocUri` from `src/diffDocProvider.ts` plus `vscode.diff`; see `viewDiff` in `messageHandler.ts` |
+| `dataSource` → `DataSource` | No equivalent shape. MIT is function-based: `loadCommits(git, input)`, `loadBranches(...)`, `commitDetails(...)`, with `gitClientFactory` supplying the `SimpleGit` instance |
+| `utils` → `UNCOMMITTED`, `archive`, `viewScm`, `viewFileAtRevision`, `viewDiffWithWorkingFile`, `copyFilePathToClipboard`, `openFile`, `openExternalUrl`, `openExtensionSettings`, `showErrorMessage`, `getSortedRepositoryPaths`, `getRelativeTimeDiff` | Author it |
+| `dataSource` → `GitChangeCounts`, `GitWorkingTreeChange`, `HeadInfo`, `BlameLineInfo`, `GitConfigKey`, `GitCommitDetailsData` | Author it, on `src/backend/types/*` |
+| `types/base`, `types/settings`, `types/message-protocol`, `types/git-domain` | Author it, on `src/types.ts` and `src/backend/types/*` |
+
+The `DataSource` row is the hard one: a class with methods becomes free
+functions taking an explicit git handle. Every blocked file touching it needs
+its call sites restructured, which is why it blocks the most files and why the
+first port of any group is pattern-establishing work rather than mechanical.
+
+### Worked example: `src/views/sidebar/sidebarView.ts`
+
+305 lines, 0.7% baseline — as portable as anything in the project, and still not
+movable today. Its 16 imports split:
+
+- **Move with it, already `YOURS`:** `./miniGraph`, `./html`,
+  `../common/repoSelection`, `../../gitStatusMonitor`,
+  `../../types/sidebar-state`, `../../types/sidebar-protocol`
+- **Already in MIT staging, retarget the import:** `../../config`,
+  `../../extensionState`
+- **Restructure the call sites:** `../../dataSource` (`DataSource`,
+  `GitChangeCounts`, `GitWorkingTreeChange`, `HeadInfo`), `../../repoManager`
+- **Author first:** `../../utils` (`UNCOMMITTED`, `viewDiff`,
+  `viewSubmoduleDiff`), `../../utils/event` (`Event`)
+- **Audit the `+` hunks:** `../common/repoWarmer` (`REVIEW`)
+
+So group A's real prerequisite is not backlog 4 alone: it needs the MIT
+`DataSource` replacement and the authored `utils` subset first. Sequence the
+group behind those, and port `sidebarView.ts` last within it, after the six
+files that move with it.
+
+### Who executes what
+
+| Kind of work | Executor |
+| --- | --- |
+| Symbol mapping, and the first port in each group | Pattern-establishing — the primary agent |
+| Remaining ports in a group, once the pattern exists | Mechanical — delegatable |
+| Every `VERIFY` pass and the reachability check | Primary agent, never delegated |
+| Reimplementation of `BASELINE` services | Pattern-establishing — primary agent |
+
+A delegated port follows an existing example in the same group and changes no
+API decisions. If a port needs a new mapping-table row, it is not mechanical and
+comes back to the primary agent.
 
 ## Compatibility inventory method
 
@@ -296,8 +389,26 @@ No settings work starts before this is complete.
 ### 1. Establish the compatibility ledger
 
 1. Create command, settings, state, and scenario inventory documents.
-2. Add a machine-readable feature ledger with `id`, `surface`, `status`,
-   `target`, and `test` fields.
+2. Add a machine-readable feature ledger at
+   `docs/roadmap/compatibility/feature-ledger.json`. One object per row, with
+   `status` drawn from the four labels above:
+
+   ```json
+   [
+     {
+       "id": "an-dr-commits.addGitRepository",
+       "surface": "command",
+       "status": "New implementation",
+       "target": "command adapter for an-dr-commits.addGitRepository",
+       "test": "tests-ext/compatibility.test.ts"
+     }
+   ]
+   ```
+
+   A prior version of this file, covering all 9 commands and 139 settings,
+   survives at the `archive/mit-cutover` tag and is worth recovering rather than
+   retyping — but re-derive every `status` from the current staging extension,
+   since that copy was written against a tree that no longer exists.
 3. Record which capabilities are already offered by the MIT staging extension.
 4. Record the cutover constraints and rollback procedure.
 
@@ -350,10 +461,19 @@ window reloads and linked worktrees.
 
 The largest block of ready-made functionality, and the point at which the
 staging extension stops being a demo. Everything here is `YOURS`: it moves,
-adapted to the MIT APIs, and is not rewritten. Repository lifecycle (backlog 4)
-is the only prerequisite.
+adapted to the MIT APIs, and is not rewritten.
 
-Port in this order, each group its own commit series:
+**Prerequisites are per file, not per group.** Read *Porting locally authored
+code* before starting: 31 of the 47 portable files compile standalone and can
+move as soon as backlog 2 gives them somewhere to live, while 16 are blocked
+until the modules they import have MIT equivalents — chiefly the `DataSource`
+replacement, the authored `utils` subset, and `RepoManager`. Those blocked files
+land late, some of them only after backlogs 7 and 8.
+
+Do not treat a group as a unit of scheduling. Within each group, port the
+standalone files first and the blocked ones as their dependencies appear.
+
+Groups, for grouping related review and testing — not for ordering:
 
 | Group | Files | Lines |
 | --- | --- | ---: |

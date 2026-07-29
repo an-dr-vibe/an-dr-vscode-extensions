@@ -1,0 +1,29 @@
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent;" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="281px" height="280px" viewBox="-0.5 -0.5 281 280" content="&lt;mxfile&gt;&lt;diagram id=&quot;bB-4c1l4kwXjOMZYHuKL&quot; name=&quot;Page-1&quot;&gt;7VjLctsgFP0aL+NBoBfLSLaTTWc6k0XbJbGwxAQLD8avfn0hIEtYfjVNnCyaTcThItA5597LeIDy+fZBkkX1TRSUDyAotgM0GkB4FyZQ/zPIziJxEFqglKywUNACT+w3dSBw6IoVdOkFKiG4YgsfnIq6plPlYURKsfHDZoL7uy5ISXvA05TwPvqDFaqyaBqBFn+krKyanQPgZp7J9KWUYlW7/WpRUzszJ81rXOiyIoXYdCA0HqBcCqHs03ybU25obRiz6yYnZvdHlrRW1yyAyK5YE75yn+0OpnYND69fQs2CYICyTcUUfVqQqZndaOU1Vqk5d9NLJcULzQUXUiOvX96ADYn6SCgjnJW1Hkz1QakOzdZUKqbJv3cTc1YU5gTZTNRqQuaMGxs9Ur6mJs5NONcE0I2bjQs6IyuuKcg4eaY82yvSD5gxzht0ANF4NI4yTVfWp9Kxa05Ktx3IUftAxZwqudMhbhaHTuZd4+zUjjetn2DqYqqOl/YgcR4u9+9uxdQPTs8TZkh6UtJCO9wNhVSVKEVN+LhFu1L6uvvCaqJGOc50Rh+qi76WurQu7k0taM2okQkzpI1AX32M83xyVv2lWMmpo9MRrIgsaRMVW8wwfdYiknKi2NqvNcfkdku/C6ZPsrdWAJJgmIZJHEYhxChuzuKcBmM8xBAAHRElGAYw8jewX+He2VpKU0V2nbCFCVieO0XsOxxGB/XmYAHGZ+P1gz1Ca/A9Zdd5Pvw3z2u15e6n88br4JcZDKNmONp2J0c7N7qQK3kOQBz/z5WDXEE3ypUABcM4DcIQhCHab3vjVNlfD65MlSBIPjhXruj9eoW+btHLfZ8sF/YONmNbkweeWbxrwOW0gDajlNZcmAS4w+B9+rE2gtYat0Uz9dszAkMAUJAmmmqM416vjo+06vg9OnX82UqcaOYfpgSOvqQQ6RU6dNqJY9PrHxdK6GGlPlFSewIBEOYYH+8gb62/+FblFwTDjtQJ9sta6IkdJelV9ffYNtB30eEl2n57701vKJ34s/P1hB0+rnKC8EsmbHIrIV45N389Ndr70+20gMPIz6HmWt2hPIn6lCfRX1Ouh+3PETZV2p970PgP&lt;/diagram&gt;&lt;/mxfile&gt;">
+    <defs/>
+    <g>
+        <g>
+            <rect x="0" y="0" width="280" height="280" rx="42" ry="42" fill="#ede5bf" stroke="none" pointer-events="all" style="fill: light-dark(rgb(237, 229, 191), rgb(49, 42, 9));"/>
+        </g>
+        <g>
+            <path d="M 130.63 183.19 L 122.5 151.68 Q 120 142 110 142 L 60 142 Q 50 142 50 132 L 50 82" fill="none" stroke="#dc9b14" stroke-width="30" stroke-miterlimit="10" pointer-events="stroke" style="stroke: light-dark(rgb(220, 155, 20), rgb(153, 97, 0));"/>
+        </g>
+        <g>
+            <path d="M 148.82 183.05 L 157.37 151.65 Q 160 142 170 142 L 220 142 Q 230 142 230 132 L 230 82" fill="none" stroke="#cc0066" stroke-width="30" stroke-miterlimit="10" pointer-events="stroke" style="stroke: light-dark(rgb(204, 0, 102), rgb(255, 150, 238));"/>
+        </g>
+        <g>
+            <ellipse cx="230" cy="52" rx="30" ry="30" fill="none" stroke="#cc0066" stroke-width="20" transform="rotate(-90,230,52)" pointer-events="all" style="stroke: light-dark(rgb(204, 0, 102), rgb(255, 150, 238));"/>
+        </g>
+        <g>
+            <ellipse cx="50" cy="52" rx="30" ry="30" fill="none" stroke="#dc9b14" stroke-width="20" transform="rotate(-90,50,52)" pointer-events="all" style="stroke: light-dark(rgb(220, 155, 20), rgb(153, 97, 0));"/>
+        </g>
+        <g>
+            <path d="M 140 182 L 140 82" fill="none" stroke="#004c99" stroke-width="30" stroke-miterlimit="10" pointer-events="stroke" style="stroke: light-dark(rgb(0, 76, 153), rgb(125, 190, 255));"/>
+        </g>
+        <g>
+            <ellipse cx="140" cy="52" rx="30" ry="30" fill="none" stroke="#004c99" stroke-width="20" transform="rotate(-90,140,52)" pointer-events="all" style="stroke: light-dark(rgb(0, 76, 153), rgb(125, 190, 255));"/>
+        </g>
+        <g>
+            <ellipse cx="140" cy="219.5" rx="37.5" ry="37.5" fill="#000000" stroke="#000000" stroke-width="20" transform="rotate(-90,140,219.5)" pointer-events="all" style="fill: light-dark(rgb(0, 0, 0), rgb(237, 237, 237)); stroke: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));"/>
+        </g>
+    </g>
+</svg>

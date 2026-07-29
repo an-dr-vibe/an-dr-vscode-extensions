@@ -1,0 +1,9 @@
+# Excluded from install.ps1 while the MIT transition is in progress.
+#
+# This extension is a staging codebase, not something to run day to day: it
+# duplicates much of an-dr-commits' surface and is meant to be built and tested
+# deliberately, not linked into the editor alongside the extension it will
+# eventually replace.
+#
+# Delete this file at cutover, when it takes over the an-dr-commits identity.
+# See docs/roadmap/an-dr-commits-mit-transition.md.

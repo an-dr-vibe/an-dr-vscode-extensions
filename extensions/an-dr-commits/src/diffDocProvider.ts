@@ -1,88 +1,161 @@
-import * as vscode from "vscode";
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { DataSource } from './dataSource';
+import { GitFileStatus } from './types';
+import { UNCOMMITTED, getPathFromStr, showErrorMessage } from './utils';
+import { Disposable, toDisposable } from './utils/disposable';
 
-import { GitInstance } from "./backend/gitClient";
-import { getPathFromStr } from "./backend/utils/path";
-import { EXTENSION_ID } from "./extension/constant/const";
-
-export class DiffDocProvider implements vscode.TextDocumentContentProvider {
-  public static scheme = EXTENSION_ID;
-  private gitClient: GitInstance;
-  private onDidChangeEventEmitter = new vscode.EventEmitter<vscode.Uri>();
-  private docs = new Map<string, DiffDocument>();
-  private subscriptions: vscode.Disposable;
-
-  constructor(gitClient: GitInstance) {
-    this.gitClient = gitClient;
-    this.subscriptions = vscode.workspace.onDidCloseTextDocument((doc) =>
-      this.docs.delete(doc.uri.toString())
-    );
-  }
-
-  public dispose() {
-    this.subscriptions.dispose();
-    this.docs.clear();
-    this.onDidChangeEventEmitter.dispose();
-  }
-
-  get onDidChange() {
-    return this.onDidChangeEventEmitter.event;
-  }
-
-  public provideTextDocumentContent(uri: vscode.Uri): string | Thenable<string> {
-    let document = this.docs.get(uri.toString());
-    if (document) {
-      return document.value;
-    }
-
-    let request = decodeDiffDocUri(uri);
-    return this.gitClient()
-      .cwd(request.repo)
-      .show([`${request.commit}:${request.filePath}`])
-      .catch(() => "")
-      .then((data) => {
-        let doc = new DiffDocument(data);
-        this.docs.set(uri.toString(), doc);
-        return doc.value;
-      });
-  }
+export const enum DiffSide {
+	Old,
+	New
 }
 
+/**
+ * Manages providing a specific revision of a repository file for use in the Visual Studio Code Diff View.
+ */
+export class DiffDocProvider extends Disposable implements vscode.TextDocumentContentProvider {
+	public static scheme = 'an-dr-commits';
+	private readonly dataSource: DataSource;
+	private readonly docs = new Map<string, DiffDocument>();
+	private readonly onDidChangeEventEmitter = new vscode.EventEmitter<vscode.Uri>();
+
+	/**
+	 * Creates the Commits Diff Document Provider.
+	 * @param dataSource The Commits DataSource instance.
+	 */
+	constructor(dataSource: DataSource) {
+		super();
+		this.dataSource = dataSource;
+
+		this.registerDisposables(
+			vscode.workspace.onDidCloseTextDocument((doc) => this.docs.delete(doc.uri.toString())),
+			this.onDidChangeEventEmitter,
+			toDisposable(() => this.docs.clear())
+		);
+	}
+
+	/**
+	 * An event to signal a resource has changed.
+	 */
+	get onDidChange() {
+		return this.onDidChangeEventEmitter.event;
+	}
+
+	/**
+	 * Provides the content of a text document at a specific Git revision.
+	 * @param uri The `an-dr-commits://file.ext?encoded-data` URI.
+	 * @returns The content of the text document.
+	 */
+	public provideTextDocumentContent(uri: vscode.Uri): string | Thenable<string> {
+		const document = this.docs.get(uri.toString());
+		if (document) {
+			return document.value;
+		}
+
+		const request = decodeDiffDocUri(uri);
+		if (request.content !== undefined) {
+			const document = new DiffDocument(request.content);
+			this.docs.set(uri.toString(), document);
+			return document.value;
+		}
+		if (!request.exists) {
+			// Return empty file (used for one side of added / deleted file diff)
+			return '';
+		}
+
+		return this.dataSource.getCommitFile(request.repo, request.commit, request.filePath).then(
+			(contents) => {
+				const document = new DiffDocument(contents);
+				this.docs.set(uri.toString(), document);
+				return document.value;
+			},
+			(errorMessage) => {
+				showErrorMessage('Unable to retrieve file: ' + errorMessage);
+				return '';
+			}
+		);
+	}
+}
+
+/**
+ * Represents the content of a Diff Document.
+ */
 class DiffDocument {
-  private body: string;
+	private readonly body: string;
 
-  constructor(body: string) {
-    this.body = body;
-  }
+	/**
+	 * Creates a Diff Document with the specified content.
+	 * @param body The content of the document.
+	 */
+	constructor(body: string) {
+		this.body = body;
+	}
 
-  get value() {
-    return this.body;
-  }
+	/**
+	 * Get the content of the Diff Document.
+	 */
+	get value() {
+		return this.body;
+	}
 }
 
-export function encodeDiffDocUri(repo: string, path: string, commit: string): vscode.Uri {
-  return vscode.Uri.parse(
-    DiffDocProvider.scheme +
-      ":" +
-      getPathFromStr(path) +
-      "?commit=" +
-      encodeURIComponent(commit) +
-      "&repo=" +
-      encodeURIComponent(repo)
-  );
+
+/* Encoding and decoding URI's */
+
+/**
+ * Represents the data passed through `an-dr-commits://file.ext?encoded-data` URI's by the DiffDocProvider.
+ */
+type DiffDocUriData = {
+	filePath: string;
+	commit: string;
+	repo: string;
+	exists: boolean;
+	/** Pre-rendered content used when a Git object cannot be read as a file blob. */
+	content?: string;
+};
+
+/**
+ * Produce the URI of a file to be used in the Visual Studio Diff View.
+ * @param repo The repository the file is within.
+ * @param filePath The path of the file.
+ * @param commit The commit hash specifying the revision of the file.
+ * @param type The Git file status of the change.
+ * @param diffSide The side of the Diff View that this URI will be displayed on.
+ * @returns A URI of the form `an-dr-commits://file.ext?encoded-data` or `file://path/file.ext`
+ */
+export function encodeDiffDocUri(repo: string, filePath: string, commit: string, type: GitFileStatus, diffSide: DiffSide, content?: string): vscode.Uri {
+	if (commit === UNCOMMITTED && type !== GitFileStatus.Deleted) {
+		return vscode.Uri.file(path.join(repo, filePath));
+	}
+
+	const fileDoesNotExist = (diffSide === DiffSide.Old && type === GitFileStatus.Added) || (diffSide === DiffSide.New && type === GitFileStatus.Deleted);
+	const data: DiffDocUriData = {
+		filePath: getPathFromStr(filePath),
+		commit: commit,
+		repo: repo,
+		exists: !fileDoesNotExist,
+		content
+	};
+
+	let extension: string;
+	if (fileDoesNotExist) {
+		extension = '';
+	} else {
+		const extIndex = data.filePath.indexOf('.', data.filePath.lastIndexOf('/') + 1);
+		extension = extIndex > -1 ? data.filePath.substring(extIndex) : '';
+	}
+
+	return vscode.Uri.file('file' + extension).with({
+		scheme: DiffDocProvider.scheme,
+		query: Buffer.from(JSON.stringify(data)).toString('base64')
+	});
 }
 
-export function decodeDiffDocUri(uri: vscode.Uri) {
-  let queryArgs = decodeUriQueryArgs(uri.query);
-  return { filePath: uri.path, commit: queryArgs.commit, repo: queryArgs.repo };
-}
-
-function decodeUriQueryArgs(query: string) {
-  let queryComps = query.split("&"),
-    queryArgs: { [key: string]: string } = {},
-    i;
-  for (i = 0; i < queryComps.length; i++) {
-    let pair = queryComps[i].split("=");
-    queryArgs[pair[0]] = decodeURIComponent(pair[1]);
-  }
-  return queryArgs;
+/**
+ * Decode the data from a `an-dr-commits://file.ext?encoded-data` URI.
+ * @param uri The URI to decode data from.
+ * @returns The decoded DiffDocUriData.
+ */
+export function decodeDiffDocUri(uri: vscode.Uri): DiffDocUriData {
+	return JSON.parse(Buffer.from(uri.query, 'base64').toString());
 }

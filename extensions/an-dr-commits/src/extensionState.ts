@@ -1,86 +1,414 @@
-import * as fs from "node:fs";
+import * as fs from 'fs';
+import * as vscode from 'vscode';
+import { Avatar, AvatarCache } from './avatarManager';
+import { getConfig } from './config';
+import { BooleanOverride, ErrorInfo, FileViewType, CommitsViewGlobalState, CommitsViewWorkspaceState, GitRepoSet, GitRepoState, LastCommitsRequest, LastRepoInfoRequest, LastRepoRequestSet, LastRepoRequests, RepoCommitOrdering } from './types';
+import { GitExecutable, getPathFromStr } from './utils';
+import { Disposable } from './utils/disposable';
+import { Event } from './utils/event';
 
-import { ExtensionContext, Memento } from "vscode";
+const ACTIVITY_GRAPH_HEIGHT = 'activityGraphHeight';
+const AVATAR_STORAGE_FOLDER = '/avatars';
+const AVATAR_CACHE = 'avatarCache';
+const GLOBAL_VIEW_STATE = 'globalViewState';
+const IGNORED_REPOS = 'ignoredRepos';
+const LAST_ACTIVE_REPO = 'lastActiveRepo';
+const LAST_COMMITS_REQUESTS = 'lastCommitsRequests';
+const LAST_KNOWN_GIT_PATH = 'lastKnownGitPath';
+const REPO_STATES = 'repoStates';
+const WORKSPACE_VIEW_STATE = 'workspaceViewState';
 
-import { getPathFromStr } from "./backend/utils/path";
-import { Avatar, AvatarCache, GitRepoSet } from "./types";
+/** Caps the recorded commits requests, so a long-lived workspace can't grow the state unboundedly. */
+const MAX_LAST_COMMITS_REQUESTS = 50;
 
-const AVATAR_STORAGE_FOLDER = "/avatars";
-const AVATAR_CACHE = "avatarCache";
-const LAST_ACTIVE_REPO = "lastActiveRepo";
-const REPO_STATES = "repoStates";
+export const DEFAULT_ACTIVITY_GRAPH_HEIGHT = 120;
 
-export class ExtensionState {
-  private globalState: Memento;
-  private workspaceState: Memento;
-  private globalStoragePath: string;
-  private avatarStorageAvailable: boolean = false;
+export const DEFAULT_REPO_STATE: GitRepoState = {
+	commitDetailsViewDivider: 0.5,
+	commitDetailsViewHeight: 250,
+	commitDetailsViewTopRowRatio: 0.45,
+	fullDiffCompact: false,
+	fullDiffPanelHeight: 250,
+	columnWidths: null,
+	commitOrdering: RepoCommitOrdering.Default,
+	fileViewType: FileViewType.Default,
+	hideRemotes: [],
+	includeCommitsMentionedByReflogs: BooleanOverride.Default,
+	issueLinkingConfig: null,
+	lastImportAt: 0,
+	name: null,
+	onlyFollowFirstParent: BooleanOverride.Default,
+	onRepoLoadShowCheckedOutBranch: BooleanOverride.Default,
+	onRepoLoadShowSpecificBranches: null,
+	pullRequestConfig: null,
+	showRemoteBranches: true,
+	showRemoteBranchesV2: BooleanOverride.Default,
+	showStashes: BooleanOverride.Default,
+	showTags: BooleanOverride.Default,
+	starred: false,
+	workspaceFolderIndex: null
+};
 
-  constructor(context: ExtensionContext) {
-    this.globalState = context.globalState;
-    this.workspaceState = context.workspaceState;
+const DEFAULT_GIT_GRAPH_VIEW_GLOBAL_STATE: CommitsViewGlobalState = {
+	alwaysAcceptCheckoutCommit: false,
+	fullDiffViewMode: 'sideBySide',
+	issueLinkingConfig: null,
+	pushTagSkipRemoteCheck: false,
+	filesPanelWidth: 220,
+	filesPanelHidden: false
+};
 
-    this.globalStoragePath = getPathFromStr(context.globalStoragePath);
-    fs.stat(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err) => {
-      if (!err) {
-        this.avatarStorageAvailable = true;
-      } else {
-        fs.mkdir(this.globalStoragePath, () => {
-          fs.mkdir(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (mkdirErr) => {
-            if (!mkdirErr) {
-              this.avatarStorageAvailable = true;
-            }
-          });
-        });
-      }
-    });
-  }
+const DEFAULT_GIT_GRAPH_VIEW_WORKSPACE_STATE: CommitsViewWorkspaceState = {
+	findIsCaseSensitive: false,
+	findIsRegex: false,
+	findOpenCommitDetailsView: false
+};
 
-  /* Discovered Repos */
-  public getRepos() {
-    return this.workspaceState.get<GitRepoSet>(REPO_STATES, {});
-  }
-  public saveRepos(gitRepoSet: GitRepoSet) {
-    this.workspaceState.update(REPO_STATES, gitRepoSet);
-  }
+/**
+ * Manages the Commits Extension State, which stores data in both the Visual Studio Code Global & Workspace State.
+ */
+export class ExtensionState extends Disposable {
+	private readonly globalState: vscode.Memento;
+	private readonly workspaceState: vscode.Memento;
+	private readonly globalStoragePath: string;
+	private avatarStorageAvailable: boolean = false;
 
-  /* Last Active Repo */
-  public getLastActiveRepo() {
-    return this.workspaceState.get<string | null>(LAST_ACTIVE_REPO, null);
-  }
-  public setLastActiveRepo(repo: string | null) {
-    this.workspaceState.update(LAST_ACTIVE_REPO, repo);
-  }
+	/**
+	 * Creates the Commits Extension State.
+	 * @param context The context of the extension.
+	 * @param onDidChangeGitExecutable The Event emitting the Git executable for Commits to use.
+	 */
+	constructor(context: vscode.ExtensionContext, onDidChangeGitExecutable: Event<GitExecutable>) {
+		super();
+		this.globalState = context.globalState;
+		this.workspaceState = context.workspaceState;
 
-  /* Avatars */
-  public isAvatarStorageAvailable() {
-    return this.avatarStorageAvailable;
-  }
-  public getAvatarStoragePath() {
-    return this.globalStoragePath + AVATAR_STORAGE_FOLDER;
-  }
-  public getAvatarCache() {
-    return this.globalState.get<AvatarCache>(AVATAR_CACHE, {});
-  }
-  public saveAvatar(email: string, avatar: Avatar) {
-    let avatars = this.getAvatarCache();
-    avatars[email] = avatar;
-    this.globalState.update(AVATAR_CACHE, avatars);
-  }
-  public removeAvatarFromCache(email: string) {
-    let avatars = this.getAvatarCache();
-    delete avatars[email];
-    this.globalState.update(AVATAR_CACHE, avatars);
-  }
-  public clearAvatarCache() {
-    this.globalState.update(AVATAR_CACHE, {});
-    fs.readdir(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err, files) => {
-      if (err) {
-        return;
-      }
-      for (let i = 0; i < files.length; i++) {
-        fs.unlink(this.globalStoragePath + AVATAR_STORAGE_FOLDER + "/" + files[i], () => {});
-      }
-    });
-  }
+		this.globalStoragePath = getPathFromStr(context.globalStoragePath);
+		fs.stat(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err) => {
+			if (!err) {
+				this.avatarStorageAvailable = true;
+			} else {
+				fs.mkdir(this.globalStoragePath, () => {
+					fs.mkdir(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err) => {
+						if (!err || err.code === 'EEXIST') {
+							// The directory was created, or it already exists
+							this.avatarStorageAvailable = true;
+						}
+					});
+				});
+			}
+		});
+
+		this.registerDisposable(
+			onDidChangeGitExecutable((gitExecutable) => {
+				this.setLastKnownGitPath(gitExecutable.path);
+			})
+		);
+	}
+
+
+	/* Known Repositories */
+
+	/**
+	 * Get the known repositories in the current workspace.
+	 * @returns The set of repositories.
+	 */
+	public getRepos() {
+		const repoSet = this.workspaceState.get<GitRepoSet>(REPO_STATES, {});
+		const outputSet: GitRepoSet = {};
+		let showRemoteBranchesDefaultValue: boolean | null = null;
+		Object.keys(repoSet).forEach((repo) => {
+			outputSet[repo] = Object.assign({}, DEFAULT_REPO_STATE, repoSet[repo]);
+			if (typeof repoSet[repo].showRemoteBranchesV2 === 'undefined' && typeof repoSet[repo].showRemoteBranches !== 'undefined') {
+				if (showRemoteBranchesDefaultValue === null) {
+					showRemoteBranchesDefaultValue = getConfig().showRemoteBranches;
+				}
+				if (repoSet[repo].showRemoteBranches !== showRemoteBranchesDefaultValue) {
+					outputSet[repo].showRemoteBranchesV2 = repoSet[repo].showRemoteBranches ? BooleanOverride.Enabled : BooleanOverride.Disabled;
+				}
+			}
+		});
+		return outputSet;
+	}
+
+	/**
+	 * Set the known repositories in the current workspace.
+	 * @param gitRepoSet The set of repositories.
+	 */
+	public saveRepos(gitRepoSet: GitRepoSet) {
+		this.updateWorkspaceState(REPO_STATES, gitRepoSet);
+	}
+
+	/**
+	 * Transfer state references from one known repository to another.
+	 * @param oldRepo The repository to transfer state from.
+	 * @param newRepo The repository to transfer state to.
+	 */
+	public transferRepo(oldRepo: string, newRepo: string) {
+		if (this.getLastActiveRepo() === oldRepo) {
+			this.setLastActiveRepo(newRepo);
+		}
+	}
+
+
+	/* Global View State */
+
+	/**
+	 * Get the global state of the Commits View.
+	 * @returns The global state.
+	 */
+	public getGlobalViewState() {
+		const globalViewState = this.globalState.get<CommitsViewGlobalState>(GLOBAL_VIEW_STATE, DEFAULT_GIT_GRAPH_VIEW_GLOBAL_STATE);
+		return Object.assign({}, DEFAULT_GIT_GRAPH_VIEW_GLOBAL_STATE, globalViewState);
+	}
+
+	/**
+	 * Set the global state of the Commits View.
+	 * @param state The global state.
+	 */
+	public setGlobalViewState(state: CommitsViewGlobalState) {
+		return this.updateGlobalState(GLOBAL_VIEW_STATE, state);
+	}
+
+
+	/* Workspace View State */
+
+	/**
+	 * Get the workspace state of the Commits View.
+	 * @returns The workspace state.
+	 */
+	public getWorkspaceViewState() {
+		const workspaceViewState = this.workspaceState.get<CommitsViewWorkspaceState>(WORKSPACE_VIEW_STATE, DEFAULT_GIT_GRAPH_VIEW_WORKSPACE_STATE);
+		return Object.assign({}, DEFAULT_GIT_GRAPH_VIEW_WORKSPACE_STATE, workspaceViewState);
+	}
+
+	/**
+	 * Set the workspace state of the Commits View.
+	 * @param state The workspace state.
+	 */
+	public setWorkspaceViewState(state: CommitsViewWorkspaceState) {
+		return this.updateWorkspaceState(WORKSPACE_VIEW_STATE, state);
+	}
+
+
+	/* Ignored Repos */
+
+	/**
+	 * Get the ignored repositories in the current workspace.
+	 * @returns An array of the paths of ignored repositories.
+	 */
+	public getIgnoredRepos() {
+		return this.workspaceState.get<string[]>(IGNORED_REPOS, []);
+	}
+
+	/**
+	 * Set the ignored repositories in the current workspace.
+	 * @param ignoredRepos An array of the paths of ignored repositories.
+	 */
+	public setIgnoredRepos(ignoredRepos: string[]) {
+		return this.updateWorkspaceState(IGNORED_REPOS, ignoredRepos);
+	}
+
+
+	/* Activity Bar Graph Height */
+
+	/**
+	 * Get the persisted height of the Activity Bar mini commit graph.
+	 * @returns The height in pixels.
+	 */
+	public getActivityGraphHeight() {
+		return this.globalState.get<number>(ACTIVITY_GRAPH_HEIGHT, DEFAULT_ACTIVITY_GRAPH_HEIGHT);
+	}
+
+	/**
+	 * Set the persisted height of the Activity Bar mini commit graph.
+	 * @param height The height in pixels.
+	 */
+	public setActivityGraphHeight(height: number) {
+		return this.updateGlobalState(ACTIVITY_GRAPH_HEIGHT, height);
+	}
+
+
+	/* Last Active Repo */
+
+	/**
+	 * Get the last active repository in the current workspace.
+	 * @returns The path of the last active repository.
+	 */
+	public getLastActiveRepo() {
+		return this.workspaceState.get<string | null>(LAST_ACTIVE_REPO, null);
+	}
+
+	/**
+	 * Set the last active repository in the current workspace.
+	 * @param repo The path of the last active repository.
+	 */
+	public setLastActiveRepo(repo: string | null) {
+		this.updateWorkspaceState(LAST_ACTIVE_REPO, repo);
+	}
+
+	/* Last Repository Requests */
+
+	/**
+	 * Get how a repository was last loaded, used to warm the cache with the requests the tab is
+	 * about to make (see ADR-026).
+	 * @param repo The path of the repository.
+	 * @returns The recorded requests, or NULL if the repository has not been loaded before.
+	 */
+	public getLastRepoRequests(repo: string): LastRepoRequests | null {
+		return this.workspaceState.get<LastRepoRequestSet>(LAST_COMMITS_REQUESTS, {})[repo] ?? null;
+	}
+
+	/**
+	 * Record the parameters of a successful repo-info load.
+	 * @param repo The path of the repository.
+	 * @param request The request parameters to record.
+	 */
+	public setLastRepoInfoRequest(repo: string, request: LastRepoInfoRequest) {
+		return this.updateLastRepoRequests(repo, (existing) => ({ repoInfo: request, commits: existing?.commits ?? null }));
+	}
+
+	/**
+	 * Record the parameters of a successful commits load.
+	 * @param repo The path of the repository.
+	 * @param request The request parameters to record.
+	 */
+	public setLastCommitsRequest(repo: string, request: LastCommitsRequest) {
+		return this.updateLastRepoRequests(repo, (existing) => ({ repoInfo: existing?.repoInfo ?? null, commits: request }));
+	}
+
+	/**
+	 * Merges a change into a repository's recorded requests. Re-inserting the repository keeps
+	 * insertion order meaningful, so trimming drops the least recently loaded repositories.
+	 */
+	private updateLastRepoRequests(repo: string, change: (existing: LastRepoRequests | null) => LastRepoRequests) {
+		const existing = this.workspaceState.get<LastRepoRequestSet>(LAST_COMMITS_REQUESTS, {});
+		const updated: LastRepoRequestSet = {};
+		for (const key of Object.keys(existing)) {
+			if (key !== repo) updated[key] = existing[key];
+		}
+		updated[repo] = change(existing[repo] ?? null);
+
+		const keys = Object.keys(updated);
+		for (const key of keys.slice(0, Math.max(0, keys.length - MAX_LAST_COMMITS_REQUESTS))) {
+			delete updated[key];
+		}
+		return this.updateWorkspaceState(LAST_COMMITS_REQUESTS, updated);
+	}
+
+
+	/* Last Known Git Path */
+
+	/**
+	 * Get the last known path of the Git executable used by Commits.
+	 * @returns The path of the Git executable.
+	 */
+	public getLastKnownGitPath() {
+		return this.globalState.get<string | null>(LAST_KNOWN_GIT_PATH, null);
+	}
+
+	/**
+	 * Set the last known path of the Git executable used by Commits.
+	 * @param path The path of the Git executable.
+	 */
+	private setLastKnownGitPath(path: string) {
+		this.updateGlobalState(LAST_KNOWN_GIT_PATH, path);
+	}
+
+
+	/* Avatars */
+
+	/**
+	 * Checks whether the Avatar Storage Folder is available to store avatars.
+	 * @returns TRUE => Avatar Storage Folder is available, FALSE => Avatar Storage Folder isn't available.
+	 */
+	public isAvatarStorageAvailable() {
+		return this.avatarStorageAvailable;
+	}
+
+	/**
+	 * Gets the path that is used to store avatars globally in Commits.
+	 * @returns The folder path.
+	 */
+	public getAvatarStoragePath() {
+		return this.globalStoragePath + AVATAR_STORAGE_FOLDER;
+	}
+
+	/**
+	 * Gets the cache of avatars known to Commits.
+	 * @returns The avatar cache.
+	 */
+	public getAvatarCache() {
+		return this.globalState.get<AvatarCache>(AVATAR_CACHE, {});
+	}
+
+	/**
+	 * Add a new avatar to the cache of avatars known to Commits.
+	 * @param email The email address that the avatar is for.
+	 * @param avatar The details of the avatar.
+	 */
+	public saveAvatar(email: string, avatar: Avatar) {
+		let avatars = this.getAvatarCache();
+		avatars[email] = avatar;
+		this.updateGlobalState(AVATAR_CACHE, avatars);
+	}
+
+	/**
+	 * Removes an avatar from the cache of avatars known to Commits.
+	 * @param email The email address of the avatar to remove.
+	 */
+	public removeAvatarFromCache(email: string) {
+		let avatars = this.getAvatarCache();
+		delete avatars[email];
+		this.updateGlobalState(AVATAR_CACHE, avatars);
+	}
+
+	/**
+	 * Clear all avatars from the cache of avatars known to Commits.
+	 * @returns A Thenable resolving to the ErrorInfo that resulted from executing this method.
+	 */
+	public clearAvatarCache() {
+		return this.updateGlobalState(AVATAR_CACHE, {}).then((errorInfo) => {
+			if (errorInfo === null) {
+				fs.readdir(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err, files) => {
+					if (err) return;
+					for (let i = 0; i < files.length; i++) {
+						fs.unlink(this.globalStoragePath + AVATAR_STORAGE_FOLDER + '/' + files[i], () => { });
+					}
+				});
+			}
+			return errorInfo;
+		});
+	}
+
+
+	/* Update State Memento's */
+
+	/**
+	 * Update the Commits Global State with a new <key, value> pair.
+	 * @param key The key.
+	 * @param value The value.
+	 * @returns A Thenable resolving to the ErrorInfo that resulted from updating the Global State.
+	 */
+	private updateGlobalState(key: string, value: any): Thenable<ErrorInfo> {
+		return this.globalState.update(key, value).then(
+			() => null,
+			() => 'Visual Studio Code was unable to save the Commits Global State Memento.'
+		);
+	}
+
+	/**
+	 * Update the Commits Workspace State with a new <key, value> pair.
+	 * @param key The key.
+	 * @param value The value.
+	 * @returns A Thenable resolving to the ErrorInfo that resulted from updating the Workspace State.
+	 */
+	private updateWorkspaceState(key: string, value: any): Thenable<ErrorInfo> {
+		return this.workspaceState.update(key, value).then(
+			() => null,
+			() => 'Visual Studio Code was unable to save the Commits Workspace State Memento.'
+		);
+	}
 }
+
+

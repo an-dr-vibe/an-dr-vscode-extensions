@@ -65,12 +65,51 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 
 ## Building web code in an-dr-commits
 
-`an-dr-commits` is the final MIT-derived extension. Its browser UI lives in
-`src/webview/` and is bundled by `esbuild.js`; run `npm run compile` after a webview
-change. Do not revive the retired `web/` concatenation pipeline.
+`an-dr-commits` has a two-step web build: TypeScript compiles to individual JS files in
+`media/`, then `package-web.js` concatenates and uglifies them into **two** bundles
+(deleting the individual files afterwards):
 
-The extension has no dependency on VS Code's built-in Git extension. Keep repository
-discovery, selection, graph refresh, and status changes inside its own services.
+- `media/out.min.js` / `out.min.css` — the tab webview (`web/main.ts` + `web/*`), loaded by
+  `TabView` (`src/views/tab/`).
+- `media/sidebar.min.js` / `sidebar.min.css` — the sidebar webview (`web/sidebar/main.ts` +
+  `web/sidebar/*`), loaded by `SidebarView` (`src/views/sidebar/`).
+
+Both bundles include everything under `web/common/` (shared browser-side helpers with no
+`import`/`export` — see `extensions/an-dr-commits/docs/adr/ADR-003-shared-browser-module-and-sidebar-webview-bundle.md`),
+so a file placed there must compile standalone in both bundles' concatenated global scope.
+Each webview loads **only** its own bundle.
+
+- **Always use `npm run compile-web`** (or the full `npm run compile`) after editing
+  anything under `web/`. Running bare `tsc -p web/tsconfig.json` produces individual JS
+  files that neither webview loads — changes will appear to have no effect.
+- For a readable bundle during debugging, use `npm run compile-web-debug`.
+- `install.ps1` runs `npm run compile` and is already correct; this applies to manual
+  dev iteration only.
+
+`src/views/tab/`'s message-handling switch (`TabView.respondToMessage`) delegates to seven
+`views/tab/*Actions.ts` modules grouped by message category (repo lifecycle, branch/remote,
+tag/stash, commit-graph, diff/file-content, working-tree, misc) rather than inlining ~70
+case bodies in one class — see `extensions/an-dr-commits/docs/adr/ADR-004-views-reorganization-and-tabview-split.md`.
+
+## Shared view data in an-dr-commits
+
+The sidebar and the tab read through one `DataSource` (created in `core.ts`), so its caches are
+shared by construction — but sharing only pays off because of three things that are easy to
+break. See `src/views/README.md` for the fuller picture, and ADR-025 / ADR-026.
+
+- **`invalidateGraph` does not discard anything.** It marks a repository *unverified*; the next
+  read recomputes a fingerprint and either restores the cache or advances the generation for
+  real. If you add anything a cached projection depends on, it must be in either the projection
+  key or that fingerprint — the fingerprint already covers the working-tree change count because
+  projections embed an "Uncommitted Changes (N)" row. A known pre-existing gap: config values
+  like `showCommitsOnlyReferencedByTags`, mailmap and date type are in neither, so changing them
+  can serve a stale projection.
+- **`getHeadInfo` no longer spawns Git.** It derives from the same canonical unfiltered snapshot
+  `getRepoInfo` and revalidation use. Don't reintroduce direct `symbolic-ref`/`rev-parse` reads
+  for head state.
+- **Warming replays recorded parameters, it does not recompute them.** The tab's branch selection
+  is decided webview-side (`getInitialBranchesOnRepoLoad`), so `RepoWarmer` replays what the
+  webview actually asked for. Resist adding a backend copy of that logic — two copies diverge.
 
 ## Adding a new extension
 
@@ -80,16 +119,16 @@ discovery, selection, graph refresh, and status changes inside its own services.
 3. Run `.\install.ps1` — it handles `npm install`, `tsc`, and junctioning.
 4. Update `README.md` and `AGENTS.md` (this file).
 
-## an-dr-commits provenance
+## an-dr-com-mit-s provenance
 
-`an-dr-commits` is the final MIT-derived extension based only on
-`asispts/neo-git-graph`. Keep its [NOTICE.md](extensions/an-dr-commits/NOTICE.md)
+`an-dr-com-mit-s` is a separately distributed MIT fork based only on
+`asispts/neo-git-graph`. Keep its [NOTICE.md](extensions/an-dr-com-mit-s/NOTICE.md)
 and `LICENSE` intact, and do not copy implementation from post-MIT
-`mhutchie/vscode-git-graph`. Locally authored code may be relicensed and retained
-once `extensions/an-dr-commits/scripts/check-provenance.js` clears it; baseline
-expression may not. Its standalone webview build retains the upstream esbuild step
-because it bundles browser modules.
+`mhutchie/vscode-git-graph`. Locally authored `an-dr-commits` code may be
+relicensed and copied over once `extensions/an-dr-com-mit-s/scripts/check-provenance.js`
+clears it; baseline expression may not. Its standalone webview build retains the
+upstream esbuild step because it bundles browser modules.
 
-It no longer carries `.installignore`; `install.ps1` builds and links it under the
-final `an-dr-commits` identity. Build and test it directly with `npm run compile`
-and `npm test` while iterating.
+It carries a `.installignore`, so `install.ps1` skips it: build and test it
+directly with `npm run compile` and `npm test` in its own directory. Remove that
+file at cutover, when it takes over the `an-dr-commits` identity.

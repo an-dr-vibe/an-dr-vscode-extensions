@@ -203,19 +203,40 @@ with attribution preserved in the extension sources and notice files.
 
 ### an-dr: Commits
 
+Git commit graph webview with branch/tag filtering, repository selection, common Git actions,
+and an Activity Bar sidebar for working-tree changes. The sidebar shares the selected repository
+with the main Commits tab and shows a compact current-branch graph below the commit controls.
+Submodule full diffs show old/new commit details in Unified or Split view, while Raw shows Git's
+semantic submodule log.
+
+Fully self-contained: no dependency on VS Code's built-in Git extension (repo discovery,
+branch/dirty status, and refresh detection use its own git spawns and file watchers).
+Startup registers a lightweight shell; the Git-backed core loads on first use or after the
+startup-critical window, and workspace reconciliation is deferred until interaction or idle.
+
+**Config** (`an-dr-commits.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`graph.showTagsInActivityBar`|`true`|Show tag labels on the Activity Bar commit graph.|
+
+---
+
+### an-dr: Commits (MIT)
+
 An independently distributable MIT-licensed Git graph based solely on
 [neo-git-graph](https://github.com/asispts/neo-git-graph). It provides visual
 history, commit details, branch/tag actions, diffs, and multi-repository
 selection without using post-MIT Git Graph source.
 
-**Config** (`an-dr-commits.*`):
+**Config** (`an-dr-com-mit-s.*`):
 
 |Setting|Default|Description|
 |-------|-------|-----------|
 |`showStatusBarItem`|`true`|Show/hide the graph status-bar button.|
 |`statusBarIconOnly`|`true`|Show only its icon in the status bar.|
 
-Use **an-dr: Commits: View Git Graph** from the Command Palette.
+Use **an-dr: Commits (MIT): View Git Graph** from the Command Palette.
 
 ---
 

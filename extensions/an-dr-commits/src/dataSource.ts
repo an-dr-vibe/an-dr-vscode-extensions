@@ -1,0 +1,3093 @@
+// Based on vscode-an-dr-commits by Michael Hutchison
+// Original: https://github.com/mhutchie/vscode-an-dr-commits
+// License: MIT
+// Refactor note: This file remains larger than the target size because DataSource is still the stable orchestration façade for all git operations.
+import * as cp from 'child_process';
+import * as fs from 'fs';
+import { decode, encodingExists } from 'iconv-lite';
+import * as os from 'os';
+import * as path from 'path';
+import * as vscode from 'vscode';
+import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
+import { getConfig } from './config';
+import { DiffNameStatusRecord, DiffNumStatRecord, GitConfigSet, GitStatusFiles, generateFileChanges, getConfigValue, getErrorMessage, removeTrailingBlankLines, unique } from './data-source/helpers';
+import { BlameLineInfo, GitChangeCounts, GitCommitComparisonData, GitCommitData, GitCommitDetailsData, GitCommitRecord, GitRefData, GitRefSnapshot, GitRepoConfigData, GitRepoInfo, GitTagContextData, GitTagDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, GpgStatusCodeParsingDetails, HeadInfo } from './data-source/models';
+import { parseBlameIncrementalOutput, parseCommitDetailsOutput, parseDiffNameStatusOutput, parseDiffNumStatOutput, parseLogOutput, parseRefSnapshotOutput, parseRemotesContainingCommitOutput, parseStashesOutput, parseStatusOutput, parseWorkingTreeStatusOutput } from './data-source/parsers';
+import { Logger } from './logger';
+import { GraphProjectionKeyInput, RepositoryGraphCache, createGraphProjectionKey } from './repositoryGraphCache';
+import { CommitOrdering, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitStash, GitConfigLocation, GitFileStatus, GitPushBranchMode, GitRepoConfigBranches, GitRepoInProgressAction, GitRepoInProgressState, GitRepoInProgressStateType, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitSubmoduleCommit, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { GitEditorManager } from './gitEditor/gitEditorManager';
+import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
+import { Disposable } from './utils/disposable';
+import { Event, EventEmitter } from './utils/event';
+
+const DRIVE_LETTER_PATH_REGEX = /^[a-z]:\//;
+const EOL_REGEX = /\r\n|\r|\n/g;
+const INVALID_BRANCH_REGEXP = /^\(.* .*\)$/;
+const GIT_LOG_SEPARATOR = 'XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb';
+const GIT_REF_FORMAT = ['%(objectname)', '%(refname)', '%(*objectname)', '%(symref)', '%(upstream:short)', '%(upstream:track)', '%(HEAD)'].join(GIT_LOG_SEPARATOR);
+
+export const enum GitConfigKey {
+	DiffGuiTool = 'diff.guitool',
+	DiffTool = 'diff.tool',
+	RemotePushDefault = 'remote.pushdefault',
+	UserEmail = 'user.email',
+	UserName = 'user.name'
+}
+
+const GPG_STATUS_CODE_PARSING_DETAILS: Readonly<{ [statusCode: string]: GpgStatusCodeParsingDetails }> = {
+	'GOODSIG': { status: GitSignatureStatus.GoodAndValid, uid: true },
+	'BADSIG': { status: GitSignatureStatus.Bad, uid: true },
+	'ERRSIG': { status: GitSignatureStatus.CannotBeChecked, uid: false },
+	'EXPSIG': { status: GitSignatureStatus.GoodButExpired, uid: true },
+	'EXPKEYSIG': { status: GitSignatureStatus.GoodButMadeByExpiredKey, uid: true },
+	'REVKEYSIG': { status: GitSignatureStatus.GoodButMadeByRevokedKey, uid: true }
+};
+
+/** A value that is only valid while its repository stays on the generation it was read at. */
+interface GenerationScoped<T> {
+	readonly generation: number;
+	readonly value: T;
+}
+
+/**
+ * The unfiltered repository state every surface derives from: refs read without any display
+ * filtering, plus the repository's remotes. Kept caller-agnostic so one read serves the tab's
+ * repo info, the sidebar's head info, and revalidation's fingerprint alike (see ADR-026).
+ */
+interface CanonicalRepoSnapshot {
+	readonly refs: GitRefSnapshot;
+	readonly remotes: ReadonlyArray<string>;
+}
+
+/** A cached repo-info response, retaining the filtered refs that produced it for ADR-014's handoff. */
+interface CachedRepoInfo {
+	readonly info: GitRepoInfo;
+	readonly refs: GitRefData;
+	readonly refSnapshotKey: string;
+}
+
+/** A freshly-read snapshot and the fingerprint derived from it (see ADR-025). */
+interface RepoWitness {
+	readonly snapshot: CanonicalRepoSnapshot;
+	readonly fingerprint: string;
+}
+
+/**
+ * Resolves which remote an upstream ref belongs to by matching it against the repository's actual
+ * remote names, longest first. Splitting on the first '/' would be wrong for the remote names
+ * containing slashes that Git permits.
+ * @param upstreamRef The upstream ref in short form (e.g. "origin/main"), or NULL.
+ * @param remoteNames The repository's remote names.
+ * @returns The remote name, or NULL if the ref belongs to no known remote.
+ */
+function resolveUpstreamRemote(upstreamRef: string | null, remoteNames: ReadonlyArray<string>): string | null {
+	if (upstreamRef === null) return null;
+	let match: string | null = null;
+	for (const remote of remoteNames) {
+		if (!upstreamRef.startsWith(remote + '/')) continue;
+		if (match === null || remote.length > match.length) match = remote;
+	}
+	return match;
+}
+
+/**
+ * Interfaces Commits with the Git executable to provide all Git integrations.
+ */
+export class DataSource extends Disposable {
+	private readonly logger: Logger;
+	private readonly askpassEnv: AskpassEnvironment;
+	private readonly gitEditorManager: GitEditorManager;
+	private gitExecutable!: GitExecutable | null;
+	private readonly whenGitExecutableResolved: Promise<unknown>;
+	private gitExecutableSupportsGpgInfo!: boolean;
+	private gitFormatCommitDetails!: string;
+	private gitFormatLog!: string;
+	private gitFormatStash!: string;
+	private readonly pendingRefSnapshots = new Map<string, GitRefData>();
+	private readonly graphCache = new RepositoryGraphCache<GitCommit, GitCommitData>();
+	private readonly pendingGraphProjections = new Map<string, Promise<GitCommitData>>();
+	/** Canonical per-repo witness of what cached projections depend on (see ADR-025). */
+	private readonly repoFingerprints = new Map<string, string>();
+	private readonly pendingRevalidations = new Map<string, Promise<void>>();
+	/** Counts invalidations per repo, so a revalidation can detect that its witness was overtaken. */
+	private readonly invalidationEpochs = new Map<string, number>();
+	/** Generation-scoped repository snapshots shared by every surface (see ADR-026). */
+	private readonly canonicalSnapshots = new Map<string, GenerationScoped<CanonicalRepoSnapshot>>();
+	private readonly pendingCanonicalSnapshots = new Map<string, Promise<CanonicalRepoSnapshot>>();
+	private readonly repoInfoCache = new Map<string, GenerationScoped<CachedRepoInfo>>();
+	private readonly pendingRepoInfo = new Map<string, Promise<GitRepoInfo>>();
+	private readonly graphWarmupTimers = new Map<string, NodeJS.Timer>();
+	private readonly graphGenerationEmitter = new EventEmitter<string>();
+
+	/**
+	 * Creates the Commits Data Source.
+	 * @param whenGitExecutableResolved Settles once Git executable discovery has finished (the
+	 * executable itself arrives via `onDidChangeGitExecutable`). Git calls made before then are
+	 * held on this barrier instead of failing, so activation doesn't have to await discovery.
+	 * @param onDidChangeGitExecutable The Event emitting the Git executable for Commits to use.
+	 * @param logger The Commits Logger instance.
+	 */
+	constructor(whenGitExecutableResolved: Promise<unknown>, onDidChangeConfiguration: Event<vscode.ConfigurationChangeEvent>, onDidChangeGitExecutable: Event<GitExecutable>, logger: Logger) {
+		super();
+		this.logger = logger;
+		this.whenGitExecutableResolved = whenGitExecutableResolved.catch(() => null);
+		this.setGitExecutable(null);
+
+		const askpassManager = new AskpassManager();
+		const gitEditorManager = new GitEditorManager();
+		this.askpassEnv = askpassManager.getEnv();
+		this.gitEditorManager = gitEditorManager;
+
+		this.registerDisposables(
+			onDidChangeConfiguration((event) => {
+				if (
+					event.affectsConfiguration('an-dr-commits.repository.commits.showSignatureStatus') || event.affectsConfiguration('an-dr-commits.showSignatureStatus') ||
+					event.affectsConfiguration('an-dr-commits.repository.useMailmap') || event.affectsConfiguration('an-dr-commits.useMailmap')
+				) {
+					this.generateGitCommandFormats();
+				}
+			}),
+			onDidChangeGitExecutable((gitExecutable) => {
+				this.setGitExecutable(gitExecutable);
+			}),
+			askpassManager,
+			gitEditorManager,
+			this.graphGenerationEmitter
+		);
+		this.registerDisposable({ dispose: () => this.graphWarmupTimers.forEach((timer) => clearTimeout(timer)) });
+	}
+
+	/**
+	 * Check if the Git executable is unknown.
+	 * @returns TRUE => Git executable is unknown, FALSE => Git executable is known.
+	 */
+	public isGitExecutableUnknown() {
+		return this.gitExecutable === null;
+	}
+
+	/**
+	 * Set the Git executable used by the DataSource.
+	 * @param gitExecutable The Git executable.
+	 */
+	private setGitExecutable(gitExecutable: GitExecutable | null) {
+		this.gitExecutable = gitExecutable;
+		this.gitExecutableSupportsGpgInfo = gitExecutable !== null && doesVersionMeetRequirement(gitExecutable.version, GitVersionRequirement.GpgInfo);
+		this.generateGitCommandFormats();
+	}
+
+	/**
+	 * Generate the format strings used by various Git commands.
+	 */
+	private generateGitCommandFormats() {
+		const config = getConfig();
+		const useMailmap = config.useMailmap;
+
+		this.gitFormatCommitDetails = [
+			'%H', '%P', // Hash & Parent Information
+			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', '%at', useMailmap ? '%cN' : '%cn', useMailmap ? '%cE' : '%ce', '%ct', // Author / Commit Information
+			...(config.showSignatureStatus && this.gitExecutableSupportsGpgInfo ? ['%G?', '%GS', '%GK'] : ['', '', '']), // GPG Key Information
+			'%B' // Body
+		].join(GIT_LOG_SEPARATOR);
+
+		this.gitFormatLog = [
+			'%H', '%P', // Hash & Parent Information
+			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', '%ct', // Author / Commit Information
+			'%s' // Subject
+		].join(GIT_LOG_SEPARATOR);
+
+		this.gitFormatStash = [
+			'%H', '%P', '%gD', // Hash, Parent & Selector Information
+			useMailmap ? '%aN' : '%an', useMailmap ? '%aE' : '%ae', '%ct', // Author / Commit Information
+			'%s' // Subject
+		].join(GIT_LOG_SEPARATOR);
+	}
+
+
+	/* Get Data Methods - Core */
+
+	/**
+	 * Get the high-level information of a repository.
+	 * @param repo The path of the repository.
+	 * @param showRemoteBranches Are remote branches shown.
+	 * @param showStashes Are stashes shown.
+	 * @param hideRemotes An array of hidden remotes.
+	 * @returns The repositories information.
+	 */
+	public async getRepoInfo(repo: string, showRemoteBranches: boolean, showStashes: boolean, hideRemotes: ReadonlyArray<string>): Promise<GitRepoInfo> {
+		await this.ensureVerified(repo);
+		const showRemoteHeads = getConfig().showRemoteHeads;
+		const refSnapshotKey = this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes);
+		const cacheKey = refSnapshotKey + '\0' + (showStashes ? '1' : '0');
+		const generation = this.graphCache.getGeneration(repo);
+
+		const cached = this.repoInfoCache.get(cacheKey);
+		if (cached && cached.generation === generation) {
+			// Re-prime ADR-014's handoff, so a paired commits load that misses its own cache still
+			// avoids re-reading refs that this response already holds.
+			this.pendingRefSnapshots.set(cached.value.refSnapshotKey, cached.value.refs);
+			return cached.value.info;
+		}
+
+		const pendingKey = cacheKey + '\0' + generation;
+		const existingLoad = this.pendingRepoInfo.get(pendingKey);
+		if (existingLoad) return existingLoad;
+
+		const pending = this.loadRepoInfo(repo, showRemoteBranches, showStashes, hideRemotes, showRemoteHeads, refSnapshotKey).then((result) => {
+			this.pendingRepoInfo.delete(pendingKey);
+			if (result.info.error === null && this.graphCache.getGeneration(repo) === generation) {
+				this.repoInfoCache.set(cacheKey, { generation, value: result });
+			}
+			return result.info;
+		}, (error) => {
+			this.pendingRepoInfo.delete(pendingKey);
+			throw error;
+		});
+		this.pendingRepoInfo.set(pendingKey, pending);
+		return pending;
+	}
+
+	private loadRepoInfo(repo: string, showRemoteBranches: boolean, showStashes: boolean, hideRemotes: ReadonlyArray<string>, showRemoteHeads: boolean, refSnapshotKey: string): Promise<CachedRepoInfo> {
+		return Promise.all([
+			this.getRefSnapshot(repo, showRemoteBranches, showRemoteHeads, hideRemotes),
+			this.getRemotes(repo),
+			showStashes ? this.getStashes(repo) : Promise.resolve([]),
+			this.getRepoInProgressState(repo),
+			// Fetched in parallel with the other calls ("git remote -v" doesn't need the remote
+			// names first) so repo-info loads don't pay a serial git round-trip.
+			this.getRemoteUrls(repo).catch((): { [remoteName: string]: string } => ({}))
+		]).then((results) => {
+			// Detecting real repository change is no longer this method's job - revalidation owns
+			// the fingerprint now (ADR-025), computed from an unfiltered snapshot so it doesn't
+			// depend on which flags a particular caller happened to pass.
+			this.pendingRefSnapshots.set(refSnapshotKey, results[0].refs);
+			const remotes: string[] = results[1];
+			const fetchedUrls = results[4];
+			const remoteUrls: { [remoteName: string]: string | null } = {};
+			for (const remote of remotes) {
+				remoteUrls[remote] = typeof fetchedUrls[remote] === 'string' ? fetchedUrls[remote] : null;
+			}
+			return {
+				info: {
+					branches: results[0].branches.branches,
+					branchUpstreams: results[0].branches.branchUpstreams,
+					goneUpstreamBranches: results[0].branches.goneUpstreamBranches,
+					remoteHeadTargets: results[0].branches.remoteHeadTargets,
+					head: results[0].branches.head,
+					remotes: remotes,
+					remoteUrls: remoteUrls,
+					stashes: results[2],
+					repoInProgressState: results[3],
+					error: null
+				},
+				refs: results[0].refs,
+				refSnapshotKey
+			};
+		}).catch((errorMessage) => ({
+			info: { branches: [], branchUpstreams: {}, goneUpstreamBranches: [], remoteHeadTargets: {}, head: null, remotes: [], remoteUrls: {}, stashes: [], repoInProgressState: null, error: errorMessage },
+			refs: { head: null, heads: [], tags: [], remotes: [] },
+			refSnapshotKey
+		}));
+	}
+
+	/**
+	 * Get the fetch URL of every remote in a repository.
+	 * @param repo The path of the repository.
+	 * @returns A map of remote name to fetch URL.
+	 */
+	private getRemoteUrls(repo: string): Promise<{ [remoteName: string]: string }> {
+		return this.spawnGit(['remote', '-v'], repo, (stdout) => {
+			const result: { [remoteName: string]: string } = {};
+			for (const line of stdout.split(EOL_REGEX)) {
+				if (!line.includes('(fetch)')) continue;
+				const tab = line.indexOf('\t');
+				if (tab === -1) continue;
+				result[line.substring(0, tab)] = line.substring(tab + 1).replace(' (fetch)', '').trim();
+			}
+			return result;
+		});
+	}
+
+	/**
+	 * Get the commits in a repository.
+	 * @param repo The path of the repository.
+	 * @param branches The list of branch heads to display, or NULL (show all).
+	 * @param maxCommits The maximum number of commits to return.
+	 * @param showTags Are tags are shown.
+	 * @param showRemoteBranches Are remote branches shown.
+	 * @param includeCommitsMentionedByReflogs Should commits mentioned by reflogs being included.
+	 * @param onlyFollowFirstParent Only follow the first parent of commits.
+	 * @param commitOrdering The order for commits to be returned.
+	 * @param remotes An array of known remotes.
+	 * @param hideRemotes An array of hidden remotes.
+	 * @param stashes An array of all stashes in the repository.
+	 * @returns The commits in the repository.
+	 */
+	public async getCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
+		// Resolves an outstanding invalidation before the cache is consulted, so a repository the
+		// watcher merely *suspected* had changed can still serve its retained projections.
+		await this.ensureVerified(repo);
+		const key = this.createCommitProjectionKey({
+			branches, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs,
+			onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes
+		});
+		const cached = this.graphCache.getProjection(repo, key);
+		if (cached !== null && !cached.stale) {
+			this.pendingRefSnapshots.delete(this.getRefSnapshotKey(repo, showRemoteBranches, getConfig().showRemoteHeads, hideRemotes));
+			return Promise.resolve(cached.projection);
+		}
+
+		const generation = this.graphCache.getGeneration(repo);
+		const pendingKey = repo + '\0' + generation + '\0' + key;
+		const existing = this.pendingGraphProjections.get(pendingKey);
+		if (existing) return existing;
+
+		const pending = this.loadCommits(repo, branches, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes)
+			.then((projection) => {
+				if (projection.error === null && this.graphCache.setProjectionForGeneration(repo, key, generation, projection.commits.filter((commit) => commit.hash !== UNCOMMITTED), projection) && branches === null) {
+					this.scheduleGraphWarmup(repo, projection, maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes, generation);
+				}
+				this.pendingGraphProjections.delete(pendingKey);
+				return projection;
+			}, (error) => {
+				this.pendingGraphProjections.delete(pendingKey);
+				throw error;
+			});
+		this.pendingGraphProjections.set(pendingKey, pending);
+		return pending;
+	}
+
+	/**
+	 * Records that a repository's graph data *may* have changed, and notifies subscribers (e.g. the
+	 * sidebar). Callers fire this on suspicion - a watcher event, the tab regaining visibility, a
+	 * mutating action - so it deliberately does not discard anything: projections are retained and
+	 * marked unverified, and the next read revalidates them against the repository (see ADR-025).
+	 * @param repo The path of the repository.
+	 */
+	public invalidateGraph(repo: string): void {
+		this.invalidationEpochs.set(repo, (this.invalidationEpochs.get(repo) ?? 0) + 1);
+		this.graphCache.markUnverified(repo);
+		this.graphGenerationEmitter.emit(repo);
+	}
+
+	/** An Event emitting the repo path whenever its graph data may have changed (see `invalidateGraph`). */
+	get onDidInvalidateGraph(): Event<string> {
+		return this.graphGenerationEmitter.subscribe;
+	}
+
+	/**
+	 * Settles any outstanding invalidation for a repository before its cache is read.
+	 *
+	 * Recomputes the repository fingerprint and compares it with the one recorded when the
+	 * projections were stored: an identical fingerprint restores them as current (no `git log`),
+	 * a differing one advances the generation and discards them exactly as before. A repository
+	 * with no recorded fingerprint yet cannot be confirmed, so it advances - this costs one
+	 * reload on the first invalidation after a cold start, and revalidates cheaply thereafter.
+	 *
+	 * Concurrent callers share one in-flight revalidation, so the sidebar and the tab reacting to
+	 * the same watcher event don't each spawn their own.
+	 *
+	 * A witness is only trusted if no further invalidation arrived while it was being read - a
+	 * fingerprint sampled at the start of the read cannot rule out a change that happened during
+	 * it. When overtaken, the repository stays unverified (so this read still loads from Git) and
+	 * the next read revalidates against a fresh witness once the churn settles.
+	 * @param repo The path of the repository.
+	 */
+	private ensureVerified(repo: string): Promise<void> {
+		if (!this.graphCache.isUnverified(repo)) return Promise.resolve();
+
+		const existing = this.pendingRevalidations.get(repo);
+		if (existing) return existing;
+
+		const epoch = this.invalidationEpochs.get(repo) ?? 0;
+		const settle = (witness: RepoWitness | null) => {
+			this.pendingRevalidations.delete(repo);
+			if ((this.invalidationEpochs.get(repo) ?? 0) !== epoch) return;
+
+			// A failed witness must never confirm: fall through to advancing the generation, which
+			// is the same conservative outcome invalidation had before revalidation existed.
+			const fingerprint = witness !== null ? witness.fingerprint : null;
+			const previous = this.repoFingerprints.get(repo);
+			if (fingerprint !== null && typeof previous !== 'undefined' && previous === fingerprint) {
+				this.graphCache.confirmVerified(repo);
+			} else {
+				this.graphCache.advanceGeneration(repo);
+			}
+			if (fingerprint !== null) this.repoFingerprints.set(repo, fingerprint);
+			else this.repoFingerprints.delete(repo);
+
+			// The witness was read fresh, so it describes the repository as of the generation that
+			// was just settled - publishing it here means revalidation and the surfaces' own reads
+			// share one snapshot instead of each paying for their own.
+			if (witness !== null) {
+				this.canonicalSnapshots.set(repo, { generation: this.graphCache.getGeneration(repo), value: witness.snapshot });
+			}
+		};
+
+		const pending = this.computeRepoWitness(repo).then(settle, () => settle(null));
+		this.pendingRevalidations.set(repo, pending);
+		return pending;
+	}
+
+	/**
+	 * Reads the canonical repository snapshot fresh and derives the witness of everything cached
+	 * projections depend on: the repository's refs and its uncommitted-change count - the latter
+	 * because `loadCommits` splices an "Uncommitted Changes (N)" row into the projection, so refs
+	 * alone are not a sufficient witness (staging a file leaves refs byte-identical).
+	 * @param repo The path of the repository.
+	 * @returns The witness, or NULL if the repository could not be read.
+	 */
+	private computeRepoWitness(repo: string): Promise<RepoWitness | null> {
+		return Promise.all([
+			this.loadCanonicalSnapshot(repo).catch((): null => null),
+			this.getWorkingTreeChangeCount(repo).catch((): null => null)
+		]).then(([snapshot, changeCount]) => {
+			if (snapshot === null || changeCount === null) return null;
+			const refs = snapshot.refs.refs;
+			return {
+				snapshot,
+				fingerprint: JSON.stringify([refs.head, refs.heads, refs.tags, refs.remotes, changeCount])
+			};
+		});
+	}
+
+	/**
+	 * Returns the repository's canonical snapshot, reading it only once per generation. Callers
+	 * must have settled any outstanding invalidation first (`ensureVerified`), so a cached
+	 * snapshot is only ever served for a repository confirmed to be on that generation.
+	 * @param repo The path of the repository.
+	 */
+	private getCanonicalSnapshot(repo: string): Promise<CanonicalRepoSnapshot> {
+		const generation = this.graphCache.getGeneration(repo);
+		const cached = this.canonicalSnapshots.get(repo);
+		if (cached && cached.generation === generation) return Promise.resolve(cached.value);
+
+		const pendingKey = repo + '\0' + generation;
+		const existing = this.pendingCanonicalSnapshots.get(pendingKey);
+		if (existing) return existing;
+
+		const pending = this.loadCanonicalSnapshot(repo).then((snapshot) => {
+			this.pendingCanonicalSnapshots.delete(pendingKey);
+			if (this.graphCache.getGeneration(repo) === generation) {
+				this.canonicalSnapshots.set(repo, { generation, value: snapshot });
+			}
+			return snapshot;
+		}, (error) => {
+			this.pendingCanonicalSnapshots.delete(pendingKey);
+			throw error;
+		});
+		this.pendingCanonicalSnapshots.set(pendingKey, pending);
+		return pending;
+	}
+
+	/**
+	 * Reads the repository's refs unfiltered, alongside its remotes. Unfiltered so the result
+	 * describes the repository rather than whichever display flags a calling surface passed.
+	 * @param repo The path of the repository.
+	 */
+	private loadCanonicalSnapshot(repo: string): Promise<CanonicalRepoSnapshot> {
+		return Promise.all([
+			this.getRefSnapshot(repo, true, true, []),
+			this.getRemotes(repo).catch((): string[] => [])
+		]).then(([refs, remotes]) => ({ refs, remotes }));
+	}
+
+	private loadCommits(repo: string, branches: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>): Promise<GitCommitData> {
+		const config = getConfig();
+		return Promise.all([
+			this.getLog(repo, branches, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes),
+			this.consumeRefSnapshot(repo, showRemoteBranches, config.showRemoteHeads, hideRemotes).then((refData: GitRefData) => refData, (errorMessage: string) => errorMessage),
+			// Fetched in parallel with the log so the (often slow on large working trees) status
+			// call doesn't extend the view's load time; a failure only hides the uncommitted row.
+			this.getWorkingTreeChangeCount(repo).catch(() => 0)
+		]).then(async (results) => {
+			let commits: GitCommitRecord[] = results[0], refData: GitRefData | string = results[1], i;
+			const numUncommittedChanges = results[2];
+			let moreCommitsAvailable = commits.length === maxCommits + 1;
+			if (moreCommitsAvailable) commits.pop();
+
+			// It doesn't matter if getRefs() was rejected if no commits exist
+			if (typeof refData === 'string') {
+				// getRefs() returned an error message (string)
+				if (commits.length > 0) {
+					// Commits exist, throw the error
+					throw refData;
+				} else {
+					// No commits exist, so getRefs() will always return an error. Set refData to the default value
+					refData = { head: null, heads: [], tags: [], remotes: [] };
+				}
+			}
+
+			if (refData.head !== null && config.showUncommittedChanges && numUncommittedChanges > 0) {
+				for (i = 0; i < commits.length; i++) {
+					if (refData.head === commits[i].hash) {
+						commits.unshift({ hash: UNCOMMITTED, parents: [refData.head], author: '*', email: '', date: Math.round((new Date()).getTime() / 1000), message: 'Uncommitted Changes (' + numUncommittedChanges + ')' });
+						break;
+					}
+				}
+			}
+
+			let commitNodes: DeepWriteable<GitCommit>[] = [];
+			let commitLookup: { [hash: string]: number } = {};
+
+			for (i = 0; i < commits.length; i++) {
+				commitLookup[commits[i].hash] = i;
+				commitNodes.push({ ...commits[i], heads: [], tags: [], remotes: [], stash: null });
+			}
+
+			/* Insert Stashes */
+			let toAdd: { index: number, data: GitStash }[] = [];
+			for (i = 0; i < stashes.length; i++) {
+				if (typeof commitLookup[stashes[i].hash] === 'number') {
+					commitNodes[commitLookup[stashes[i].hash]].stash = {
+						selector: stashes[i].selector,
+						baseHash: stashes[i].baseHash,
+						untrackedFilesHash: stashes[i].untrackedFilesHash
+					};
+				} else if (typeof commitLookup[stashes[i].baseHash] === 'number') {
+					toAdd.push({ index: commitLookup[stashes[i].baseHash], data: stashes[i] });
+				}
+			}
+			toAdd.sort((a, b) => a.index !== b.index ? a.index - b.index : b.data.date - a.data.date);
+			for (i = toAdd.length - 1; i >= 0; i--) {
+				let stash = toAdd[i].data;
+				commitNodes.splice(toAdd[i].index, 0, {
+					hash: stash.hash,
+					parents: [stash.baseHash],
+					author: stash.author,
+					email: stash.email,
+					date: stash.date,
+					message: stash.message,
+					heads: [], tags: [], remotes: [],
+					stash: {
+						selector: stash.selector,
+						baseHash: stash.baseHash,
+						untrackedFilesHash: stash.untrackedFilesHash
+					}
+				});
+			}
+			for (i = 0; i < commitNodes.length; i++) {
+				// Correct commit lookup after stashes have been spliced in
+				commitLookup[commitNodes[i].hash] = i;
+			}
+
+			/* Annotate Heads */
+			for (i = 0; i < refData.heads.length; i++) {
+				if (typeof commitLookup[refData.heads[i].hash] === 'number') commitNodes[commitLookup[refData.heads[i].hash]].heads.push(refData.heads[i].name);
+			}
+
+			/* Annotate Tags */
+			if (showTags) {
+				for (i = 0; i < refData.tags.length; i++) {
+					if (typeof commitLookup[refData.tags[i].hash] === 'number') commitNodes[commitLookup[refData.tags[i].hash]].tags.push({ name: refData.tags[i].name, annotated: refData.tags[i].annotated });
+				}
+			}
+
+			/* Annotate Remotes */
+			for (i = 0; i < refData.remotes.length; i++) {
+				if (typeof commitLookup[refData.remotes[i].hash] === 'number') {
+					let name = refData.remotes[i].name;
+					let remote = remotes.find(remote => name.startsWith(remote + '/'));
+					commitNodes[commitLookup[refData.remotes[i].hash]].remotes.push({ name: name, remote: remote ? remote : null });
+				}
+			}
+
+			return {
+				commits: commitNodes,
+				head: refData.head,
+				tags: unique(refData.tags.map((tag) => tag.name)),
+				moreCommitsAvailable: moreCommitsAvailable,
+				error: null
+			};
+		}).catch((errorMessage) => {
+			return { commits: [], head: null, tags: [], moreCommitsAvailable: false, error: errorMessage };
+		});
+	}
+
+	/**
+	 * Get various Git config variables for a repository that are consumed by the Commits View.
+	 * @param repo The path of the repository.
+	 * @param remotes An array of known remotes.
+	 * @returns The config data.
+	 */
+	public getConfig(repo: string, remotes: ReadonlyArray<string>): Promise<GitRepoConfigData> {
+		return Promise.all([
+			this.getConfigList(repo),
+			this.getConfigList(repo, GitConfigLocation.Local),
+			this.getConfigList(repo, GitConfigLocation.Global)
+		]).then((results) => {
+			const consolidatedConfigs = results[0], localConfigs = results[1], globalConfigs = results[2];
+
+			const branches: GitRepoConfigBranches = {};
+			Object.keys(localConfigs).forEach((key) => {
+				if (key.startsWith('branch.')) {
+					if (key.endsWith('.remote')) {
+						const branchName = key.substring(7, key.length - 7);
+						branches[branchName] = {
+							pushRemote: typeof branches[branchName] !== 'undefined' ? branches[branchName].pushRemote : null,
+							remote: localConfigs[key]
+						};
+					} else if (key.endsWith('.pushremote')) {
+						const branchName = key.substring(7, key.length - 11);
+						branches[branchName] = {
+							pushRemote: localConfigs[key],
+							remote: typeof branches[branchName] !== 'undefined' ? branches[branchName].remote : null
+						};
+					}
+				}
+			});
+
+			return {
+				config: {
+					branches: branches,
+					diffTool: getConfigValue(consolidatedConfigs, GitConfigKey.DiffTool),
+					guiDiffTool: getConfigValue(consolidatedConfigs, GitConfigKey.DiffGuiTool),
+					pushDefault: getConfigValue(consolidatedConfigs, GitConfigKey.RemotePushDefault),
+					remotes: remotes.map((remote) => ({
+						name: remote,
+						url: getConfigValue(localConfigs, 'remote.' + remote + '.url'),
+						pushUrl: getConfigValue(localConfigs, 'remote.' + remote + '.pushurl')
+					})),
+					user: {
+						name: {
+							local: getConfigValue(localConfigs, GitConfigKey.UserName),
+							global: getConfigValue(globalConfigs, GitConfigKey.UserName)
+						},
+						email: {
+							local: getConfigValue(localConfigs, GitConfigKey.UserEmail),
+							global: getConfigValue(globalConfigs, GitConfigKey.UserEmail)
+						}
+					}
+				},
+				error: null
+			};
+		}).catch((errorMessage) => {
+			return { config: null, error: errorMessage };
+		});
+	}
+
+	/**
+	 * Get blame information for every line in a file.
+	 * @param repo The repository to run Git in.
+	 * @param filePath The normalised absolute file path.
+	 * @param cancellationToken Cancels the Git process when the document becomes stale.
+	 * @returns Blame information keyed by zero-based line number.
+	 */
+	public getBlameFile(repo: string, filePath: string, cancellationToken: vscode.CancellationToken): Promise<ReadonlyMap<number, BlameLineInfo>> {
+		const relativeFilePath = filePath.startsWith(pathWithTrailingSlash(repo))
+			? filePath.substring(repo.length + 1)
+			: filePath;
+		const config = getConfig(repo);
+		const args = ['blame', '--incremental'];
+		if (config.blameIgnoreWhitespace) {
+			args.push('-w');
+		}
+		for (let i = 0; i < config.blameDetectMoveOrCopyFromOtherFiles; i++) {
+			args.push('-C');
+		}
+		args.push('--', relativeFilePath);
+		return this.spawnGit(args, repo, (stdout) => parseBlameIncrementalOutput(stdout), cancellationToken);
+	}
+
+	private createCommitProjectionKey(input: Omit<GraphProjectionKeyInput, 'commitOrdering' | 'stashKeys'> & { readonly commitOrdering: CommitOrdering, readonly stashes: ReadonlyArray<GitStash> }): string {
+		return createGraphProjectionKey({
+			...input,
+			commitOrdering: input.commitOrdering,
+			stashKeys: input.stashes.map((stash) => [stash.selector, stash.hash, stash.baseHash, stash.untrackedFilesHash, stash.date, stash.message].join('\0'))
+		});
+	}
+
+	private scheduleGraphWarmup(repo: string, projection: GitCommitData, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>, generation: number): void {
+		const branches: string[] = [];
+		for (const commit of projection.commits) {
+			for (const head of commit.heads) {
+				if (!branches.includes(head)) branches.push(head);
+			}
+			for (const remote of commit.remotes) {
+				const name = 'remotes/' + remote.name;
+				if (!branches.includes(name)) branches.push(name);
+			}
+			if (branches.length >= 12) break;
+		}
+		if (branches.length === 0) return;
+
+		const existing = this.graphWarmupTimers.get(repo);
+		if (existing) clearTimeout(existing);
+		const timer = setTimeout(() => {
+			this.graphWarmupTimers.delete(repo);
+			let chain = Promise.resolve();
+			for (const branch of branches.slice(0, 12)) {
+				chain = chain.then(() => {
+					if (this.isDisposed() || this.graphCache.getGeneration(repo) !== generation) return;
+					return this.getCommits(repo, [branch], maxCommits, showTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes).then(() => undefined, () => undefined);
+				});
+			}
+		}, 750);
+		this.graphWarmupTimers.set(repo, timer);
+	}
+
+	public getCommitDisplayInfo(repo: string, commitHash: string): Promise<CommitDisplayInfo | null> {
+		return this.spawnGit(['show', '--quiet', '--format=%H%n%s', commitHash], repo, (stdout) => parseCommitDisplayOutput(stdout));
+	}
+
+
+	/* Get Data Methods - Commit Details View */
+
+	/**
+	 * Get the commit details for the Commit Details View.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit open in the Commit Details View.
+	 * @param hasParents Does the commit have parents
+	 * @returns The commit details.
+	 */
+	public getCommitDetails(repo: string, commitHash: string, hasParents: boolean): Promise<GitCommitDetailsData> {
+		const fromCommit = commitHash + (hasParents ? '^' : '');
+		return Promise.all([
+			this.getCommitDetailsBase(repo, commitHash),
+			this.getDiffFileChanges(repo, fromCommit, commitHash),
+			this.getDiffNumStat(repo, fromCommit, commitHash)
+		]).then((results) => {
+			results[0].fileChanges = generateFileChanges(results[1], results[2], null);
+			return { commitDetails: results[0], error: null };
+		}).catch((errorMessage) => {
+			return { commitDetails: null, error: errorMessage };
+		});
+	}
+
+	/**
+	 * Get the stash details for the Commit Details View.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the stash commit open in the Commit Details View.
+	 * @param stash The stash.
+	 * @returns The stash details.
+	 */
+	public getStashDetails(repo: string, commitHash: string, stash: GitCommitStash): Promise<GitCommitDetailsData> {
+		return Promise.all([
+			this.getCommitDetailsBase(repo, commitHash),
+			this.getDiffFileChanges(repo, stash.baseHash, commitHash),
+			this.getDiffNumStat(repo, stash.baseHash, commitHash),
+			stash.untrackedFilesHash !== null ? this.getDiffFileChanges(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([]),
+			stash.untrackedFilesHash !== null ? this.getDiffNumStat(repo, stash.untrackedFilesHash, stash.untrackedFilesHash) : Promise.resolve([])
+		]).then((results) => {
+			results[0].fileChanges = generateFileChanges(results[1], results[2], null);
+			if (stash.untrackedFilesHash !== null) {
+				generateFileChanges(results[3], results[4], null).forEach((fileChange) => {
+					if (fileChange.type === GitFileStatus.Added) {
+						fileChange.type = GitFileStatus.Untracked;
+						results[0].fileChanges.push(fileChange);
+					}
+				});
+			}
+			return { commitDetails: results[0], error: null };
+		}).catch((errorMessage) => {
+			return { commitDetails: null, error: errorMessage };
+		});
+	}
+
+	/**
+	 * Get the uncommitted details for the Commit Details View.
+	 * @param repo The path of the repository.
+	 * @returns The uncommitted details.
+	 */
+	public getUncommittedDetails(repo: string): Promise<GitCommitDetailsData> {
+		return Promise.all([
+			this.getDiffFileChanges(repo, 'HEAD', ''),
+			this.getDiffNumStat(repo, 'HEAD', ''),
+			this.getStatus(repo)
+		]).then(async (results) => {
+			const untrackedStats = await this.getUntrackedFileStats(repo, results[2].untracked);
+			return {
+				commitDetails: {
+					hash: UNCOMMITTED, parents: [],
+					author: '', authorEmail: '', authorDate: 0,
+					committer: '', committerEmail: '', committerDate: 0, signature: null,
+					body: '', fileChanges: generateFileChanges(results[0], results[1], results[2], untrackedStats)
+				},
+				error: null
+			};
+		}).catch((errorMessage) => {
+			return { commitDetails: null, error: errorMessage };
+		});
+	}
+
+	/**
+	 * Get the comparison details for the Commit Comparison View.
+	 * @param repo The path of the repository.
+	 * @param fromHash The commit hash the comparison is from.
+	 * @param toHash The commit hash the comparison is to.
+	 * @returns The comparison details.
+	 */
+	public getCommitComparison(repo: string, fromHash: string, toHash: string): Promise<GitCommitComparisonData> {
+		return Promise.all<DiffNameStatusRecord[], DiffNumStatRecord[], GitStatusFiles | null>([
+			this.getDiffFileChanges(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
+			this.getDiffNumStat(repo, fromHash, toHash === UNCOMMITTED ? '' : toHash),
+			toHash === UNCOMMITTED ? this.getStatus(repo) : Promise.resolve(null)
+		]).then(async (results) => {
+			const untrackedStats = results[2] !== null ? await this.getUntrackedFileStats(repo, results[2].untracked) : {};
+			return {
+				fileChanges: generateFileChanges(results[0], results[1], results[2], untrackedStats),
+				error: null
+			};
+		}).catch((errorMessage) => {
+			return { fileChanges: [], error: errorMessage };
+		});
+	}
+
+	/**
+	 * Get the contents of a file at a specific revision.
+	 * @param repo The path of the repository.
+	 * @param commitHash The commit hash specifying the revision of the file.
+	 * @param filePath The path of the file relative to the repositories root.
+	 * @returns The file contents.
+	 */
+	public getCommitFile(repo: string, commitHash: string, filePath: string) {
+		return this._spawnGit(['show', commitHash + ':' + filePath], repo, stdout => {
+			const encoding = getConfig(repo).fileEncoding;
+			return decode(stdout, encodingExists(encoding) ? encoding : 'utf8');
+		});
+	}
+
+	/**
+	 * Get the unified diff of a file between two commits, for inline display.
+	 * @param repo The path of the repository.
+	 * @param fromHash The commit hash the diff is from.
+	 * @param toHash The commit hash the diff is to.
+	 * @param oldFilePath The old file path.
+	 * @param newFilePath The new file path (may differ from oldFilePath for renames).
+	 * @returns The unified diff string, or null on error.
+	 */
+	public getFileDiff(repo: string, fromHash: string, toHash: string, oldFilePath: string, newFilePath: string): Promise<string | null> {
+		let args: string[];
+		if (fromHash === toHash) {
+			if (toHash === UNCOMMITTED) {
+				args = ['diff', 'HEAD', '--', oldFilePath];
+			} else {
+				args = ['show', '--format=', '--patch', toHash, '--', oldFilePath];
+				if (newFilePath !== oldFilePath) args.push(newFilePath);
+			}
+		} else {
+			if (toHash === UNCOMMITTED) {
+				args = ['diff', fromHash, '--', oldFilePath];
+			} else {
+				args = ['diff', fromHash, toHash, '--', oldFilePath];
+				if (newFilePath !== oldFilePath) args.push(newFilePath);
+			}
+		}
+		return this.spawnGit(args, repo, (stdout) => stdout).catch(() => null);
+	}
+
+	/**
+	 * Get Git's semantic summary for a submodule change instead of treating its gitlink as a blob.
+	 */
+	public getSubmoduleDiff(repo: string, fromHash: string, toHash: string, filePath: string): Promise<string | null> {
+		let args: string[];
+		if (fromHash === toHash) {
+			args = toHash === UNCOMMITTED
+				? ['diff', '--submodule=log', 'HEAD', '--', filePath]
+				: ['diff', '--submodule=log', toHash + '^', toHash, '--', filePath];
+		} else {
+			args = toHash === UNCOMMITTED
+				? ['diff', '--submodule=log', fromHash, '--', filePath]
+				: ['diff', '--submodule=log', fromHash, toHash, '--', filePath];
+		}
+		return this.spawnGit(args, repo, (stdout) => stdout).catch(() => null);
+	}
+
+	/** Get display metadata for one submodule gitlink endpoint. */
+	public getSubmoduleCommit(repo: string, filePath: string, sha: string | null): Promise<GitSubmoduleCommit | null> {
+		if (sha === null) return Promise.resolve(null);
+		return this.spawnGit(['-C', filePath, 'show', '-s', '--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%b', sha], repo, (stdout) => {
+			const [hash, author, authorEmail, authorDate, subject, body = ''] = stdout.replace(/^\s+/, '').replace(/\x1e$/, '').split('\x1f');
+			return { hash, author, authorEmail, authorDate: Date.parse(authorDate) / 1000, subject, body: body.trim() };
+		}).catch(() => null);
+	}
+
+	/**
+	 * Get the contents of a working tree file.
+	 * @param repo The path of the repository.
+	 * @param filePath The path of the file relative to the repositories root.
+	 * @returns The file contents.
+	 */
+	public getWorkingTreeFile(repo: string, filePath: string) {
+		const absolutePath = path.join(repo, ...filePath.split('/'));
+		return new Promise<string>((resolve, reject) => {
+			fs.readFile(absolutePath, (err, buffer) => {
+				if (err) {
+					reject(err);
+					return;
+				}
+				const encoding = getConfig(repo).fileEncoding;
+				resolve(decode(buffer, encodingExists(encoding) ? encoding : 'utf8'));
+			});
+		});
+	}
+
+
+	/* Get Data Methods - General */
+
+	/**
+	 * Get the subject of a commit.
+	 * @param repo The path of the repository.
+	 * @param commitHash The commit hash.
+	 * @returns The subject string, or NULL if an error occurred.
+	 */
+	public getCommitSubject(repo: string, commitHash: string): Promise<string | null> {
+		return this.spawnGit(['-c', 'log.showSignature=false', 'log', '--format=%s', '-n', '1', commitHash, '--'], repo, (stdout) => {
+			return stdout.trim().replace(/\s+/g, ' ');
+		}).then((subject) => subject, () => null);
+	}
+
+	/**
+	 * Get the URL of a repositories remote.
+	 * @param repo The path of the repository.
+	 * @param remote The name of the remote.
+	 * @returns The URL, or NULL if an error occurred.
+	 */
+	public getRemoteUrl(repo: string, remote: string): Promise<string | null> {
+		return this.spawnGit(['config', '--get', 'remote.' + remote + '.url'], repo, (stdout) => {
+			return stdout.split(EOL_REGEX)[0];
+		}).then((url) => url, () => null);
+	}
+
+	/**
+	 * Check to see if a file has been renamed between a commit and the working tree, and return the new file path.
+	 * @param repo The path of the repository.
+	 * @param commitHash The commit hash where `oldFilePath` is known to have existed.
+	 * @param oldFilePath The file path that may have been renamed.
+	 * @returns The new renamed file path, or NULL if either: the file wasn't renamed or the Git command failed to execute.
+	 */
+	public getNewPathOfRenamedFile(repo: string, commitHash: string, oldFilePath: string) {
+		return this.getDiffFileChanges(repo, commitHash, '', 'R').then((renamed) => {
+			const renamedRecordForFile = renamed.find((record) => record.oldFilePath === oldFilePath);
+			return renamedRecordForFile ? renamedRecordForFile.newFilePath : null;
+		}).catch(() => null);
+	}
+
+	/**
+	 * Get the details of a tag.
+	 * @param repo The path of the repository.
+	 * @param tagName The name of the tag.
+	 * @returns The tag details.
+	 */
+	public getTagDetails(repo: string, tagName: string): Promise<GitTagDetailsData> {
+		if (this.gitExecutable !== null && !doesVersionMeetRequirement(this.gitExecutable.version, GitVersionRequirement.TagDetails)) {
+			return Promise.resolve({ details: null, error: constructIncompatibleGitVersionMessage(this.gitExecutable, GitVersionRequirement.TagDetails, 'retrieving Tag Details') });
+		}
+
+		const ref = 'refs/tags/' + tagName;
+		return this.spawnGit(['for-each-ref', ref, '--format=' + ['%(objectname)', '%(taggername)', '%(taggeremail)', '%(taggerdate:unix)', '%(contents:signature)', '%(contents)'].join(GIT_LOG_SEPARATOR)], repo, (stdout) => {
+			const data = stdout.split(GIT_LOG_SEPARATOR);
+			return {
+				hash: data[0],
+				taggerName: data[1],
+				taggerEmail: data[2].substring(data[2].startsWith('<') ? 1 : 0, data[2].length - (data[2].endsWith('>') ? 1 : 0)),
+				taggerDate: parseInt(data[3]),
+				message: removeTrailingBlankLines(data.slice(5).join(GIT_LOG_SEPARATOR).replace(data[4], '').split(EOL_REGEX)).join('\n'),
+				signed: data[4] !== ''
+			};
+		}).then(async (tag) => ({
+			details: {
+				hash: tag.hash,
+				taggerName: tag.taggerName,
+				taggerEmail: tag.taggerEmail,
+				taggerDate: tag.taggerDate,
+				message: tag.message,
+				signature: tag.signed
+					? await this.getTagSignature(repo, ref)
+					: null
+			},
+			error: null
+		})).catch((errorMessage) => ({
+			details: null,
+			error: errorMessage
+		}));
+	}
+
+	/**
+	 * Resolve the object hash and tag type for a tag.
+	 * @param repo The path of the repository.
+	 * @param tagName The name of the tag.
+	 * @returns The resolved tag context.
+	 */
+	public getTagContext(repo: string, tagName: string): Promise<GitTagContextData> {
+		const ref = 'refs/tags/' + tagName;
+		return this.spawnGit(['show-ref', '--tags', '-d', ref], repo, (stdout) => {
+			let hash: string | null = null;
+			let annotated = false;
+			const lines = stdout.split(EOL_REGEX);
+			for (let i = 0; i < lines.length; i++) {
+				if (lines[i].trim() === '') continue;
+				const parts = lines[i].split(' ');
+				if (parts.length < 2) continue;
+				const lineHash = parts[0];
+				const lineRef = parts[parts.length - 1];
+				if (lineRef === ref) {
+					if (hash === null) hash = lineHash;
+				} else if (lineRef === ref + '^{}') {
+					hash = lineHash;
+					annotated = true;
+				}
+			}
+			return {
+				hash: hash,
+				annotated: annotated
+			};
+		}).then((tag) => ({
+			context: tag.hash !== null
+				? {
+					hash: tag.hash,
+					annotated: tag.annotated
+				}
+				: null,
+			error: tag.hash !== null ? null : 'Unable to find tag "' + tagName + '".'
+		})).catch((errorMessage) => ({
+			context: null,
+			error: errorMessage
+		}));
+	}
+
+	/**
+	 * Get the submodules of a repository.
+	 * @param repo The path of the repository.
+	 * @returns An array of the paths of the submodules.
+	 */
+	public getSubmodules(repo: string) {
+		return new Promise<string[]>(resolve => {
+			fs.readFile(path.join(repo, '.gitmodules'), { encoding: 'utf8' }, async (err, data) => {
+				let submodules: string[] = [];
+				if (!err) {
+					let lines = data.split(EOL_REGEX), inSubmoduleSection = false, match;
+					const section = /^\s*\[.*\]\s*$/, submodule = /^\s*\[submodule "([^"]+)"\]\s*$/, pathProp = /^\s*path\s+=\s+(.*)$/;
+
+					for (let i = 0; i < lines.length; i++) {
+						if (lines[i].match(section) !== null) {
+							inSubmoduleSection = lines[i].match(submodule) !== null;
+							continue;
+						}
+
+						if (inSubmoduleSection && (match = lines[i].match(pathProp)) !== null) {
+							let root = await this.repoRoot(getPathFromUri(vscode.Uri.file(path.join(repo, getPathFromStr(match[1])))));
+							if (root !== null && !submodules.includes(root)) {
+								submodules.push(root);
+							}
+						}
+					}
+				}
+				resolve(submodules);
+			});
+		});
+	}
+
+
+	/* Repository Info Methods */
+
+	/**
+	 * Check if there are any staged changes in the repository.
+	 * @param repo The path of the repository.
+	 * @returns TRUE => Staged Changes, FALSE => No Staged Changes.
+	 */
+	private areStagedChanges(repo: string) {
+		return this.spawnGit(['diff-index', 'HEAD'], repo, (stdout) => stdout !== '').then(changes => changes, () => false);
+	}
+
+	/**
+	 * Get the root of the repository containing the specified path.
+	 * @param pathOfPotentialRepo The path that is potentially a repository (or is contained within a repository).
+	 * @returns STRING => The root of the repository, NULL => `pathOfPotentialRepo` is not in a repository.
+	 */
+	public repoRoot(pathOfPotentialRepo: string) {
+		return this.spawnGit(['rev-parse', '--show-toplevel'], pathOfPotentialRepo, (stdout) => getPathFromUri(vscode.Uri.file(path.normalize(stdout.trim())))).then(async (pathReturnedByGit) => {
+			if (process.platform === 'win32') {
+				// On Windows Mapped Network Drives with Git >= 2.25.0, `git rev-parse --show-toplevel` returns the UNC Path for the Mapped Network Drive, instead of the Drive Letter.
+				// Attempt to replace the UNC Path with the Drive Letter.
+				let driveLetterPathMatch: RegExpMatchArray | null;
+				if ((driveLetterPathMatch = pathOfPotentialRepo.match(DRIVE_LETTER_PATH_REGEX)) && !pathReturnedByGit.match(DRIVE_LETTER_PATH_REGEX)) {
+					const realPathForDriveLetter = pathWithTrailingSlash(await realpath(driveLetterPathMatch[0], true));
+					if (realPathForDriveLetter !== driveLetterPathMatch[0] && pathReturnedByGit.startsWith(realPathForDriveLetter)) {
+						pathReturnedByGit = driveLetterPathMatch[0] + pathReturnedByGit.substring(realPathForDriveLetter.length);
+					}
+				}
+			}
+			let path = pathOfPotentialRepo;
+			let first = path.indexOf('/');
+			while (true) {
+				if (pathReturnedByGit === path || pathReturnedByGit === await realpath(path)) return path;
+				let next = path.lastIndexOf('/');
+				if (first !== next && next > -1) {
+					path = path.substring(0, next);
+				} else {
+					return pathReturnedByGit;
+				}
+			}
+		}).catch(() => null); // null => path is not in a repo
+	}
+
+
+	/* Git Action Methods - Remotes */
+
+	/**
+	 * Add a new remote to a repository.
+	 * @param repo The path of the repository.
+	 * @param name The name of the remote.
+	 * @param url The URL of the remote.
+	 * @param pushUrl The Push URL of the remote.
+	 * @param fetch Fetch the remote after it is added.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async addRemote(repo: string, name: string, url: string, pushUrl: string | null, fetch: boolean) {
+		let status = await this.runGitCommand(['remote', 'add', name, url], repo);
+		if (status !== null) return status;
+
+		if (pushUrl !== null) {
+			status = await this.runGitCommand(['remote', 'set-url', name, '--push', pushUrl], repo);
+			if (status !== null) return status;
+		}
+
+		return fetch ? this.fetch(repo, name, false, false) : null;
+	}
+
+	/**
+	 * Delete an existing remote from a repository.
+	 * @param repo The path of the repository.
+	 * @param name The name of the remote.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public deleteRemote(repo: string, name: string) {
+		return this.runGitCommand(['remote', 'remove', name], repo);
+	}
+
+	/**
+	 * Edit an existing remote of a repository.
+	 * @param repo The path of the repository.
+	 * @param nameOld The old name of the remote.
+	 * @param nameNew The new name of the remote.
+	 * @param urlOld The old URL of the remote.
+	 * @param urlNew The new URL of the remote.
+	 * @param pushUrlOld The old Push URL of the remote.
+	 * @param pushUrlNew The new Push URL of the remote.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async editRemote(repo: string, nameOld: string, nameNew: string, urlOld: string | null, urlNew: string | null, pushUrlOld: string | null, pushUrlNew: string | null) {
+		if (nameOld !== nameNew) {
+			let status = await this.runGitCommand(['remote', 'rename', nameOld, nameNew], repo);
+			if (status !== null) return status;
+		}
+
+		if (urlOld !== urlNew) {
+			let args = ['remote', 'set-url', nameNew];
+			if (urlNew === null) args.push('--delete', urlOld!);
+			else if (urlOld === null) args.push('--add', urlNew);
+			else args.push(urlNew, urlOld);
+
+			let status = await this.runGitCommand(args, repo);
+			if (status !== null) return status;
+		}
+
+		if (pushUrlOld !== pushUrlNew) {
+			let args = ['remote', 'set-url', '--push', nameNew];
+			if (pushUrlNew === null) args.push('--delete', pushUrlOld!);
+			else if (pushUrlOld === null) args.push('--add', pushUrlNew);
+			else args.push(pushUrlNew, pushUrlOld);
+
+			let status = await this.runGitCommand(args, repo);
+			if (status !== null) return status;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Prune an existing remote of a repository.
+	 * @param repo The path of the repository.
+	 * @param name The name of the remote.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public pruneRemote(repo: string, name: string) {
+		return this.runGitCommand(['remote', 'prune', name], repo);
+	}
+
+
+	/* Git Action Methods - Tags */
+
+	/**
+	 * Add a new tag to a commit.
+	 * @param repo The path of the repository.
+	 * @param tagName The name of the tag.
+	 * @param commitHash The hash of the commit the tag should be added to.
+	 * @param type Is the tag annotated or lightweight.
+	 * @param message The message of the tag (if it is an annotated tag).
+	 * @param force Force add the tag, replacing an existing tag with the same name (if it exists).
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public addTag(repo: string, tagName: string, commitHash: string, type: TagType, message: string, force: boolean) {
+		const args = ['tag'];
+		if (force) {
+			args.push('-f');
+		}
+		if (type === TagType.Lightweight) {
+			args.push(tagName);
+		} else {
+			args.push(getConfig().signTags ? '-s' : '-a', tagName, '-m', message);
+		}
+		args.push(commitHash);
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Delete an existing tag from a repository.
+	 * @param repo The path of the repository.
+	 * @param tagName The name of the tag.
+	 * @param deleteOnRemote The name of the remote to delete the tag on, or NULL.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async deleteTag(repo: string, tagName: string, deleteOnRemote: string | null) {
+		if (deleteOnRemote !== null) {
+			let status = await this.runGitCommand(['push', deleteOnRemote, '--delete', tagName], repo);
+			if (status !== null) return status;
+		}
+		return this.runGitCommand(['tag', '-d', tagName], repo);
+	}
+
+
+	/* Git Action Methods - Remote Sync */
+
+	/**
+	 * Fetch from the repositories remote(s).
+	 * @param repo The path of the repository.
+	 * @param remote The remote to fetch, or NULL (fetch all remotes).
+	 * @param prune Is pruning enabled.
+	 * @param pruneTags Should tags be pruned.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public fetch(repo: string, remote: string | null, prune: boolean, pruneTags: boolean) {
+		let args = ['fetch', remote === null ? '--all' : remote];
+
+		if (prune) {
+			args.push('--prune');
+		}
+		if (pruneTags) {
+			if (!prune) {
+				return Promise.resolve('In order to Prune Tags, pruning must also be enabled when fetching from ' + (remote !== null ? 'a remote' : 'remote(s)') + '.');
+			} else if (this.gitExecutable !== null && !doesVersionMeetRequirement(this.gitExecutable.version, GitVersionRequirement.FetchAndPruneTags)) {
+				return Promise.resolve(constructIncompatibleGitVersionMessage(this.gitExecutable, GitVersionRequirement.FetchAndPruneTags, 'pruning tags when fetching'));
+			}
+			args.push('--prune-tags');
+		}
+
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Push a branch to a remote.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the branch to push.
+	 * @param remote The remote to push the branch to.
+	 * @param setUpstream Set the branches upstream.
+	 * @param mode The mode of the push.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public pushBranch(repo: string, branchName: string, remote: string, setUpstream: boolean, mode: GitPushBranchMode) {
+		let args = ['push'];
+		args.push(remote, branchName);
+		if (setUpstream) args.push('--set-upstream');
+		if (mode !== GitPushBranchMode.Normal) args.push('--' + mode);
+
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Push a branch to multiple remotes.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the branch to push.
+	 * @param remotes The remotes to push the branch to.
+	 * @param setUpstream Set the branches upstream.
+	 * @param mode The mode of the push.
+	 * @returns The ErrorInfo's from the executed commands.
+	 */
+	public async pushBranchToMultipleRemotes(repo: string, branchName: string, remotes: string[], setUpstream: boolean, mode: GitPushBranchMode): Promise<ErrorInfo[]> {
+		if (remotes.length === 0) {
+			return ['No remote(s) were specified to push the branch ' + branchName + ' to.'];
+		}
+
+		const results: ErrorInfo[] = [];
+		for (let i = 0; i < remotes.length; i++) {
+			const result = await this.pushBranch(repo, branchName, remotes[i], setUpstream, mode);
+			results.push(result);
+			if (result !== null) break;
+		}
+		return results;
+	}
+
+	/**
+	 * Push a tag to remote(s).
+	 * @param repo The path of the repository.
+	 * @param tagName The name of the tag to push.
+	 * @param remotes The remote(s) to push the tag to.
+	 * @param commitHash The commit hash the tag is on.
+	 * @param skipRemoteCheck Skip checking that the tag is on each of the `remotes`.
+	 * @returns The ErrorInfo's from the executed commands.
+	 */
+	public async pushTag(repo: string, tagName: string, remotes: string[], commitHash: string, skipRemoteCheck: boolean): Promise<ErrorInfo[]> {
+		if (remotes.length === 0) {
+			return ['No remote(s) were specified to push the tag ' + tagName + ' to.'];
+		}
+
+		if (!skipRemoteCheck) {
+			const remotesContainingCommit = await this.getRemotesContainingCommit(repo, commitHash, remotes).catch(() => remotes);
+			const remotesNotContainingCommit = remotes.filter((remote) => !remotesContainingCommit.includes(remote));
+			if (remotesNotContainingCommit.length > 0) {
+				return [ErrorInfoExtensionPrefix.PushTagCommitNotOnRemote + JSON.stringify(remotesNotContainingCommit)];
+			}
+		}
+
+		const results: ErrorInfo[] = [];
+		for (let i = 0; i < remotes.length; i++) {
+			const result = await this.runGitCommand(['push', remotes[i], tagName], repo);
+			results.push(result);
+			if (result !== null) break;
+		}
+		return results;
+	}
+
+
+	/* Git Action Methods - Branches */
+
+	/**
+	 * Checkout a branch in a repository.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the branch to checkout.
+	 * @param remoteBranch The name of the remote branch to check out (if not NULL).
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public checkoutBranch(repo: string, branchName: string, remoteBranch: string | null) {
+		let args = ['checkout'];
+		if (remoteBranch === null) args.push(branchName);
+		else args.push('-b', branchName, remoteBranch);
+
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Create a branch at a commit.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the branch.
+	 * @param commitHash The hash of the commit the branch should be created at.
+	 * @param checkout Check out the branch after it is created.
+	 * @param force Force create the branch, replacing an existing branch with the same name (if it exists).
+	 * @returns The ErrorInfo's from the executed command(s).
+	 */
+	public async createBranch(repo: string, branchName: string, commitHash: string, checkout: boolean, force: boolean) {
+		const args = [];
+		if (checkout && !force) {
+			args.push('checkout', '-b');
+		} else {
+			args.push('branch');
+			if (force) {
+				args.push('-f');
+			}
+		}
+		args.push(branchName, commitHash);
+
+		const statuses = [await this.runGitCommand(args, repo)];
+		if (statuses[0] === null && checkout && force) {
+			statuses.push(await this.checkoutBranch(repo, branchName, null));
+		}
+		return statuses;
+	}
+
+	/**
+	 * Delete a branch in a repository.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the branch.
+	 * @param force Should force the branch to be deleted (even if not merged).
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public deleteBranch(repo: string, branchName: string, force: boolean) {
+		return this.runGitCommand(['branch', force ? '-D' : '-d', branchName], repo);
+	}
+
+	/**
+	 * Delete multiple local branches in a repository.
+	 * @param repo The path of the repository.
+	 * @param branchNames The names of the branches to delete.
+	 * @param force Should force the branches to be deleted (even if not merged).
+	 * @returns The ErrorInfo for each executed delete command.
+	 */
+	public async cleanupLocalBranches(repo: string, branchNames: ReadonlyArray<string>, force: boolean) {
+		const errors: ErrorInfo[] = [];
+		for (let i = 0; i < branchNames.length; i++) {
+			errors.push(await this.deleteBranch(repo, branchNames[i], force));
+		}
+		return errors;
+	}
+
+	/**
+	 * Delete a remote branch in a repository.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the branch.
+	 * @param remote The name of the remote to delete the branch on.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async deleteRemoteBranch(repo: string, branchName: string, remote: string) {
+		let remoteStatus = await this.runGitCommand(['push', remote, '--delete', branchName], repo);
+		if (remoteStatus !== null && (new RegExp('remote ref does not exist', 'i')).test(remoteStatus)) {
+			let trackingBranchStatus = await this.runGitCommand(['branch', '-d', '-r', remote + '/' + branchName], repo);
+			return trackingBranchStatus === null ? null : 'Branch does not exist on the remote, deleting the remote tracking branch ' + remote + '/' + branchName + '.\n' + trackingBranchStatus;
+		}
+		return remoteStatus;
+	}
+
+	/**
+	 * Set the default branch for a remote.
+	 * @param repo The path of the repository.
+	 * @param remote The name of the remote.
+	 * @param branch The branch name on the remote.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public setRemoteDefaultBranch(repo: string, remote: string, branch: string) {
+		return this.runGitCommand(['remote', 'set-head', remote, branch], repo);
+	}
+
+	/**
+	 * Fetch a remote branch into a local branch.
+	 * @param repo The path of the repository.
+	 * @param remote The name of the remote containing the remote branch.
+	 * @param remoteBranch The name of the remote branch.
+	 * @param localBranch The name of the local branch.
+	 * @param force Force fetch the remote branch.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public fetchIntoLocalBranch(repo: string, remote: string, remoteBranch: string, localBranch: string, force: boolean) {
+		const args = ['fetch'];
+		if (force) {
+			args.push('-f');
+		}
+		args.push(remote, remoteBranch + ':' + localBranch);
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Returns the list of files with unstaged changes (modified tracked + untracked).
+	 * @param repo The path of the repository.
+	 */
+	public async getUnstagedFiles(repo: string): Promise<string[]> {
+		const result = await this.spawnGit(['status', '--short', '--porcelain'], repo, (stdout) => stdout).catch(() => '');
+		return result.split('\n')
+			.filter((line) => line.length > 0)
+			.map((line) => line.substring(3));
+	}
+
+	public getWorkingTreeChanges(repo: string): Promise<GitWorkingTreeChangesData> {
+		const getNumStatLookup = (cached: boolean) => this.spawnGit(
+			['diff', '--numstat', '--find-renames', '-z', ...(cached ? ['--cached'] : [])],
+			repo,
+			(stdout) => {
+				const lookup: { [filePath: string]: { additions: number | null; deletions: number | null } } = {};
+				const records = parseDiffNumStatOutput(stdout.split('\0'));
+				for (let i = 0; i < records.length; i++) {
+					lookup[records[i].filePath] = {
+						additions: Number.isFinite(records[i].additions) ? records[i].additions : null,
+						deletions: Number.isFinite(records[i].deletions) ? records[i].deletions : null
+					};
+				}
+				return lookup;
+			}
+		);
+
+		return Promise.all([
+			this.spawnGit(['status', '--porcelain=v2', '-z', '--untracked-files=all'], repo, (stdout) => stdout),
+			getNumStatLookup(true),
+			getNumStatLookup(false)
+		]).then(async (results) => {
+			const stagedStats = results[1];
+			const unstagedStats = results[2];
+			const records = parseWorkingTreeStatusOutput(results[0]);
+			const untrackedStats = await this.getUntrackedFileStats(repo, records.filter((r) => r.workTreeStatus === '?').map((r) => r.path));
+			const changes: GitWorkingTreeChange[] = [];
+			const getStats = (filePath: string, staged: boolean) => (staged ? stagedStats[filePath] : unstagedStats[filePath]) || untrackedStats[filePath] || { additions: null, deletions: null };
+			for (let i = 0; i < records.length; i++) {
+				const record = records[i];
+				const worktreeSha = record.submodule !== null && record.submodule.commitChanged
+					? await this.getSubmoduleHead(repo, record.path)
+					: record.indexSha;
+				const createSubmodule = (oldSha: string | null, newSha: string | null) => record.submodule === null ? null : ({
+					oldSha,
+					newSha,
+					trackedChanges: record.submodule.trackedChanges,
+					untrackedChanges: record.submodule.untrackedChanges
+				});
+				if (record.indexStatus !== '.' && record.indexStatus !== '?') {
+					const status = record.indexStatus === 'D' ? 'D' : record.indexStatus === 'A' ? 'A' : record.indexStatus === 'R' || record.indexStatus === 'C' ? 'R' : 'M';
+					changes.push({ path: record.path, oldPath: record.oldPath, status: status as GitWorkingTreeChange['status'], staged: true, ...getStats(record.path, true), submodule: createSubmodule(record.headSha, record.indexSha) });
+				}
+				const hasWorktreeChange = record.workTreeStatus !== '.' || (record.submodule !== null && (record.submodule.commitChanged || record.submodule.trackedChanges || record.submodule.untrackedChanges));
+				if (hasWorktreeChange && record.indexStatus !== '?') {
+					const status = record.workTreeStatus === '?' ? 'U' : record.workTreeStatus === 'D' ? 'D' : 'M';
+					changes.push({ path: record.path, status: status as GitWorkingTreeChange['status'], staged: false, ...getStats(record.path, false), submodule: createSubmodule(record.indexSha, worktreeSha) });
+				}
+			}
+			return { changes, error: null };
+		}).catch((errorMessage) => ({ changes: [], error: errorMessage }));
+	}
+
+	/**
+	 * Gets working-tree change counts for the given repository. Mirrors `getWorkingTreeChanges`'
+	 * row construction (staged and unstaged entries counted separately) so counts always match
+	 * the sidebar's changes tree, without that method's extra numstat / submodule-head spawns.
+	 * @param repo The path of the repository.
+	 * @returns The counts, or NULL if the status could not be read.
+	 */
+	public getStatusCounts(repo: string): Promise<GitChangeCounts | null> {
+		return this.spawnGit(['status', '--porcelain=v2', '-z', '--untracked-files=all'], repo, (stdout) => {
+			const records = parseWorkingTreeStatusOutput(stdout);
+			let modified = 0, deleted = 0;
+			for (let i = 0; i < records.length; i++) {
+				const record = records[i];
+				if (record.indexStatus === '?') {
+					modified++;
+					continue;
+				}
+				if (record.indexStatus !== '.' && record.indexStatus !== '?') {
+					if (record.indexStatus === 'D') deleted++;
+					else modified++;
+				}
+				const hasWorktreeChange = record.workTreeStatus !== '.' || (record.submodule !== null && (record.submodule.commitChanged || record.submodule.trackedChanges || record.submodule.untrackedChanges));
+				if (hasWorktreeChange && record.indexStatus !== '?') {
+					if (record.workTreeStatus === 'D') deleted++;
+					else modified++;
+				}
+			}
+			return { modified, deleted };
+		}).catch((): null => null);
+	}
+
+	/** Gets the checked-out commit of an initialised submodule. */
+	private getSubmoduleHead(repo: string, filePath: string): Promise<string | null> {
+		return this.spawnGit(['-C', filePath, 'rev-parse', 'HEAD'], repo, (stdout) => stdout.trim()).catch(() => null);
+	}
+
+	/**
+	 * Gets addition/deletion counts for untracked files, which `git diff --numstat` never
+	 * reports since they aren't part of any diff. Diffs each file against `/dev/null` instead;
+	 * `--no-index` always exits 1 when a difference is found, so exit code is ignored here.
+	 */
+	private async getUntrackedFileStats(repo: string, filePaths: string[]): Promise<{ [filePath: string]: { additions: number | null; deletions: number | null } }> {
+		const lookup: { [filePath: string]: { additions: number | null; deletions: number | null } } = {};
+		await Promise.all(filePaths.map((filePath) => this._spawnGit(
+			['diff', '--no-index', '--numstat', '--', '/dev/null', filePath], repo,
+			(stdout) => stdout.toString(), true
+		).then((stdout) => {
+			const record = parseDiffNumStatOutput(stdout.split('\0'))[0];
+			lookup[filePath] = {
+				additions: record !== undefined && Number.isFinite(record.additions) ? record.additions : null,
+				deletions: record !== undefined && Number.isFinite(record.deletions) ? record.deletions : null
+			};
+		}, () => {
+			lookup[filePath] = { additions: null, deletions: null };
+		})));
+		return lookup;
+	}
+
+	public stageFiles(repo: string, files: string[]): Promise<ErrorInfo> {
+		return this.runGitCommand(['add', '--', ...files], repo);
+	}
+
+	public unstageFiles(repo: string, files: string[]): Promise<ErrorInfo> {
+		return this.runGitCommand(['reset', 'HEAD', '--', ...files], repo);
+	}
+
+	public async getPreviousCommitMessage(repo: string): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			return {
+				message: await this.getCommitMessage(repo, 'HEAD'),
+				error: null
+			};
+		} catch (error) {
+			return {
+				message: null,
+				error: typeof error === 'string' ? error : 'Unable to read the previous commit message.'
+			};
+		}
+	}
+
+	public commitChanges(repo: string, message: string, amend: boolean): Promise<ErrorInfo> {
+		const args = ['commit'];
+		if (amend) args.push('--amend');
+		if (message) args.push('-m', message);
+		else if (amend) args.push('--no-edit');
+		return this.runGitCommand(args, repo);
+	}
+
+	public discardFileChanges(repo: string, filePaths: string[], isUntracked: boolean, restoreToIndex: boolean = false): Promise<ErrorInfo> {
+		if (isUntracked) {
+			return this.runGitCommand(['clean', '-f', '--', ...filePaths], repo);
+		}
+		if (restoreToIndex) {
+			return this.runGitCommand(['checkout', '--', ...filePaths], repo);
+		}
+		return this.runGitCommand(['checkout', 'HEAD', '--', ...filePaths], repo);
+	}
+
+	/** Reset a submodule to the parent index, optionally deleting nested untracked content. */
+	public async discardSubmoduleChanges(repo: string, filePath: string, cleanUntracked: boolean): Promise<ErrorInfo> {
+		const resetError = await this.runGitCommand(['submodule', 'update', '--checkout', '--force', '--recursive', '--', filePath], repo);
+		if (resetError !== null || !cleanUntracked) return resetError;
+		const cleanError = await this.runGitCommand(['-C', filePath, 'clean', '-fd'], repo);
+		if (cleanError !== null) return cleanError;
+		return this.runGitCommand(['-C', filePath, 'submodule', 'foreach', '--recursive', 'git clean -fd'], repo);
+	}
+
+	public async addToGitignore(repo: string, filePath: string, type: 'root' | 'local' | 'extension'): Promise<ErrorInfo> {
+		const normalized = filePath.replace(/\\/g, '/');
+		const basename = normalized.split('/').pop()!;
+		const dir = normalized.includes('/') ? normalized.substring(0, normalized.lastIndexOf('/')) : '';
+		const ext = basename.includes('.') ? basename.split('.').pop() : null;
+
+		let pattern: string;
+		let gitignorePath: string;
+
+		if (type === 'root') {
+			pattern = '/' + normalized;
+			gitignorePath = path.join(repo, '.gitignore');
+		} else if (type === 'local') {
+			pattern = '/' + basename;
+			gitignorePath = dir ? path.join(repo, dir, '.gitignore') : path.join(repo, '.gitignore');
+		} else {
+			if (!ext) return 'File has no extension to ignore by.';
+			pattern = '*.' + ext;
+			gitignorePath = path.join(repo, '.gitignore');
+		}
+
+		try {
+			let content = '';
+			try { content = fs.readFileSync(gitignorePath, 'utf8'); } catch { }
+			const lines = content.split('\n').map((l) => l.trim());
+			if (lines.includes(pattern)) return null;
+			if (content.length > 0 && !content.endsWith('\n')) content += '\n';
+			fs.writeFileSync(gitignorePath, content + pattern + '\n', 'utf8');
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	/**
+	 * Stash uncommitted changes, pull, then optionally re-apply the stash.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the remote branch.
+	 * @param remote The name of the remote.
+	 * @param createNewCommit Is `--no-ff` enabled if a merge is required.
+	 * @param squash Is `--squash` enabled if a merge is required.
+	 * @param reapply Whether to pop the stash after a successful pull.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async pullBranchWithStash(repo: string, branchName: string, remote: string, createNewCommit: boolean, squash: boolean, reapply: boolean): Promise<ErrorInfo> {
+		const stashError = await this.pushStash(repo, 'an-dr-commits: auto-stash before pull', false);
+		if (stashError !== null) return stashError;
+		const pullError = await this.pullBranch(repo, branchName, remote, createNewCommit, squash);
+		if (pullError !== null) return pullError;
+		if (reapply) return this.popStash(repo, 'stash@{0}', false);
+		return null;
+	}
+
+	/**
+	 * Pull a remote branch into the current branch.
+	 * @param repo The path of the repository.
+	 * @param branchName The name of the remote branch.
+	 * @param remote The name of the remote containing the remote branch.
+	 * @param createNewCommit Is `--no-ff` enabled if a merge is required.
+	 * @param squash Is `--squash` enabled if a merge is required.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public pullBranch(repo: string, branchName: string, remote: string, createNewCommit: boolean, squash: boolean) {
+		const args = ['pull', remote, branchName], config = getConfig();
+		if (squash) {
+			args.push('--squash');
+		} else if (createNewCommit) {
+			args.push('--no-ff');
+		}
+		if (config.signCommits) {
+			args.push('-S');
+		}
+		return this.runGitCommand(args, repo).then((pullStatus) => {
+			return pullStatus === null && squash
+				? this.commitSquashIfStagedChangesExist(repo, remote + '/' + branchName, MergeActionOn.Branch, config.squashPullMessageFormat, config.signCommits)
+				: pullStatus;
+		});
+	}
+
+	/**
+	 * Rename a branch in a repository.
+	 * @param repo The path of the repository.
+	 * @param oldName The old name of the branch.
+	 * @param newName The new name of the branch.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public renameBranch(repo: string, oldName: string, newName: string) {
+		return this.runGitCommand(['branch', '-m', oldName, newName], repo);
+	}
+
+	public setBranchUpstream(repo: string, branchName: string, upstream: string) {
+		return this.runGitCommand(['branch', '--set-upstream-to=' + upstream, branchName], repo);
+	}
+
+	public unsetBranchUpstream(repo: string, branchName: string) {
+		return this.runGitCommand(['branch', '--unset-upstream', branchName], repo);
+	}
+
+
+	/* Git Action Methods - Branches & Commits */
+
+	/**
+	 * Merge a branch or commit into the current branch.
+	 * @param repo The path of the repository.
+	 * @param obj The object to be merged into the current branch.
+	 * @param actionOn Is the merge on a branch, remote-tracking branch or commit.
+	 * @param createNewCommit Is `--no-ff` enabled.
+	 * @param squash Is `--squash` enabled.
+	 * @param noCommit Is `--no-commit` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public merge(repo: string, obj: string, actionOn: MergeActionOn, createNewCommit: boolean, squash: boolean, noCommit: boolean) {
+		const args = ['merge', obj], config = getConfig();
+		if (squash) {
+			args.push('--squash');
+		} else if (createNewCommit) {
+			args.push('--no-ff');
+		}
+		if (noCommit) {
+			args.push('--no-commit');
+		}
+		if (config.signCommits) {
+			args.push('-S');
+		}
+		return this.runGitCommand(args, repo).then((mergeStatus) => {
+			return mergeStatus === null && squash && !noCommit
+				? this.commitSquashIfStagedChangesExist(repo, obj, actionOn, config.squashMergeMessageFormat, config.signCommits)
+				: mergeStatus;
+		});
+	}
+
+	/**
+	 * Rebase the current branch on a branch or commit.
+	 * @param repo The path of the repository.
+	 * @param obj The object the current branch will be rebased onto.
+	 * @param actionOn Is the rebase on a branch or commit.
+	 * @param ignoreDate Is `--ignore-date` enabled.
+	 * @param interactive Should the rebase be performed interactively.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public rebase(repo: string, obj: string, actionOn: RebaseActionOn, ignoreDate: boolean, interactive: boolean) {
+		if (interactive) {
+			return this.openGitTerminal(
+				repo,
+				'rebase --interactive ' + (getConfig().signCommits ? '-S ' : '') + (actionOn === RebaseActionOn.Branch ? obj.replace(/'/g, '"\'"') : obj),
+				'Rebase on "' + (actionOn === RebaseActionOn.Branch ? obj : abbrevCommit(obj)) + '"'
+			);
+		} else {
+			const args = ['rebase', obj];
+			if (ignoreDate) {
+				args.push('--ignore-date');
+			}
+			if (getConfig().signCommits) {
+				args.push('-S');
+			}
+			return this.runGitCommand(args, repo);
+		}
+	}
+
+
+	/* Git Action Methods - Branches & Tags */
+
+	/**
+	 * Create an archive of a repository at a specific reference, and save to disk.
+	 * @param repo The path of the repository.
+	 * @param ref The reference of the revision to archive.
+	 * @param outputFilePath The file path that the archive should be saved to.
+	 * @param type The type of archive.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public archive(repo: string, ref: string, outputFilePath: string, type: 'tar' | 'zip') {
+		return this.runGitCommand(['archive', '--format=' + type, '-o', outputFilePath, ref], repo);
+	}
+
+
+	/* Git Action Methods - Commits */
+
+	/**
+	 * Checkout a commit in a repository.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to check out.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public checkoutCommit(repo: string, commitHash: string) {
+		return this.runGitCommand(['checkout', commitHash], repo);
+	}
+
+	/**
+	 * Cherrypick a commit in a repository.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to be cherry picked.
+	 * @param parentIndex The parent index if the commit is a merge.
+	 * @param recordOrigin Is `-x` enabled.
+	 * @param noCommit Is `--no-commit` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public cherrypickCommit(repo: string, commitHash: string, parentIndex: number, recordOrigin: boolean, noCommit: boolean) {
+		const args = ['cherry-pick'];
+		if (noCommit) {
+			args.push('--no-commit');
+		}
+		if (recordOrigin) {
+			args.push('-x');
+		}
+		if (getConfig().signCommits) {
+			args.push('-S');
+		}
+		if (parentIndex > 0) {
+			args.push('-m', parentIndex.toString());
+		}
+		args.push(commitHash);
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Drop a commit in a repository.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to drop.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public dropCommit(repo: string, commitHash: string) {
+		const args = ['rebase'];
+		if (getConfig().signCommits) {
+			args.push('-S');
+		}
+		args.push('--onto', commitHash + '^', commitHash);
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Reword (change message of) a commit using a scripted interactive rebase.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to reword.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async promptForRewordCommitMessage(repo: string, commitHash: string): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			return await this.openCommitMessageEditor(await this.getCommitMessage(repo, commitHash));
+		} catch (error) {
+			return {
+				message: null,
+				error: error instanceof Error ? error.message : <ErrorInfo>error
+			};
+		}
+	}
+
+	/**
+	 * Reword (change message of) a commit using a scripted interactive rebase.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to reword.
+	 * @param commitMessage The commit message to use, or undefined to prompt in the editor.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async rewordCommit(repo: string, commitHash: string, commitMessage?: string): Promise<ErrorInfo> {
+		if (typeof commitMessage === 'undefined') {
+			const result = await this.promptForRewordCommitMessage(repo, commitHash);
+			if (result.error !== null || result.message === null) return result.error;
+			commitMessage = result.message;
+		}
+		return this.runScriptedRebase(repo, commitHash + '^', {
+			transform: { reword: commitHash.slice(0, 7) },
+			commitMessage: commitMessage
+		});
+	}
+
+	/**
+	 * Edit the author of a commit using a scripted interactive rebase with an exec step.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit whose author to change.
+	 * @param name The new author name.
+	 * @param email The new author email.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public editCommitAuthor(repo: string, commitHash: string, name: string, email: string): Promise<ErrorInfo> {
+		const authorStr = name + ' <' + email + '>';
+		return this.runScriptedRebase(repo, commitHash + '^', {
+			transform: {
+				execAfter: [{ hash: commitHash.slice(0, 7), command: 'git commit --amend --author "' + authorStr + '" --no-edit' }]
+			}
+		});
+	}
+
+	/**
+	 * Squash a set of commits into one using a scripted interactive rebase.
+	 * commitHashes[0] = newest commit (lowest graph index), commitHashes[N-1] = oldest (first in rebase todo).
+	 * The oldest is kept as 'pick'; all newer ones are changed to 'squash'.
+	 * @param repo The path of the repository.
+	 * @param commitHashes Commit hashes sorted newest-first (as returned by the frontend).
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async promptForSquashCommitMessage(repo: string, commitHashes: ReadonlyArray<string>): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			const commitMessages = await Promise.all(commitHashes.slice().reverse().map((commitHash) => this.getCommitMessage(repo, commitHash)));
+			return await this.openCommitMessageEditor(this.createDefaultSquashCommitMessage(commitMessages));
+		} catch (error) {
+			return {
+				message: null,
+				error: error instanceof Error ? error.message : <ErrorInfo>error
+			};
+		}
+	}
+
+	/**
+	 * Squash a set of commits into one using a scripted interactive rebase.
+	 * commitHashes[0] = newest commit (lowest graph index), commitHashes[N-1] = oldest (first in rebase todo).
+	 * The oldest is kept as 'pick'; all newer ones are changed to 'squash'.
+	 * @param repo The path of the repository.
+	 * @param commitHashes Commit hashes sorted newest-first (as returned by the frontend).
+	 * @param commitMessage The commit message to use, or undefined to prompt in the editor.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public async squashCommits(repo: string, commitHashes: ReadonlyArray<string>, commitMessage?: string): Promise<ErrorInfo> {
+		if (typeof commitMessage === 'undefined') {
+			const result = await this.promptForSquashCommitMessage(repo, commitHashes);
+			if (result.error !== null || result.message === null) return result.error;
+			commitMessage = result.message;
+		}
+		// commitHashes[N-1] = oldest = the 'pick' anchor; squash all the newer ones
+		const squashShortHashes = commitHashes.slice(0, -1).map((h) => h.slice(0, 7));
+		return this.runScriptedRebase(repo, commitHashes[commitHashes.length - 1] + '^', {
+			transform: { squash: squashShortHashes },
+			commitMessage: commitMessage
+		});
+	}
+
+	/**
+	 * Find the Node.js executable by searching PATH directories.
+	 * Falls back to 'node' if not found (relies on it being in PATH at shell time).
+	 */
+	private findNodeExecutable(): string | null {
+		const pathDirs = (process.env.PATH || '').split(path.delimiter);
+		const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
+		for (const dir of pathDirs) {
+			if (!dir) continue;
+			const candidate = path.join(dir, nodeName);
+			try {
+				fs.accessSync(candidate, fs.constants.X_OK);
+				return candidate;
+			} catch (_) { /* not found here */ }
+		}
+		// Fall back to the runtime VS Code's extension host is already using.
+		// On remote/Docker this is a plain node binary; on desktop it's Electron,
+		// which can execute plain Node.js scripts the same way.
+		try {
+			fs.accessSync(process.execPath, fs.constants.X_OK);
+			return process.execPath;
+		} catch (_) { }
+		return null;
+	}
+
+	/**
+	 * Quote a file path so that git's sh.exe (git-for-windows) treats it as a single token.
+	 * Converts backslashes to forward slashes and wraps in double quotes.
+	 */
+	private shQuotePath(p: string): string {
+		return '"' + p.replace(/\\/g, '/') + '"';
+	}
+
+	/**
+	 * Run a scripted interactive rebase by writing temp Node.js scripts that act as
+	 * GIT_SEQUENCE_EDITOR (and optionally GIT_EDITOR) so no terminal is needed.
+	 *
+	 * The transform is passed as plain JSON data to the script — no closure serialization —
+	 * so closed-over variables are always available at script runtime.
+	 */
+	private async runScriptedRebase(repo: string, base: string, opts: {
+		transform: {
+			/** Short hash of the commit whose verb should change from 'pick' to 'reword'. */
+			reword?: string;
+			/** Short hashes that should change from 'pick' to 'squash' (the anchor/oldest commit is NOT listed here). */
+			squash?: string[];
+			/** Exec lines to insert immediately after a matching pick line. */
+			execAfter?: Array<{ hash: string; command: string }>;
+		};
+		commitMessage?: string;
+	}): Promise<ErrorInfo> {
+		if (this.gitExecutable === null) {
+			return UNABLE_TO_FIND_GIT_MSG;
+		}
+
+		const nodeExe = this.findNodeExecutable();
+		if (nodeExe === null) {
+			return 'Unable to squash commits: Node.js was not found on PATH. Please install Node.js and ensure it is accessible.';
+		}
+		const uid = Date.now() + '-' + Math.random().toString(36).slice(2);
+		const seqScript = path.join(os.tmpdir(), 'an-dr-commits-seq-' + uid + '.js');
+		const msgScript = path.join(os.tmpdir(), 'an-dr-commits-msg-' + uid + '.js');
+
+		// Embed transform data as JSON so the script needs no closure variables.
+		// Hash matching uses startsWith-style checks to handle git's variable abbreviation length.
+		const transformJson = JSON.stringify(opts.transform);
+		fs.writeFileSync(seqScript, [
+			'var fs = require(\'fs\');',
+			'var data = ' + transformJson + ';',
+			'var file = process.argv[process.argv.length - 1];',
+			'var lines = fs.readFileSync(file, "utf8").split(/\\r?\\n/);',
+			'var out = [];',
+			'for (var i = 0; i < lines.length; i++) {',
+			'  var line = lines[i];',
+			'  var parts = line.split(" ");',
+			'  if (parts[0] === "pick" && parts[1]) {',
+			'    var h = parts[1];',
+			'    var rest = parts.slice(1).join(" ");',
+			'    if (data.reword && (h.indexOf(data.reword) === 0 || data.reword.indexOf(h) === 0)) {',
+			'      line = "reword " + rest;',
+			'    } else if (data.squash && data.squash.some(function(s){return h.indexOf(s)===0||s.indexOf(h)===0;})) {',
+			'      line = "squash " + rest;',
+			'    }',
+			'    out.push(line);',
+			'    if (data.execAfter) {',
+			'      data.execAfter.forEach(function(ea) {',
+			'        if (h.indexOf(ea.hash) === 0 || ea.hash.indexOf(h) === 0)',
+			'          out.push("exec " + ea.command);',
+			'      });',
+			'    }',
+			'  } else {',
+			'    out.push(line);',
+			'  }',
+			'}',
+			'fs.writeFileSync(file, out.join("\\n"));'
+		].join('\n'));
+
+		const env: NodeJS.ProcessEnv = Object.assign({}, process.env, this.askpassEnv, {
+			GIT_SEQUENCE_EDITOR: this.shQuotePath(nodeExe) + ' ' + this.shQuotePath(seqScript)
+		});
+
+		if (opts.commitMessage !== undefined) {
+			const escapedMsg = JSON.stringify(opts.commitMessage);
+			fs.writeFileSync(msgScript, [
+				'var fs = require(\'fs\');',
+				'fs.writeFileSync(process.argv[process.argv.length - 1], ' + escapedMsg + ');'
+			].join('\n'));
+			env['GIT_EDITOR'] = this.shQuotePath(nodeExe) + ' ' + this.shQuotePath(msgScript);
+		}
+
+		const args = ['rebase', '-i'];
+		if (getConfig().signCommits) {
+			args.splice(1, 0, '-S');
+		}
+		args.push(base);
+
+		let result: ErrorInfo = null;
+		try {
+			await resolveSpawnOutput(cp.spawn(this.gitExecutable.path, args, {
+				cwd: repo,
+				env: env
+			})).then((values) => {
+				const status = values[0], stdout = values[1], stderr = values[2];
+				if (status.code === 0) {
+					result = null;
+				} else {
+					result = getErrorMessage(status.error, stdout, stderr);
+				}
+			});
+		} catch (e) {
+			result = getErrorMessage(e, Buffer.alloc(0), '');
+		}
+
+		try { fs.unlinkSync(seqScript); } catch (_) { /* ignore */ }
+		if (opts.commitMessage !== undefined) {
+			try { fs.unlinkSync(msgScript); } catch (_) { /* ignore */ }
+		}
+
+		return result!;
+	}
+
+	private async openCommitMessageEditor(initialContent: string): Promise<{ message: string | null; error: ErrorInfo }> {
+		try {
+			const commitMessage = await this.gitEditorManager.showCommitMessageEditor(initialContent);
+			if (commitMessage === null || commitMessage.trim() === '') {
+				return { message: null, error: null };
+			}
+			return { message: commitMessage, error: null };
+		} catch (error) {
+			return {
+				message: null,
+				error: error instanceof Error ? error.message : 'Unable to open the Git commit editor.'
+			};
+		}
+	}
+
+	private getCommitMessage(repo: string, commitHash: string): Promise<string> {
+		return this.spawnGit(['show', '-s', '--format=%B', commitHash], repo, (stdout) => stdout);
+	}
+
+	private createDefaultSquashCommitMessage(commitMessages: ReadonlyArray<string>): string {
+		const lines = ['# This is a combination of ' + commitMessages.length + ' commits.', ''];
+		for (let i = 0; i < commitMessages.length; i++) {
+			lines.push('# Commit message #' + (i + 1) + ':', '');
+			lines.push(...removeTrailingBlankLines(commitMessages[i].replace(/\r\n/g, '\n').split('\n')));
+			lines.push('');
+		}
+		return removeTrailingBlankLines(lines).join('\n');
+	}
+
+	/**
+	 * Reset the current branch to a specified commit.
+	 * @param repo The path of the repository.
+	 * @param commit The hash of the commit that the current branch should be reset to.
+	 * @param resetMode The mode of the reset.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public resetToCommit(repo: string, commit: string, resetMode: GitResetMode) {
+		return this.runGitCommand(['reset', '--' + resetMode, commit], repo);
+	}
+
+	/**
+	 * Reset to HEAD, hard. When deep=true also clean all untracked files/dirs and reinitialise submodules.
+	 */
+	public async resetToHead(repo: string, resetTracked: boolean, cleanUntracked: boolean, cleanIgnored: boolean, resetSubmodules: boolean, cleanSubmodules: boolean, updateSubmodules: boolean): Promise<ErrorInfo> {
+		if (resetTracked) {
+			const err = await this.runGitCommand(['reset', '--hard', 'HEAD'], repo);
+			if (err !== null) return err;
+		}
+		if (cleanUntracked || cleanIgnored) {
+			const flags = '-ff' + (cleanIgnored ? 'x' : '') + 'd';
+			const err = await this.runGitCommand(['clean', flags], repo);
+			if (err !== null) return err;
+		}
+		if (resetSubmodules) {
+			const err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git reset --hard HEAD'], repo);
+			if (err !== null) return err;
+		}
+		if (cleanSubmodules) {
+			const err = await this.runGitCommand(['submodule', 'foreach', '--recursive', 'git clean -ffdx'], repo);
+			if (err !== null) return err;
+		}
+		if (updateSubmodules) {
+			const err = await this.runGitCommand(['submodule', 'update', '--init', '--recursive'], repo);
+			if (err !== null) return err;
+		}
+		return null;
+	}
+
+	/**
+	 * Revert a commit in a repository.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit to revert.
+	 * @param parentIndex The parent index if the commit is a merge.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public revertCommit(repo: string, commitHash: string, parentIndex: number) {
+		const args = ['revert', '--no-edit'];
+		if (getConfig().signCommits) {
+			args.push('-S');
+		}
+		if (parentIndex > 0) {
+			args.push('-m', parentIndex.toString());
+		}
+		args.push(commitHash);
+		return this.runGitCommand(args, repo);
+	}
+
+
+	/* Git Action Methods - Config */
+
+	/**
+	 * Set a configuration value for a repository.
+	 * @param repo The path of the repository.
+	 * @param key The Git Config Key to be set.
+	 * @param value The value to be set.
+	 * @param location The location where the configuration value should be set.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public setConfigValue(repo: string, key: GitConfigKey, value: string, location: GitConfigLocation) {
+		return this.runGitCommand(['config', '--' + location, key, value], repo);
+	}
+
+	/**
+	 * Unset a configuration value for a repository.
+	 * @param repo The path of the repository.
+	 * @param key The Git Config Key to be unset.
+	 * @param location The location where the configuration value should be unset.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public unsetConfigValue(repo: string, key: GitConfigKey, location: GitConfigLocation) {
+		return this.runGitCommand(['config', '--' + location, '--unset-all', key], repo);
+	}
+
+
+	/* Git Action Methods - Uncommitted */
+
+	/**
+	 * Clean the untracked files in a repository.
+	 * @param repo The path of the repository.
+	 * @param directories Is `-d` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public cleanUntrackedFiles(repo: string, directories: boolean) {
+		return this.runGitCommand(['clean', '-f' + (directories ? 'd' : '')], repo);
+	}
+
+
+	/* Git Action Methods - File */
+
+	/**
+	 * Reset a file to the specified revision.
+	 * @param repo The path of the repository.
+	 * @param commitHash The commit to reset the file to.
+	 * @param filePath The file to reset.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public resetFileToRevision(repo: string, commitHash: string, filePath: string) {
+		return this.runGitCommand(['checkout', commitHash, '--', filePath], repo);
+	}
+
+
+	/* Git Action Methods - Stash */
+
+	/**
+	 * Apply a stash in a repository.
+	 * @param repo The path of the repository.
+	 * @param selector The selector of the stash.
+	 * @param reinstateIndex Is `--index` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public applyStash(repo: string, selector: string, reinstateIndex: boolean) {
+		let args = ['stash', 'apply'];
+		if (reinstateIndex) args.push('--index');
+		args.push(selector);
+
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Create a branch from a stash.
+	 * @param repo The path of the repository.
+	 * @param selector The selector of the stash.
+	 * @param branchName The name of the branch to be created.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public branchFromStash(repo: string, selector: string, branchName: string) {
+		return this.runGitCommand(['stash', 'branch', branchName, selector], repo);
+	}
+
+	/**
+	 * Drop a stash in a repository.
+	 * @param repo The path of the repository.
+	 * @param selector The selector of the stash.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public dropStash(repo: string, selector: string) {
+		return this.runGitCommand(['stash', 'drop', selector], repo);
+	}
+
+	/**
+	 * Pop a stash in a repository.
+	 * @param repo The path of the repository.
+	 * @param selector The selector of the stash.
+	 * @param reinstateIndex Is `--index` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public popStash(repo: string, selector: string, reinstateIndex: boolean) {
+		let args = ['stash', 'pop'];
+		if (reinstateIndex) args.push('--index');
+		args.push(selector);
+
+		return this.runGitCommand(args, repo);
+	}
+
+	/**
+	 * Push the uncommitted changes to a stash.
+	 * @param repo The path of the repository.
+	 * @param message The message of the stash.
+	 * @param includeUntracked Is `--include-untracked` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public pushStash(repo: string, message: string, includeUntracked: boolean): Promise<ErrorInfo> {
+		if (this.gitExecutable === null) {
+			return Promise.resolve(UNABLE_TO_FIND_GIT_MSG);
+		} else if (!doesVersionMeetRequirement(this.gitExecutable.version, GitVersionRequirement.PushStash)) {
+			return Promise.resolve(constructIncompatibleGitVersionMessage(this.gitExecutable, GitVersionRequirement.PushStash));
+		}
+
+		let args = ['stash', 'push'];
+		if (includeUntracked) args.push('--include-untracked');
+		if (message !== '') args.push('--message', message);
+		return this.runGitCommand(args, repo);
+	}
+
+
+	/* Public Utils */
+
+	/**
+	 * Opens an external directory diff for the specified commits.
+	 * @param repo The path of the repository.
+	 * @param fromHash The commit hash the diff is from.
+	 * @param toHash The commit hash the diff is to.
+	 * @param isGui Is the external diff tool GUI based.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public openExternalDirDiff(repo: string, fromHash: string, toHash: string, isGui: boolean) {
+		return new Promise<ErrorInfo>((resolve) => {
+			if (this.gitExecutable === null) {
+				resolve(UNABLE_TO_FIND_GIT_MSG);
+			} else {
+				const args = ['difftool', '--dir-diff'];
+				if (isGui) {
+					args.push('-g');
+				}
+				if (fromHash === toHash) {
+					if (toHash === UNCOMMITTED) {
+						args.push('HEAD');
+					} else {
+						args.push(toHash + '^..' + toHash);
+					}
+				} else {
+					if (toHash === UNCOMMITTED) {
+						args.push(fromHash);
+					} else {
+						args.push(fromHash + '..' + toHash);
+					}
+				}
+				if (isGui) {
+					this.logger.logDebug('External diff tool is being opened (' + args[args.length - 1] + ')');
+					this.runGitCommand(args, repo).then((errorInfo) => {
+						this.logger.logDebug('External diff tool has exited (' + args[args.length - 1] + ')');
+						if (errorInfo !== null) {
+							const errorMessage = errorInfo.replace(EOL_REGEX, ' ');
+							this.logger.logError(errorMessage);
+							showErrorMessage(errorMessage);
+						}
+					});
+				} else {
+					openGitTerminal(repo, this.gitExecutable.path, args.join(' '), 'Open External Directory Diff');
+				}
+				setTimeout(() => resolve(null), 1500);
+			}
+		});
+	}
+
+	/**
+	 * Open a new terminal, set up the Git executable, and optionally run a command.
+	 * @param repo The path of the repository.
+	 * @param command The command to run.
+	 * @param name The name for the terminal.
+	 * @returns The ErrorInfo from opening the terminal.
+	 */
+	public openGitTerminal(repo: string, command: string | null, name: string) {
+		return new Promise<ErrorInfo>((resolve) => {
+			if (this.gitExecutable === null) {
+				resolve(UNABLE_TO_FIND_GIT_MSG);
+			} else {
+				openGitTerminal(repo, this.gitExecutable.path, command, name);
+				setTimeout(() => resolve(null), 1000);
+			}
+		});
+	}
+
+
+	/* Private Data Providers */
+
+	private getRefSnapshot(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>): Promise<GitRefSnapshot> {
+		return Promise.all([
+			this.spawnGit(['for-each-ref', '--format=' + GIT_REF_FORMAT, 'refs/heads', 'refs/remotes', 'refs/tags'], repo, (stdout) => stdout),
+			this.spawnGit(['rev-parse', '--verify', 'HEAD'], repo, (stdout) => stdout.trim()).catch((): null => null)
+		]).then(([stdout, headHash]) => parseRefSnapshotOutput(stdout, headHash, GIT_LOG_SEPARATOR, {
+			showRemoteBranches,
+			showRemoteHeads,
+			hideRemotePatterns: hideRemotes.map((remote) => 'refs/remotes/' + remote + '/')
+		}));
+	}
+
+	/**
+	 * Continue or abort a repository in-progress state.
+	 * @param repo The path of the repository.
+	 * @param state The repository in-progress state type.
+	 * @param action The action to perform.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public repoInProgressAction(repo: string, state: GitRepoInProgressStateType, action: GitRepoInProgressAction) {
+		const gitAction = action === GitRepoInProgressAction.Continue ? '--continue' : '--abort';
+		const gitState = state === GitRepoInProgressStateType.Rebase
+			? 'rebase'
+			: state === GitRepoInProgressStateType.Merge
+				? 'merge'
+				: state === GitRepoInProgressStateType.CherryPick
+					? 'cherry-pick'
+					: 'revert';
+		return this.runGitCommand([gitState, gitAction], repo);
+	}
+
+	/**
+	 * Get the base commit details for the Commit Details View.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit open in the Commit Details View.
+	 * @returns The base commit details.
+	 */
+	private getCommitDetailsBase(repo: string, commitHash: string) {
+		return this.spawnGit(
+			['-c', 'log.showSignature=false', 'show', '--quiet', commitHash, '--format=' + this.gitFormatCommitDetails],
+			repo,
+			(stdout) => parseCommitDetailsOutput(stdout, GIT_LOG_SEPARATOR)
+		);
+	}
+
+	/**
+	 * Get the configuration list of a repository.
+	 * @param repo The path of the repository.
+	 * @param location The location of the configuration to be listed.
+	 * @returns A set of key-value pairs of Git configuration records.
+	 */
+	private getConfigList(repo: string, location?: GitConfigLocation): Promise<GitConfigSet> {
+		const args = ['--no-pager', 'config', '--list', '-z', '--includes'];
+		if (location) {
+			args.push('--' + location);
+		}
+
+		return this.spawnGit(args, repo, (stdout) => {
+			const configs: GitConfigSet = {}, keyValuePairs = stdout.split('\0');
+			const numPairs = keyValuePairs.length - 1;
+			let comps, key;
+			for (let i = 0; i < numPairs; i++) {
+				comps = keyValuePairs[i].split(EOL_REGEX);
+				key = comps.shift()!;
+				configs[key] = comps.join('\n');
+			}
+			return configs;
+		}).catch((errorMessage) => {
+			if (typeof errorMessage === 'string') {
+				const message = errorMessage.toLowerCase();
+				if (message.startsWith('fatal: unable to read config file') && message.endsWith('no such file or directory')) {
+					// If the Git command failed due to the configuration file not existing, return an empty list instead of throwing the exception
+					return {};
+				}
+			} else {
+				errorMessage = 'An unexpected error occurred while spawning the Git child process.';
+			}
+			throw errorMessage;
+		});
+	}
+
+	/**
+	 * Get the diff raw file-change records, including modes and object IDs.
+	 * @param repo The path of the repository.
+	 * @param fromHash The revision the diff is from.
+	 * @param toHash The revision the diff is to.
+	 * @param filter The types of file changes to retrieve (defaults to `AMDR`).
+	 * @returns An array of raw file-change records.
+	 */
+	private getDiffFileChanges(repo: string, fromHash: string, toHash: string, filter: string = 'AMDRT') {
+		return this.execDiff(repo, fromHash, toHash, '--raw', filter).then((output) => parseDiffNameStatusOutput(output));
+	}
+
+	/**
+	 * Get the diff `--numstat` records.
+	 * @param repo The path of the repository.
+	 * @param fromHash The revision the diff is from.
+	 * @param toHash The revision the diff is to.
+	 * @param filter The types of file changes to retrieve (defaults to `AMDR`).
+	 * @returns An array of `--numstat` records.
+	 */
+	private getDiffNumStat(repo: string, fromHash: string, toHash: string, filter: string = 'AMDR') {
+		return this.execDiff(repo, fromHash, toHash, '--numstat', filter).then((output) => parseDiffNumStatOutput(output));
+	}
+
+	/**
+	 * Get the raw commits in a repository.
+	 * @param repo The path of the repository.
+	 * @param branches The list of branch heads to display, or NULL (show all).
+	 * @param num The maximum number of commits to return.
+	 * @param includeTags Include commits only referenced by tags.
+	 * @param includeRemotes Include remote branches.
+	 * @param includeCommitsMentionedByReflogs Include commits mentioned by reflogs.
+	 * @param onlyFollowFirstParent Only follow the first parent of commits.
+	 * @param order The order for commits to be returned.
+	 * @param remotes An array of the known remotes.
+	 * @param hideRemotes An array of hidden remotes.
+	 * @param stashes An array of all stashes in the repository.
+	 * @returns An array of commits.
+	 */
+	private getLog(repo: string, branches: ReadonlyArray<string> | null, num: number, includeTags: boolean, includeRemotes: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, order: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>) {
+		const args = ['-c', 'log.showSignature=false', 'log', '--max-count=' + num, '--format=' + this.gitFormatLog, '--' + order + '-order'];
+		if (onlyFollowFirstParent) {
+			args.push('--first-parent');
+		}
+		if (branches !== null) {
+			for (let i = 0; i < branches.length; i++) {
+				args.push(branches[i]);
+			}
+		} else {
+			// Show All
+			args.push('--branches');
+			if (includeTags) args.push('--tags');
+			if (includeCommitsMentionedByReflogs) args.push('--reflog');
+			if (includeRemotes) {
+				if (hideRemotes.length === 0) {
+					args.push('--remotes');
+				} else {
+					remotes.filter((remote) => !hideRemotes.includes(remote)).forEach((remote) => {
+						args.push('--glob=refs/remotes/' + remote);
+					});
+				}
+			}
+
+			// Add the unique list of base hashes of stashes, so that commits only referenced by stashes are displayed
+			const stashBaseHashes = stashes.map((stash) => stash.baseHash);
+			stashBaseHashes.filter((hash, index) => stashBaseHashes.indexOf(hash) === index).forEach((hash) => args.push(hash));
+
+			args.push('HEAD');
+		}
+		args.push('--');
+
+		return this.spawnGit(args, repo, (stdout) => parseLogOutput(stdout, GIT_LOG_SEPARATOR));
+	}
+
+	private consumeRefSnapshot(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>) {
+		const key = this.getRefSnapshotKey(repo, showRemoteBranches, showRemoteHeads, hideRemotes);
+		const pending = this.pendingRefSnapshots.get(key);
+		if (typeof pending !== 'undefined') {
+			this.pendingRefSnapshots.delete(key);
+			return Promise.resolve(pending);
+		}
+		return this.getRefSnapshot(repo, showRemoteBranches, showRemoteHeads, hideRemotes).then((snapshot) => snapshot.refs);
+	}
+
+	private getRefSnapshotKey(repo: string, showRemoteBranches: boolean, showRemoteHeads: boolean, hideRemotes: ReadonlyArray<string>) {
+		return [repo, showRemoteBranches ? '1' : '0', showRemoteHeads ? '1' : '0', ...hideRemotes].join('\0');
+	}
+
+	/**
+	 * Get all of the remotes that contain the specified commit hash.
+	 * @param repo The path of the repository.
+	 * @param commitHash The commit hash to test.
+	 * @param knownRemotes The list of known remotes to check for.
+	 * @returns A promise resolving to a list of remote names.
+	 */
+	private getRemotesContainingCommit(repo: string, commitHash: string, knownRemotes: string[]) {
+		return this.spawnGit(
+			['branch', '-r', '--no-color', '--contains=' + commitHash],
+			repo,
+			(stdout) => parseRemotesContainingCommitOutput(stdout, INVALID_BRANCH_REGEXP, knownRemotes)
+		);
+	}
+
+	/**
+	 * Get the stashes in a repository.
+	 * @param repo The path of the repository.
+	 * @returns An array of stashes.
+	 */
+	private getStashes(repo: string) {
+		return this.spawnGit(
+			['reflog', '--format=' + this.gitFormatStash, 'refs/stash', '--'],
+			repo,
+			(stdout) => parseStashesOutput(stdout, GIT_LOG_SEPARATOR)
+		).catch(() => <GitStash[]>[]);
+	}
+
+	/**
+	 * Get the names of the remotes of a repository.
+	 * @param repo The path of the repository.
+	 * @returns An array of remote names.
+	 */
+	private getRemotes(repo: string) {
+		return this.spawnGit(['remote'], repo, (stdout) => {
+			let lines = stdout.split(EOL_REGEX);
+			lines.pop();
+			return lines;
+		});
+	}
+
+	/**
+	 * Get the current branch, its HEAD commit, and its upstream (if any) - derived from the shared
+	 * repository snapshot rather than its own Git processes, so a surface that reads head info
+	 * costs nothing once any surface has read the repository this generation (see ADR-026).
+	 * @param repo The path of the repository.
+	 * @returns The head info, or NULL if there is no checked out local branch (mirrors vscode.git's
+	 * `state.HEAD.name` being undefined in that case, which callers rely on to short-circuit).
+	 */
+	public async getHeadInfo(repo: string): Promise<HeadInfo | null> {
+		await this.ensureVerified(repo);
+		const snapshot = await this.getCanonicalSnapshot(repo).catch((): null => null);
+		if (snapshot === null) return null;
+
+		// The parser reports a detached HEAD as the 'HEAD' sentinel and an unborn one as NULL -
+		// both are "no checked out local branch", which is what NULL means to every caller here.
+		const branchName = snapshot.refs.branches.head;
+		if (branchName === null || branchName === 'HEAD') return null;
+
+		const remoteNames = [...snapshot.remotes];
+		const upstreamRef = snapshot.refs.branches.branchUpstreams[branchName] ?? null;
+		return {
+			branchName,
+			headHash: snapshot.refs.refs.head,
+			upstreamRemote: resolveUpstreamRemote(upstreamRef, remoteNames),
+			upstreamRef,
+			remoteNames
+		};
+	}
+
+	/**
+	 * Get the signature of a signed tag.
+	 * @param repo The path of the repository.
+	 * @param ref The reference identifying the tag.
+	 * @returns A Promise resolving to the signature.
+	 */
+	private getTagSignature(repo: string, ref: string): Promise<GitSignature> {
+		return this._spawnGit(['verify-tag', '--raw', ref], repo, (stdout, stderr) => stderr || stdout.toString(), true).then((output) => {
+			const records = output.split(EOL_REGEX)
+				.filter((line) => line.startsWith('[GNUPG:] '))
+				.map((line) => line.split(' '));
+
+			let signature: Writeable<GitSignature> | null = null, trustLevel: string | null = null, parsingDetails: GpgStatusCodeParsingDetails | undefined;
+			for (let i = 0; i < records.length; i++) {
+				parsingDetails = GPG_STATUS_CODE_PARSING_DETAILS[records[i][1]];
+				if (parsingDetails) {
+					if (signature !== null) {
+						throw new Error('Multiple Signatures Exist: As Git currently doesn\'t support them, nor does Commits (for consistency).');
+					} else {
+						signature = {
+							status: parsingDetails.status,
+							key: records[i][2],
+							signer: parsingDetails.uid ? records[i].slice(3).join(' ') : '' // When parsingDetails.uid === TRUE, the signer is the rest of the record (so join the remaining arguments)
+						};
+					}
+				} else if (records[i][1].startsWith('TRUST_')) {
+					trustLevel = records[i][1];
+				}
+			}
+
+			if (signature !== null && signature.status === GitSignatureStatus.GoodAndValid && (trustLevel === 'TRUST_UNDEFINED' || trustLevel === 'TRUST_NEVER')) {
+				signature.status = GitSignatureStatus.GoodWithUnknownValidity;
+			}
+
+			if (signature !== null) {
+				return signature;
+			} else {
+				throw new Error('No Signature could be parsed.');
+			}
+		}).catch(() => ({
+			status: GitSignatureStatus.CannotBeChecked,
+			key: '',
+			signer: ''
+		}));
+	}
+
+	/**
+	 * Get the number of uncommitted changes in a repository.
+	 * @param repo The path of the repository.
+	 * @returns The number of uncommitted changes.
+	 */
+	public getWorkingTreeChangeCount(repo: string) {
+		if (!getConfig().showUncommittedChanges) return Promise.resolve(0);
+		return this.spawnGit(['status', '--untracked-files=' + (getConfig().showUntrackedFiles ? 'all' : 'no'), '--porcelain'], repo, (stdout) => {
+			const numLines = stdout.split(EOL_REGEX).length;
+			return numLines > 1 ? numLines - 1 : 0;
+		});
+	}
+
+	/**
+	 * Get the untracked and deleted files that are not staged or committed.
+	 * @param repo The path of the repository.
+	 * @returns The untracked and deleted files.
+	 */
+	private getStatus(repo: string) {
+		return this.spawnGit(
+			['status', '-s', '--untracked-files=' + (getConfig().showUntrackedFiles ? 'all' : 'no'), '--porcelain', '-z'],
+			repo,
+			(stdout) => parseStatusOutput(stdout)
+		);
+	}
+
+	private getRepoInProgressState(repo: string): Promise<GitRepoInProgressState | null> {
+		return this.spawnGit([
+			'rev-parse',
+			'--git-path', 'rebase-merge',
+			'--git-path', 'rebase-apply',
+			'--git-path', 'MERGE_HEAD',
+			'--git-path', 'CHERRY_PICK_HEAD',
+			'--git-path', 'REVERT_HEAD'
+		], repo, (stdout) => stdout.split(EOL_REGEX).filter((line) => line.trim() !== '')).then(async (gitPaths) => {
+			if (gitPaths.length < 5) return null;
+
+			const resolveGitPath = (gitPath: string) =>
+				DRIVE_LETTER_PATH_REGEX.test(gitPath) || path.isAbsolute(gitPath)
+					? gitPath
+					: path.resolve(repo, gitPath);
+
+			const rebaseMergePath = resolveGitPath(gitPaths[0]);
+			const rebaseApplyPath = resolveGitPath(gitPaths[1]);
+			const mergeHeadPath = resolveGitPath(gitPaths[2]);
+			const cherryPickHeadPath = resolveGitPath(gitPaths[3]);
+			const revertHeadPath = resolveGitPath(gitPaths[4]);
+
+			const hasRebaseMerge = await this.pathExists(rebaseMergePath);
+			const hasRebaseApply = hasRebaseMerge ? false : await this.pathExists(rebaseApplyPath);
+			if (hasRebaseMerge || hasRebaseApply) {
+				const rebasePath = hasRebaseMerge ? rebaseMergePath : rebaseApplyPath;
+				return {
+					type: GitRepoInProgressStateType.Rebase,
+					rebaseProgress: await this.getRebaseProgress(rebasePath),
+					rebaseContext: await this.getRebaseContext(repo, rebasePath),
+					rebaseCommitStates: await this.getRebaseCommitStates(rebasePath),
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: await this.getRebaseSubject(rebasePath)
+				};
+			}
+
+			if (await this.pathExists(mergeHeadPath)) {
+				return {
+					type: GitRepoInProgressStateType.Merge,
+					rebaseProgress: null,
+					rebaseContext: null,
+					rebaseCommitStates: null,
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: null
+				};
+			}
+			if (await this.pathExists(cherryPickHeadPath)) {
+				return {
+					type: GitRepoInProgressStateType.CherryPick,
+					rebaseProgress: null,
+					rebaseContext: null,
+					rebaseCommitStates: null,
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: null
+				};
+			}
+			if (await this.pathExists(revertHeadPath)) {
+				return {
+					type: GitRepoInProgressStateType.Revert,
+					rebaseProgress: null,
+					rebaseContext: null,
+					rebaseCommitStates: null,
+					workingTreeStatus: await this.getRepoInProgressWorkingTreeStatus(repo),
+					subject: null
+				};
+			}
+			return null;
+		});
+	}
+
+	private async getRebaseContext(repo: string, rebasePath: string): Promise<{
+		branch: string | null;
+		onto: string | null;
+	}> {
+		const branchRef = await this.readTextFile(path.join(rebasePath, 'head-name'));
+		const ontoNameRef = await this.readTextFile(path.join(rebasePath, 'onto_name'));
+		const ontoHash = await this.readTextFile(path.join(rebasePath, 'onto'));
+
+		const branch = this.normaliseRefName(branchRef);
+		if (ontoNameRef !== null) {
+			return {
+				branch: branch,
+				onto: this.normaliseRefName(ontoNameRef)
+			};
+		}
+		if (ontoHash === null) {
+			return {
+				branch: branch,
+				onto: null
+			};
+		}
+
+		const ontoHashTrimmed = ontoHash.trim();
+		const ontoRef = await this.spawnGit(
+			['for-each-ref', '--format=%(refname:short)', '--points-at', ontoHashTrimmed, 'refs/heads', 'refs/remotes'],
+			repo,
+			(stdout) => stdout.split(EOL_REGEX).map((line) => line.trim()).filter((line) => line !== '')
+		).then((refs) => refs.length > 0 ? refs[0] : null, () => null);
+
+		return {
+			branch: branch,
+			onto: ontoRef !== null ? ontoRef : abbrevCommit(ontoHashTrimmed)
+		};
+	}
+
+	private async getRepoInProgressWorkingTreeStatus(repo: string): Promise<{
+		changed: number;
+		staged: number;
+		conflicts: number;
+		untracked: number;
+	} | null> {
+		const conflictStates = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
+		return this.spawnGit(['status', '--porcelain', '--untracked-files=all'], repo, (stdout) => {
+			const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
+			let changed = 0, staged = 0, conflicts = 0, untracked = 0;
+			for (let i = 0; i < lines.length; i++) {
+				if (lines[i].length < 2) continue;
+				const x = lines[i].substring(0, 1), y = lines[i].substring(1, 2), xy = x + y;
+				if (xy === '??') {
+					untracked++;
+					continue;
+				}
+				if (conflictStates.has(xy)) {
+					conflicts++;
+					continue;
+				}
+				if (x !== ' ' && x !== '?') staged++;
+				if (y !== ' ' && y !== '?') changed++;
+			}
+			return { changed, staged, conflicts, untracked };
+		}).catch(() => null);
+	}
+
+	private async getRebaseSubject(rebasePath: string): Promise<string | null> {
+		const candidates = ['message', 'final-commit', 'msg-clean'];
+		for (let i = 0; i < candidates.length; i++) {
+			const content = await this.readTextFile(path.join(rebasePath, candidates[i]));
+			if (content === null) continue;
+			const subjectLine = content
+				.split(EOL_REGEX)
+				.map((line) => line.trim())
+				.find((line) => line !== '' && !line.startsWith('#'));
+			if (typeof subjectLine === 'string') {
+				return subjectLine.length > 120 ? subjectLine.substring(0, 120) + '...' : subjectLine;
+			}
+		}
+		return null;
+	}
+
+	private async getRebaseCommitStates(rebasePath: string): Promise<Array<{
+		hash: string;
+		kind: 'todo' | 'done' | 'in-progress';
+		offset: number;
+	}>> {
+		const [todoContent, doneContent, stoppedShaContent] = await Promise.all([
+			this.readTextFile(path.join(rebasePath, 'git-rebase-todo')),
+			this.readTextFile(path.join(rebasePath, 'done')),
+			this.readTextFile(path.join(rebasePath, 'stopped-sha'))
+		]);
+
+		const parseHashes = (content: string | null) => {
+			if (content === null) return [];
+			return content
+				.split(EOL_REGEX)
+				.map((line) => line.trim())
+				.filter((line) => line !== '' && !line.startsWith('#'))
+				.map((line) => line.split(/\s+/))
+				.filter((tokens) => tokens.length >= 2 && /^(pick|reword|edit|squash|fixup|drop)$/i.test(tokens[0]))
+				.map((tokens) => tokens[1]);
+		};
+
+		const todoHashes = parseHashes(todoContent);
+		const doneHashes = parseHashes(doneContent);
+		const inProgressHash = stoppedShaContent !== null && stoppedShaContent.trim() !== '' ? stoppedShaContent.trim() : null;
+
+		const states: Array<{ hash: string; kind: 'todo' | 'done' | 'in-progress'; offset: number }> = [];
+		const seen: { [hash: string]: boolean } = {};
+		const addState = (hash: string, kind: 'todo' | 'done' | 'in-progress', offset: number) => {
+			const key = hash.toLowerCase();
+			if (seen[key]) return;
+			seen[key] = true;
+			states.push({ hash, kind, offset });
+		};
+
+		if (inProgressHash !== null) {
+			addState(inProgressHash, 'in-progress', 0);
+		}
+		for (let i = 0; i < todoHashes.length; i++) {
+			addState(todoHashes[i], 'todo', i + 1);
+		}
+		let doneOffset = 1;
+		for (let i = doneHashes.length - 1; i >= 0; i--) {
+			if (inProgressHash !== null && doneHashes[i].toLowerCase() === inProgressHash.toLowerCase()) continue;
+			addState(doneHashes[i], 'done', -doneOffset);
+			doneOffset++;
+		}
+
+		return states;
+	}
+
+	private async getRebaseProgress(rebasePath: string) {
+		const candidates: Array<{ current: string; total: string }> = [
+			{ current: 'msgnum', total: 'end' },
+			{ current: 'next', total: 'last' }
+		];
+
+		for (let i = 0; i < candidates.length; i++) {
+			const current = await this.readIntFile(path.join(rebasePath, candidates[i].current));
+			const total = await this.readIntFile(path.join(rebasePath, candidates[i].total));
+			if (current !== null && total !== null && current > 0 && total > 0 && current <= total) {
+				return { current, total };
+			}
+		}
+
+		return null;
+	}
+
+	private async readIntFile(filePath: string): Promise<number | null> {
+		return new Promise((resolve) => {
+			fs.readFile(filePath, 'utf8', (error, content) => {
+				if (error !== null) {
+					resolve(null);
+					return;
+				}
+				const parsed = parseInt(content.trim(), 10);
+				resolve(Number.isFinite(parsed) ? parsed : null);
+			});
+		});
+	}
+
+	private async readTextFile(filePath: string): Promise<string | null> {
+		return new Promise((resolve) => {
+			fs.readFile(filePath, 'utf8', (error, content) => {
+				if (error !== null) {
+					resolve(null);
+					return;
+				}
+				resolve(content);
+			});
+		});
+	}
+
+	private normaliseRefName(ref: string | null): string | null {
+		if (ref === null) return null;
+		const trimmed = ref.trim();
+		if (trimmed === '') return null;
+		if (trimmed.startsWith('refs/heads/')) return trimmed.substring('refs/heads/'.length);
+		if (trimmed.startsWith('refs/remotes/')) return trimmed.substring('refs/remotes/'.length);
+		return trimmed;
+	}
+
+	private async pathExists(filePath: string): Promise<boolean> {
+		return new Promise((resolve) => {
+			fs.access(filePath, fs.constants.F_OK, (error) => {
+				resolve(error === null);
+			});
+		});
+	}
+
+
+	/* Private Utils */
+
+	/**
+	 * Check if there are staged changes that resulted from a squash merge, and if so, commit them.
+	 * @param repo The path of the repository.
+	 * @param obj The object being squash merged into the current branch.
+	 * @param actionOn Is the merge on a branch, remote-tracking branch or commit.
+	 * @param squashMessageFormat The format to be used in the commit message of the squash.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	private commitSquashIfStagedChangesExist(repo: string, obj: string, actionOn: MergeActionOn, squashMessageFormat: SquashMessageFormat, signCommits: boolean): Promise<ErrorInfo> {
+		return this.areStagedChanges(repo).then((changes) => {
+			if (changes) {
+				const args = ['commit'];
+				if (signCommits) {
+					args.push('-S');
+				}
+				if (squashMessageFormat === SquashMessageFormat.Default) {
+					args.push('-m', 'Merge ' + actionOn.toLowerCase() + ' \'' + obj + '\'');
+				} else {
+					args.push('--no-edit');
+				}
+				return this.runGitCommand(args, repo);
+			} else {
+				return null;
+			}
+		});
+	}
+
+	/**
+	 * Get the diff between two revisions.
+	 * @param repo The path of the repository.
+	 * @param fromHash The revision the diff is from.
+	 * @param toHash The revision the diff is to.
+	 * @param arg Sets the data reported from the diff.
+	 * @param filter The types of file changes to retrieve.
+	 * @returns The diff output.
+	 */
+	private execDiff(repo: string, fromHash: string, toHash: string, arg: '--numstat' | '--raw', filter: string) {
+		let args: string[];
+		if (fromHash === toHash) {
+			args = ['diff-tree', arg, '-r', '--root', '--find-renames', '--diff-filter=' + filter, '-z', fromHash];
+		} else {
+			args = ['diff', arg, '--find-renames', '--diff-filter=' + filter, '-z', fromHash];
+			if (toHash !== '') args.push(toHash);
+		}
+		if (arg === '--raw') args.splice(2, 0, '--no-abbrev');
+
+		return this.spawnGit(args, repo, (stdout) => {
+			let lines = stdout.split('\0');
+			if (fromHash === toHash) lines.shift();
+			return lines;
+		});
+	}
+
+	/**
+	 * Run a Git command (typically for a Commits View action).
+	 * @param args The arguments to pass to Git.
+	 * @param repo The repository to run the command in.
+	 * @returns The returned ErrorInfo (suitable for being sent to the Commits View).
+	 */
+	private runGitCommand(args: string[], repo: string): Promise<ErrorInfo> {
+		return this._spawnGit(args, repo, () => null).catch((errorMessage: string) => errorMessage);
+	}
+
+	/**
+	 * Spawn Git, with the return value resolved from `stdout` as a string.
+	 * @param args The arguments to pass to Git.
+	 * @param repo The repository to run the command in.
+	 * @param resolveValue A callback invoked to resolve the data from `stdout`.
+	 */
+	private spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: string): T }, cancellationToken?: vscode.CancellationToken) {
+		return this._spawnGit(args, repo, (stdout) => resolveValue(stdout.toString()), false, cancellationToken);
+	}
+
+	/**
+	 * Spawn Git, with the return value resolved from `stdout` as a buffer.
+	 * @param args The arguments to pass to Git.
+	 * @param repo The repository to run the command in.
+	 * @param resolveValue A callback invoked to resolve the data from `stdout` and `stderr`.
+	 * @param ignoreExitCode Ignore the exit code returned by Git (default: `FALSE`).
+	 * @param cancellationToken Cancels the child process when requested.
+	 */
+	private async _spawnGit<T>(args: string[], repo: string, resolveValue: { (stdout: Buffer, stderr: string): T }, ignoreExitCode: boolean = false, cancellationToken?: vscode.CancellationToken) {
+		if (this.gitExecutable === null) {
+			// Executable discovery may still be in flight (activation doesn't await it) - hold the
+			// call until it settles; if discovery failed, gitExecutable stays null and we reject.
+			await this.whenGitExecutableResolved;
+		}
+		return new Promise<T>((resolve, reject) => {
+			if (this.gitExecutable === null) {
+				return reject(UNABLE_TO_FIND_GIT_MSG);
+			}
+
+			// GIT_OPTIONAL_LOCKS=0 stops read commands (e.g. git status) from taking index.lock for
+			// opportunistic index refreshes, so they can safely run concurrently with user-initiated
+			// git actions. Mandatory locks (commit, stage, ...) are unaffected.
+			const child = cp.spawn(this.gitExecutable.path, args, {
+				cwd: repo,
+				env: Object.assign({}, process.env, this.askpassEnv, { GIT_OPTIONAL_LOCKS: '0' })
+			});
+			const cancellation = cancellationToken?.onCancellationRequested(() => child.kill());
+			if (cancellationToken?.isCancellationRequested) child.kill();
+			resolveSpawnOutput(child).then((values) => {
+				const status = values[0], stdout = values[1], stderr = values[2];
+				if (status.code === 0 || ignoreExitCode) {
+					resolve(resolveValue(stdout, stderr));
+				} else {
+					reject(getErrorMessage(status.error, stdout, stderr));
+				}
+			}).then(() => cancellation?.dispose(), () => cancellation?.dispose());
+
+			this.logger.logCmd('git', args);
+		});
+	}
+}
+
+export type { BlameLineInfo, GitChangeCounts, GitCommitDetailsData, GitWorkingTreeChange, GitWorkingTreeChangesData, HeadInfo } from './data-source/models';
+
+export interface CommitDisplayInfo {
+	readonly hash: string;
+	readonly summary: string;
+}
+
+function parseCommitDisplayOutput(stdout: string): CommitDisplayInfo | null {
+	const lines = stdout.split(EOL_REGEX).filter((line) => line !== '');
+	if (lines.length === 0 || lines[0].length === 0) return null;
+	return {
+		hash: lines[0],
+		summary: typeof lines[1] === 'string' ? lines[1] : ''
+	};
+}

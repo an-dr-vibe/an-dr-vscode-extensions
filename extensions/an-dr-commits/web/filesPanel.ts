@@ -1,0 +1,195 @@
+/**
+ * FilesPanel — persistent right sidebar showing changed files for the selected commit.
+ * Mirrors the BranchPanel pattern for layout management.
+ */
+class FilesPanel {
+	private readonly panel: HTMLElement;
+	private readonly headerElem: HTMLElement;
+	private readonly footerElem: HTMLElement;
+	private readonly contentElem: HTMLElement;
+	private panelHidden: boolean;
+	private panelWidth: number;
+	private scrollTop: number = 0;
+	private onScroll: () => void = () => {};
+	private layoutChangeCallback: () => void;
+	private layoutChangeHandle: number | null = null;
+
+	constructor(layoutChangeCallback: () => void = () => {}) {
+		this.layoutChangeCallback = layoutChangeCallback;
+		this.panelHidden = true;
+		this.panelWidth = globalState.filesPanelWidth;
+
+		this.panel = document.getElementById('filesPanel')!;
+
+		// Resize handle on the left edge
+		const resizeHandle = document.createElement('div');
+		resizeHandle.id = 'filesPanelResizeHandle';
+		this.panel.appendChild(resizeHandle);
+		this.setupResize(resizeHandle);
+
+		// Header bar (populated by Commit Details View when a commit is expanded)
+		this.headerElem = document.createElement('div');
+		this.headerElem.id = 'filesPanelHeader';
+		this.panel.appendChild(this.headerElem);
+
+		// Scrollable content area
+		this.contentElem = document.createElement('div');
+		this.contentElem.id = 'filesPanelContent';
+		this.panel.appendChild(this.contentElem);
+
+		this.footerElem = document.createElement('div');
+		this.footerElem.id = 'filesPanelFooter';
+		this.panel.appendChild(this.footerElem);
+
+		this.contentElem.addEventListener('scroll', () => {
+			this.scrollTop = this.contentElem.scrollTop;
+			this.onScroll();
+		});
+
+		// Apply initial state (always start hidden — visibility is driven by commit selection)
+		this.applyInlineWidth(this.panelWidth);
+		this.applyWidth(0);
+		document.body.classList.add('filesPanelHidden');
+
+		this.showPlaceholder();
+	}
+
+	private setupResize(handle: HTMLElement) {
+		let startX = 0;
+		let startWidth = 0;
+		const onMove = (e: MouseEvent) => {
+			const w = Math.max(140, Math.min(600, startWidth - (e.clientX - startX)));
+			this.panelWidth = w;
+			this.applyWidth(w);
+			this.applyInlineWidth(w);
+		};
+		const onUp = () => {
+			document.removeEventListener('mousemove', onMove);
+			document.removeEventListener('mouseup', onUp);
+			updateGlobalViewState('filesPanelWidth', this.panelWidth);
+		};
+		handle.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			startX = e.clientX;
+			startWidth = this.panelWidth;
+			document.addEventListener('mousemove', onMove);
+			document.addEventListener('mouseup', onUp);
+		});
+	}
+
+	private applyWidth(width: number) {
+		document.body.style.setProperty('--files-panel-width', width + 'px');
+		this.scheduleLayoutChange();
+	}
+
+	private applyInlineWidth(width: number) {
+		document.body.style.setProperty('--files-panel-inline-width', width + 'px');
+	}
+
+	public hide() {
+		if (!this.panelHidden) this.toggle();
+	}
+
+	public toggle() {
+		this.panelHidden = !this.panelHidden;
+		if (this.panelHidden) {
+			document.body.classList.add('filesPanelHidden');
+			this.applyWidth(0);
+		} else {
+			document.body.classList.remove('filesPanelHidden');
+			this.applyWidth(this.panelWidth);
+		}
+		const inlineContent = document.getElementById('commitDetailsViewInlineFilesContent');
+		if (inlineContent !== null) {
+			inlineContent.innerHTML = this.contentElem.innerHTML;
+		}
+	}
+
+	public show() {
+		if (!this.panelHidden) return;
+		this.panelHidden = false;
+		document.body.classList.remove('filesPanelHidden');
+		this.applyWidth(this.panelWidth);
+	}
+
+	/** Recalculate content top offset to match the actual header height. */
+	public syncContentTop() {
+		const h = this.headerElem.offsetHeight;
+		const f = this.footerElem.offsetHeight;
+		this.contentElem.style.top = h > 0 ? h + 'px' : '';
+		this.contentElem.style.bottom = f > 0 ? f + 'px' : '';
+	}
+
+	public setContentLoading() {
+		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder delayedLoadingFeedback">Loading...</div>';
+	}
+
+	private showPlaceholder() {
+		this.contentElem.innerHTML = '<div class="filesPanelPlaceholder">Select one or two commits to see the changed files</div>';
+	}
+
+	public update(fileTree: FileTreeFolder, fileChanges: ReadonlyArray<GG.GitFileChange>, contextMenuOpen: number, fileViewType: GG.FileViewType, isUncommitted: boolean, selectedFilePath: string | null = null) {
+		this.clearFooter();
+		const html = generateFileViewHtml(fileTree, fileChanges, contextMenuOpen, fileViewType, isUncommitted, selectedFilePath);
+		this.contentElem.innerHTML = html;
+		this.contentElem.scrollTop = this.scrollTop;
+	}
+
+	public getHeaderElem(): HTMLElement {
+		return this.headerElem;
+	}
+
+	public clearHeader() {
+		this.headerElem.innerHTML = '';
+		this.syncContentTop();
+	}
+
+	public getFooterElem(): HTMLElement {
+		return this.footerElem;
+	}
+
+	public clearFooter() {
+		this.footerElem.innerHTML = '';
+		this.syncContentTop();
+	}
+
+	public clear() {
+		this.scrollTop = 0;
+		this.clearHeader();
+		this.clearFooter();
+		this.showPlaceholder();
+	}
+
+	public getScrollTop(): number {
+		return this.scrollTop;
+	}
+
+	public setScrollTop(scrollTop: number) {
+		this.scrollTop = scrollTop;
+		this.contentElem.scrollTop = scrollTop;
+	}
+
+	public setOnScrollCallback(cb: () => void) {
+		this.onScroll = cb;
+	}
+
+	public getContentElem(): HTMLElement {
+		return this.contentElem;
+	}
+
+	public getContentHtml(): string {
+		return this.contentElem.innerHTML;
+	}
+
+	public isHidden(): boolean {
+		return this.panelHidden;
+	}
+
+	private scheduleLayoutChange() {
+		if (this.layoutChangeHandle !== null) return;
+		this.layoutChangeHandle = requestAnimationFrame(() => {
+			this.layoutChangeHandle = null;
+			this.layoutChangeCallback();
+		});
+	}
+}

@@ -1,12 +1,5 @@
-/.vscode-test/
-/media/*.js
-/node_modules/
-**/out/
+coverage
+media
+node_modules
+out
 *.vsix
-
-*.orig
-
-# nix / direnv
-/.direnv/
-/result
-/result-*

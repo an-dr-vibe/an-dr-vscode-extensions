@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 function isPanelOpen() {
   return vscode.window.tabGroups.all
     .flatMap((g) => g.tabs)
-    .some((t) => t.label === "(neo) Git Graph");
+    .some((t) => t.label === "an-dr: Commits (MIT)");
 }
 
 async function openPanel() {

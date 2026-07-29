@@ -9,6 +9,22 @@ import { GitRepoSet } from "@/types";
 
 import { makeRepo } from "@tests/backend/helpers";
 
+/**
+ * Removes a freshly created Git repo directory, retrying on Windows EPERM.
+ * A just-spawned `git` subprocess or antivirus real-time scan can hold a
+ * file handle on a `.git` directory for a short time after the operation
+ * that used it has resolved; an immediate rmSync can race with that.
+ */
+async function removeRepoDirectory(repo: string) {
+  for (let attempt = 0; fs.existsSync(repo) && attempt < 5; attempt++) {
+    try {
+      fs.rmSync(repo, { recursive: true, force: true });
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // eslint-disable-line no-await-in-loop
+    }
+  }
+}
+
 function makeManager(initialRepos: GitRepoSet = {}) {
   const store = { repos: { ...initialRepos } };
   let saveCount = 0;
@@ -227,11 +243,7 @@ suite("repoManager", () => {
       repo = makeRepo();
     });
 
-    teardown(() => {
-      if (fs.existsSync(repo)) {
-        fs.rmSync(repo, { recursive: true, force: true });
-      }
-    });
+    teardown(() => removeRepoDirectory(repo));
 
     test("returns false and keeps repos when all repos still exist", async () => {
       const { manager, store } = makeManager({ [repo]: { columnWidths: null } });
@@ -241,7 +253,7 @@ suite("repoManager", () => {
     });
 
     test("returns true and removes repos that no longer exist", async () => {
-      fs.rmSync(repo, { recursive: true, force: true });
+      await removeRepoDirectory(repo);
       const { manager, store } = makeManager({ [repo]: { columnWidths: null } });
       const changed = await manager.checkReposExist();
       assert.strictEqual(changed, true);
@@ -249,7 +261,7 @@ suite("repoManager", () => {
     });
 
     test("calls sendRepos when repos are removed", async () => {
-      fs.rmSync(repo, { recursive: true, force: true });
+      await removeRepoDirectory(repo);
       const { manager, statusBar } = makeManager({ [repo]: { columnWidths: null } });
       await manager.checkReposExist();
       assert.ok(statusBar.lastCount >= 0);

@@ -6,6 +6,7 @@ import type * as GG from "@/types";
 import { createVscodeMock, receive, setupHtml } from "./setup";
 
 const REPO = "/workspace/my-repo";
+let vscodeMock: ReturnType<typeof createVscodeMock>;
 
 const defaultViewState: GG.GitGraphViewState = {
   autoCenterCommitDetailsView: true,
@@ -46,7 +47,7 @@ const twoCommits: GitCommitNode[] = [
 describe("webview rendering", () => {
   beforeAll(async () => {
     vi.resetModules();
-    createVscodeMock();
+    vscodeMock = createVscodeMock();
     setupHtml(defaultViewState);
     await import("@/webview/main");
     receive({
@@ -67,5 +68,19 @@ describe("webview rendering", () => {
 
   it("shows Load More Commits button when more commits are available", () => {
     expect(document.getElementById("loadMoreCommitsBtn")).not.toBeNull();
+  });
+
+  it("routes rendered external links through the extension host", () => {
+    vscodeMock.clearMessages();
+    const link = document.createElement("a");
+    link.href = "mailto:alice@example.com";
+    link.textContent = "Alice";
+    document.body.append(link);
+
+    link.click();
+
+    expect(vscodeMock.sentMessages).toEqual([
+      { command: "openExternalUrl", url: "mailto:alice@example.com" }
+    ]);
   });
 });

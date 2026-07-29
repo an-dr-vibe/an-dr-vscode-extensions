@@ -9,6 +9,7 @@ import type {
 
 import { Dropdown } from "./dropdown";
 import { Graph } from "./graph";
+import { observeExternalUrls } from "./observers/urlEvents";
 import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
 import { resolveFileIcon } from "./utils/fileIcons";
@@ -1266,6 +1267,7 @@ let gitGraph = new GitGraphView(
   },
   vscode.getState()
 );
+observeExternalUrls();
 
 /* Command Processing */
 window.addEventListener("message", (event) => {
@@ -1353,6 +1355,11 @@ window.addEventListener("message", (event) => {
     case "viewDiff":
       if (msg.success === false) {
         showErrorDialog(l10n.unableToViewDiff, null, null);
+      }
+      break;
+    case "openExternalUrl":
+      if (msg.error !== null) {
+        showErrorDialog(l10n.unableToOpenUrl, msg.error, null);
       }
       break;
   }

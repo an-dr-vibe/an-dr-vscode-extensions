@@ -26,6 +26,7 @@ export function getWebviewLocalizedStrings() {
     // Error messages
     unableToLoadCommitDetails: vscode.l10n.t("Unable to load commit details"),
     unableToCopyToClipboard: vscode.l10n.t("Unable to Copy {0} to Clipboard"),
+    unableToOpenUrl: vscode.l10n.t("Unable to open URL"),
     unableToViewDiff: vscode.l10n.t("Unable to view diff of file"),
     unableToAddTag: vscode.l10n.t("Unable to Add Tag"),
     unableToCheckoutBranch: vscode.l10n.t("Unable to Checkout Branch"),

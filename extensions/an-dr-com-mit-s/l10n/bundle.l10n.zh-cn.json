@@ -85,6 +85,7 @@
   "Tag Name": "标签名",
   "Branch Name": "分支名",
   "Unable to Copy {0} to Clipboard": "无法复制{0}到剪贴板",
+  "Unable to open URL": "无法打开 URL",
   "Unable to view diff of file": "无法查看文件差异",
   "Unable to Add Tag": "无法添加标签",
   "Unable to Checkout Branch": "无法检出分支",

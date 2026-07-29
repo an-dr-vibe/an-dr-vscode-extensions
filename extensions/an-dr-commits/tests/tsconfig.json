@@ -1,23 +1,14 @@
 {
-	"compilerOptions": {
-		"declaration": true,
-		"lib": [
-			"es6"
-		],
-		"module": "commonjs",
-		"noFallthroughCasesInSwitch": true,
-		"noImplicitAny": true,
-		"noUnusedLocals": true,
-		"noUnusedParameters": true,
-		"removeComments": true,
-		"sourceMap": true,
-		"strict": true,
-		"target": "es6",
-		"types": [
-			"jest",
-			"node",
-			"vscode",
-			"../src/utils/@types/node"
-		]
-	}
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2023", "dom"]
+  },
+  "include": [
+    "./backend/**/*.ts",
+    "./extension/**/*.ts",
+    "./webview/**/*.ts",
+    "../src/backend/**/*.ts",
+    "../src/extension/**/*.ts",
+    "../src/webview/**/*.ts"
+  ]
 }

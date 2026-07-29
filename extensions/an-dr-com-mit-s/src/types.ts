@@ -15,6 +15,7 @@ export type GitGraphViewState = {
   autoCenterCommitDetailsView: boolean;
   dateFormat: DateFormat;
   fetchAvatars: boolean;
+  fileIcons: Record<string, string>;
   graphColours: string[];
   graphStyle: GraphStyle;
   initialLoadCommits: number;

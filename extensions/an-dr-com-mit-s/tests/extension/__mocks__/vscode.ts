@@ -16,3 +16,7 @@ export const commands = {
 export const window = {
   showErrorMessage: () => Promise.resolve(undefined)
 };
+
+export const extensions = {
+  getExtension: () => undefined
+};

@@ -7,6 +7,7 @@ import { ExtensionState } from "@/extensionState";
 import { GitGraphViewState } from "@/types";
 
 import { EXTENSION_NAME } from "./constant/const";
+import { loadFileIcons } from "./fileIcons";
 import { getWebviewLocalizedStrings } from "./l10n/webviewL10n";
 import { RepoManager } from "./repoManager";
 
@@ -35,6 +36,7 @@ export function buildWebviewHtml(opts: {
     autoCenterCommitDetailsView: config.autoCenterCommitDetailsView(),
     dateFormat: config.dateFormat(),
     fetchAvatars: config.fetchAvatars() && extensionState.isAvatarStorageAvailable(),
+    fileIcons: loadFileIcons(),
     graphColours: config.graphColours(),
     graphStyle: config.graphStyle(),
     initialLoadCommits: config.initialLoadCommits(),

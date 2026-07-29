@@ -11,6 +11,7 @@ import { Dropdown } from "./dropdown";
 import { Graph } from "./graph";
 import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
+import { resolveFileIcon } from "./utils/fileIcons";
 import { arraysEqual, ELLIPSIS, refInvalid } from "./utils/git";
 import { escapeHtml, unescapeHtml } from "./utils/html";
 import { svgIcons } from "./utils/icons";
@@ -1487,7 +1488,7 @@ function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[]) {
           ? ' title="' + l10n.tooltipBinaryFile + '"'
           : "") +
         '><span class="gitFileIcon">' +
-        svgIcons.file +
+        (resolveFileIcon(viewState.fileIcons, folder.contents[keys[i]].name) ?? svgIcons.file) +
         "</span>" +
         escapeHtml(folder.contents[keys[i]].name) +
         (gitFile.type === "R"

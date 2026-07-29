@@ -11,6 +11,7 @@ const defaultViewState: GG.GitGraphViewState = {
   autoCenterCommitDetailsView: true,
   dateFormat: "Date & Time",
   fetchAvatars: false,
+  fileIcons: {},
   graphColours: ["#0085d9"],
   graphStyle: "rounded",
   initialLoadCommits: 300,

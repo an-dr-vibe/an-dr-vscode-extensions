@@ -222,8 +222,12 @@ file compiles once moved, and the obstacle differs by area. Measured over the 47
 | `src/*`, imports all `YOURS` |     6 |   212 | None — move it                                                         |
 | `src/*`, blocked             |    16 | 1,405 | Imports resolve into `BASELINE`/`REVIEW` modules                       |
 
-**Only 620 lines are drop-in.** The rest needs one of two conversions, and
-neither is visible in a provenance verdict.
+**Only 620 lines are drop-in, and even that overstates it.** A file with only
+`YOURS` imports still needs those imports to already exist as ported files in
+staging, or a real caller for the result — see
+[zero-blocker-finding.md](compatibility/zero-blocker-finding.md) for six files
+that compile standalone and still have nowhere to go today. The rest needs one
+of two conversions, and neither is visible in a provenance verdict.
 
 ### The `web/` trap
 

@@ -31,7 +31,9 @@ export class StatusBarItem {
     if (show) {
       logger.log(`StatusBarItem.show() (showStatusBarItem=${show}, numRepos=${this.numRepos})`);
       if (this.numRepos === 0) {
-        this.statusBarItem.text = this.config.statusBarIconOnly() ? "$(eye)" : `$(eye) ${EXTENSION_NAME}`;
+        this.statusBarItem.text = this.config.statusBarIconOnly()
+          ? "$(eye)"
+          : `$(eye) ${EXTENSION_NAME}`;
         this.statusBarItem.tooltip = vscode.l10n.t("No Git repository found — watching for one");
       } else {
         this.statusBarItem.text = this.config.statusBarIconOnly()

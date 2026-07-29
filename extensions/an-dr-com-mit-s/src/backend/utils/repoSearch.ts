@@ -4,9 +4,9 @@ import * as path from "node:path";
 import { isGitRepository } from "@/backend/utils/git";
 import { evalPromises } from "@/backend/utils/promise";
 
-async function isDirectory(path: string): Promise<boolean> {
+async function isDirectory(directoryPath: string): Promise<boolean> {
   return fs
-    .stat(path)
+    .stat(directoryPath)
     .then((s) => s.isDirectory())
     .catch(() => false);
 }
@@ -14,7 +14,9 @@ async function isDirectory(path: string): Promise<boolean> {
 /** Return true when a directory is a known repository or lies within one. */
 function isKnownRepositoryDirectory(directory: string, knownRepoPath: string): boolean {
   const relativePath = path.relative(knownRepoPath, directory);
-  return relativePath === "" || (!relativePath.startsWith(`..${path.sep}`) && relativePath !== "..");
+  return (
+    relativePath === "" || (!relativePath.startsWith(`..${path.sep}`) && relativePath !== "..")
+  );
 }
 
 export async function searchDirectoryForRepos(

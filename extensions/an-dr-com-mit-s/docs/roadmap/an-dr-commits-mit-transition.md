@@ -10,13 +10,13 @@ neo-git-graph-derived code.
 Every file in the current `an-dr-commits` falls into exactly one of three
 categories, decided by the provenance checker and nothing else:
 
-| Category | Share of source | What happens to it |
-| --- | ---: | --- |
-| `YOURS` | 5,134 lines | **Move it.** Locally authored, relicensable MIT. |
-| `REVIEW` | 6,755 lines | **Annotate, then move the `+` hunks.** |
-| `BASELINE` | 10,941 lines | **Do not move.** Reimplement, or use the MIT equivalent. |
+| Category   | Share of source | What happens to it                                       |
+| ---------- | --------------: | -------------------------------------------------------- |
+| `YOURS`    |     5,134 lines | **Move it.** Locally authored, relicensable MIT.         |
+| `REVIEW`   |     6,755 lines | **Annotate, then move the `+` hunks.**                   |
+| `BASELINE` |    10,941 lines | **Do not move.** Reimplement, or use the MIT equivalent. |
 
-Moving `YOURS` code is not a shortcut around this plan — it *is* the plan. A
+Moving `YOURS` code is not a shortcut around this plan — it _is_ the plan. A
 transition that reimplements code the author already owns wastes the work and
 loses behaviour that has no other specification. Most `BASELINE` lines need no
 reimplementation either: neo-git-graph is itself a Git Graph fork, so it already
@@ -43,6 +43,7 @@ of another 6,755. Treating it as reference-only is a misreading of this plan.
    and later refactors such as `c52c771` moved baseline code into brand-new
    files. Run the provenance checker below and record its verdict for every
    copy; in a `REVIEW` file, take only the `+` hunks.
+
 3. Public interface facts can be recorded independently: command IDs, setting
    keys, view IDs, and user-observable acceptance scenarios. Their
    implementation must be authored on the MIT foundation.
@@ -53,13 +54,13 @@ of another 6,755. Treating it as reference-only is a misreading of this plan.
 
 ## Terminology and working copies
 
-| Term | Location | Role |
-| --- | --- | --- |
-| Current Commits | `extensions/an-dr-commits` | Behavioural reference, and a source for locally authored code only. |
-| Baseline snapshot | `4d4c579:extensions/an-dr-git` | The imported Git Graph source, before any local work. Restricted; the checker's reference. |
-| MIT staging extension | `extensions/an-dr-com-mit-s` | The only codebase changed during the migration. |
-| Final extension | `extensions/an-dr-commits` | The staging extension after approved cutover and identity switch. |
-| MIT baseline | neo-git-graph at the revision in `NOTICE.md` | Imported source provenance. |
+| Term                  | Location                                     | Role                                                                                       |
+| --------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Current Commits       | `extensions/an-dr-commits`                   | Behavioural reference, and a source for locally authored code only.                        |
+| Baseline snapshot     | `4d4c579:extensions/an-dr-git`               | The imported Git Graph source, before any local work. Restricted; the checker's reference. |
+| MIT staging extension | `extensions/an-dr-com-mit-s`                 | The only codebase changed during the migration.                                            |
+| Final extension       | `extensions/an-dr-commits`                   | The staging extension after approved cutover and identity switch.                          |
+| MIT baseline          | neo-git-graph at the revision in `NOTICE.md` | Imported source provenance.                                                                |
 
 ## Provenance checker
 
@@ -80,11 +81,11 @@ Verdicts are `YOURS` (under 5% baseline overlap), `BASELINE` (over 40%), and
 `REVIEW` in between. Current classification of the 160 scanned files, with
 source and tests separated because they carry very different costs:
 
-| Verdict | Files | Source lines | Test lines | Meaning |
-| --- | ---: | ---: | ---: | --- |
-| `YOURS` | 55 | 5,134 | 454 | Locally authored; copy and relicense freely. |
-| `REVIEW` | 40 | 6,755 | 350 | Mixed origin; annotate and take only `+` hunks. |
-| `BASELINE` | 65 | 10,941 | 14,076 | Substantially the imported snapshot; reimplement instead. |
+| Verdict    | Files | Source lines | Test lines | Meaning                                                   |
+| ---------- | ----: | -----------: | ---------: | --------------------------------------------------------- |
+| `YOURS`    |    55 |        5,134 |        454 | Locally authored; copy and relicense freely.              |
+| `REVIEW`   |    40 |        6,755 |        350 | Mixed origin; annotate and take only `+` hunks.           |
+| `BASELINE` |    65 |       10,941 |     14,076 | Substantially the imported snapshot; reimplement instead. |
 
 **The test column is the hidden cost of this project.** 14,076 lines of the
 existing suite are `BASELINE` and cannot move — `tests/dataSource.test.ts` alone
@@ -106,17 +107,17 @@ deleted at cutover along with the staging identity.
 
 The final package has the existing stable identity:
 
-| Surface | Final value |
-| --- | --- |
-| Extension ID | `an-dr.an-dr-commits` |
-| Package name | `an-dr-commits` |
-| Command namespace | `an-dr-commits.*` |
-| Configuration namespace | `an-dr-commits.*` |
-| Virtual diff scheme | `an-dr-commits` |
-| Activity Bar container | `an-dr-commits-container` |
-| Activity Bar view | `an-dr-commits.activityView` |
-| Status-bar preference | `an-dr-commits.statusBarIconOnly` is present and defaults to `true` |
-| Uninstall hook | `vscode:uninstall` script is present and cleans the same state the extension writes |
+| Surface                 | Final value                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| Extension ID            | `an-dr.an-dr-commits`                                                               |
+| Package name            | `an-dr-commits`                                                                     |
+| Command namespace       | `an-dr-commits.*`                                                                   |
+| Configuration namespace | `an-dr-commits.*`                                                                   |
+| Virtual diff scheme     | `an-dr-commits`                                                                     |
+| Activity Bar container  | `an-dr-commits-container`                                                           |
+| Activity Bar view       | `an-dr-commits.activityView`                                                        |
+| Status-bar preference   | `an-dr-commits.statusBarIconOnly` is present and defaults to `true`                 |
+| Uninstall hook          | `vscode:uninstall` script is present and cleans the same state the extension writes |
 
 During development the staging extension keeps its `an-dr-com-mit-s` identity
 so both implementations can run side by side. The identity swap happens once,
@@ -128,22 +129,22 @@ Backlog 1.3 asks for this; here is the measured answer, so the size of the
 project is visible before any work starts. Re-read both columns from the
 manifests when the ledger is built and treat drift as a ledger bug.
 
-| Surface | MIT staging today | Target | Gap |
-| --- | ---: | ---: | ---: |
-| Commands | 2 | 9 | 7 |
-| Settings | 14 | 139 | 125 |
-| Activity Bar views | 0 | 1 | 1 |
+| Surface            | MIT staging today | Target | Gap |
+| ------------------ | ----------------: | -----: | --: |
+| Commands           |                 2 |      9 |   7 |
+| Settings           |                14 |    139 | 125 |
+| Activity Bar views |                 0 |      1 |   1 |
 
 The settings gap is the largest single number in this plan and the least
 examined. Backlog 0 triages it before any of it is scheduled.
 
 ### Decisions now recorded
 
-| Question | Answer | Recorded in |
-| --- | --- | --- |
+| Question                                                                                         | Answer                                                                                          | Recorded in  |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------ |
 | Keep the imported `zh-cn`/`zh-tw` localization (`l10n/`, `package.nls.*`, `npm run l10n:check`)? | Yes. Keep `l10n:check` green; every user-facing string added from here needs all three bundles. | This roadmap |
-| Keep the upstream `oxlint`/`oxfmt` toolchain, or move to the repository's `eslint` convention? | Keep `oxlint`/`oxfmt`; they are MIT-baseline tooling. | ADR pending |
-| Keep esbuild and Vitest, against the repository's "no bundler, no test framework" convention? | Keep both; the webview genuinely needs bundling. | ADR pending |
+| Keep the upstream `oxlint`/`oxfmt` toolchain, or move to the repository's `eslint` convention?   | Keep `oxlint`/`oxfmt`; they are MIT-baseline tooling.                                           | ADR pending  |
+| Keep esbuild and Vitest, against the repository's "no bundler, no test framework" convention?    | Keep both; the webview genuinely needs bundling.                                                | ADR pending  |
 
 The last two were settled once and the ADR recording them was lost when the
 premature cutover was reverted; a copy survives at the `archive/mit-cutover`
@@ -152,38 +153,38 @@ item those decisions actually bind.
 
 ### Decisions still open
 
-| Question | Blocks | Default if undecided |
-| --- | --- | --- |
-| Which of the 139 settings are kept, retired, or deferred? | Backlog 3 and most of 7 | None — backlog 0 exists to answer this, and scheduling settings work before it is answered is how the estimate runs away |
-| Does workspace state migrate from the current extension, or start fresh under new keys? | Backlog 4 | Start fresh under versioned keys; never write the legacy keys, so rolling back to the current extension keeps working |
+| Question                                                                                | Blocks                  | Default if undecided                                                                                                     |
+| --------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Which of the 139 settings are kept, retired, or deferred?                               | Backlog 3 and most of 7 | None — backlog 0 exists to answer this, and scheduling settings work before it is answered is how the estimate runs away |
+| Does workspace state migrate from the current extension, or start fresh under new keys? | Backlog 4               | Start fresh under versioned keys; never write the legacy keys, so rolling back to the current extension keeps working    |
 
 ## Initial structural alignment
 
 The first work is an MIT-only refactor that gives the staging extension seams
-matching the *responsibilities* of current Commits. File names may align where
+matching the _responsibilities_ of current Commits. File names may align where
 that makes the migration easier, but no current Commits file content moves over.
 
-| Current Commits responsibility and source area | MIT staging starting point | Planned staging structure | Mechanical change |
-| --- | --- | --- | --- |
-| Lightweight activation, commands, serializer: `src/extension.ts`, `src/core.ts`, `src/commandIds.ts` | `src/extension/main.ts`, `src/extension/initExtension.ts` | `src/extension.ts`, `src/core.ts`, `src/commandIds.ts` | Move MIT activation wiring behind a lazy `core` factory; retain only MIT logic and write small adapters. |
-| Git reads and graph snapshot: `src/dataSource.ts`, `src/data-source/*`, `src/repositoryGraphCache.ts` | `src/backend/gitClient.ts`, `src/backend/queries/*` | `src/dataSource.ts`, `src/data-source/*`, `src/repositoryGraphCache.ts` | Rehome MIT query functions first; expose a typed façade before adding caching. |
-| Repository discovery/state: `src/repoManager.ts`, `src/repo-manager/*` | `src/extension/repoManager.ts`, `src/extension/watchForRepos.ts`, `src/backend/queries/repoSearch.ts`, `src/backend/utils/repoSearch.ts` | `src/repoManager.ts`, `src/repo-manager/*` | Move MIT repository code into a single manager facade; preserve current behaviour only through acceptance tests. |
-| Repository change monitoring: `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts` | `src/repoFileWatcher.ts`, `src/extension/watchForRepos.ts` | `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts` | Keep the MIT watcher first. `gitStatusMonitor.ts` is **2.7% baseline** — annotate, then relicense and move. |
-| Git actions: `src/commands.ts` | `src/backend/actions/{branch,commit,merge,tag}.ts` | `src/commands.ts`, `src/actions/*` | Wrap existing MIT actions in one command dispatcher; add missing actions one operation at a time. |
-| Graph editor tab: `src/views/tab/*` | `src/extension/{webviewPanel,webviewHtml,webviewBridge,messageHandler}.ts` | `src/views/tab/*` | Keep the MIT bridge and panel lifecycle; split adapters by message category only after parity tests exist. |
-| Browser graph UI: `web/*`, `web/styles/*` | `src/webview/*`, `media/*.css` | `web/*` | Move the MIT browser modules and their CSS without semantic change, and repoint the esbuild webview entry point. The bundler stays esbuild — see below. |
-| Status bar: `src/statusBarItem.ts` | `src/statusBarItem.ts` | `src/statusBarItem.ts` | Rename only at first; preserve icon-only configuration and add branch/dirty status later. |
-| Commit/file virtual documents: `src/diffDocProvider.ts` | `src/diffDocProvider.ts` | `src/diffDocProvider.ts` | Retain MIT provider; add richer file/revision flows independently. |
-| Extension state: `src/extensionState.ts` | `src/extensionState.ts` | `src/extensionState.ts`, `src/compat/migrationState.ts` | Keep MIT storage; add a versioned migration reader instead of importing old stored objects. |
-| Avatars: `src/avatarManager.ts` | `src/avatarManager.ts` | `src/avatarManager.ts` | Already MIT; verify and retain. |
-| Settings access: `src/config.ts` | `src/config.ts` | `src/config.ts` | Already MIT; extend key by key as backlog 3 adds the compatibility reader. |
-| Logging: `src/logger.ts` | `src/extension/utils/logger.ts` | `src/logger.ts` | Rehome only. |
-| Git credential prompts: `src/askpass/*` | No equivalent | `src/askpass/*` | **100% baseline** (`askpassMain.ts`), **91%** (`askpassManager.ts`) — reimplement. Blocks any authenticated fetch/pull/push, see backlog 6. |
-| Git interactive editor: `src/gitEditor/*` | No equivalent | `src/gitEditor/*` | **32% baseline** (`gitEditorMain.ts`), **17%** (`gitEditorManager.ts`), both `REVIEW` — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 6. |
-| Install/uninstall life cycle: `src/life-cycle/*` | No equivalent | `src/life-cycle/*` | **84–90% baseline** (`startup.ts`, `utils.ts`; `uninstall.ts` is 65%) — reimplement; the `vscode:uninstall` hook must exist before cutover. |
-| Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*` | No equivalent | `src/views/sidebar/*`, `web/sidebar/*` | **1.0% baseline on `sidebarView.ts`, `YOURS`** across 9 files — relicense and move, ordered by the import graph rather than by feature; see *Porting locally authored code*. |
-| Inline blame: `src/inlineBlame.ts` | No equivalent | `src/inlineBlame.ts` | **0% baseline, `YOURS`** — relicense and move, with its test. |
-| Code review hand-off: `src/views/tab/miscActions.ts` | No equivalent | `src/codeReviewIntegration.ts` | **0% baseline, `YOURS`** — relicense and move. The whole contract is one outbound `executeCommand('an-dr-code-review.setCommitRange', from, to, repo)`; nothing is persisted on this side. |
+| Current Commits responsibility and source area                                                        | MIT staging starting point                                                                                                               | Planned staging structure                                               | Mechanical change                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lightweight activation, commands, serializer: `src/extension.ts`, `src/core.ts`, `src/commandIds.ts`  | `src/extension/main.ts`, `src/extension/initExtension.ts`                                                                                | `src/extension.ts`, `src/core.ts`, `src/commandIds.ts`                  | Move MIT activation wiring behind a lazy `core` factory; retain only MIT logic and write small adapters.                                                                                    |
+| Git reads and graph snapshot: `src/dataSource.ts`, `src/data-source/*`, `src/repositoryGraphCache.ts` | `src/backend/gitClient.ts`, `src/backend/queries/*`                                                                                      | `src/dataSource.ts`, `src/data-source/*`, `src/repositoryGraphCache.ts` | Rehome MIT query functions first; expose a typed façade before adding caching.                                                                                                              |
+| Repository discovery/state: `src/repoManager.ts`, `src/repo-manager/*`                                | `src/extension/repoManager.ts`, `src/extension/watchForRepos.ts`, `src/backend/queries/repoSearch.ts`, `src/backend/utils/repoSearch.ts` | `src/repoManager.ts`, `src/repo-manager/*`                              | Move MIT repository code into a single manager facade; preserve current behaviour only through acceptance tests.                                                                            |
+| Repository change monitoring: `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts`                     | `src/repoFileWatcher.ts`, `src/extension/watchForRepos.ts`                                                                               | `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts`                     | Keep the MIT watcher first. `gitStatusMonitor.ts` is **2.7% baseline** — annotate, then relicense and move.                                                                                 |
+| Git actions: `src/commands.ts`                                                                        | `src/backend/actions/{branch,commit,merge,tag}.ts`                                                                                       | `src/commands.ts`, `src/actions/*`                                      | Wrap existing MIT actions in one command dispatcher; add missing actions one operation at a time.                                                                                           |
+| Graph editor tab: `src/views/tab/*`                                                                   | `src/extension/{webviewPanel,webviewHtml,webviewBridge,messageHandler}.ts`                                                               | `src/views/tab/*`                                                       | Keep the MIT bridge and panel lifecycle; split adapters by message category only after parity tests exist.                                                                                  |
+| Browser graph UI: `web/*`, `web/styles/*`                                                             | `src/webview/*`, `media/*.css`                                                                                                           | `web/*`                                                                 | Move the MIT browser modules and their CSS without semantic change, and repoint the esbuild webview entry point. The bundler stays esbuild — see below.                                     |
+| Status bar: `src/statusBarItem.ts`                                                                    | `src/statusBarItem.ts`                                                                                                                   | `src/statusBarItem.ts`                                                  | Rename only at first; preserve icon-only configuration and add branch/dirty status later.                                                                                                   |
+| Commit/file virtual documents: `src/diffDocProvider.ts`                                               | `src/diffDocProvider.ts`                                                                                                                 | `src/diffDocProvider.ts`                                                | Retain MIT provider; add richer file/revision flows independently.                                                                                                                          |
+| Extension state: `src/extensionState.ts`                                                              | `src/extensionState.ts`                                                                                                                  | `src/extensionState.ts`, `src/compat/migrationState.ts`                 | Keep MIT storage; add a versioned migration reader instead of importing old stored objects.                                                                                                 |
+| Avatars: `src/avatarManager.ts`                                                                       | `src/avatarManager.ts`                                                                                                                   | `src/avatarManager.ts`                                                  | Already MIT; verify and retain.                                                                                                                                                             |
+| Settings access: `src/config.ts`                                                                      | `src/config.ts`                                                                                                                          | `src/config.ts`                                                         | Already MIT; extend key by key as backlog 3 adds the compatibility reader.                                                                                                                  |
+| Logging: `src/logger.ts`                                                                              | `src/extension/utils/logger.ts`                                                                                                          | `src/logger.ts`                                                         | Rehome only.                                                                                                                                                                                |
+| Git credential prompts: `src/askpass/*`                                                               | No equivalent                                                                                                                            | `src/askpass/*`                                                         | **100% baseline** (`askpassMain.ts`), **91%** (`askpassManager.ts`) — reimplement. Blocks any authenticated fetch/pull/push, see backlog 6.                                                 |
+| Git interactive editor: `src/gitEditor/*`                                                             | No equivalent                                                                                                                            | `src/gitEditor/*`                                                       | **32% baseline** (`gitEditorMain.ts`), **17%** (`gitEditorManager.ts`), both `REVIEW` — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 6. |
+| Install/uninstall life cycle: `src/life-cycle/*`                                                      | No equivalent                                                                                                                            | `src/life-cycle/*`                                                      | **84–90% baseline** (`startup.ts`, `utils.ts`; `uninstall.ts` is 65%) — reimplement; the `vscode:uninstall` hook must exist before cutover.                                                 |
+| Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*`                                          | No equivalent                                                                                                                            | `src/views/sidebar/*`, `web/sidebar/*`                                  | **1.0% baseline on `sidebarView.ts`, `YOURS`** across 9 files — relicense and move, ordered by the import graph rather than by feature; see _Porting locally authored code_.                |
+| Inline blame: `src/inlineBlame.ts`                                                                    | No equivalent                                                                                                                            | `src/inlineBlame.ts`                                                    | **0% baseline, `YOURS`** — relicense and move, with its test.                                                                                                                               |
+| Code review hand-off: `src/views/tab/miscActions.ts`                                                  | No equivalent                                                                                                                            | `src/codeReviewIntegration.ts`                                          | **0% baseline, `YOURS`** — relicense and move. The whole contract is one outbound `executeCommand('an-dr-code-review.setCommitRange', from, to, repo)`; nothing is persisted on this side.  |
 
 The staging extension bundles with esbuild (`esbuild.js`, entry points
 `src/extension/main.ts` and `src/webview/main.ts`) and tests with Vitest, unlike
@@ -210,16 +211,16 @@ Before feature work begins, the staging extension must:
 
 ## Porting locally authored code
 
-A `YOURS` verdict means the *expression* is relicensable. It does not mean the
+A `YOURS` verdict means the _expression_ is relicensable. It does not mean the
 file compiles once moved, and the obstacle differs by area. Measured over the 47
 `YOURS` source files:
 
-| Category | Files | Lines | Obstacle |
-| --- | ---: | ---: | --- |
-| CSS | 2 | 408 | None — move it |
-| `web/*` | 23 | 3,109 | Written for global-scope concatenation; needs conversion to ES modules |
-| `src/*`, imports all `YOURS` | 6 | 212 | None — move it |
-| `src/*`, blocked | 16 | 1,405 | Imports resolve into `BASELINE`/`REVIEW` modules |
+| Category                     | Files | Lines | Obstacle                                                               |
+| ---------------------------- | ----: | ----: | ---------------------------------------------------------------------- |
+| CSS                          |     2 |   408 | None — move it                                                         |
+| `web/*`                      |    23 | 3,109 | Written for global-scope concatenation; needs conversion to ES modules |
+| `src/*`, imports all `YOURS` |     6 |   212 | None — move it                                                         |
+| `src/*`, blocked             |    16 | 1,405 | Imports resolve into `BASELINE`/`REVIEW` modules                       |
 
 **Only 620 lines are drop-in.** The rest needs one of two conversions, and
 neither is visible in a provenance verdict.
@@ -246,17 +247,17 @@ typechecks cleanly and passes any test not exercising that path. For each ported
 
 The blockers concentrate in a handful of modules:
 
-| Blocking module | Files needing it | Verdict |
-| --- | ---: | --- |
-| `src/dataSource.ts` | 9 | BASELINE |
-| `src/utils.ts` | 6 | BASELINE |
-| `src/repoManager.ts` | 5 | BASELINE |
-| `src/config.ts` | 4 | BASELINE |
-| `src/logger.ts` | 4 | BASELINE |
-| `src/utils/event.ts` | 4 | BASELINE (100%) |
-| `src/utils/disposable.ts` | 3 | BASELINE |
-| `src/types/base.ts` | 3 | BASELINE |
-| `src/types/message-protocol.ts` | 3 | BASELINE |
+| Blocking module                 | Files needing it | Verdict         |
+| ------------------------------- | ---------------: | --------------- |
+| `src/dataSource.ts`             |                9 | BASELINE        |
+| `src/utils.ts`                  |                6 | BASELINE        |
+| `src/repoManager.ts`            |                5 | BASELINE        |
+| `src/config.ts`                 |                4 | BASELINE        |
+| `src/logger.ts`                 |                4 | BASELINE        |
+| `src/utils/event.ts`            |                4 | BASELINE (100%) |
+| `src/utils/disposable.ts`       |                3 | BASELINE        |
+| `src/types/base.ts`             |                3 | BASELINE        |
+| `src/types/message-protocol.ts` |                3 | BASELINE        |
 
 **Port order follows the obstacle, not the feature grouping.** Move the 620
 drop-in lines first; convert `web/` files once the module pattern is
@@ -270,24 +271,24 @@ Every symbol the blocked files import from a non-`YOURS` module, and what it
 becomes. "Author it" means no MIT equivalent exists and the replacement is new
 code — never a copy of the baseline original.
 
-| Old import | MIT equivalent |
-| --- | --- |
-| `utils/event` → `Event`, `EventEmitter` | `vscode.EventEmitter` / `vscode.Event` from the VS Code API |
-| `utils/disposable` → `Disposable`, `toDisposable` | `vscode.Disposable` |
-| `logger` → `Logger` | `logger` in `src/extension/utils/logger.ts` |
-| `config` → `getConfig` | the `config` object in `src/config.ts` |
-| `extensionState` → `ExtensionState` | `ExtensionState` in `src/extensionState.ts` |
-| `avatarManager` → `AvatarManager` | `AvatarManager` in `src/avatarManager.ts` |
-| `repoFileWatcher` → `RepoFileWatcher` | `RepoFileWatcher` in `src/repoFileWatcher.ts` |
-| `repoManager` → `RepoManager` | `createRepoManager` in `src/extension/repoManager.ts` — a factory, not a class |
-| `utils` → `abbrevCommit` | `src/backend/utils/string.ts` |
-| `utils` → `getPathFromUri` | `src/backend/utils/path.ts` |
-| `utils` → `copyToClipboard` | `src/extension/utils/clipboard.ts` |
-| `utils` → `viewDiff` | `encodeDiffDocUri` from `src/diffDocProvider.ts` plus `vscode.diff`; see `viewDiff` in `messageHandler.ts` |
-| `dataSource` → `DataSource` | No equivalent shape. MIT is function-based: `loadCommits(git, input)`, `loadBranches(...)`, `commitDetails(...)`, with `gitClientFactory` supplying the `SimpleGit` instance |
-| `utils` → `UNCOMMITTED`, `archive`, `viewScm`, `viewFileAtRevision`, `viewDiffWithWorkingFile`, `copyFilePathToClipboard`, `openFile`, `openExternalUrl`, `openExtensionSettings`, `showErrorMessage`, `getSortedRepositoryPaths`, `getRelativeTimeDiff` | Author it |
-| `dataSource` → `GitChangeCounts`, `GitWorkingTreeChange`, `HeadInfo`, `BlameLineInfo`, `GitConfigKey`, `GitCommitDetailsData` | Author it, on `src/backend/types/*` |
-| `types/base`, `types/settings`, `types/message-protocol`, `types/git-domain` | Author it, on `src/types.ts` and `src/backend/types/*` |
+| Old import                                                                                                                                                                                                                                               | MIT equivalent                                                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `utils/event` → `Event`, `EventEmitter`                                                                                                                                                                                                                  | `vscode.EventEmitter` / `vscode.Event` from the VS Code API                                                                                                                  |
+| `utils/disposable` → `Disposable`, `toDisposable`                                                                                                                                                                                                        | `vscode.Disposable`                                                                                                                                                          |
+| `logger` → `Logger`                                                                                                                                                                                                                                      | `logger` in `src/extension/utils/logger.ts`                                                                                                                                  |
+| `config` → `getConfig`                                                                                                                                                                                                                                   | the `config` object in `src/config.ts`                                                                                                                                       |
+| `extensionState` → `ExtensionState`                                                                                                                                                                                                                      | `ExtensionState` in `src/extensionState.ts`                                                                                                                                  |
+| `avatarManager` → `AvatarManager`                                                                                                                                                                                                                        | `AvatarManager` in `src/avatarManager.ts`                                                                                                                                    |
+| `repoFileWatcher` → `RepoFileWatcher`                                                                                                                                                                                                                    | `RepoFileWatcher` in `src/repoFileWatcher.ts`                                                                                                                                |
+| `repoManager` → `RepoManager`                                                                                                                                                                                                                            | `createRepoManager` in `src/extension/repoManager.ts` — a factory, not a class                                                                                               |
+| `utils` → `abbrevCommit`                                                                                                                                                                                                                                 | `src/backend/utils/string.ts`                                                                                                                                                |
+| `utils` → `getPathFromUri`                                                                                                                                                                                                                               | `src/backend/utils/path.ts`                                                                                                                                                  |
+| `utils` → `copyToClipboard`                                                                                                                                                                                                                              | `src/extension/utils/clipboard.ts`                                                                                                                                           |
+| `utils` → `viewDiff`                                                                                                                                                                                                                                     | `encodeDiffDocUri` from `src/diffDocProvider.ts` plus `vscode.diff`; see `viewDiff` in `messageHandler.ts`                                                                   |
+| `dataSource` → `DataSource`                                                                                                                                                                                                                              | No equivalent shape. MIT is function-based: `loadCommits(git, input)`, `loadBranches(...)`, `commitDetails(...)`, with `gitClientFactory` supplying the `SimpleGit` instance |
+| `utils` → `UNCOMMITTED`, `archive`, `viewScm`, `viewFileAtRevision`, `viewDiffWithWorkingFile`, `copyFilePathToClipboard`, `openFile`, `openExternalUrl`, `openExtensionSettings`, `showErrorMessage`, `getSortedRepositoryPaths`, `getRelativeTimeDiff` | Author it                                                                                                                                                                    |
+| `dataSource` → `GitChangeCounts`, `GitWorkingTreeChange`, `HeadInfo`, `BlameLineInfo`, `GitConfigKey`, `GitCommitDetailsData`                                                                                                                            | Author it, on `src/backend/types/*`                                                                                                                                          |
+| `types/base`, `types/settings`, `types/message-protocol`, `types/git-domain`                                                                                                                                                                             | Author it, on `src/types.ts` and `src/backend/types/*`                                                                                                                       |
 
 The `DataSource` row is the hard one: a class with methods becomes free
 functions taking an explicit git handle. Every blocked file touching it needs
@@ -317,14 +318,14 @@ files that move with it.
 
 ### Who executes what
 
-| Kind of work | Lines | Executor |
-| --- | ---: | --- |
-| CSS and drop-in `src/` files | 620 | Mechanical — delegatable immediately |
-| Symbol mapping, and the first port in each cluster | — | Pattern-establishing — primary agent |
-| `web/` ports after the module pattern exists | ~3,100 | Delegatable, but see the caveat below |
-| Blocked `src/` ports | ~1,405 | Pattern-establishing — primary agent |
-| Reimplementation of `BASELINE` services | — | Pattern-establishing — primary agent |
-| Every `VERIFY` pass and the reachability check | — | Primary agent, never delegated |
+| Kind of work                                       |  Lines | Executor                              |
+| -------------------------------------------------- | -----: | ------------------------------------- |
+| CSS and drop-in `src/` files                       |    620 | Mechanical — delegatable immediately  |
+| Symbol mapping, and the first port in each cluster |      — | Pattern-establishing — primary agent  |
+| `web/` ports after the module pattern exists       | ~3,100 | Delegatable, but see the caveat below |
+| Blocked `src/` ports                               | ~1,405 | Pattern-establishing — primary agent  |
+| Reimplementation of `BASELINE` services            |      — | Pattern-establishing — primary agent  |
+| Every `VERIFY` pass and the reachability check     |      — | Primary agent, never delegated        |
 
 **Only 620 lines are delegatable before any pattern work.** The `web/` bulk
 becomes delegatable only after the first two or three conversions establish how
@@ -342,13 +343,13 @@ primary agent.
 Do not reverse-engineer implementation details. Build a compact, independent
 contract from observable behaviour.
 
-| Inventory item | Source of fact | Resulting artefact |
-| --- | --- | --- |
-| Commands and menus (9 commands today) | Current package manifest and Command Palette | `docs/roadmap/compatibility/commands.md` |
-| Configuration keys and defaults (139 keys today) | Current package manifest and Settings UI | `docs/roadmap/compatibility/settings.md` |
-| View IDs and storage keys | Running extension behaviour and package manifest | `docs/roadmap/compatibility/state.md` |
-| Git action behaviour | Disposable Git fixture repositories | Black-box Vitest suites under `tests/`, written from scratch |
-| Graph and details UI | Manual acceptance checklist and screenshots | Scenario checklist, not copied markup or styles |
+| Inventory item                                   | Source of fact                                   | Resulting artefact                                           |
+| ------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------ |
+| Commands and menus (9 commands today)            | Current package manifest and Command Palette     | `docs/roadmap/compatibility/commands.md`                     |
+| Configuration keys and defaults (139 keys today) | Current package manifest and Settings UI         | `docs/roadmap/compatibility/settings.md`                     |
+| View IDs and storage keys                        | Running extension behaviour and package manifest | `docs/roadmap/compatibility/state.md`                        |
+| Git action behaviour                             | Disposable Git fixture repositories              | Black-box Vitest suites under `tests/`, written from scratch |
+| Graph and details UI                             | Manual acceptance checklist and screenshots      | Scenario checklist, not copied markup or styles              |
 
 The two counts above are a snapshot; re-read them from the manifest when the
 ledger is built, and treat any drift as a ledger bug rather than adjusting them
@@ -392,19 +393,19 @@ settings-driven ones first.
 The measured column is the basis for the size rule; an item that cannot be split
 into 150–300 line commits is not ready to start.
 
-| # | Item | Move | Author | Tests |
-| ---: | --- | ---: | ---: | ---: |
-| 0 | Triage the settings surface | — | — | — |
-| 1 | Compatibility ledger | — | ~200 | — |
-| 2 | Align the MIT staging structure | — | ~400 | ~300 |
-| 3 | Compatibility shell | — | ~350 | ~250 |
-| 4 | Repository lifecycle and status | ~226 | ~500 | ~600 |
-| 5 | Port the provenance-clear feature set | ~4,200 | ~600 | ~1,500 |
-| 6 | Git action parity | ~325 | ~1,800 | ~3,000 |
-| 7 | Graph and browser parity | ~1,028 | ~1,200 | ~2,500 |
-| 8 | Details, comparison, and file workflows | ~1,052 | ~900 | ~2,000 |
-| 9 | Install/uninstall life cycle and optional integrations | — | ~700 | ~600 |
-| 10 | Cutover and cleanup | — | ~200 | — |
+|   # | Item                                                   |   Move | Author |  Tests |
+| --: | ------------------------------------------------------ | -----: | -----: | -----: |
+|   0 | Triage the settings surface                            |      — |      — |      — |
+|   1 | Compatibility ledger                                   |      — |   ~200 |      — |
+|   2 | Align the MIT staging structure                        |      — |   ~400 |   ~300 |
+|   3 | Compatibility shell                                    |      — |   ~350 |   ~250 |
+|   4 | Repository lifecycle and status                        |   ~226 |   ~500 |   ~600 |
+|   5 | Port the provenance-clear feature set                  | ~4,200 |   ~600 | ~1,500 |
+|   6 | Git action parity                                      |   ~325 | ~1,800 | ~3,000 |
+|   7 | Graph and browser parity                               | ~1,028 | ~1,200 | ~2,500 |
+|   8 | Details, comparison, and file workflows                | ~1,052 |   ~900 | ~2,000 |
+|   9 | Install/uninstall life cycle and optional integrations |      — |   ~700 |   ~600 |
+|  10 | Cutover and cleanup                                    |      — |   ~200 |      — |
 
 Roughly 6,800 lines move, 6,850 are authored, and 10,750 are tests. **The test
 column is the largest** — if a plan revision ever makes it look small, the
@@ -450,6 +451,7 @@ No settings work starts before this is complete.
    survives at the `archive/mit-cutover` tag and is worth recovering rather than
    retyping — but re-derive every `status` from the current staging extension,
    since that copy was written against a tree that no longer exists.
+
 3. Record which capabilities are already offered by the MIT staging extension.
 4. Record the cutover constraints and rollback procedure.
 
@@ -504,8 +506,8 @@ The largest block of ready-made functionality, and the point at which the
 staging extension stops being a demo. Everything here is `YOURS`: it moves,
 adapted to the MIT APIs, and is not rewritten.
 
-**Prerequisites are per file, not per group.** Read *Porting locally authored
-code* before starting: 31 of the 47 portable files compile standalone and can
+**Prerequisites are per file, not per group.** Read _Porting locally authored
+code_ before starting: 31 of the 47 portable files compile standalone and can
 move as soon as backlog 2 gives them somewhere to live, while 16 are blocked
 until the modules they import have MIT equivalents — chiefly the `DataSource`
 replacement, the authored `utils` subset, and `RepoManager`. Those blocked files
@@ -521,13 +523,13 @@ Groups, for grouping related review and testing — not for ordering. They cover
 needs them. Do not read the group list as the complete inventory — the ledger
 is:
 
-| Group | Files | Lines |
-| --- | --- | ---: |
-| A. Activity Bar sidebar | `web/sidebar/*`, `src/views/sidebar/*`, `src/types/sidebar-{protocol,state}.ts` | ~1,404 |
+| Group                                   | Files                                                                                                  |  Lines |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | -----: |
+| A. Activity Bar sidebar                 | `web/sidebar/*`, `src/views/sidebar/*`, `src/types/sidebar-{protocol,state}.ts`                        | ~1,404 |
 | B. Changes, files, and full-diff panels | `web/changesPanel.ts`, `web/filesPanel.ts`, `web/main/fullDiffPanel.ts`, `web/styles/changesPanel.css` | ~1,052 |
-| C. Graph rendering helpers | `web/main/{loadProcessing,tableRender,controlsLayout,avatarVisuals,constructorInit}.ts` | ~1,028 |
-| D. Blame, graph cache, status monitor | `src/inlineBlame.ts`, `src/repositoryGraphCache.ts`, `src/gitStatusMonitor.ts` | ~423 |
-| E. Tab action modules | `src/views/tab/{commitGraphActions,diffFileContentActions,workingTreeActions,miscActions}.ts` | ~325 |
+| C. Graph rendering helpers              | `web/main/{loadProcessing,tableRender,controlsLayout,avatarVisuals,constructorInit}.ts`                | ~1,028 |
+| D. Blame, graph cache, status monitor   | `src/inlineBlame.ts`, `src/repositoryGraphCache.ts`, `src/gitStatusMonitor.ts`                         |   ~423 |
+| E. Tab action modules                   | `src/views/tab/{commitGraphActions,diffFileContentActions,workingTreeActions,miscActions}.ts`          |   ~325 |
 
 Adapting to the MIT APIs is real work — imports, type names, and service
 boundaries all differ — but the behaviour and its edge cases come across intact,
@@ -662,7 +664,7 @@ the increment fails. Either wire it to a caller or delete it — a module kept
 
 The same failure has a manifest form: a declared command that no code
 registers, or a declared setting that no code reads. Both are user-visible lies
-and both are caught by the same question — *what reaches this?*
+and both are caught by the same question — _what reaches this?_
 
 Use `an-dr-commits` as a copy source only through the checker, never by
 inspection alone. A file that "looks new" proves nothing: the refactors moved
@@ -677,7 +679,7 @@ The final replacement may take the `an-dr-commits` identity only when all gates
 are true:
 
 - The feature ledger has no unclassified rows.
-- Every question in *Decisions still open* has been answered and recorded.
+- Every question in _Decisions still open_ has been answered and recorded.
 - Each retained public feature has a passing acceptance test.
 - `LICENSE`, `NOTICE.md`, and dependency notices pass the provenance review,
   and `NOTICE.md` still names the exact neo-git-graph commit the code derives

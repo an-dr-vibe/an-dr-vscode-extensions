@@ -4,11 +4,28 @@
 
 Replace the implementation currently installed as `an-dr-commits` with an
 MIT-derived implementation while retaining its public VS Code identity and
-user-facing capabilities. The migration starts from this extension's
-neo-git-graph-derived code, not from the existing `an-dr-commits` source.
+user-facing capabilities. The migration builds on this extension's
+neo-git-graph-derived code.
 
-This is a transition plan, not an instruction to copy the current Commits
-implementation. The existing extension is a behavioural reference only.
+Every file in the current `an-dr-commits` falls into exactly one of three
+categories, decided by the provenance checker and nothing else:
+
+| Category | Share of source | What happens to it |
+| --- | ---: | --- |
+| `YOURS` | 5,134 lines | **Move it.** Locally authored, relicensable MIT. |
+| `REVIEW` | 6,755 lines | **Annotate, then move the `+` hunks.** |
+| `BASELINE` | 10,941 lines | **Do not move.** Reimplement, or use the MIT equivalent. |
+
+Moving `YOURS` code is not a shortcut around this plan — it *is* the plan. A
+transition that reimplements code the author already owns wastes the work and
+loses behaviour that has no other specification. Most `BASELINE` lines need no
+reimplementation either: neo-git-graph is itself a Git Graph fork, so it already
+supplies equivalents for `dataSource`, `utils`, `config`, `avatarManager`,
+`dialog`, `findWidget`, `settingsWidget`, and `web/graph.ts`.
+
+The current extension is therefore two things at once: a behavioural reference,
+**and** the licensed source for 5,134 lines of `YOURS` code plus the clean hunks
+of another 6,755. Treating it as reference-only is a misreading of this plan.
 
 ## Non-negotiable provenance rules
 
@@ -60,13 +77,20 @@ node scripts/check-provenance.js --json                 # machine-readable
 ```
 
 Verdicts are `YOURS` (under 5% baseline overlap), `BASELINE` (over 40%), and
-`REVIEW` in between. Current classification of the 160 scanned files:
+`REVIEW` in between. Current classification of the 160 scanned files, with
+source and tests separated because they carry very different costs:
 
-| Verdict | Files | Meaning |
-| --- | ---: | --- |
-| `YOURS` | 55 | Locally authored; copy and relicense freely. 5,588 substantive lines. |
-| `REVIEW` | 40 | Mixed origin; annotate and take only `+` hunks. |
-| `BASELINE` | 65 | Substantially the imported snapshot; reimplement instead. |
+| Verdict | Files | Source lines | Test lines | Meaning |
+| --- | ---: | ---: | ---: | --- |
+| `YOURS` | 55 | 5,134 | 454 | Locally authored; copy and relicense freely. |
+| `REVIEW` | 40 | 6,755 | 350 | Mixed origin; annotate and take only `+` hunks. |
+| `BASELINE` | 65 | 10,941 | 14,076 | Substantially the imported snapshot; reimplement instead. |
+
+**The test column is the hidden cost of this project.** 14,076 lines of the
+existing suite are `BASELINE` and cannot move — `tests/dataSource.test.ts` alone
+is 4,264 lines, `tests/tabView.test.ts` 2,320, `tests/config.test.ts` 1,641.
+Every one of those behaviours needs a black-box test written from scratch. Budget
+for it explicitly; it is plausibly the single largest line item below.
 
 The thresholds are heuristics, not a licence. `REVIEW` means read the
 annotation, and a `YOURS` verdict on a file that only makes sense as a patch to
@@ -98,16 +122,40 @@ During development the staging extension keeps its `an-dr-com-mit-s` identity
 so both implementations can run side by side. The identity swap happens once,
 at cutover; it is never performed halfway through feature work.
 
-### Decisions still open
+### The gap to close
 
-These have no answer yet and block the sections that name them. Resolve each
-with a design decision before the section that depends on it starts.
+Backlog 1.3 asks for this; here is the measured answer, so the size of the
+project is visible before any work starts. Re-read both columns from the
+manifests when the ledger is built and treat drift as a ledger bug.
+
+| Surface | MIT staging today | Target | Gap |
+| --- | ---: | ---: | ---: |
+| Commands | 2 | 9 | 7 |
+| Settings | 14 | 139 | 125 |
+| Activity Bar views | 0 | 1 | 1 |
+
+The settings gap is the largest single number in this plan and the least
+examined. Backlog 0 triages it before any of it is scheduled.
+
+### Decisions now recorded
+
+| Question | Answer | Recorded in |
+| --- | --- | --- |
+| Keep the imported `zh-cn`/`zh-tw` localization (`l10n/`, `package.nls.*`, `npm run l10n:check`)? | Yes. Keep `l10n:check` green; every user-facing string added from here needs all three bundles. | This roadmap |
+| Keep the upstream `oxlint`/`oxfmt` toolchain, or move to the repository's `eslint` convention? | Keep `oxlint`/`oxfmt`; they are MIT-baseline tooling. | ADR pending |
+| Keep esbuild and Vitest, against the repository's "no bundler, no test framework" convention? | Keep both; the webview genuinely needs bundling. | ADR pending |
+
+The last two were settled once and the ADR recording them was lost when the
+premature cutover was reverted; a copy survives at the `archive/mit-cutover`
+tag. Rewrite it as this extension's ADR-002 during backlog 2, which is the first
+item those decisions actually bind.
+
+### Decisions still open
 
 | Question | Blocks | Default if undecided |
 | --- | --- | --- |
-| Does the final extension keep the imported `zh-cn`/`zh-tw` localization (`l10n/`, `package.nls.*`, `npm run l10n:check`)? | Cutover; every string added between now and then | Keep it, and keep `l10n:check` green |
-| Does the final extension keep the upstream `oxlint`/`oxfmt` toolchain, or move to the repository's `eslint` convention? | Backlog 2 | Keep `oxlint`/`oxfmt`; they are MIT-baseline tooling |
-| Does the final extension keep esbuild and Vitest, against the repository's "no bundler, no test framework" convention? | Backlog 2 | Keep both. The root `AGENTS.md` already states the esbuild exception, but no ADR records it — write one, since [ADR-001](../adr/ADR-001-mit-fork-provenance.md) covers only provenance |
+| Which of the 139 settings are kept, retired, or deferred? | Backlog 3 and most of 7 | None — backlog 0 exists to answer this, and scheduling settings work before it is answered is how the estimate runs away |
+| Does workspace state migrate from the current extension, or start fresh under new keys? | Backlog 4 | Start fresh under versioned keys; never write the legacy keys, so rolling back to the current extension keeps working |
 
 ## Initial structural alignment
 
@@ -130,8 +178,8 @@ that makes the migration easier, but no current Commits file content moves over.
 | Avatars: `src/avatarManager.ts` | `src/avatarManager.ts` | `src/avatarManager.ts` | Already MIT; verify and retain. |
 | Settings access: `src/config.ts` | `src/config.ts` | `src/config.ts` | Already MIT; extend key by key as backlog 3 adds the compatibility reader. |
 | Logging: `src/logger.ts` | `src/extension/utils/logger.ts` | `src/logger.ts` | Rehome only. |
-| Git credential prompts: `src/askpass/*` | No equivalent | `src/askpass/*` | **94% baseline** — reimplement. Blocks any authenticated fetch/pull/push, see backlog 5. |
-| Git interactive editor: `src/gitEditor/*` | No equivalent | `src/gitEditor/*` | **19% baseline, `REVIEW`** — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 5. |
+| Git credential prompts: `src/askpass/*` | No equivalent | `src/askpass/*` | **94% baseline** — reimplement. Blocks any authenticated fetch/pull/push, see backlog 6. |
+| Git interactive editor: `src/gitEditor/*` | No equivalent | `src/gitEditor/*` | **19% baseline, `REVIEW`** — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 6. |
 | Install/uninstall life cycle: `src/life-cycle/*` | No equivalent | `src/life-cycle/*` | **86% baseline** — reimplement; the `vscode:uninstall` hook must exist before cutover. |
 | Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*` | No equivalent | `src/views/sidebar/*`, `web/sidebar/*` | **0.7% baseline, `YOURS`** across 9 files — relicense and move after tab parity. |
 | Inline blame: `src/inlineBlame.ts` | No equivalent | `src/inlineBlame.ts` | **0% baseline, `YOURS`** — relicense and move, with its test. |
@@ -193,6 +241,58 @@ Each numbered item is split into commits of roughly 150–300 changed lines. A
 commit must compile and have focused tests; do not mix structural moves with a
 new feature in the same commit.
 
+### Ordering principle
+
+Two rules decide the order, and they sometimes conflict:
+
+1. **Portable code moves as early as its substrate allows.** A `YOURS` file is
+   already written, already tested in production use, and costs a fraction of an
+   equivalent reimplementation. Deferring it converts cheap work into expensive
+   work and leaves the extension unusable for longer.
+2. **Nothing moves before what it depends on.** The sidebar needs a repository
+   manager; the panels need the tab. Where the two rules conflict, this one wins
+   — but the delay must be a real dependency, not a preference for finishing one
+   category before starting another.
+
+The estimates below are substantive lines from the provenance data, split by
+what moves versus what must be authored. They are the basis for the size rule;
+an item that cannot be split into 150–300 line commits is not ready to start.
+
+| # | Item | Move | Author | Tests |
+| ---: | --- | ---: | ---: | ---: |
+| 0 | Triage the settings surface | — | — | — |
+| 1 | Compatibility ledger | — | ~200 | — |
+| 2 | Align the MIT staging structure | — | ~400 | ~300 |
+| 3 | Compatibility shell | — | ~350 | ~250 |
+| 4 | Repository lifecycle and status | ~226 | ~500 | ~600 |
+| 5 | Port the provenance-clear feature set | ~4,200 | ~600 | ~1,500 |
+| 6 | Git action parity | ~325 | ~1,800 | ~3,000 |
+| 7 | Graph and browser parity | ~1,028 | ~1,200 | ~2,500 |
+| 8 | Details, comparison, and file workflows | ~1,052 | ~900 | ~2,000 |
+| 9 | Install/uninstall life cycle and optional integrations | — | ~700 | ~600 |
+| 10 | Cutover and cleanup | — | ~200 | — |
+
+Roughly 6,800 lines move, 6,850 are authored, and 10,750 are tests. **The test
+column is the largest** — if a plan revision ever makes it look small, the
+revision is wrong.
+
+### 0. Triage the settings surface
+
+125 of the 139 settings have no MIT equivalent today. Scheduling that as one
+undifferentiated block is how this project's estimate runs away, so classify
+before committing to any of it.
+
+1. List all 139 keys with their current default and the feature they control.
+2. Label each **keep** (reimplement), **retire** (drop, with a migration note),
+   or **defer** (post-cutover), and record a line estimate per keep.
+3. Sum the keeps into the backlog 3, 7, and 8 estimates above, replacing them.
+4. Any setting controlling a feature that is itself retired is retired with it —
+   a setting for a view that does not exist is the defect this transition
+   already shipped once.
+
+**Exit:** Every one of the 139 keys carries a label and, if kept, an estimate.
+No settings work starts before this is complete.
+
 ### 1. Establish the compatibility ledger
 
 1. Create command, settings, state, and scenario inventory documents.
@@ -246,7 +346,36 @@ extension remains the only provider of incomplete features.
 **Exit:** Multiple repositories remain correctly selected and refreshed across
 window reloads and linked worktrees.
 
-### 5. Git action parity
+### 5. Port the provenance-clear feature set
+
+The largest block of ready-made functionality, and the point at which the
+staging extension stops being a demo. Everything here is `YOURS`: it moves,
+adapted to the MIT APIs, and is not rewritten. Repository lifecycle (backlog 4)
+is the only prerequisite.
+
+Port in this order, each group its own commit series:
+
+| Group | Files | Lines |
+| --- | --- | ---: |
+| A. Activity Bar sidebar | `web/sidebar/*`, `src/views/sidebar/*`, `src/types/sidebar-{protocol,state}.ts` | ~1,404 |
+| B. Changes, files, and full-diff panels | `web/changesPanel.ts`, `web/filesPanel.ts`, `web/main/fullDiffPanel.ts`, `web/styles/changesPanel.css` | ~1,052 |
+| C. Graph rendering helpers | `web/main/{loadProcessing,tableRender,controlsLayout,avatarVisuals,constructorInit}.ts` | ~1,028 |
+| D. Blame, graph cache, status monitor | `src/inlineBlame.ts`, `src/repositoryGraphCache.ts`, `src/gitStatusMonitor.ts` | ~423 |
+| E. Tab action modules | `src/views/tab/{commitGraphActions,diffFileContentActions,workingTreeActions,miscActions}.ts` | ~325 |
+
+Adapting to the MIT APIs is real work — imports, type names, and service
+boundaries all differ — but the behaviour and its edge cases come across intact,
+which is the entire reason this category exists.
+
+Group E's Code Review hand-off, in `miscActions.ts`, is one outbound
+`executeCommand('an-dr-code-review.setCommitRange', from, to, repo)` behind
+capability detection. When the receiver is absent the user must be told, not
+left with a button that silently does nothing.
+
+**Exit:** Every ported file is reachable from `activate()`, exercised through
+its real caller, and recorded with its checker verdict.
+
+### 6. Git action parity
 
 Implement and test one operation family at a time. Two shared services come
 first, because most families below fail without them:
@@ -265,12 +394,12 @@ first, because most families below fail without them:
    stash, apply, pop, drop, and branch-from-stash.
 5. Remote operations: add, edit, delete, fetch, and prune. The pull-request
    launch action belongs here; the URL construction it calls is built in
-   backlog 7.4.
+   backlog 8.4.
 
 Each operation uses a disposable local Git fixture and checks success, failure,
 cancellation, and repository-in-progress handling.
 
-### 6. Graph and browser parity
+### 7. Graph and browser parity
 
 1. Add branch/tag/stash/ref filtering, custom glob patterns, and repository
    load modes.
@@ -284,7 +413,7 @@ cancellation, and repository-in-progress handling.
 **Exit:** Every graph scenario in the compatibility ledger has a passing
 black-box test or an explicit retirement decision.
 
-### 7. Details, comparison, and file workflows
+### 8. Details, comparison, and file workflows
 
 1. Add commit details, file list/tree, copy/open actions, URLs, Markdown, and
    emoji rendering.
@@ -294,21 +423,22 @@ black-box test or an explicit retirement decision.
 4. Add issue-link and pull-request provider configuration as independent URL
    construction modules.
 
-### 8. Sidebar, blame, and review tooling
+### 9. Install/uninstall life cycle and optional integrations
 
-1. Add the Activity Bar container, shared repository selection, working-tree
-   controls, and mini graph.
-2. Add inline blame as a cancellable document-version service with its own
-   configuration and tests.
-3. Add the Code Review hand-off: a single outbound
-   `an-dr-code-review.setCommitRange` invocation behind capability detection,
-   degrading silently when that extension is absent. No state crosses back.
-4. Add the install/uninstall life cycle, including the `vscode:uninstall`
-   script, so uninstalling the final extension clears the state it wrote.
-5. Add SCM title/actions and terminal integration last, behind capability
+The sidebar, blame, and Code Review hand-off that this item used to hold moved
+to backlog 5 — they are `YOURS` and should not wait behind reimplementation
+work. What remains here is genuinely baseline-derived or optional.
+
+1. Add the install/uninstall life cycle, including the `vscode:uninstall`
+   script, so uninstalling the final extension clears the state it wrote. The
+   current implementation is **86% baseline** — reimplement, do not move.
+   Verify the hook actually runs: it is skipped for extensions installed by
+   symlink or junction, which is how `install.ps1` installs everything here, so
+   a hook that is never exercised is not done.
+2. Add SCM title/actions and terminal integration last, behind capability
    detection.
 
-### 9. Cutover and cleanup
+### 10. Cutover and cleanup
 
 1. Prune the upstream project scaffolding the MIT import carried in, which
    belongs to neo-git-graph's own repository rather than to an extension inside
@@ -333,13 +463,40 @@ For every transition task, use this sequence to keep reasoning small and
 repeatable:
 
 1. Choose one ledger row and one target module.
-2. Copy only the closest MIT staging module, then rename/move it if necessary.
+2. Establish the source: the closest MIT staging module, a checker-cleared
+   `YOURS` file from the current extension, the `+` hunks of a `REVIEW` file, or
+   newly authored code. Record which, with the checker verdict.
 3. Add a small typed adapter or independently authored implementation.
-4. Add a black-box test for the row's observable behaviour.
-5. Run `npm run typecheck`, `npm run compile`, the focused Vitest project
+4. Wire it to its real caller in the same commit. A module that compiles but
+   nothing reaches is not progress.
+5. Add a black-box test for the row's observable behaviour, driven through that
+   caller rather than by importing the module directly.
+6. Run `npm run typecheck`, `npm run compile`, the focused Vitest project
    (`npx vitest run --project backend|extension|webview`), and
    `git diff --check`.
-6. Review the diff for forbidden path references and provenance drift.
+7. Run the reachability check below.
+8. Review the diff for forbidden path references and provenance drift.
+
+### Reachability check
+
+An earlier attempt at this transition marked eighteen increments complete while
+shipping eight modules that nothing imported, each with a passing unit test on
+its own exported helper. Green tests do not distinguish working code from dead
+code; this check does.
+
+For every symbol exported by a file the increment added, list its references:
+
+```sh
+grep -rl "<exportedSymbol>" src tests | grep -v node_modules
+```
+
+If the only matches are the file itself and its own test, the symbol is dead and
+the increment fails. Either wire it to a caller or delete it — a module kept
+"for later" is indistinguishable from a module that was never finished.
+
+The same failure has a manifest form: a declared command that no code
+registers, or a declared setting that no code reads. Both are user-visible lies
+and both are caught by the same question — *what reaches this?*
 
 Use `an-dr-commits` as a copy source only through the checker, never by
 inspection alone. A file that "looks new" proves nothing: the refactors moved
@@ -364,6 +521,14 @@ are true:
   with `--baseline 4d4c579:extensions/an-dr-git` against the final tree reports
   no `BASELINE` file and no unresolved `REVIEW` file.
 - Every copied file or hunk has a recorded checker verdict.
+- Every declared command is registered on **every** activation path, including
+  the path taken when no repository is found, and every declared setting is read
+  by code that acts on it. A manifest entry with no implementation behind it
+  fails the cutover.
+- No exported symbol is referenced only by its own file and its own test.
+- The cutover preflight asserts observable behaviour, not manifest arithmetic.
+  A gate that counts entries in the same file it guards passes by construction
+  and proves nothing.
 - `extensions/an-dr-commits/NOTICE.md` is corrected: it currently claims the
   original license is MIT, which contradicts the restrictive `LICENSE` beside
   it, and its project URL is a find/replace corruption of the upstream one.

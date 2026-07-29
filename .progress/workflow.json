@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "flow": "DetailedAuto",
-  "phase": "FINAL_REVIEW",
+  "phase": "COMMIT",
   "baseBranch": "main",
   "baseCommit": "3d955d4c2d6402ceaff128f2780f7f645c25a564",
   "featureBranch": "feature/an-dr-com-mit-s",
@@ -11,8 +11,8 @@
     "done": "A new an-dr-com-mit-s extension exists, has an MIT license and attribution, compiles successfully, and can be installed by install.ps1.",
     "outOfScope": "Marketplace publication, copying restricted Git Graph revisions, and changes to the existing an-dr-commits extension."
   },
-  "currentIncrementId": null,
-  "commitBaseline": null,
+  "currentIncrementId": "1f63905c63a248f5bfc2d141d2cc8d9b",
+  "commitBaseline": "4af0702fdd89e5d9adf45a15929666f1fa92088a",
   "increments": [
     {
       "id": "0ddf904333c54cd397899b6d1f494a9e",
@@ -34,6 +34,55 @@
       "status": "completed",
       "scope": "Distribution verification",
       "description": "Document the extension, verify its license boundary and build, and validate installation discovery."
+    },
+    {
+      "id": "1f63905c63a248f5bfc2d141d2cc8d9b",
+      "number": 4,
+      "status": "verified",
+      "scope": "MIT feature-parity migration",
+      "description": "Map the public an-dr-commits feature set and reimplement the missing functionality on an-dr-com-mit-s using only the MIT-derived foundation and independent code."
+    },
+    {
+      "id": "3584f282892f47b3a9eb4265c3b15430",
+      "number": 5,
+      "status": "planned",
+      "scope": "Compatibility contract",
+      "description": "Document the public command, configuration, view, and persisted-state compatibility contract for replacing an-dr-commits with the MIT foundation."
+    },
+    {
+      "id": "6e6abca314494c9da3ef82d6a5413c25",
+      "number": 6,
+      "status": "planned",
+      "scope": "MIT core replacement",
+      "description": "Create an an-dr-commits identity on the MIT foundation and replace basic graph, repository discovery, status-bar, and command surfaces without restricted implementation reuse."
+    },
+    {
+      "id": "17acc80d84af46dc99ca88881360963d",
+      "number": 7,
+      "status": "planned",
+      "scope": "Git workflow parity",
+      "description": "Independently implement branch, tag, stash, working-tree, remote, and commit workflow actions required by the public Commits behavior."
+    },
+    {
+      "id": "33c79f015f594b8cb8f3777b036d4bc7",
+      "number": 8,
+      "status": "planned",
+      "scope": "Graph and details parity",
+      "description": "Independently implement filtering, search, comparison, commit details, file navigation, diff modes, and display configuration on the MIT foundation."
+    },
+    {
+      "id": "2b218f984b1643a18f130e2f473a719e",
+      "number": 9,
+      "status": "planned",
+      "scope": "Workspace tooling parity",
+      "description": "Independently implement Activity Bar changes, code-review state, inline blame, repository lifecycle, and public integrations."
+    },
+    {
+      "id": "a41a7feaeb2740c9a78d432d90ee7428",
+      "number": 10,
+      "status": "planned",
+      "scope": "Migration verification",
+      "description": "Migrate documented user-facing settings and commands, verify behavior across platforms, and install the replacement under the an-dr-commits identity."
     }
   ],
   "approvals": [],
@@ -127,8 +176,63 @@
       "at": "2026-07-28T22:04:27.4166313Z",
       "action": "advance",
       "detail": "Advanced from SUMMARY to FINAL_REVIEW."
+    },
+    {
+      "at": "2026-07-29T04:26:22.1488142Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 4: MIT feature-parity migration"
+    },
+    {
+      "at": "2026-07-29T04:27:09.2159783Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 5: Compatibility contract"
+    },
+    {
+      "at": "2026-07-29T04:27:10.1574895Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 6: MIT core replacement"
+    },
+    {
+      "at": "2026-07-29T04:27:11.2304314Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 7: Git workflow parity"
+    },
+    {
+      "at": "2026-07-29T04:27:12.1719868Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 8: Graph and details parity"
+    },
+    {
+      "at": "2026-07-29T04:27:13.1041516Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 9: Workspace tooling parity"
+    },
+    {
+      "at": "2026-07-29T04:27:14.1586131Z",
+      "action": "add-increment",
+      "detail": "Inserted increment 10: Migration verification"
+    },
+    {
+      "at": "2026-07-29T04:38:25.1481699Z",
+      "action": "advance",
+      "detail": "Advanced from SPLIT to BRANCH."
+    },
+    {
+      "at": "2026-07-29T04:38:25.8413316Z",
+      "action": "advance",
+      "detail": "Advanced from BRANCH to BUILD."
+    },
+    {
+      "at": "2026-07-29T04:40:02.3723511Z",
+      "action": "advance",
+      "detail": "Advanced from BUILD to VERIFY."
+    },
+    {
+      "at": "2026-07-29T04:40:06.4601360Z",
+      "action": "advance",
+      "detail": "Advanced from VERIFY to COMMIT."
     }
   ],
   "createdAt": "2026-07-28T21:53:20.1017975Z",
-  "updatedAt": "2026-07-28T22:04:27.4308283Z"
+  "updatedAt": "2026-07-29T04:40:06.4673292Z"
 }

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "flow": "DetailedAuto",
-  "phase": "COMMIT",
+  "phase": "BUILD",
   "baseBranch": "main",
   "baseCommit": "3d955d4c2d6402ceaff128f2780f7f645c25a564",
   "featureBranch": "feature/an-dr-com-mit-s",
@@ -11,8 +11,8 @@
     "done": "A new an-dr-com-mit-s extension exists, has an MIT license and attribution, compiles successfully, and can be installed by install.ps1.",
     "outOfScope": "Marketplace publication, copying restricted Git Graph revisions, and changes to the existing an-dr-commits extension."
   },
-  "currentIncrementId": "1f63905c63a248f5bfc2d141d2cc8d9b",
-  "commitBaseline": "4af0702fdd89e5d9adf45a15929666f1fa92088a",
+  "currentIncrementId": "3584f282892f47b3a9eb4265c3b15430",
+  "commitBaseline": null,
   "increments": [
     {
       "id": "0ddf904333c54cd397899b6d1f494a9e",
@@ -38,14 +38,14 @@
     {
       "id": "1f63905c63a248f5bfc2d141d2cc8d9b",
       "number": 4,
-      "status": "verified",
+      "status": "completed",
       "scope": "MIT feature-parity migration",
       "description": "Map the public an-dr-commits feature set and reimplement the missing functionality on an-dr-com-mit-s using only the MIT-derived foundation and independent code."
     },
     {
       "id": "3584f282892f47b3a9eb4265c3b15430",
       "number": 5,
-      "status": "planned",
+      "status": "in_progress",
       "scope": "Compatibility contract",
       "description": "Document the public command, configuration, view, and persisted-state compatibility contract for replacing an-dr-commits with the MIT foundation."
     },
@@ -228,11 +228,16 @@
       "detail": "Advanced from BUILD to VERIFY."
     },
     {
-      "at": "2026-07-29T04:40:06.4601360Z",
+      "at": "2026-07-29T04:40:06.460136Z",
       "action": "advance",
       "detail": "Advanced from VERIFY to COMMIT."
+    },
+    {
+      "at": "2026-07-29T04:54:20.7477029Z",
+      "action": "advance",
+      "detail": "Advanced from COMMIT to BUILD."
     }
   ],
   "createdAt": "2026-07-28T21:53:20.1017975Z",
-  "updatedAt": "2026-07-29T04:40:06.4673292Z"
+  "updatedAt": "2026-07-29T04:54:20.7553927Z"
 }

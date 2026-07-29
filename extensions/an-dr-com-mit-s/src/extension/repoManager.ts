@@ -4,12 +4,12 @@ import { Config } from "@/config";
 import { ExtensionState } from "@/extensionState";
 import { StatusBarItem } from "@/statusBarItem";
 import { GitRepoSet, GitRepoState } from "@/types";
+import { getSortedRepositoryPaths } from "@/utils";
 
 function sortRepos(repos: GitRepoSet) {
-  const repoPaths = Object.keys(repos).toSorted();
   const sorted: GitRepoSet = {};
-  for (let i = 0; i < repoPaths.length; i++) {
-    sorted[repoPaths[i]] = repos[repoPaths[i]];
+  for (const repo of getSortedRepositoryPaths(repos)) {
+    sorted[repo] = repos[repo];
   }
   return sorted;
 }

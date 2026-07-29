@@ -7,6 +7,7 @@ import { GitClient, gitClientFactory } from "@/backend/gitClient";
 import { findGitRepos } from "@/backend/queries/repoSearch";
 import { buildExtensionUri } from "@/backend/utils/path";
 import { config } from "@/config";
+import { DataSource } from "@/dataSource";
 import { DiffDocProvider } from "@/diffDocProvider";
 import { EXTENSION_ID, EXTENSION_NAME } from "@/extension/constant/const";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
@@ -18,6 +19,7 @@ import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";
 import { ExtensionState } from "@/extensionState";
 import { RepoFileWatcher } from "@/repoFileWatcher";
 import { StatusBarItem } from "@/statusBarItem";
+import { showErrorMessage } from "@/utils";
 
 export type InitExtension = typeof initExtension;
 
@@ -26,7 +28,8 @@ function registerViewCommand(
   repoManager: RepoManager,
   extensionState: ExtensionState,
   avatarManager: AvatarManager,
-  gitClient: GitClient
+  gitClient: GitClient,
+  dataSource: DataSource
 ) {
   let currentPanel: WebviewPanel | undefined;
   ctx.subscriptions.push(
@@ -61,6 +64,7 @@ function registerViewCommand(
       const { onPanelShown } = registerMessageHandlers(bridge, {
         config,
         gitClient,
+        dataSource,
         repoManager,
         extensionState,
         avatarManager,
@@ -103,6 +107,7 @@ export function initExtension(
     );
 
     const gitClient = gitClientFactory(extensionState.getLastActiveRepo() ?? "", config.gitPath());
+    const dataSource = new DataSource(gitClient, config.gitPath);
     ctx.subscriptions.push(
       vscode.workspace.registerTextDocumentContentProvider(
         DiffDocProvider.scheme,
@@ -114,7 +119,7 @@ export function initExtension(
     const repoManager = createRepoManager(extensionState, statusBarItem, config);
     repoManager.setRepos(repos);
     repoManager.sendRepos();
-    registerViewCommand(ctx, repoManager, extensionState, avatarManager, gitClient);
+    registerViewCommand(ctx, repoManager, extensionState, avatarManager, gitClient, dataSource);
 
     const gitWatcher = vscode.workspace.createFileSystemWatcher("**/.git");
     ctx.subscriptions.push(
@@ -183,6 +188,7 @@ export function initExtension(
     );
   } catch (err) {
     logger.log(`Error during initialization: ${err instanceof Error ? err.message : String(err)}`);
+    void showErrorMessage(vscode.l10n.t("Commits could not finish loading. Please retry."));
     throw err;
   }
 }

@@ -12,16 +12,25 @@ import { mergeBranch, mergeCommit } from "@/backend/actions/merge";
 import { addTag, deleteTag, pushTag } from "@/backend/actions/tag";
 import { GitClient } from "@/backend/gitClient";
 import { commitDetails } from "@/backend/queries/commitDetails";
-import { loadBranches } from "@/backend/queries/loadBranches";
-import { loadCommits } from "@/backend/queries/loadCommits";
 import { GitFileChangeType } from "@/backend/types";
 import { abbrevCommit } from "@/backend/utils/string";
 import { Config } from "@/config";
+import { DataSource } from "@/dataSource";
 import { encodeDiffDocUri } from "@/diffDocProvider";
 import { copyToClipboard } from "@/extension/utils/clipboard";
 import { ExtensionState } from "@/extensionState";
 import { RepoFileWatcher } from "@/repoFileWatcher";
 import { RequestMessage, ResponseMessage } from "@/types";
+import {
+  archive,
+  getRelativeTimeDiff,
+  openExtensionSettings,
+  openExternalUrl,
+  openFile,
+  viewFileAtRevision,
+  viewScm,
+  viewSubmoduleDiff
+} from "@/utils";
 
 import { RepoManager } from "./repoManager";
 import { WebviewBridge } from "./webviewBridge";
@@ -63,13 +72,22 @@ export function registerMessageHandlers(
   deps: {
     config: Config;
     gitClient: GitClient;
+    dataSource: DataSource;
     repoManager: RepoManager;
     extensionState: ExtensionState;
     avatarManager: AvatarManager;
     repoFileWatcher: RepoFileWatcher;
   }
 ) {
-  const { config, gitClient, repoManager, extensionState, avatarManager, repoFileWatcher } = deps;
+  const {
+    config,
+    gitClient,
+    dataSource,
+    repoManager,
+    extensionState,
+    avatarManager,
+    repoFileWatcher
+  } = deps;
 
   let currentRepo: string | null = null;
 
@@ -109,7 +127,7 @@ export function registerMessageHandlers(
   bridge.onMessage("loadCommits", async (msg) => {
     bridge.post({
       command: "loadCommits",
-      ...(await loadCommits(gitClient.getInstance(), {
+      ...(await dataSource.loadCommits({
         branchName: msg.branchName,
         maxCommits: msg.maxCommits,
         showRemoteBranches: msg.showRemoteBranches,
@@ -123,7 +141,7 @@ export function registerMessageHandlers(
   bridge.onMessage("loadBranches", async (msg) => {
     bridge.post({
       command: "loadBranches",
-      ...(await loadBranches(gitClient.getInstance(), {
+      ...(await dataSource.loadBranches({
         showRemoteBranches: msg.showRemoteBranches,
         hard: msg.hard,
         currentRepo: currentRepo!,
@@ -184,6 +202,34 @@ export function registerMessageHandlers(
     bridge.post({
       command: "viewDiff",
       success: await viewDiff(msg.repo, msg.commitHash, msg.oldFilePath, msg.newFilePath, msg.type)
+    });
+  });
+
+  function registerUtilityAction<
+    T extends Exclude<RequestMessage["command"], "getRelativeTimeDiff">
+  >(command: T, handler: (msg: Extract<RequestMessage, { command: T }>) => Promise<string | null>) {
+    bridge.onMessage(command, async (msg) => {
+      bridge.post({ command, error: await handler(msg) } as ResponseMessage);
+    });
+  }
+
+  registerUtilityAction("archive", (msg) => archive(msg.repo, msg.ref, dataSource));
+  registerUtilityAction("viewSubmoduleDiff", (msg) =>
+    viewSubmoduleDiff(msg.repo, msg.fromHash, msg.toHash, msg.filePath, dataSource)
+  );
+  registerUtilityAction("viewScm", () => viewScm());
+  registerUtilityAction("viewFileAtRevision", (msg) =>
+    viewFileAtRevision(msg.repo, msg.hash, msg.filePath)
+  );
+  registerUtilityAction("openFile", (msg) =>
+    openFile(msg.repo, msg.filePath, msg.hash, dataSource)
+  );
+  registerUtilityAction("openExternalUrl", (msg) => openExternalUrl(msg.url, msg.type));
+  registerUtilityAction("openExtensionSettings", () => openExtensionSettings());
+  bridge.onMessage("getRelativeTimeDiff", (msg) => {
+    bridge.post({
+      command: "getRelativeTimeDiff",
+      value: getRelativeTimeDiff(msg.unixTimestamp)
     });
   });
 

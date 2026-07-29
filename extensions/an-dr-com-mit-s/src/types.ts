@@ -96,6 +96,53 @@ export type ResponseViewDiff = {
   success: boolean;
 };
 
+export type RequestUtilityAction =
+  | {
+      command: "archive";
+      repo: string;
+      ref: string;
+    }
+  | {
+      command: "viewSubmoduleDiff";
+      repo: string;
+      fromHash: string;
+      toHash: string;
+      filePath: string;
+    }
+  | { command: "viewScm" }
+  | {
+      command: "viewFileAtRevision";
+      repo: string;
+      hash: string;
+      filePath: string;
+    }
+  | {
+      command: "openFile";
+      repo: string;
+      filePath: string;
+      hash: string | null;
+    }
+  | {
+      command: "openExternalUrl";
+      url: string;
+      type?: string;
+    }
+  | { command: "openExtensionSettings" }
+  | {
+      command: "getRelativeTimeDiff";
+      unixTimestamp: number;
+    };
+
+export type ResponseUtilityAction =
+  | {
+      command: Exclude<RequestUtilityAction["command"], "getRelativeTimeDiff">;
+      error: string | null;
+    }
+  | {
+      command: "getRelativeTimeDiff";
+      value: string;
+    };
+
 export type ResponseRefresh = {
   command: "refresh";
 };
@@ -108,7 +155,8 @@ export type RequestMessage =
   | RequestLoadRepos
   | RequestSaveRepoState
   | RequestCopyToClipboard
-  | RequestViewDiff;
+  | RequestViewDiff
+  | RequestUtilityAction;
 
 export type ResponseMessage =
   | ActionResponse
@@ -117,4 +165,5 @@ export type ResponseMessage =
   | ResponseLoadRepos
   | ResponseCopyToClipboard
   | ResponseViewDiff
+  | ResponseUtilityAction
   | ResponseRefresh;

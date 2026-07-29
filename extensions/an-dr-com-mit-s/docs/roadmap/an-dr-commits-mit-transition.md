@@ -168,7 +168,7 @@ that makes the migration easier, but no current Commits file content moves over.
 | Lightweight activation, commands, serializer: `src/extension.ts`, `src/core.ts`, `src/commandIds.ts` | `src/extension/main.ts`, `src/extension/initExtension.ts` | `src/extension.ts`, `src/core.ts`, `src/commandIds.ts` | Move MIT activation wiring behind a lazy `core` factory; retain only MIT logic and write small adapters. |
 | Git reads and graph snapshot: `src/dataSource.ts`, `src/data-source/*`, `src/repositoryGraphCache.ts` | `src/backend/gitClient.ts`, `src/backend/queries/*` | `src/dataSource.ts`, `src/data-source/*`, `src/repositoryGraphCache.ts` | Rehome MIT query functions first; expose a typed façade before adding caching. |
 | Repository discovery/state: `src/repoManager.ts`, `src/repo-manager/*` | `src/extension/repoManager.ts`, `src/extension/watchForRepos.ts`, `src/backend/queries/repoSearch.ts`, `src/backend/utils/repoSearch.ts` | `src/repoManager.ts`, `src/repo-manager/*` | Move MIT repository code into a single manager facade; preserve current behaviour only through acceptance tests. |
-| Repository change monitoring: `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts` | `src/repoFileWatcher.ts`, `src/extension/watchForRepos.ts` | `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts` | Keep the MIT watcher first. `gitStatusMonitor.ts` is **4% baseline** — annotate, then relicense and move. |
+| Repository change monitoring: `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts` | `src/repoFileWatcher.ts`, `src/extension/watchForRepos.ts` | `src/repoFileWatcher.ts`, `src/gitStatusMonitor.ts` | Keep the MIT watcher first. `gitStatusMonitor.ts` is **2.7% baseline** — annotate, then relicense and move. |
 | Git actions: `src/commands.ts` | `src/backend/actions/{branch,commit,merge,tag}.ts` | `src/commands.ts`, `src/actions/*` | Wrap existing MIT actions in one command dispatcher; add missing actions one operation at a time. |
 | Graph editor tab: `src/views/tab/*` | `src/extension/{webviewPanel,webviewHtml,webviewBridge,messageHandler}.ts` | `src/views/tab/*` | Keep the MIT bridge and panel lifecycle; split adapters by message category only after parity tests exist. |
 | Browser graph UI: `web/*`, `web/styles/*` | `src/webview/*`, `media/*.css` | `web/*` | Move the MIT browser modules and their CSS without semantic change, and repoint the esbuild webview entry point. The bundler stays esbuild — see below. |
@@ -178,10 +178,10 @@ that makes the migration easier, but no current Commits file content moves over.
 | Avatars: `src/avatarManager.ts` | `src/avatarManager.ts` | `src/avatarManager.ts` | Already MIT; verify and retain. |
 | Settings access: `src/config.ts` | `src/config.ts` | `src/config.ts` | Already MIT; extend key by key as backlog 3 adds the compatibility reader. |
 | Logging: `src/logger.ts` | `src/extension/utils/logger.ts` | `src/logger.ts` | Rehome only. |
-| Git credential prompts: `src/askpass/*` | No equivalent | `src/askpass/*` | **94% baseline** — reimplement. Blocks any authenticated fetch/pull/push, see backlog 6. |
-| Git interactive editor: `src/gitEditor/*` | No equivalent | `src/gitEditor/*` | **19% baseline, `REVIEW`** — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 6. |
-| Install/uninstall life cycle: `src/life-cycle/*` | No equivalent | `src/life-cycle/*` | **86% baseline** — reimplement; the `vscode:uninstall` hook must exist before cutover. |
-| Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*` | No equivalent | `src/views/sidebar/*`, `web/sidebar/*` | **0.7% baseline, `YOURS`** across 9 files — relicense and move, ordered by the import graph rather than by feature; see *Porting locally authored code*. |
+| Git credential prompts: `src/askpass/*` | No equivalent | `src/askpass/*` | **100% baseline** (`askpassMain.ts`), **91%** (`askpassManager.ts`) — reimplement. Blocks any authenticated fetch/pull/push, see backlog 6. |
+| Git interactive editor: `src/gitEditor/*` | No equivalent | `src/gitEditor/*` | **32% baseline** (`gitEditorMain.ts`), **17%** (`gitEditorManager.ts`), both `REVIEW` — annotate and take the authored hunks. Blocks interactive rebase and message editing, see backlog 6. |
+| Install/uninstall life cycle: `src/life-cycle/*` | No equivalent | `src/life-cycle/*` | **84–90% baseline** (`startup.ts`, `utils.ts`; `uninstall.ts` is 65%) — reimplement; the `vscode:uninstall` hook must exist before cutover. |
+| Activity Bar sidebar: `src/views/sidebar/*`, `web/sidebar/*` | No equivalent | `src/views/sidebar/*`, `web/sidebar/*` | **1.0% baseline on `sidebarView.ts`, `YOURS`** across 9 files — relicense and move, ordered by the import graph rather than by feature; see *Porting locally authored code*. |
 | Inline blame: `src/inlineBlame.ts` | No equivalent | `src/inlineBlame.ts` | **0% baseline, `YOURS`** — relicense and move, with its test. |
 | Code review hand-off: `src/views/tab/miscActions.ts` | No equivalent | `src/codeReviewIntegration.ts` | **0% baseline, `YOURS`** — relicense and move. The whole contract is one outbound `executeCommand('an-dr-code-review.setCommitRange', from, to, repo)`; nothing is persisted on this side. |
 
@@ -211,12 +211,38 @@ Before feature work begins, the staging extension must:
 ## Porting locally authored code
 
 A `YOURS` verdict means the *expression* is relicensable. It does not mean the
-file compiles once moved. Measured over the 47 `YOURS` source files:
+file compiles once moved, and the obstacle differs by area. Measured over the 47
+`YOURS` source files:
 
-| | Files |
-| --- | ---: |
-| Compile standalone — every relative import is also `YOURS` | 31 |
-| Blocked — at least one import resolves into `BASELINE`/`REVIEW` | 16 |
+| Category | Files | Lines | Obstacle |
+| --- | ---: | ---: | --- |
+| CSS | 2 | 408 | None — move it |
+| `web/*` | 23 | 3,109 | Written for global-scope concatenation; needs conversion to ES modules |
+| `src/*`, imports all `YOURS` | 6 | 212 | None — move it |
+| `src/*`, blocked | 16 | 1,405 | Imports resolve into `BASELINE`/`REVIEW` modules |
+
+**Only 620 lines are drop-in.** The rest needs one of two conversions, and
+neither is visible in a provenance verdict.
+
+### The `web/` trap
+
+22 of the 23 `web/` files contain **zero `import` statements** —
+`web/changesPanel.ts` is 615 lines with none, `web/main/fullDiffPanel.ts` 469,
+`web/main/loadProcessing.ts` 437. They are not dependency-free; the retired
+build pipeline concatenated them into one global scope, so their dependencies
+were never written down. The MIT webview uses real ES modules bundled by
+esbuild.
+
+Porting one therefore means recovering its implicit dependencies: find every
+identifier it uses but does not define, locate that identifier's origin, and
+add an explicit import. An import-graph analysis cannot find these — a file with
+no imports looks standalone and is not.
+
+This fails silently. A missed global becomes a runtime `undefined` that
+typechecks cleanly and passes any test not exercising that path. For each ported
+`web/` file, exercise it in the running extension, not only under Vitest.
+
+### Blocked `src/` files
 
 The blockers concentrate in a handful of modules:
 
@@ -232,10 +258,11 @@ The blockers concentrate in a handful of modules:
 | `src/types/base.ts` | 3 | BASELINE |
 | `src/types/message-protocol.ts` | 3 | BASELINE |
 
-**Port order follows the import graph, not the feature grouping.** Move the 31
-standalone files first; each blocked file becomes portable only once every
-module it imports has an MIT equivalent. Recompute this classification after
-each group lands rather than trusting the snapshot above.
+**Port order follows the obstacle, not the feature grouping.** Move the 620
+drop-in lines first; convert `web/` files once the module pattern is
+established; port blocked `src/` files only after every module they import has
+an MIT equivalent. Recompute this classification after each group lands rather
+than trusting the snapshot above.
 
 ### Symbol mapping
 
@@ -290,16 +317,25 @@ files that move with it.
 
 ### Who executes what
 
-| Kind of work | Executor |
-| --- | --- |
-| Symbol mapping, and the first port in each group | Pattern-establishing — the primary agent |
-| Remaining ports in a group, once the pattern exists | Mechanical — delegatable |
-| Every `VERIFY` pass and the reachability check | Primary agent, never delegated |
-| Reimplementation of `BASELINE` services | Pattern-establishing — primary agent |
+| Kind of work | Lines | Executor |
+| --- | ---: | --- |
+| CSS and drop-in `src/` files | 620 | Mechanical — delegatable immediately |
+| Symbol mapping, and the first port in each cluster | — | Pattern-establishing — primary agent |
+| `web/` ports after the module pattern exists | ~3,100 | Delegatable, but see the caveat below |
+| Blocked `src/` ports | ~1,405 | Pattern-establishing — primary agent |
+| Reimplementation of `BASELINE` services | — | Pattern-establishing — primary agent |
+| Every `VERIFY` pass and the reachability check | — | Primary agent, never delegated |
 
-A delegated port follows an existing example in the same group and changes no
-API decisions. If a port needs a new mapping-table row, it is not mechanical and
-comes back to the primary agent.
+**Only 620 lines are delegatable before any pattern work.** The `web/` bulk
+becomes delegatable only after the first two or three conversions establish how
+implicit globals map to explicit imports — and even then, each port must be
+exercised in the running extension, because the failure mode is a runtime
+`undefined` that every static check passes.
+
+A delegated port follows an existing example in the same cluster and changes no
+API decisions. If a port needs a new mapping-table row, or introduces an import
+whose origin is not already mapped, it is not mechanical and comes back to the
+primary agent.
 
 ## Compatibility inventory method
 
@@ -347,9 +383,14 @@ Two rules decide the order, and they sometimes conflict:
    — but the delay must be a real dependency, not a preference for finishing one
    category before starting another.
 
-The estimates below are substantive lines from the provenance data, split by
-what moves versus what must be authored. They are the basis for the size rule;
-an item that cannot be split into 150–300 line commits is not ready to start.
+In the table below, **the Move column is measured** — substantive lines from the
+provenance data. **The Author and Tests columns are estimates** and have not
+been derived from anything; treat them as order-of-magnitude only and replace
+each with a real figure when its backlog item is planned. Backlog 0 replaces the
+settings-driven ones first.
+
+The measured column is the basis for the size rule; an item that cannot be split
+into 150–300 line commits is not ready to start.
 
 | # | Item | Move | Author | Tests |
 | ---: | --- | ---: | ---: | ---: |
@@ -473,7 +514,12 @@ land late, some of them only after backlogs 7 and 8.
 Do not treat a group as a unit of scheduling. Within each group, port the
 standalone files first and the blocked ones as their dependencies appear.
 
-Groups, for grouping related review and testing — not for ordering:
+Groups, for grouping related review and testing — not for ordering. They cover
+4,232 of the 5,134 `YOURS` source lines; the remaining ~900 (`extension.ts`,
+`statusBarItem.ts`, `graphRebase.ts`, `webviewHtml.ts`, `syntaxHighlight.ts`,
+`fileIcons.ts` and other singletons) are ported alongside whichever group first
+needs them. Do not read the group list as the complete inventory — the ledger
+is:
 
 | Group | Files | Lines |
 | --- | --- | ---: |
@@ -551,7 +597,7 @@ work. What remains here is genuinely baseline-derived or optional.
 
 1. Add the install/uninstall life cycle, including the `vscode:uninstall`
    script, so uninstalling the final extension clears the state it wrote. The
-   current implementation is **86% baseline** — reimplement, do not move.
+   current implementation is **84–90% baseline** — reimplement, do not move.
    Verify the hook actually runs: it is skipped for extensions installed by
    symlink or junction, which is how `install.ps1` installs everything here, so
    a hook that is never exercised is not done.

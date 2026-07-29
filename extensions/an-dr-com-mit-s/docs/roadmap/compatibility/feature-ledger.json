@@ -1,0 +1,331 @@
+[
+  {
+    "id": "an-dr-commits.view",
+    "surface": "command",
+    "status": "Already MIT",
+    "target": "command adapter for an-dr-commits.view",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.clearAvatarCache",
+    "surface": "command",
+    "status": "Already MIT",
+    "target": "command adapter for an-dr-commits.clearAvatarCache",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.addGitRepository",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "repository lifecycle command",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.removeGitRepository",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "repository lifecycle command",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.fetch",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "remote operation command",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.pull",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "remote operation command, needs askpass",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.push",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "remote operation command, needs askpass",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.version",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "trivial version display",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.openFile",
+    "surface": "command",
+    "status": "New implementation",
+    "target": "file workflow command",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.statusBarIconOnly",
+    "surface": "setting",
+    "status": "Already MIT",
+    "target": "staging reads this key verbatim",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.commits.fetchAvatars",
+    "surface": "setting",
+    "status": "Adapter",
+    "target": "key-path adapter onto staging's flat fetchAvatars",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.keyboardShortcut.refresh",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "keybindings manifest contribution",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.logLevel",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "logger level filter",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.defaultCommitMessage",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "working-tree commit default",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.dialog.repoInProgress.confirmAbort",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "repository-in-progress handling",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.currentUserAlias",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.delayBlame",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.detectMoveOrCopyFromOtherFiles",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.extendedHoverInformation",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.ignoreWhitespace",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.inlineMessageEnabled",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.inlineMessageFormat",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.inlineMessageMargin",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.inlineMessageNoCommit",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.blame.maxLineCount",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "inline blame",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.inlineBlame.enabled",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "deprecated alias for blame.inlineMessageEnabled",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.branchPanel.flattenSingleChildGroups",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "sidebar branch tree",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.branchPanel.groupsFirst",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "sidebar branch tree",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.branchPanel.showLocalBranchUpstream",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "sidebar branch tree",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.graph.showTagsInActivityBar",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "sidebar mini graph",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.scmButtons.fetch",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "SCM title integration",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.scmButtons.pull",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "SCM title integration",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.scmButtons.push",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "SCM title integration",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.statusBarItem.dirtyIndicator",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "repository status",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.commitDetailsView.defaultDiffMode",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "details/comparison",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.commits.avatar.mode",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "graph avatar display",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.commits.avatar.shape",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "graph avatar display",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.commits.avatar.size",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "graph avatar display",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.commits.columnVisibility",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "graph column display",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.commits.committedVisual",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "graph column display",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.onLoad.mode",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "repository lifecycle",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.repository.onLoad.showRemoteBranchesForSelectedLocalBranches",
+    "surface": "setting",
+    "status": "New implementation",
+    "target": "repository lifecycle",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits.activityView",
+    "surface": "view",
+    "status": "New implementation",
+    "target": "Activity Bar sidebar webview",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "repoStates",
+    "surface": "state",
+    "status": "Adapter",
+    "target": "versioned key, never migrates the legacy shape",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "lastActiveRepo",
+    "surface": "state",
+    "status": "Already MIT",
+    "target": "identical shape in both extensions",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "avatarCache",
+    "surface": "state",
+    "status": "Already MIT",
+    "target": "identical shape in both extensions",
+    "test": "tests-ext/compatibility.test.ts"
+  },
+  {
+    "id": "an-dr-commits (diff scheme)",
+    "surface": "scheme",
+    "status": "Already MIT",
+    "target": "rename only, at cutover",
+    "test": "tests-ext/compatibility.test.ts"
+  }
+]

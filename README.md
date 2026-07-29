@@ -222,6 +222,24 @@ startup-critical window, and workspace reconciliation is deferred until interact
 
 ---
 
+### an-dr: Commits (MIT)
+
+An independently distributable MIT-licensed Git graph based solely on
+[neo-git-graph](https://github.com/asispts/neo-git-graph). It provides visual
+history, commit details, branch/tag actions, diffs, and multi-repository
+selection without using post-MIT Git Graph source.
+
+**Config** (`an-dr-com-mit-s.*`):
+
+|Setting|Default|Description|
+|-------|-------|-----------|
+|`showStatusBarItem`|`true`|Show/hide the graph status-bar button.|
+|`statusBarIconOnly`|`true`|Show only its icon in the status bar.|
+
+Use **an-dr: Commits (MIT): View Git Graph** from the Command Palette.
+
+---
+
 ### an-dr: Extensions Grid
 
 Grid overview of every installed extension (an-dr and third-party alike, enabled or
@@ -348,6 +366,16 @@ Then **Ctrl+Shift+P** → `Developer: Reload Window` in VS Code.
 
 - **Windows**: creates NTFS junctions — no admin rights needed.
 - **Linux/macOS**: creates symlinks — no admin rights needed.
+
+### Excluding an extension
+
+An extension containing a `.installignore` file is skipped: it is not built, not linked,
+and not marked application-scoped. If an earlier run had already linked it, that link is
+removed, so adding the file uninstalls the extension rather than just freezing it.
+
+Use it for work in progress that should not load in the editor yet. The file's contents
+are ignored — put a comment inside saying why, and delete the file to re-enable the
+extension.
 
 ### When a build fails
 

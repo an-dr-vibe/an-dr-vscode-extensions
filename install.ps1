@@ -228,8 +228,9 @@ function Build-Extension ([string]$ExtDir, [string]$ExtName) {
 
 # ── main loop — one link per nested extension dir ─────────────────────────────
 
-$linked  = 0
-$skipped = 0
+$linked   = 0
+$skipped  = 0
+$excluded = 0
 $failed  = @()   # @{ Name; Reason } per extension whose build did not succeed
 $extensionIds = @()
 
@@ -240,14 +241,38 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     # recognises it; fall back to folder name if fields are missing.
     $pkgJson = Join-Path $src 'package.json'
     $dstName = $ext.Name
+    $extId   = $null
     if (Test-Path $pkgJson) {
         $pkg = Get-Content $pkgJson -Raw | ConvertFrom-Json
         if ($pkg.publisher -and $pkg.name -and $pkg.version) {
             $dstName = "$($pkg.publisher).$($pkg.name)-$($pkg.version)"
-            $extensionIds += "$($pkg.publisher).$($pkg.name)"
+            $extId = "$($pkg.publisher).$($pkg.name)"
         }
     }
     $dst = Join-Path $VscodeExtensions $dstName
+
+    # An extension opts out of the shared install by containing a .installignore file,
+    # for work that must not load in the editor yet. Opting out also removes any link an
+    # earlier run left behind, so it uninstalls rather than merely stopping updates.
+    if (Test-Path (Join-Path $src '.installignore')) {
+        $unlinked = $false
+        foreach ($stale in @($dst, (Join-Path $VscodeExtensions $ext.Name))) {
+            if (Test-ManagedLink $stale) {
+                Remove-ManagedLink $stale
+                $unlinked = $true
+            }
+        }
+        Write-Host "  $dstName" -ForegroundColor DarkGray -NoNewline
+        if ($unlinked) {
+            Write-Host ' (excluded by .installignore — unlinked)' -ForegroundColor DarkGray
+        } else {
+            Write-Host ' (excluded by .installignore)' -ForegroundColor DarkGray
+        }
+        $excluded++
+        continue
+    }
+
+    if ($extId) { $extensionIds += $extId }
 
     Write-Host "  $dstName" -ForegroundColor Yellow -NoNewline
 
@@ -291,8 +316,10 @@ if ($extensionIds.Count -gt 0) {
 
 Write-Host ''
 
+$excludedNote = if ($excluded -gt 0) { ", excluded $excluded" } else { '' }
+
 if ($failed.Count -gt 0) {
-    Write-Host "  Done — linked $linked, skipped $skipped, FAILED $($failed.Count)." -ForegroundColor Red
+    Write-Host "  Done — linked $linked, skipped $skipped$excludedNote, FAILED $($failed.Count)." -ForegroundColor Red
     Write-Host ''
     Write-Host '  Failed extensions:' -ForegroundColor Red
     foreach ($f in $failed) {
@@ -304,6 +331,6 @@ if ($failed.Count -gt 0) {
     exit 1
 }
 
-Write-Host "  Done — linked $linked, skipped $skipped." -ForegroundColor Cyan
+Write-Host "  Done — linked $linked, skipped $skipped$excludedNote." -ForegroundColor Cyan
 Write-Host "  Run 'Developer: Reload Window' in VS Code to activate."
 Write-Host ''

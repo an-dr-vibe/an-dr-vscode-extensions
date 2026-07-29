@@ -28,6 +28,9 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 - No monorepo tooling. Each extension under `extensions/` is fully self-contained with its
   own `package.json`, `tsconfig.json`, `node_modules/`, and `out/`.
 - `install.ps1` picks up new extensions automatically — just add a dir under `extensions/`.
+  An extension opts out by containing a `.installignore` file; the installer then skips the
+  build, removes any link a previous run created, and leaves it out of the
+  application-scoped list. See `docs/adr/ADR-003-installignore-opt-out.md`.
 - `install.ps1` never reports a failed build as a success: it checks `$LASTEXITCODE` after
   `npm install` / `npm run compile` (a non-zero native exit is *not* a PowerShell
   terminating error, so `$ErrorActionPreference = 'Stop'` does not catch it), verifies the
@@ -65,6 +68,7 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 `an-dr-commits` has a two-step web build: TypeScript compiles to individual JS files in
 `media/`, then `package-web.js` concatenates and uglifies them into **two** bundles
 (deleting the individual files afterwards):
+
 - `media/out.min.js` / `out.min.css` — the tab webview (`web/main.ts` + `web/*`), loaded by
   `TabView` (`src/views/tab/`).
 - `media/sidebar.min.js` / `sidebar.min.css` — the sidebar webview (`web/sidebar/main.ts` +
@@ -114,3 +118,17 @@ break. See `src/views/README.md` for the fuller picture, and ADR-025 / ADR-026.
 2. Copy `tsconfig.json` and `.vscodeignore` from an existing extension — they are identical.
 3. Run `.\install.ps1` — it handles `npm install`, `tsc`, and junctioning.
 4. Update `README.md` and `AGENTS.md` (this file).
+
+## an-dr-com-mit-s provenance
+
+`an-dr-com-mit-s` is a separately distributed MIT fork based only on
+`asispts/neo-git-graph`. Keep its [NOTICE.md](extensions/an-dr-com-mit-s/NOTICE.md)
+and `LICENSE` intact, and do not copy implementation from post-MIT
+`mhutchie/vscode-git-graph`. Locally authored `an-dr-commits` code may be
+relicensed and copied over once `extensions/an-dr-com-mit-s/scripts/check-provenance.js`
+clears it; baseline expression may not. Its standalone webview build retains the
+upstream esbuild step because it bundles browser modules.
+
+It carries a `.installignore`, so `install.ps1` skips it: build and test it
+directly with `npm run compile` and `npm test` in its own directory. Remove that
+file at cutover, when it takes over the `an-dr-commits` identity.

@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2023", "dom"]
+  },
+  "include": [
+    "./backend/**/*.ts",
+    "./extension/**/*.ts",
+    "./webview/**/*.ts",
+    "../src/backend/**/*.ts",
+    "../src/extension/**/*.ts",
+    "../src/webview/**/*.ts"
+  ]
+}

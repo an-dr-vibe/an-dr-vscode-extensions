@@ -5,4 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 24-47:** Adds renderWebviewMetaTags, renderLoadingSplashHtml helpers.
+- **Lines 2-12:** Adds the authored standardiseCspSource implementation.
+- **Lines 24-47:** Defines the authored WebviewChromeOptions type.

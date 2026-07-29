@@ -5,5 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 1-139:** Adds handlePullBranchUnstagedChanges, commitsGetCurrentPullRemote, commitsRunPullCurrentBranchAction helpers.
-- **Lines 156-238:** Adds commitsForcePushCurrentBranchAction, commitsShowPushButtonContextMenu, commitsShowPullButtonContextMenu helpers.
+- **Lines 1-139:** Adds the authored handlePullBranchUnstagedChanges, commitsGetCurrentPullRemote, commitsRunPullCurrentBranchAction helpers.
+- **Lines 156-238:** Adds the authored commitsForcePushCurrentBranchAction, commitsShowPushButtonContextMenu, commitsShowPullButtonContextMenu helpers.

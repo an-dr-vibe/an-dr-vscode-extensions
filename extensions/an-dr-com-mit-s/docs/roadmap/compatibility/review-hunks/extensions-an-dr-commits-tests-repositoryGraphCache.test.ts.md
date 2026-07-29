@@ -5,4 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 14-81:** Adds describe, it, expect helpers.
+- **Lines 3-10:** Defines the authored TestCommit, TestProjection types.
+- **Lines 14-81:** Adds authored coverage for RepositoryGraphCache and Should create stable keys from every graph-affecting request field.

@@ -5,4 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 71-156:** Adds commitsMakeTableResizable, commitsApplyColumnWidths, commitsInitColumnDrag helpers.
+- **Lines 1-5:** Adds the authored commitsApplyColumnWidths implementation.
+- **Lines 11-17:** Adds the authored commitsInitColumnDrag implementation.
+- **Lines 71-156:** Adds the authored commitsMakeTableResizable, toggleColumnVisibility, changeCommitOrdering helpers.

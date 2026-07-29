@@ -5,7 +5,9 @@
 
 ## Independently useful authored runs
 
-- **Lines 6-76:** Adds parseBlameIncrementalOutput, parseRefSnapshotOutput, parseCommitDetailsOutput helpers.
-- **Lines 93-128:** Adds parseDiffNameStatusOutput, parseDiffNumStatOutput helpers.
-- **Lines 139-190:** Adds parseWorkingTreeStatusOutput, parseLogOutput helpers.
-- **Lines 230-251:** Adds parseStatusOutput implementation.
+- **Lines 6-76:** Defines the authored RefSnapshotParserOptions type.
+- **Lines 93-128:** Adds the authored parseDiffNameStatusOutput, parseDiffNumStatOutput helpers.
+- **Lines 139-190:** Defines the authored WorkingTreeStatusRecord type.
+- **Lines 197-201:** Adds the authored parseRemotesContainingCommitOutput implementation.
+- **Lines 209-215:** Adds the authored parseStashesOutput implementation.
+- **Lines 230-251:** Adds the authored parseStatusOutput implementation.

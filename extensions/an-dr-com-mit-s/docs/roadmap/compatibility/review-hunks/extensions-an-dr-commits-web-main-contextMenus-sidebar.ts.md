@@ -5,6 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 1-263:** Adds commitsOpenSidebarContextMenu, commitsSidebarSectionActions, commitsSidebarBranchActions helpers.
-- **Lines 276-299:** Adds runAction implementation.
-- **Lines 313-416:** Adds runAction, commitsBuildBatchArchiveAction, commitsGetSidebarBatchContextMenuActions helpers.
+- **Lines 1-263:** Adds the authored commitsOpenSidebarContextMenu, commitsSidebarSectionActions, commitsSidebarBranchActions helpers.
+- **Lines 276-299:** Adds an authored implementation block.
+- **Lines 313-416:** Adds the authored commitsBuildBatchArchiveAction, commitsGetSidebarBatchContextMenuActions, commitsGetSidebarBatchRequestRefs helpers.

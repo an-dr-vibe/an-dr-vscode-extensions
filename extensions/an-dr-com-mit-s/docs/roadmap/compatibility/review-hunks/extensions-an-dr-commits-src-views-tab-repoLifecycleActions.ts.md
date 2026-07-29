@@ -5,6 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 11-63:** Adds sendMessage, respondLoadRepos, getCurrentRepo helpers.
-- **Lines 69-95:** Adds handleLoadCommits implementation.
-- **Lines 103-166:** Adds handleLoadConfig, handleRescanForRepos, showErrorMessage helpers.
+- **Lines 11-63:** Defines the authored RepoLifecycleActionContext type.
+- **Lines 69-95:** Adds the authored handleLoadCommits implementation.
+- **Lines 103-166:** Adds the authored handleLoadConfig, handleRescanForRepos, handleSetRepoState helpers.

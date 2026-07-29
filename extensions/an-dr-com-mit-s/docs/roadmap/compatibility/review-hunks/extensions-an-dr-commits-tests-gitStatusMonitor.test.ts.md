@@ -5,4 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 24-77:** Adds it, expect, createRepo helpers.
+- **Lines 2-18:** Adds authored coverage for GitStatusMonitor.
+- **Lines 24-77:** Adds the authored createRepo implementation.

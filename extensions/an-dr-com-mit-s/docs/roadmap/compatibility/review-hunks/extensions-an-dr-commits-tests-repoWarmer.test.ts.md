@@ -5,4 +5,4 @@
 
 ## Independently useful authored runs
 
-- **Lines 22-126:** Adds describe, beforeEach, afterEach helpers.
+- **Lines 22-126:** Adds the authored flush implementation.

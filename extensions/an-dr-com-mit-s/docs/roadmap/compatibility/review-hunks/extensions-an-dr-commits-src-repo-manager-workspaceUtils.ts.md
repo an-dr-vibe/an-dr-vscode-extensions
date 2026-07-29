@@ -5,4 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 5-22:** Adds getWorkspaceFolderInfoForRepoInclusionMapping implementation.
+- **Lines 5-22:** Defines the authored WorkspaceFolderInfoForRepoInclusionMapping type.
+- **Lines 47-49:** Adds the authored doesPathExist implementation.

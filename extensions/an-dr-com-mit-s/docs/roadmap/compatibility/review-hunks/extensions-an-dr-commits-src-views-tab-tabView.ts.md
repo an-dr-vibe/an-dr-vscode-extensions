@@ -5,11 +5,12 @@
 
 ## Independently useful authored runs
 
-- **Lines 27-43:** Adds Manages the Commits View.
-- **Lines 58-148:** Adds constructor implementation.
-- **Lines 199-231:** Adds The repo file watcher was stopped while hidden, so any cached graph.
-- **Lines 248-369:** Adds Respond to messages sent from the Webview. Read-only requests run concurrently, so a.
-- **Lines 378-626:** Adds handleFetchAvatar, handleSetRepoState, handleSetRepoStarred helpers.
-- **Lines 659-670:** Adds an authored implementation block.
+- **Lines 27-43:** Defines the authored TabView type.
+- **Lines 58-148:** Adds the authored createOrShow, revive, constructor helpers.
+- **Lines 158-168:** Adds an authored implementation block.
+- **Lines 199-231:** Adds an authored implementation block.
+- **Lines 248-369:** Adds the authored respondToRepoChange, respondToMutatingMessage helpers.
+- **Lines 378-626:** Adds an authored implementation block.
+- **Lines 659-670:** Adds the authored loadRepoFromSharedSelection implementation.
 - **Lines 680-690:** Adds an authored implementation block.
 - **Lines 722-744:** Adds an authored implementation block.

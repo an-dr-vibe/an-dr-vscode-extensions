@@ -5,6 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 22-34:** Adds activateCore implementation.
+- **Lines 22-34:** Defines the authored ActivatedCore type.
 - **Lines 47-62:** Adds an authored implementation block.
-- **Lines 80-108:** Adds executeCommand, ensureGit, ensureRepositories helpers.
+- **Lines 80-108:** Adds the authored executeCommand, ensureGit, ensureRepositories helpers.

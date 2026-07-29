@@ -5,5 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 1-17:** Adds commitsGetNumColumns, commitsScrollToStash helpers.
-- **Lines 48-70:** Adds commitsFindRenderedRefElem, commitsRevealReference, commitsLoadMoreCommits helpers.
+- **Lines 1-17:** Adds the authored commitsGetNumColumns, commitsScrollToStash helpers.
+- **Lines 25-37:** Adds the authored commitsScrollToCommit implementation.
+- **Lines 48-70:** Adds the authored commitsFindRenderedRefElem, commitsRevealReference, commitsLoadMoreCommits helpers.

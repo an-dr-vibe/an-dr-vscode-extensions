@@ -5,6 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 17-31:** Adds an authored implementation block.
-- **Lines 54-122:** Adds isEnabled, getEnv, closeTrackedCommitMessageEditors helpers.
-- **Lines 130-186:** Adds resolve, getIPCHandlePath helpers.
+- **Lines 17-31:** Defines the authored GitEditorEnvironment, GitEditorRequest, GitEditorManager types.
+- **Lines 54-122:** Adds the authored isEnabled, getEnv, showCommitMessageEditor helpers.
+- **Lines 130-186:** Adds the authored openCommitMessageEditor, getIPCHandlePath helpers.

@@ -5,4 +5,4 @@
 
 ## Independently useful authored runs
 
-- **Lines 1-25:** Adds commitsRenderFetchButton, alterClass, commitsRenderTagDetails helpers.
+- **Lines 1-25:** Adds the authored commitsRenderFetchButton, commitsRenderTagDetails helpers.

@@ -5,4 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 32-73:** Adds warm implementation.
+- **Lines 8-21:** Defines the authored RepoWarmer type.
+- **Lines 32-73:** Adds the authored warm, run helpers.

@@ -5,5 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 58-109:** Adds runAction, commitsGetCommitEditMenuGroup, commitsGetCommitContextMenuActions helpers.
-- **Lines 115-223:** Adds checkoutCommit, commitsCommitCherryPickAction, commitsCommitRevertAction helpers.
+- **Lines 1-4:** Adds the authored commitsCommitCherryPickAction implementation.
+- **Lines 58-109:** Adds the authored commitsGetCommitEditMenuGroup, commitsGetCommitContextMenuActions helpers.
+- **Lines 115-223:** Adds the authored commitsGetMultiSelectContextMenuActions, commitsGetUncommittedChangesContextMenuActions, checkoutCommit helpers.

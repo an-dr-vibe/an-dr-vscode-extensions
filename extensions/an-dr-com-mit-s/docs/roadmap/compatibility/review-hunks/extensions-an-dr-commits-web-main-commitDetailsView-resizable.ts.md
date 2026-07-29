@@ -5,4 +5,5 @@
 
 ## Independently useful authored runs
 
-- **Lines 11-63:** Adds commitsMakeCommitDetailsViewResizable, processResizingCommitDetailsViewHeight, addListenerToClass helpers.
+- **Lines 1-5:** Adds the authored commitsSetCommitDetailsViewDivider implementation.
+- **Lines 11-63:** Adds the authored commitsMakeCommitDetailsViewResizable, commitsMakeCommitDetailsViewDividerDraggable helpers.

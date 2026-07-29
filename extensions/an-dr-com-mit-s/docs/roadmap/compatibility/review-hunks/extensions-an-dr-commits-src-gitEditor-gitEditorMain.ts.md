@@ -5,4 +5,4 @@
 
 ## Independently useful authored runs
 
-- **Lines 18-37:** Adds setTimeout, main helpers.
+- **Lines 18-37:** Adds an authored implementation block.

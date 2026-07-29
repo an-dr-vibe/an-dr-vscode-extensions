@@ -5,6 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 3-30:** Adds an authored implementation block.
-- **Lines 52-87:** Adds an authored implementation block.
-- **Lines 94-149:** Adds an authored implementation block.
+- **Lines 3-30:** Defines the authored BlameLineInfo, GitBranchData, HeadInfo types.
+- **Lines 52-87:** Defines the authored GitCommitComparisonData, GitWorkingTreeChange, GitWorkingTreeChangesData types.
+- **Lines 94-149:** Defines the authored GitRefSnapshot, GitRepoInfo, GitRepoConfigData types.

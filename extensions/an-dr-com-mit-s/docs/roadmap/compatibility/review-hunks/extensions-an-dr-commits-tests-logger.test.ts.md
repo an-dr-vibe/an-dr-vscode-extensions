@@ -5,4 +5,4 @@
 
 ## Independently useful authored runs
 
-- **Lines 32-131:** Adds expect, it, describe helpers.
+- **Lines 32-131:** Adds authored coverage for Should not log a debug message when the log level is Info and Should log a debug message when the log level is Debug.

@@ -5,4 +5,7 @@
 
 ## Independently useful authored runs
 
-- **Lines 60-143:** Adds runAction, commitsBranchPushAction, commitsBranchExtraMenuGroups helpers.
+- **Lines 1-8:** Adds the authored commitsBranchPushAction implementation.
+- **Lines 27-38:** Adds an authored implementation block.
+- **Lines 43-55:** Adds the authored commitsBranchCoreMenuGroup implementation.
+- **Lines 60-143:** Adds the authored commitsBranchExtraMenuGroups, commitsGetBranchContextMenuActions helpers.

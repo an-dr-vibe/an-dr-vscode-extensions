@@ -5,4 +5,4 @@
 
 ## Independently useful authored runs
 
-- **Lines 1-118:** Adds commitsGetRemoteBranchContextMenuActions, runAction, commitsGetStashCoreMenuGroup helpers.
+- **Lines 1-118:** Adds the authored commitsGetRemoteBranchContextMenuActions, commitsGetStashCoreMenuGroup, commitsGetStashContextMenuActions helpers.

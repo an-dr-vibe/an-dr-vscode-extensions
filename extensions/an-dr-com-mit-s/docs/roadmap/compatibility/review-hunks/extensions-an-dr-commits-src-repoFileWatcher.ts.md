@@ -5,7 +5,7 @@
 
 ## Independently useful authored runs
 
-- **Lines 16-30:** Adds constructor implementation.
+- **Lines 16-30:** Adds the authored constructor implementation.
 - **Lines 48-58:** Adds an authored implementation block.
-- **Lines 76-123:** Adds mute, unmute, refreshRepo helpers.
-- **Lines 129-149:** Adds resolveRedirectedGitDirs implementation.
+- **Lines 76-123:** Adds the authored mute, unmute, refreshRepo helpers.
+- **Lines 129-149:** Adds the authored resolveRedirectedGitDirs implementation.

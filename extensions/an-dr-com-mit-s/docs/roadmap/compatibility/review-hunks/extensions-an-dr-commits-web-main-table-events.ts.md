@@ -5,5 +5,6 @@
 
 ## Independently useful authored runs
 
-- **Lines 15-75:** Adds closeDialogAndContextMenu, commitsHandleCommitDragEvents helpers.
-- **Lines 99-199:** Adds closeDialogAndContextMenu, commitsHandleRefContextMenu, handledEvent helpers.
+- **Lines 15-75:** Adds the authored commitsHandleCommitDragEvents implementation.
+- **Lines 80-90:** Adds the authored commitsHandleTableDblClick implementation.
+- **Lines 99-199:** Adds the authored commitsHandleRefContextMenu, commitsHandleCommitContextMenu, commitsObserveTableEvents helpers.

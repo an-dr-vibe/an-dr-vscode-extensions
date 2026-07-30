@@ -17,6 +17,7 @@
   "Commits could not finish loading. Please retry.": "Commits 無法完成載入。請重試。",
   "No Git repository found — watching for one": "找不到 Git 存放庫 — 正在監看",
   "View Git Graph": "檢視 Git 分支圖",
+  "Toggle Branch Panel": "切換分支面板",
   "Repo": "存放庫",
   "Branch": "分支",
   "Show Remote Branches": "顯示遠端分支",

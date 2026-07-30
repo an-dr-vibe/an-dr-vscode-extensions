@@ -120,6 +120,8 @@ declare global {
     expandedCommit: ExpandedCommit | null;
     /** Absent in state saved before the changed-files panel existed. */
     filesPanelWidth?: number;
+    /** Absent in state saved before the branch panel existed. */
+    branchPanel?: import("./branchPanel").BranchPanelState;
   }
 }
 

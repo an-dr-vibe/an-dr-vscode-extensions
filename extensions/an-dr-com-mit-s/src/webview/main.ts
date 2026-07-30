@@ -8,6 +8,7 @@ import type {
   GitResetMode
 } from "@/backend/types";
 
+import { BranchPanel } from "./branchPanel";
 import { hideContextMenuIfOpen, showContextMenu } from "./contextMenu";
 import {
   hideDialog,
@@ -59,6 +60,7 @@ class GitGraphView {
   private footerElem: HTMLElement;
   private repoDropdown: Dropdown;
   private branchDropdown: Dropdown;
+  private branchPanel: BranchPanel;
   private showRemoteBranchesElem: HTMLInputElement;
   private scrollShadowElem: HTMLElement;
   private filesPanel: FilesPanel;
@@ -97,6 +99,7 @@ class GitGraphView {
       this.renderShowLoading();
       this.requestLoadCommits(true, () => {});
     });
+    this.branchPanel = new BranchPanel(prevState?.branchPanel, () => this.saveState());
     this.showRemoteBranchesElem = <HTMLInputElement>(
       document.getElementById("showRemoteBranchesCheckbox")!
     );
@@ -232,6 +235,8 @@ class GitGraphView {
       });
     }
     this.branchDropdown.setOptions(options, this.currentBranch);
+    this.branchPanel.setOptions(options, this.currentBranch);
+    this.branchPanel.setCurrentBranch(this.gitBranchHead);
 
     this.triggerLoadBranchesCallback(true, isRepo);
   }
@@ -463,7 +468,8 @@ class GitGraphView {
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
       expandedCommit: this.expandedCommit,
-      filesPanelWidth: this.filesPanelWidth
+      filesPanelWidth: this.filesPanelWidth,
+      branchPanel: this.branchPanel.getState()
     });
   }
 

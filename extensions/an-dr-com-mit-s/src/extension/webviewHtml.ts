@@ -107,6 +107,7 @@ export function buildWebviewHtml(opts: {
   if (numRepos > 0) {
     body = `<body style="${colorVars}">
 		<div id="controls">
+			<div id="branchPanelToggle" class="roundedBtn" title="${vscode.l10n.t("Toggle Branch Panel")}"></div>
 			<span id="repoControl"><span class="unselectable">${vscode.l10n.t("Repo")}: </span><div id="repoSelect" class="dropdown"></div></span>
 			<span id="branchControl"><span class="unselectable">${vscode.l10n.t("Branch")}: </span><div id="branchSelect" class="dropdown"></div></span>
 			<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>${vscode.l10n.t("Show Remote Branches")}</label>
@@ -118,6 +119,10 @@ export function buildWebviewHtml(opts: {
 				<div id="refreshBtn" class="roundedBtn">${vscode.l10n.t("Refresh")}</div>
 			</span>
 		</div>
+		<aside id="branchPanelSidebar">
+			<div id="branchPanel"></div>
+			<div id="branchPanelResizeHandle"></div>
+		</aside>
 		<div id="repoInProgressBanner"></div>
 		<div id="content">
 			<div id="commitGraph"></div>

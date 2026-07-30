@@ -16,6 +16,7 @@
   "open the extension settings": "open the extension settings",
   "No Git repository found — watching for one": "No Git repository found — watching for one",
   "View Git Graph": "View Git Graph",
+  "Toggle Branch Panel": "Toggle Branch Panel",
   "Repo": "Repo",
   "Branch": "Branch",
   "Show Remote Branches": "Show Remote Branches",

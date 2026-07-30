@@ -1,5 +1,6 @@
 import { escapeHtml } from "./utils/html";
 import { svgIcons } from "./utils/icons";
+import { addOutsideClickListener } from "./utils/outsideClick";
 
 interface DropdownOption {
   name: string;
@@ -51,9 +52,9 @@ export class Dropdown {
     this.elem.appendChild(this.currentValueElem);
     this.elem.appendChild(this.menuElem);
 
-    document.addEventListener(
-      "click",
-      (e) => {
+    addOutsideClickListener(
+      (target) => target.closest(".dropdown") === this.elem,
+      (e, inside) => {
         if (!e.target) {
           return;
         }
@@ -68,7 +69,7 @@ export class Dropdown {
             this.filterInput.focus();
           }
         } else if (this.dropdownVisible) {
-          if ((<HTMLElement>e.target).closest(".dropdown") !== this.elem) {
+          if (!inside) {
             this.close();
           } else {
             let option = <HTMLElement | null>(<HTMLElement>e.target).closest(".dropdownOption");
@@ -87,8 +88,7 @@ export class Dropdown {
             }
           }
         }
-      },
-      true
+      }
     );
     document.addEventListener("contextmenu", () => this.close(), true);
     document.addEventListener(

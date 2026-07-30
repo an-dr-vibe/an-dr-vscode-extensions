@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { GitCommitNode } from "@/backend/types";
 import type * as GG from "@/types";
+import { UNCOMMITTED } from "@/webview/utils/graphConstants";
 
 import { createVscodeMock, receive, setupHtml } from "./setup";
 
@@ -86,6 +87,35 @@ describe("webview rendering", () => {
   it("still renders non-tag refs with the branch markup", () => {
     const head = document.querySelector('.gitRef.head[data-name="main"]');
     expect(head).not.toBeNull();
+  });
+
+  it("uses the shared uncommitted hash through the real commit renderer", () => {
+    receive({
+      command: "loadCommits",
+      commits: [
+        { ...twoCommits[0], hash: UNCOMMITTED, message: "Uncommitted Changes (3)", refs: [] }
+      ],
+      head: "abc123",
+      moreCommitsAvailable: false,
+      hard: true
+    });
+
+    const row = document.querySelector("tr.unsavedChanges");
+    expect(row).not.toBeNull();
+    expect(row?.textContent).toContain("Uncommitted Changes (3)");
+  });
+
+  it("closes a dropdown on an outside click but not an inside click", () => {
+    const currentValue = document.querySelector("#repoSelect .dropdownCurrentValue") as HTMLElement;
+    const menu = document.querySelector("#repoSelect .dropdownMenu") as HTMLElement;
+    const dropdown = document.getElementById("repoSelect")!;
+
+    currentValue.click();
+    expect(dropdown.classList.contains("dropdownOpen")).toBe(true);
+    menu.click();
+    expect(dropdown.classList.contains("dropdownOpen")).toBe(true);
+    document.body.click();
+    expect(dropdown.classList.contains("dropdownOpen")).toBe(false);
   });
 
   it("routes rendered external links through the extension host", () => {

@@ -14,6 +14,7 @@ import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
 import { resolveFileIcon } from "./utils/fileIcons";
 import { arraysEqual, ELLIPSIS, refInvalid } from "./utils/git";
+import { UNCOMMITTED } from "./utils/graphConstants";
 import { escapeHtml, unescapeHtml } from "./utils/html";
 import { svgIcons } from "./utils/icons";
 import { renderTagPill } from "./utils/refPills";
@@ -219,7 +220,7 @@ class GitGraphView {
           arraysEqual(a.parentHashes, b.parentHashes, (pa, pb) => pa === pb)
       )
     ) {
-      if (this.commits.length > 0 && this.commits[0].hash === "*") {
+      if (this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED) {
         this.commits[0] = commits[0];
         this.saveState();
         this.renderUncommitedChanges();
@@ -231,7 +232,7 @@ class GitGraphView {
     this.moreCommitsAvailable = moreAvailable;
     this.commits = commits;
     this.commitHead = commitHead;
-    if (this.commits.length > 0 && this.commits[0].hash === "*") {
+    if (this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED) {
       const match = this.commits[0].message.match(/\((\d+)\)$/);
       const count = match ? match[1] : "?";
       this.commits[0].message = l10n.uncommittedChanges.replace("{0}", count);
@@ -434,7 +435,7 @@ class GitGraphView {
       }
       html +=
         "<tr " +
-        (this.commits[i].hash !== "*"
+        (this.commits[i].hash !== UNCOMMITTED
           ? 'class="commit' +
             (this.commits[i].hash === this.commitHead ? " head" : "") +
             '" data-hash="' +
@@ -927,6 +928,10 @@ class GitGraphView {
       date.title +
       '">' +
       date.value +
+      // These asterisks are placeholder display text for the author and
+      // commit columns, which have no value until the changes are committed.
+      // They are deliberately not UNCOMMITTED: that constant is the commit
+      // hash sentinel, and the two only coincide by accident.
       '</td><td title="* <>">*</td><td title="*">*</td>';
   }
   private renderShowLoading() {

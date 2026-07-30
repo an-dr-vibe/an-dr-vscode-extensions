@@ -12,6 +12,10 @@ declare global {
 
   interface Config {
     autoCenterCommitDetailsView: boolean;
+    committedVisual: "Avatar" | "Initials";
+    avatarMode: "Auto (Fetched then Pattern)" | "Fetched Only" | "Procedural Pattern" | "Disabled";
+    avatarSize: "Normal" | "Small";
+    avatarShape: "Circle" | "Square";
     fetchAvatars: boolean;
     graphColours: string[];
     graphStyle: "rounded" | "angular";

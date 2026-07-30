@@ -11,6 +11,10 @@ let vscodeMock: ReturnType<typeof createVscodeMock>;
 
 const defaultViewState: GG.GitGraphViewState = {
   autoCenterCommitDetailsView: true,
+  committedVisual: "Initials",
+  avatarMode: "Auto (Fetched then Pattern)",
+  avatarSize: "Normal",
+  avatarShape: "Circle",
   dateFormat: "Date & Time",
   fetchAvatars: false,
   fileIcons: {},
@@ -87,6 +91,13 @@ describe("webview rendering", () => {
   it("still renders non-tag refs with the branch markup", () => {
     const head = document.querySelector('.gitRef.head[data-name="main"]');
     expect(head).not.toBeNull();
+  });
+
+  it("renders the configured author initials through the real commit table", () => {
+    const initials = document.querySelector(".avatar.initials.circle.normal");
+    expect(initials).not.toBeNull();
+    expect(initials?.textContent).toBe("AL");
+    expect(initials?.querySelector(".avatarImg")).toBeNull();
   });
 
   it("uses the shared uncommitted hash through the real commit renderer", () => {

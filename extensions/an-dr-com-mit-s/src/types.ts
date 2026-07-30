@@ -13,6 +13,10 @@ export type GitRepoState = {
 
 export type GitGraphViewState = {
   autoCenterCommitDetailsView: boolean;
+  committedVisual: "Avatar" | "Initials";
+  avatarMode: "Auto (Fetched then Pattern)" | "Fetched Only" | "Procedural Pattern" | "Disabled";
+  avatarSize: "Normal" | "Small";
+  avatarShape: "Circle" | "Square";
   dateFormat: DateFormat;
   fetchAvatars: boolean;
   fileIcons: Record<string, string>;

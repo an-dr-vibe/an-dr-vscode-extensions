@@ -140,6 +140,54 @@
           "default": true,
           "description": "%config.autoCenterCommitDetailsView%"
         },
+        "an-dr-com-mit-s.repository.commits.committedVisual": {
+          "type": "string",
+          "enum": [
+            "Avatar",
+            "Initials"
+          ],
+          "enumDescriptions": [
+            "Render a visual avatar next to committed date/time.",
+            "Render deterministic 2-letter initials next to committed date/time."
+          ],
+          "default": "Avatar",
+          "description": "Controls the visual shown in the Committed column."
+        },
+        "an-dr-com-mit-s.repository.commits.avatar.mode": {
+          "type": "string",
+          "enum": [
+            "Auto (Fetched then Pattern)",
+            "Fetched Only",
+            "Procedural Pattern",
+            "Disabled"
+          ],
+          "enumDescriptions": [
+            "Show fetched avatars when available, otherwise show deterministic procedural patterns.",
+            "Show only fetched avatars (no fallback visual).",
+            "Always show deterministic procedural patterns.",
+            "Don't show any author visual."
+          ],
+          "default": "Auto (Fetched then Pattern)",
+          "description": "Controls how author visuals are rendered in the Committed column and Commit Details."
+        },
+        "an-dr-com-mit-s.repository.commits.avatar.size": {
+          "type": "string",
+          "enum": [
+            "Normal",
+            "Small"
+          ],
+          "default": "Normal",
+          "description": "Controls avatar size in the Committed column."
+        },
+        "an-dr-com-mit-s.repository.commits.avatar.shape": {
+          "type": "string",
+          "enum": [
+            "Circle",
+            "Square"
+          ],
+          "default": "Circle",
+          "description": "Controls the shape of author visuals in the Committed column and Commit Details."
+        },
         "an-dr-com-mit-s.dateFormat": {
           "type": "string",
           "enum": [

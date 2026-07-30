@@ -5,6 +5,14 @@ import { EXTENSION_ID, getConfigKey, TARGET_EXTENSION_ID } from "./extension/con
 import { DateFormat, GraphStyle } from "./types";
 
 type TabIconColourTheme = "colour" | "grey";
+type CommittedVisual = "Avatar" | "Initials";
+type AvatarMode =
+  | "Auto (Fetched then Pattern)"
+  | "Fetched Only"
+  | "Procedural Pattern"
+  | "Disabled";
+type AvatarSize = "Normal" | "Small";
+type AvatarShape = "Circle" | "Square";
 
 function getConfig<T>(key: string, defaultValue: T): T {
   return vscode.workspace.getConfiguration(EXTENSION_ID).get(key, defaultValue);
@@ -28,6 +36,30 @@ function getCompatibleConfig<T>(stagingKey: string, targetKey: string, defaultVa
 
 export const config = {
   autoCenterCommitDetailsView: (): boolean => getConfig("autoCenterCommitDetailsView", true),
+  committedVisual: (): CommittedVisual =>
+    getCompatibleConfig(
+      "repository.commits.committedVisual",
+      "repository.commits.committedVisual",
+      "Avatar"
+    ),
+  avatarMode: (): AvatarMode =>
+    getCompatibleConfig(
+      "repository.commits.avatar.mode",
+      "repository.commits.avatar.mode",
+      "Auto (Fetched then Pattern)"
+    ),
+  avatarSize: (): AvatarSize =>
+    getCompatibleConfig(
+      "repository.commits.avatar.size",
+      "repository.commits.avatar.size",
+      "Normal"
+    ),
+  avatarShape: (): AvatarShape =>
+    getCompatibleConfig(
+      "repository.commits.avatar.shape",
+      "repository.commits.avatar.shape",
+      "Circle"
+    ),
   dateFormat: (): DateFormat => getConfig("dateFormat", "Date & Time"),
   dateType: (): DateType => getConfig("dateType", "Author Date"),
   fetchAvatars: (): boolean =>

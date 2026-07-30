@@ -10,6 +10,7 @@ import type {
 import { Dropdown } from "./dropdown";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
+import { renderAuthorVisualHtml } from "./utils/avatarVisuals";
 import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
 import { resolveFileIcon } from "./utils/fileIcons";
@@ -250,6 +251,7 @@ class GitGraphView {
       }
       if (
         this.config.fetchAvatars &&
+        this.config.avatarMode !== "Disabled" &&
         typeof this.avatars[this.commits[i].email] !== "string" &&
         this.commits[i].email !== ""
       ) {
@@ -286,6 +288,8 @@ class GitGraphView {
       escapedEmail = escapeHtml(email);
     for (let i = 0; i < avatarsElems.length; i++) {
       if (avatarsElems[i].dataset.email === escapedEmail) {
+        avatarsElems[i].classList.remove("empty");
+        delete avatarsElems[i].dataset.procedural;
         avatarsElems[i].innerHTML = '<img class="avatarImg" src="' + image + '">';
       }
     }
@@ -457,15 +461,14 @@ class GitGraphView {
         '</td><td title="' +
         escapeHtml(this.commits[i].author + " <" + this.commits[i].email + ">") +
         '">' +
-        (this.config.fetchAvatars
-          ? '<span class="avatar" data-email="' +
-            escapeHtml(this.commits[i].email) +
-            '">' +
-            (typeof this.avatars[this.commits[i].email] === "string"
-              ? '<img class="avatarImg" src="' + this.avatars[this.commits[i].email] + '">'
-              : "") +
-            "</span>"
-          : "") +
+        renderAuthorVisualHtml(
+          this.config,
+          this.commits[i].author,
+          this.commits[i].email,
+          typeof this.avatars[this.commits[i].email] === "string"
+            ? this.avatars[this.commits[i].email]
+            : null
+        ) +
         escapeHtml(this.commits[i].author) +
         '</td><td title="' +
         escapeHtml(this.commits[i].hash) +
@@ -1265,6 +1268,10 @@ let gitGraph = new GitGraphView(
   viewState.lastActiveRepo,
   {
     autoCenterCommitDetailsView: viewState.autoCenterCommitDetailsView,
+    committedVisual: viewState.committedVisual,
+    avatarMode: viewState.avatarMode,
+    avatarSize: viewState.avatarSize,
+    avatarShape: viewState.avatarShape,
     fetchAvatars: viewState.fetchAvatars,
     graphColours: viewState.graphColours,
     graphStyle: viewState.graphStyle,

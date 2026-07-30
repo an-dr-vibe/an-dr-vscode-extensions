@@ -132,6 +132,21 @@ authored fresh. Estimate only; it is not derived from anything.
 Delegatable **once a fixture pattern exists**, which the existing
 `tests/backend/*` suites largely provide.
 
+## Installer gap found while enabling side-by-side install
+
+`install.ps1` links each extension into a directory named
+`<publisher>.<name>-<version>`, but never removes a link from a previous
+version. When the premature cutover briefly published the MIT build as
+`an-dr-commits@0.5.0`, it left `an-dr.an-dr-commits-0.5.0` behind; after the
+revert restored 2.0.0 the two links coexisted, both pointing at the same
+folder and both claiming the same extension ID. `extensions.json` still
+referenced the stale one, so no entry described the version actually on disk.
+
+Both were repaired by hand. Before cutover, the installer should remove links
+whose version no longer matches the extension's manifest — otherwise the
+identity switch will leave exactly this behind again, and a duplicate ID is
+harder to notice than a missing one.
+
 ## Stage 6 — Cutover
 
 Only after every gate in the roadmap's _Cutover gates_ holds. Ordered:

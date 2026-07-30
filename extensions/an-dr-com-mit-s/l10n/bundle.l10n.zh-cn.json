@@ -125,5 +125,13 @@
   "{0} deletions": "{0} 处删除",
   "Select a Git repository before running {0}.": "运行 {0} 前请先选择一个 Git 仓库。",
   "Git {0} failed: {1}": "Git {0} 失败：{1}",
-  "Git is requesting credentials": "Git 正在请求凭据"
+  "Git is requesting credentials": "Git 正在请求凭据",
+  "Filter commits...": "筛选提交...",
+  "Filter by message, author, email, or hash": "按提交信息、作者、邮箱或哈希筛选",
+  "Fetch from Remote(s)": "从远程获取",
+  "Fetch": "获取",
+  "Pull Current Branch": "拉取当前分支",
+  "Pull": "拉取",
+  "Push Current Branch": "推送当前分支",
+  "Push": "推送"
 }

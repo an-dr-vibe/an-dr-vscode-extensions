@@ -63,6 +63,12 @@ export type RequestSelectRepo = {
   repo: string;
 };
 
+/** Runs a remote operation the extension host already implements. */
+export type RequestRemoteOperation = {
+  command: "remoteOperation";
+  operation: "fetch" | "pull" | "push";
+};
+
 export type RequestLoadRepos = {
   command: "loadRepos";
   check: boolean;
@@ -159,6 +165,7 @@ export type RequestMessage =
   | QueryRequest
   | RequestFetchAvatar
   | RequestSelectRepo
+  | RequestRemoteOperation
   | RequestLoadRepos
   | RequestSaveRepoState
   | RequestCopyToClipboard

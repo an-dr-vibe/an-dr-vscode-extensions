@@ -28,6 +28,7 @@ function createHarness() {
   const gitStatusMonitor = { selectRepo: vi.fn() };
   const gitClient = { setRepo: vi.fn() };
   const repoFileWatcher = { start: vi.fn() };
+  const runRemoteOperation = vi.fn(async () => {});
   registerMessageHandlers(bridge as never, {
     config: {} as never,
     gitClient: gitClient as never,
@@ -36,9 +37,10 @@ function createHarness() {
     repoManager: {} as never,
     extensionState: {} as never,
     avatarManager: {} as never,
-    repoFileWatcher: repoFileWatcher as never
+    repoFileWatcher: repoFileWatcher as never,
+    runRemoteOperation
   });
-  return { gitStatusMonitor, handlers, post };
+  return { gitStatusMonitor, handlers, post, runRemoteOperation };
 }
 
 describe("registerMessageHandlers utility actions", () => {
@@ -91,5 +93,25 @@ describe("registerMessageHandlers utility actions", () => {
     });
 
     expect(gitStatusMonitor.selectRepo).toHaveBeenCalledWith("C:/repo");
+  });
+  it.each(["fetch", "pull", "push"])("runs the %s toolbar operation", async (operation) => {
+    const { handlers, runRemoteOperation } = createHarness();
+
+    await handlers.get("remoteOperation")!({ command: "remoteOperation", operation } as never);
+
+    expect(runRemoteOperation).toHaveBeenCalledWith(operation);
+  });
+
+  it("ignores an operation it has no handler for", async () => {
+    // The name selects a handler to invoke, and the type is erased over the
+    // message port, so an unknown value must not reach the command table.
+    const { handlers, runRemoteOperation } = createHarness();
+
+    await handlers.get("remoteOperation")!({
+      command: "remoteOperation",
+      operation: "reset --hard"
+    } as never);
+
+    expect(runRemoteOperation).not.toHaveBeenCalled();
   });
 });

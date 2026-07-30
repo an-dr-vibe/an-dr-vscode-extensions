@@ -18,6 +18,7 @@ import { Config } from "@/config";
 import { DataSource } from "@/dataSource";
 import { encodeDiffDocUri } from "@/diffDocProvider";
 import { copyToClipboard } from "@/extension/utils/clipboard";
+import { logger } from "@/extension/utils/logger";
 import { ExtensionState } from "@/extensionState";
 import { GitStatusMonitor } from "@/gitStatusMonitor";
 import { RepoFileWatcher } from "@/repoFileWatcher";
@@ -79,6 +80,8 @@ export function registerMessageHandlers(
     extensionState: ExtensionState;
     avatarManager: AvatarManager;
     repoFileWatcher: RepoFileWatcher;
+    /** Runs a remote operation, supplied by the caller that owns askpass. */
+    runRemoteOperation: (operation: "fetch" | "pull" | "push") => Promise<void>;
   }
 ) {
   const {
@@ -173,6 +176,18 @@ export function registerMessageHandlers(
     gitClient.setRepo(msg.repo);
     gitStatusMonitor.selectRepo(msg.repo);
     repoFileWatcher.start(msg.repo);
+  });
+
+  // The toolbar buttons reuse the same handlers as the palette commands, so
+  // credentials, error reporting, and status refresh behave identically.
+  bridge.onMessage("remoteOperation", async (msg) => {
+    // The operation names a handler to invoke, so it is checked against the
+    // known set rather than trusted; the type is erased over the message port.
+    if (msg.operation !== "fetch" && msg.operation !== "pull" && msg.operation !== "push") {
+      logger.log(`Ignoring unknown remote operation: ${String(msg.operation)}`);
+      return;
+    }
+    await deps.runRemoteOperation(msg.operation);
   });
 
   bridge.onMessage("loadRepos", async (msg) => {

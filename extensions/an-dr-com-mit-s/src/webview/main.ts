@@ -26,6 +26,7 @@ class GitGraphView {
   private gitBranches: string[] = [];
   private gitBranchHead: string | null = null;
   private commits: GitCommitNode[] = [];
+  private commitFilterText: string = "";
   private commitHead: string | null = null;
   private commitLookup: { [hash: string]: number } = {};
   private avatars: AvatarImageCollection = {};
@@ -90,6 +91,21 @@ class GitGraphView {
     document.getElementById("refreshBtn")!.addEventListener("click", () => {
       this.refresh(true);
     });
+    for (const operation of ["fetch", "pull", "push"] as const) {
+      document.getElementById(`${operation}Btn`)?.addEventListener("click", () => {
+        sendMessage({ command: "remoteOperation", operation });
+      });
+    }
+    const filterElem = <HTMLInputElement | null>document.getElementById("commitFilter");
+    if (filterElem !== null) {
+      filterElem.addEventListener("input", () => this.applyCommitFilter(filterElem.value));
+      filterElem.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          this.applyCommitFilter("");
+          filterElem.value = "";
+        }
+      });
+    }
     this.observeWindowSizeChanges();
     this.observeWebviewStyleChanges();
     this.observeWebviewScroll();
@@ -296,6 +312,45 @@ class GitGraphView {
   }
 
   /* Refresh */
+  /**
+   * Hides commit rows that do not match the filter text, matching on message,
+   * author, email, or a hash prefix. Filtering is presentational: the rows
+   * stay in the table and the graph is untouched, so clearing the filter
+   * restores the view without reloading.
+   */
+  public applyCommitFilter(text: string) {
+    this.commitFilterText = text;
+    const active = text !== "";
+    document.body.classList.toggle("commitFilterActive", active);
+
+    // The uncommitted-changes row carries no commit metadata, so it cannot
+    // match a filter; hide it too rather than leave it as a false result.
+    const uncommittedRow = document.querySelector<HTMLElement>(".unsavedChanges");
+    uncommittedRow?.classList.toggle("filterHidden", active);
+
+    const rows = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName("commit");
+    if (!active) {
+      for (let i = 0; i < rows.length; i++) {
+        rows[i].classList.remove("filterHidden");
+      }
+      return;
+    }
+
+    const lower = text.toLowerCase();
+    for (let i = 0; i < rows.length; i++) {
+      const commit = this.commits[parseInt(rows[i].dataset.id ?? "", 10)];
+      if (commit === undefined) {
+        continue;
+      }
+      const match =
+        commit.message.toLowerCase().includes(lower) ||
+        commit.hash.toLowerCase().startsWith(lower) ||
+        commit.author.toLowerCase().includes(lower) ||
+        commit.email.toLowerCase().includes(lower);
+      rows[i].classList.toggle("filterHidden", !match);
+    }
+  }
+
   public refresh(hard: boolean) {
     if (hard) {
       if (this.expandedCommit !== null) {
@@ -494,6 +549,11 @@ class GitGraphView {
       ? '<div id="loadMoreCommitsBtn" class="roundedBtn">' + l10n.loadMore + "</div>"
       : "";
     this.makeTableResizable();
+    // Rendering replaces every row, so an active filter has to be re-applied
+    // or a refresh or "load more" would silently reveal filtered-out commits.
+    if (this.commitFilterText !== "") {
+      this.applyCommitFilter(this.commitFilterText);
+    }
 
     if (this.moreCommitsAvailable) {
       document.getElementById("loadMoreCommitsBtn")!.addEventListener("click", () => {

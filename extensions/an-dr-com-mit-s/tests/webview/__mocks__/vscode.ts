@@ -32,3 +32,23 @@ export const l10n = {
   },
   uri: undefined
 };
+
+/**
+ * Enough of `vscode.Uri` for `buildExtensionUri`, so a test can build the
+ * panel HTML with the real builder instead of a hand-copied duplicate.
+ */
+export const Uri = {
+  file: (fsPath: string) => ({
+    fsPath,
+    scheme: "file",
+    toString: () => `file://${fsPath.replace(/\\/g, "/")}`
+  })
+};
+
+export const env = { language: "en" };
+
+/**
+ * No icon extension is installed under test, so `loadFileIcons` takes its
+ * documented empty-map path rather than reading icons off disk.
+ */
+export const extensions = { getExtension: () => undefined };

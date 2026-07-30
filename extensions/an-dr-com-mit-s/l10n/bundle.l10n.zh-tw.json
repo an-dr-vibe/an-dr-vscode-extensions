@@ -125,5 +125,13 @@
   "{0} deletions": "{0} 處刪除",
   "Select a Git repository before running {0}.": "執行 {0} 前請先選擇一個 Git 儲存庫。",
   "Git {0} failed: {1}": "Git {0} 失敗：{1}",
-  "Git is requesting credentials": "Git 正在要求認證資訊"
+  "Git is requesting credentials": "Git 正在要求認證資訊",
+  "Filter commits...": "篩選提交...",
+  "Filter by message, author, email, or hash": "依提交訊息、作者、電子郵件或雜湊篩選",
+  "Fetch from Remote(s)": "從遠端擷取",
+  "Fetch": "擷取",
+  "Pull Current Branch": "提取目前分支",
+  "Pull": "提取",
+  "Push Current Branch": "推送目前分支",
+  "Push": "推送"
 }

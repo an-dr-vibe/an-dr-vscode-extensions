@@ -110,7 +110,13 @@ export function buildWebviewHtml(opts: {
 			<span id="repoControl"><span class="unselectable">${vscode.l10n.t("Repo")}: </span><div id="repoSelect" class="dropdown"></div></span>
 			<span id="branchControl"><span class="unselectable">${vscode.l10n.t("Branch")}: </span><div id="branchSelect" class="dropdown"></div></span>
 			<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>${vscode.l10n.t("Show Remote Branches")}</label>
-      <div id="refreshBtn" class="roundedBtn">${vscode.l10n.t("Refresh")}</div>
+			<span id="commitFilterControl"><input id="commitFilter" type="search" spellcheck="false" placeholder="${vscode.l10n.t("Filter commits...")}" title="${vscode.l10n.t("Filter by message, author, email, or hash")}"></span>
+			<span id="controlsBtns">
+				<div id="fetchBtn" class="roundedBtn" title="${vscode.l10n.t("Fetch from Remote(s)")}">${vscode.l10n.t("Fetch")}</div>
+				<div id="pullBtn" class="roundedBtn" title="${vscode.l10n.t("Pull Current Branch")}">${vscode.l10n.t("Pull")}</div>
+				<div id="pushBtn" class="roundedBtn" title="${vscode.l10n.t("Push Current Branch")}">${vscode.l10n.t("Push")}</div>
+				<div id="refreshBtn" class="roundedBtn">${vscode.l10n.t("Refresh")}</div>
+			</span>
 		</div>
 		<div id="content">
 			<div id="commitGraph"></div>

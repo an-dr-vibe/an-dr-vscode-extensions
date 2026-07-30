@@ -512,12 +512,50 @@ svg.fileIcon {
   width: 14px;
   vertical-align: text-top;
 }
-#refreshBtn {
+#commitFilterControl {
+  margin: 0 10px;
+  flex: 1 1 120px;
+  min-width: 120px;
+  display: flex;
+}
+#commitFilter {
+  width: 100%;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+#commitFilter:focus {
+  border-color: var(--vscode-focusBorder);
+}
+/* Pushed to the trailing edge so the buttons stay grouped away from the
+   selectors, and kept from wrapping apart when the toolbar is narrow. */
+#controlsBtns {
   margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+#controlsBtns .roundedBtn {
   width: 80px;
   height: 22px;
   line-height: 22px;
   border-radius: 11px;
+}
+/* Rows filtered out stay in the table so clearing the filter restores them. */
+tr.filterHidden {
+  display: none;
+}
+/* The graph is absolutely positioned against row offsets, so it would be
+   drawn against the wrong rows once any are hidden. Hide it while filtering
+   rather than redraw a graph whose parent commits are not on screen. */
+body.commitFilterActive #commitGraph {
+  display: none;
 }
 #loadMoreCommitsBtn {
   width: 180px;

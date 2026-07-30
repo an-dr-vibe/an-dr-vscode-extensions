@@ -23,7 +23,8 @@ const viewState: GG.GitGraphViewState = {
   lastActiveRepo: null,
   loadMoreCommits: 75,
   locale: "en",
-  repos: {},
+  // The builder only emits the panel controls when a repo exists.
+  repos: { "/workspace/repo": { columnWidths: null } },
   showCurrentBranchByDefault: false
 };
 

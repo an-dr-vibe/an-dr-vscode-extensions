@@ -42,7 +42,8 @@ function registerViewCommand(
   avatarManager: AvatarManager,
   gitClient: GitClient,
   dataSource: DataSource,
-  gitStatusMonitor: GitStatusMonitor
+  gitStatusMonitor: GitStatusMonitor,
+  remoteCommands: ReturnType<typeof createRemoteCommands>
 ) {
   let currentPanel: WebviewPanel | undefined;
   ctx.subscriptions.push(
@@ -82,7 +83,8 @@ function registerViewCommand(
         repoManager,
         extensionState,
         avatarManager,
-        repoFileWatcher
+        repoFileWatcher,
+        runRemoteOperation: (operation) => remoteCommands[operation]()
       });
 
       currentPanel = createWebviewPanel({
@@ -142,15 +144,6 @@ export function initExtension(
     );
     ctx.subscriptions.push(gitStatusMonitor);
     ctx.subscriptions.push(new InlineBlameController(dataSource, repoManager, config));
-    registerViewCommand(
-      ctx,
-      repoManager,
-      extensionState,
-      avatarManager,
-      gitClient,
-      dataSource,
-      gitStatusMonitor
-    );
     // Git prompts for credentials through this endpoint; without it an
     // authenticated fetch, pull, or push would block on a terminal the
     // extension host does not have.
@@ -165,16 +158,29 @@ export function initExtension(
       }
     );
 
+    // The toolbar and the palette share one set of handlers, so both paths
+    // prompt for credentials and report failures identically.
+    const remoteCommands = createRemoteCommands(
+      gitStatusMonitor,
+      () => askpassEnv,
+      runRemoteOperationWithGit(config.gitPath)
+    );
+    registerViewCommand(
+      ctx,
+      repoManager,
+      extensionState,
+      avatarManager,
+      gitClient,
+      dataSource,
+      gitStatusMonitor,
+      remoteCommands
+    );
     ctx.subscriptions.push(
       ...registerPublicCommands(
         ctx,
         {
           ...createRepositoryCommands(repoManager, gitStatusMonitor, config),
-          ...createRemoteCommands(
-            gitStatusMonitor,
-            () => askpassEnv,
-            runRemoteOperationWithGit(config.gitPath)
-          )
+          ...remoteCommands
         },
         dataSource,
         new Set(["view", "clearAvatarCache"])

@@ -76,6 +76,16 @@ place staging does this work inline today and replace it.
 `src/webview/main.ts`. Note the non-tag branch was left exactly as it was —
 convert only what the file covers.
 
+**When a conversion introduces a shared constant, replace only the occurrences
+that mean the same thing.** Converting `graphConstants.ts` introduced
+`UNCOMMITTED = "*"`, and a grep for `"*"` in `main.ts` matched four places.
+Three were genuine commit-hash comparisons. The fourth was
+`renderUncommitedChanges`, which renders literal asterisks as placeholder text
+for the author and commit columns — identical output, unrelated meaning.
+Substituting there compiles, passes every test, and silently couples the two:
+change the sentinel later and the table cells change with it. Match on
+meaning, not on the character.
+
 **Convert only the parts that have a caller.** `refPills.ts` also contained
 `renderTagOverflowPill`, the compact "+N" badge. Its only caller is the
 sidebar's mini graph, which staging does not have yet. It was written, tested,

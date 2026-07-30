@@ -1,3 +1,4 @@
+import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
 import {
   ActionRequest,
   ActionResponse,
@@ -160,7 +161,11 @@ export type ResponseRefresh = {
   command: "refresh";
 };
 
+/** Asks for the operation the repository is part-way through. */
+export type RequestRepoInProgress = { command: "repoInProgress" };
+
 export type RequestMessage =
+  | RequestRepoInProgress
   | ActionRequest
   | QueryRequest
   | RequestFetchAvatar
@@ -172,7 +177,14 @@ export type RequestMessage =
   | RequestViewDiff
   | RequestUtilityAction;
 
+/** The operation the repository is part-way through, or null when none is. */
+export type ResponseRepoInProgress = {
+  command: "repoInProgress";
+  state: RepoInProgressState | null;
+};
+
 export type ResponseMessage =
+  | ResponseRepoInProgress
   | ActionResponse
   | QueryResponse
   | ResponseFetchAvatar

@@ -118,6 +118,7 @@ export function buildWebviewHtml(opts: {
 				<div id="refreshBtn" class="roundedBtn">${vscode.l10n.t("Refresh")}</div>
 			</span>
 		</div>
+		<div id="repoInProgressBanner"></div>
 		<div id="content">
 			<div id="commitGraph"></div>
 			<div id="commitTable"></div>

@@ -156,6 +156,13 @@ export function registerMessageHandlers(
     });
   });
 
+  bridge.onMessage("repoInProgress", async () => {
+    bridge.post({
+      command: "repoInProgress",
+      state: currentRepo === null ? null : await dataSource.getRepoInProgress(currentRepo)
+    });
+  });
+
   bridge.onMessage("commitDetails", async (msg) => {
     bridge.post({
       command: "commitDetails",

@@ -103,6 +103,28 @@ body.unableToLoad p {
   margin-right: var(--files-panel-width, 0px);
 }
 
+/* Repository in-progress banner */
+#repoInProgressBanner {
+  display: none;
+  padding: 6px 10px;
+  margin-right: var(--files-panel-width, 0px);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+  background: var(--vscode-editorWarning-background, rgba(255, 166, 0, 0.12));
+  font-size: 12px;
+}
+#repoInProgressBanner.active {
+  display: block;
+}
+/* A conflict is what blocks the operation, so it reads as an error. */
+#repoInProgressBanner.conflicted {
+  background: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.12));
+}
+#repoInProgressBannerSecondary {
+  opacity: 0.8;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
 /* Changed-files panel */
 #filesPanel {
   position: fixed;

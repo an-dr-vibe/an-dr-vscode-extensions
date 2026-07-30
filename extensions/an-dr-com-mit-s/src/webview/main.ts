@@ -1,3 +1,4 @@
+import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
 import type {
   GitCommandStatus,
   GitCommitDetails,
@@ -23,6 +24,7 @@ import { Dropdown } from "./dropdown";
 import { DEFAULT_FILES_PANEL_WIDTH, FilesPanel } from "./filesPanel";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
+import { RepoInProgressBanner } from "./repoInProgressBanner";
 import { renderAuthorVisualHtml } from "./utils/avatarVisuals";
 import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
@@ -61,6 +63,7 @@ class GitGraphView {
   private scrollShadowElem: HTMLElement;
   private filesPanel: FilesPanel;
   private filesPanelWidth: number;
+  private repoInProgressBanner: RepoInProgressBanner;
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
@@ -104,6 +107,7 @@ class GitGraphView {
     });
     this.scrollShadowElem = <HTMLInputElement>document.getElementById("scrollShadow")!;
     this.filesPanelWidth = prevState?.filesPanelWidth ?? DEFAULT_FILES_PANEL_WIDTH;
+    this.repoInProgressBanner = new RepoInProgressBanner();
     this.filesPanel = new FilesPanel(this.filesPanelWidth, (width) => {
       this.filesPanelWidth = width;
       this.saveState();
@@ -371,6 +375,10 @@ class GitGraphView {
     }
   }
 
+  public renderRepoInProgress(state: RepoInProgressState | null) {
+    this.repoInProgressBanner.render(state);
+  }
+
   public refresh(hard: boolean) {
     if (hard) {
       if (this.expandedCommit !== null) {
@@ -413,6 +421,9 @@ class GitGraphView {
     });
   }
   private requestLoadBranchesAndCommits(hard: boolean) {
+    // Asked for on every refresh: the state changes outside the panel, when
+    // the user runs a rebase or merge from a terminal.
+    sendMessage({ command: "repoInProgress" });
     this.requestLoadBranches(hard, (branchChanges: boolean, isRepo: boolean) => {
       if (isRepo) {
         this.requestLoadCommits(hard, (commitChanges: boolean) => {
@@ -1476,6 +1487,9 @@ window.addEventListener("message", (event) => {
       break;
     case "loadBranches":
       gitGraph.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
+      break;
+    case "repoInProgress":
+      gitGraph.renderRepoInProgress(msg.state);
       break;
     case "loadCommits":
       gitGraph.loadCommits(msg.commits, msg.head, msg.moreCommitsAvailable, msg.hard);

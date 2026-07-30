@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 
 import type { FileStatusResult, SimpleGit } from "simple-git";
 import { simpleGit } from "simple-git";
@@ -7,6 +9,7 @@ import * as vscode from "vscode";
 import type { GitClient } from "@/backend/gitClient";
 import { loadBranches } from "@/backend/queries/loadBranches";
 import { loadCommits } from "@/backend/queries/loadCommits";
+import { getRepoInProgressState, RepoInProgressState } from "@/backend/queries/repoInProgress";
 import { getPathFromStr } from "@/backend/utils/path";
 import {
   BlameLineInfo,
@@ -36,6 +39,14 @@ function toRepoRelativePath(repo: string, filePath: string) {
   const normalized = getPathFromStr(filePath);
   const root = getPathFromStr(repo);
   return normalized.startsWith(root + "/") ? normalized.substring(root.length + 1) : normalized;
+}
+
+/** Splits command output into trimmed, non-empty lines. */
+function toLines(stdout: string): string[] {
+  return stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
 }
 
 function createGit(repo: string, gitPath: string) {
@@ -135,6 +146,66 @@ export class DataSource {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Reports the operation the repository is part-way through.
+   *
+   * Each state file is resolved with `rev-parse --git-path` rather than
+   * assumed to sit under `<repo>/.git`, because in a linked worktree or a
+   * submodule it lives elsewhere and would otherwise never be found.
+   */
+  public async getRepoInProgress(repo: string): Promise<RepoInProgressState | null> {
+    const git = this.gitFactory(repo, this.getGitPath());
+    const run = async (args: string[]): Promise<string | null> => {
+      try {
+        return await git.raw(args);
+      } catch {
+        return null;
+      }
+    };
+    return getRepoInProgressState({
+      resolveGitPaths: async (names) => {
+        const stdout = await run(["rev-parse", ...names.flatMap((name) => ["--git-path", name])]);
+        return stdout === null
+          ? null
+          : toLines(stdout).map((line) =>
+              path.isAbsolute(line) ? line : path.resolve(repo, line)
+            );
+      },
+      pathExists: async (target) => {
+        try {
+          await fs.stat(target);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      readTextFile: async (target) => {
+        try {
+          return await fs.readFile(target, "utf8");
+        } catch {
+          // Absent is the normal case: it means the state does not apply.
+          return null;
+        }
+      },
+      readStatusPorcelain: () => run(["status", "--porcelain", "--untracked-files=all"]),
+      nameCommit: async (hash) => {
+        const stdout = await run([
+          "for-each-ref",
+          "--format=%(refname:short)",
+          "--points-at",
+          hash,
+          "refs/heads",
+          "refs/remotes"
+        ]);
+        if (stdout === null) {
+          return null;
+        }
+        const names = toLines(stdout);
+        return names.length > 0 ? names[0] : null;
+      }
+    });
   }
 
   /** Counts modified and deleted staged/unstaged entries. */

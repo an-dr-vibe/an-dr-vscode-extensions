@@ -83,8 +83,43 @@
       },
       {
         "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.addGitRepository",
+        "title": "%command.addGitRepository%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
         "command": "an-dr-com-mit-s.clearAvatarCache",
         "title": "%command.clearAvatarCache%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.fetch",
+        "title": "%command.fetch%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.pull",
+        "title": "%command.pull%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.push",
+        "title": "%command.push%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.removeGitRepository",
+        "title": "%command.removeGitRepository%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.version",
+        "title": "%command.version%"
+      },
+      {
+        "category": "an-dr: Commits (MIT)",
+        "command": "an-dr-com-mit-s.openFile",
+        "title": "%command.openFile%"
       }
     ],
     "menus": {

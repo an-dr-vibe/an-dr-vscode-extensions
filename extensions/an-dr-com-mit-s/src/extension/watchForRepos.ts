@@ -2,9 +2,10 @@ import * as vscode from "vscode";
 
 import { findGitRepos } from "@/backend/queries/repoSearch";
 import { config } from "@/config";
-import { EXTENSION_NAME, getCommandId, getConfigKey } from "@/extension/constant/const";
+import { EXTENSION_NAME, getConfigKey } from "@/extension/constant/const";
 import type { InitExtension } from "@/extension/initExtension";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
+import { registerPublicCommands } from "@/extension/publicCommands";
 import { StatusBarItem } from "@/statusBarItem";
 
 type WatcherState = {
@@ -59,23 +60,20 @@ export function watchForRepos(
         }
       }
     }),
-    vscode.commands.registerCommand(getCommandId("view"), async () => {
-      await vscode.window.showErrorMessage(EXTENSION_NAME, {
-        detail: vscode.l10n.t(
-          "Either the current workspace does not contain a Git repository, or the Git repository is not configured correctly."
-        ),
-        modal: true
-      });
-    }),
-    vscode.commands.registerCommand(getCommandId("clearAvatarCache"), async () => {
-      await vscode.window.showErrorMessage(EXTENSION_NAME, {
-        detail: vscode.l10n.t(
-          "Either the current workspace does not contain a Git repository, or the Git repository is not configured correctly."
-        ),
-        modal: true
-      });
+    ...registerPublicCommands(ctx, {
+      view: () => showMissingRepo(),
+      clearAvatarCache: () => showMissingRepo()
     })
   );
 
   return { dispose: () => dispose(state) };
+}
+
+function showMissingRepo() {
+  return vscode.window.showErrorMessage(EXTENSION_NAME, {
+    detail: vscode.l10n.t(
+      "Either the current workspace does not contain a Git repository, or the Git repository is not configured correctly."
+    ),
+    modal: true
+  });
 }

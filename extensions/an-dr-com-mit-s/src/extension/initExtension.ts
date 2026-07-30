@@ -17,6 +17,7 @@ import {
 } from "@/extension/constant/const";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerMessageHandlers } from "@/extension/messageHandler";
+import { registerPublicCommands } from "@/extension/publicCommands";
 import { createRepoManager, RepoManager } from "@/extension/repoManager";
 import { logger } from "@/extension/utils/logger";
 import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
@@ -142,6 +143,9 @@ export function initExtension(
       gitClient,
       dataSource,
       gitStatusMonitor
+    );
+    ctx.subscriptions.push(
+      ...registerPublicCommands(ctx, {}, dataSource, new Set(["view", "clearAvatarCache"]))
     );
 
     const gitWatcher = vscode.workspace.createFileSystemWatcher("**/.git");

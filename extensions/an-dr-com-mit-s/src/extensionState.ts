@@ -3,12 +3,15 @@ import * as fs from "node:fs";
 import { ExtensionContext, Memento } from "vscode";
 
 import { getPathFromStr } from "./backend/utils/path";
+import { getVersionedStateKey, shouldReadStagingLegacyState } from "./extension/constant/const";
 import { Avatar, AvatarCache, GitRepoSet } from "./types";
 
 const AVATAR_STORAGE_FOLDER = "/avatars";
 const AVATAR_CACHE = "avatarCache";
-const LAST_ACTIVE_REPO = "lastActiveRepo";
-const REPO_STATES = "repoStates";
+const LEGACY_LAST_ACTIVE_REPO = "lastActiveRepo";
+const LEGACY_REPO_STATES = "repoStates";
+const LAST_ACTIVE_REPO = getVersionedStateKey(LEGACY_LAST_ACTIVE_REPO);
+const REPO_STATES = getVersionedStateKey(LEGACY_REPO_STATES);
 
 export class ExtensionState {
   private globalState: Memento;
@@ -38,7 +41,7 @@ export class ExtensionState {
 
   /* Discovered Repos */
   public getRepos() {
-    return this.workspaceState.get<GitRepoSet>(REPO_STATES, {});
+    return this.getWorkspaceState<GitRepoSet>(REPO_STATES, LEGACY_REPO_STATES, {});
   }
   public saveRepos(gitRepoSet: GitRepoSet) {
     this.workspaceState.update(REPO_STATES, gitRepoSet);
@@ -46,7 +49,7 @@ export class ExtensionState {
 
   /* Last Active Repo */
   public getLastActiveRepo() {
-    return this.workspaceState.get<string | null>(LAST_ACTIVE_REPO, null);
+    return this.getWorkspaceState<string | null>(LAST_ACTIVE_REPO, LEGACY_LAST_ACTIVE_REPO, null);
   }
   public setLastActiveRepo(repo: string | null) {
     this.workspaceState.update(LAST_ACTIVE_REPO, repo);
@@ -82,5 +85,15 @@ export class ExtensionState {
         fs.unlink(this.globalStoragePath + AVATAR_STORAGE_FOLDER + "/" + files[i], () => {});
       }
     });
+  }
+
+  private getWorkspaceState<T>(key: string, stagingLegacyKey: string, defaultValue: T): T {
+    const value = this.workspaceState.get<T>(key);
+    if (value !== undefined) {
+      return value;
+    }
+    return shouldReadStagingLegacyState()
+      ? this.workspaceState.get<T>(stagingLegacyKey, defaultValue)
+      : defaultValue;
   }
 }

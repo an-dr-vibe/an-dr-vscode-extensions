@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import { Config } from "./config";
 import type { GitChangeCounts } from "./data-source/models";
-import { EXTENSION_ID, EXTENSION_NAME } from "./extension/constant/const";
+import { EXTENSION_NAME, getCommandId } from "./extension/constant/const";
 import { logger } from "./extension/utils/logger";
 
 export class StatusBarItem {
@@ -16,7 +16,7 @@ export class StatusBarItem {
     this.config = config;
     this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
     this.statusBarItem.name = EXTENSION_NAME;
-    this.statusBarItem.command = `${EXTENSION_ID}.view`;
+    this.statusBarItem.command = getCommandId("view");
     context.subscriptions.push(this.statusBarItem);
     logger.log(
       `StatusBarItem created (showStatusBarItem=${config.showStatusBarItem()}, numRepos=0)`

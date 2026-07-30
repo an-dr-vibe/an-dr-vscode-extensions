@@ -2,10 +2,10 @@ import * as vscode from "vscode";
 
 import { GitInstance } from "./backend/gitClient";
 import { getPathFromStr } from "./backend/utils/path";
-import { EXTENSION_ID } from "./extension/constant/const";
+import { getVirtualDocumentScheme } from "./extension/constant/const";
 
 export class DiffDocProvider implements vscode.TextDocumentContentProvider {
-  public static scheme = EXTENSION_ID;
+  public static scheme = getVirtualDocumentScheme();
   private gitClient: GitInstance;
   private onDidChangeEventEmitter = new vscode.EventEmitter<vscode.Uri>();
   private docs = new Map<string, DiffDocument>();

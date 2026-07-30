@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import { findGitRepos } from "@/backend/queries/repoSearch";
 import { config } from "@/config";
-import { EXTENSION_ID, EXTENSION_NAME } from "@/extension/constant/const";
+import { EXTENSION_NAME, getCommandId, getConfigKey } from "@/extension/constant/const";
 import type { InitExtension } from "@/extension/initExtension";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { StatusBarItem } from "@/statusBarItem";
@@ -53,13 +53,13 @@ export function watchForRepos(
       check(ctx, state, onReposFound, statusBarItem)
     ),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration(`${EXTENSION_ID}.maxDepthOfRepoSearch`)) {
+      if (e.affectsConfiguration(getConfigKey("maxDepthOfRepoSearch"))) {
         if (maxDepth.increased(config.maxDepthOfRepoSearch())) {
           void check(ctx, state, onReposFound, statusBarItem);
         }
       }
     }),
-    vscode.commands.registerCommand(`${EXTENSION_ID}.view`, async () => {
+    vscode.commands.registerCommand(getCommandId("view"), async () => {
       await vscode.window.showErrorMessage(EXTENSION_NAME, {
         detail: vscode.l10n.t(
           "Either the current workspace does not contain a Git repository, or the Git repository is not configured correctly."
@@ -67,7 +67,7 @@ export function watchForRepos(
         modal: true
       });
     }),
-    vscode.commands.registerCommand(`${EXTENSION_ID}.clearAvatarCache`, async () => {
+    vscode.commands.registerCommand(getCommandId("clearAvatarCache"), async () => {
       await vscode.window.showErrorMessage(EXTENSION_NAME, {
         detail: vscode.l10n.t(
           "Either the current workspace does not contain a Git repository, or the Git repository is not configured correctly."

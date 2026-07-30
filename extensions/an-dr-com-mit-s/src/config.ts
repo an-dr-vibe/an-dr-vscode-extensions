@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 import { DateType } from "./backend/types";
-import { EXTENSION_ID } from "./extension/constant/const";
+import { EXTENSION_ID, getConfigKey, TARGET_EXTENSION_ID } from "./extension/constant/const";
 import { DateFormat, GraphStyle } from "./types";
 
 type TabIconColourTheme = "colour" | "grey";
@@ -10,11 +10,28 @@ function getConfig<T>(key: string, defaultValue: T): T {
   return vscode.workspace.getConfiguration(EXTENSION_ID).get(key, defaultValue);
 }
 
+function getExplicitConfig<T>(section: string, key: string): T | undefined {
+  const inspected = vscode.workspace.getConfiguration(section).inspect?.<T>(key);
+  if (inspected === undefined) {
+    return undefined;
+  }
+  const values = [inspected.workspaceFolderValue, inspected.workspaceValue, inspected.globalValue];
+  return values.find((value) => value !== undefined);
+}
+
+function getCompatibleConfig<T>(stagingKey: string, targetKey: string, defaultValue: T): T {
+  return (
+    getExplicitConfig<T>(EXTENSION_ID, stagingKey) ??
+    vscode.workspace.getConfiguration(TARGET_EXTENSION_ID).get(targetKey, defaultValue)
+  );
+}
+
 export const config = {
   autoCenterCommitDetailsView: (): boolean => getConfig("autoCenterCommitDetailsView", true),
   dateFormat: (): DateFormat => getConfig("dateFormat", "Date & Time"),
   dateType: (): DateType => getConfig("dateType", "Author Date"),
-  fetchAvatars: (): boolean => getConfig("fetchAvatars", false),
+  fetchAvatars: (): boolean =>
+    getCompatibleConfig("fetchAvatars", "repository.commits.fetchAvatars", false),
   graphColours: (): string[] =>
     getConfig("graphColours", [
       "#0085d9",
@@ -35,10 +52,14 @@ export const config = {
   maxDepthOfRepoSearch: (): number => getConfig("maxDepthOfRepoSearch", 0),
   showCurrentBranchByDefault: (): boolean => getConfig("showCurrentBranchByDefault", false),
   showStatusBarItem: (): boolean => getConfig("showStatusBarItem", true),
-  statusBarIconOnly: (): boolean => getConfig("statusBarIconOnly", true),
+  statusBarIconOnly: (): boolean =>
+    getCompatibleConfig("statusBarIconOnly", "statusBarIconOnly", true),
   showUncommittedChanges: (): boolean => getConfig("showUncommittedChanges", true),
   tabIconColourTheme: (): TabIconColourTheme => getConfig("tabIconColourTheme", "colour"),
-  gitPath: (): string => vscode.workspace.getConfiguration("git").get("path", null) ?? "git"
+  gitPath: (): string => vscode.workspace.getConfiguration("git").get("path", null) ?? "git",
+  affectsStatusBarIconOnly: (event: vscode.ConfigurationChangeEvent): boolean =>
+    event.affectsConfiguration(getConfigKey("statusBarIconOnly")) ||
+    event.affectsConfiguration(getConfigKey("statusBarIconOnly", TARGET_EXTENSION_ID))
 };
 
 export type Config = typeof config;

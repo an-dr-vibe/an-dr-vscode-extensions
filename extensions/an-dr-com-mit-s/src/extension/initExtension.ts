@@ -9,7 +9,12 @@ import { buildExtensionUri } from "@/backend/utils/path";
 import { config } from "@/config";
 import { DataSource } from "@/dataSource";
 import { DiffDocProvider } from "@/diffDocProvider";
-import { EXTENSION_ID, EXTENSION_NAME } from "@/extension/constant/const";
+import {
+  EXTENSION_ID,
+  EXTENSION_NAME,
+  getCommandId,
+  getConfigKey
+} from "@/extension/constant/const";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerMessageHandlers } from "@/extension/messageHandler";
 import { createRepoManager, RepoManager } from "@/extension/repoManager";
@@ -35,7 +40,7 @@ function registerViewCommand(
 ) {
   let currentPanel: WebviewPanel | undefined;
   ctx.subscriptions.push(
-    vscode.commands.registerCommand(`${EXTENSION_ID}.view`, () => {
+    vscode.commands.registerCommand(getCommandId("view"), () => {
       if (currentPanel) {
         currentPanel.reveal(vscode.window.activeTextEditor?.viewColumn);
         return;
@@ -104,7 +109,7 @@ export function initExtension(
     const avatarManager = new AvatarManager(config.gitPath, extensionState);
 
     ctx.subscriptions.push(
-      vscode.commands.registerCommand(`${EXTENSION_ID}.clearAvatarCache`, () => {
+      vscode.commands.registerCommand(getCommandId("clearAvatarCache"), () => {
         avatarManager.clearCache();
       })
     );
@@ -183,13 +188,13 @@ export function initExtension(
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (
-          e.affectsConfiguration(`${EXTENSION_ID}.showStatusBarItem`) ||
-          e.affectsConfiguration(`${EXTENSION_ID}.statusBarIconOnly`)
+          e.affectsConfiguration(getConfigKey("showStatusBarItem")) ||
+          config.affectsStatusBarIconOnly(e)
         ) {
           statusBarItem.refresh();
         } else if (e.affectsConfiguration("git.path")) {
           gitClient.setGitPath(config.gitPath());
-        } else if (e.affectsConfiguration(`${EXTENSION_ID}.maxDepthOfRepoSearch`)) {
+        } else if (e.affectsConfiguration(getConfigKey("maxDepthOfRepoSearch"))) {
           if (maxDepth.increased(config.maxDepthOfRepoSearch())) {
             const paths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
             void findGitRepos(paths, config.gitPath(), config.maxDepthOfRepoSearch()).then(

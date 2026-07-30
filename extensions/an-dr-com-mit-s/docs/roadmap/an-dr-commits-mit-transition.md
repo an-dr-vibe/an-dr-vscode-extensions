@@ -27,6 +27,24 @@ The current extension is therefore two things at once: a behavioural reference,
 **and** the licensed source for 5,134 lines of `YOURS` code plus the clean hunks
 of another 6,755. Treating it as reference-only is a misreading of this plan.
 
+### But `YOURS` lines are not uniformly recoverable
+
+A licence to move a file does not mean the file can run here.
+[ADR-002](../adr/ADR-002-refit-features-onto-the-mit-tab.md) records the limit:
+the 2.x tab's own glue is `YOURS`, but it is written against a substrate that is
+`BASELINE` — `graph.ts`, `dialog.ts`, `contextMenu.ts`, `findWidget.ts`,
+`settingsWidget.ts`, `textFormatter.ts`, `customSelect.ts`, `web/utils.ts`,
+`fileTree.ts`, about 2,644 lines that cannot be copied. `tableRender`,
+`constructorInit` and `loadProcessing` between them reference 123 view members,
+93 of which do not exist here.
+
+So the recoverable share is the part that is **self-contained**. Inline blame
+moved because it needs nothing from the old tab; `changesPanel` and
+`tableRender` do not, because they need most of it. Authored features are
+re-fitted onto the MIT tab one at a time; the 2.x tab is not reproduced.
+
+Do not treat 5,134 as a portable-work estimate.
+
 ## Non-negotiable provenance rules
 
 1. Copy or move implementation code only within `an-dr-com-mit-s`, or import it
@@ -148,7 +166,7 @@ examined. Backlog 0 triages it before any of it is scheduled.
 
 The last two were settled once and the ADR recording them was lost when the
 premature cutover was reverted; a copy survives at the `archive/mit-cutover`
-tag. Rewrite it as this extension's ADR-002 during backlog 2, which is the first
+tag. Rewrite it under the next free ADR number during backlog 2, which is the first
 item those decisions actually bind.
 
 ### Decisions still open

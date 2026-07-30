@@ -11,18 +11,25 @@ Where a figure is an estimate, it says so.
 
 ## Where we are
 
-| Surface                   |  Target | Staging today |                                                                                       Gap |
-| ------------------------- | ------: | ------------: | ----------------------------------------------------------------------------------------: |
-| Commands declared         |       9 |             9 |                                                                                         0 |
-| Commands implemented      |       9 |             5 | **4** (`fetch`, `pull`, `push` unimplemented; `view`/`clearAvatarCache` wired separately) |
-| Settings declared         | 34 kept |            14 |                   **33** (13 of staging's 14 are MIT-native, disjoint from the kept list) |
-| Activity Bar views        |       1 |             0 |                                                                                         1 |
-| `contributes.keybindings` |       1 |        absent |                                                                                         1 |
-| `YOURS` source ported     |   5,134 |           156 |                                                                                 **4,978** |
+Updated 2026-07-30, after the 3.0.0 release.
 
-Verification is real and green: typecheck, lint, format, `l10n:check`,
-180 Vitest tests, 28 `vscode-test` tests, and `check-provenance.js` at zero
-`BASELINE`.
+| Surface                   |  Target | Staging today | Gap                                                |
+| ------------------------- | ------: | ------------: | -------------------------------------------------- |
+| Version                   | > 2.0.0 |         3.0.0 | none — no longer a downgrade                       |
+| Commands declared         |       9 |             9 | 0                                                  |
+| Commands implemented      |       9 |             9 | 0                                                  |
+| Settings declared         | 34 kept |            29 | **18** kept keys still missing                     |
+| Activity Bar views        |       1 |             0 | 1 — blocked, see stage 3                           |
+| `contributes.keybindings` |       1 |        absent | 1                                                  |
+| `YOURS` source re-fitted  |  ~2,480 |          ~640 | ~1,840 re-fittable; ~2,650 blocked behind baseline |
+
+The `YOURS` row no longer counts 5,134 as the target: ADR-002 established that
+about 2,650 of those lines cannot run here without reimplementing the baseline
+substrate they were written against.
+
+Verification is real and green: typecheck, lint, format, `l10n:check` at
+127/127 in both Chinese locales, 248 Vitest tests, 33 `vscode-test` tests, and
+`check-provenance.js` at zero `BASELINE`.
 
 ### What is already genuinely done
 
@@ -36,10 +43,9 @@ Verification is real and green: typecheck, lint, format, `l10n:check`,
 - `utils.ts`, `dataSource.ts`, `gitStatusMonitor.ts`, `fileIcons` ported and
   reachable from `activate()`.
 
-## Stage 1 — Finish the command surface (increments 13, 15, 16)
+## Stage 1 — Finish the command surface — DONE
 
-The declared contract is complete but four commands still error out. This is
-the smallest remaining piece and unblocks scenario rows 6 and 7.
+All nine commands now do their job. Kept for the record of how they landed:
 
 | Increment | Work                                                 |      Estimate |
 | --------- | ---------------------------------------------------- | ------------: |
@@ -55,9 +61,9 @@ whole transition and is not delegatable.
 rather than hanging (scenario 7, the defect that made the old cutover's remote
 commands unusable).
 
-## Stage 2 — The `web/` ES-module conversion pattern (not yet started)
+## Stage 2 — The `web/` ES-module conversion pattern — DONE
 
-**This is the gate on everything in Stage 3, and it has no worked example yet.**
+**Established.** See [web-conversion-pattern.md](web-conversion-pattern.md); three files have been converted with it, two by a delegate.
 
 22 of 23 portable `web/` files contain **zero `import` statements** —
 `web/changesPanel.ts` is 615 lines with none. They relied on the retired
@@ -76,34 +82,37 @@ only under Vitest.
 | 2a   | Convert one small `web/` file end-to-end; record the pattern |     ~150 |
 | 2b   | Convert two more, confirming the pattern generalises         |     ~300 |
 
-**Exit:** a written, followed-twice procedure for global→module conversion.
-Until this exists, the ~3,100 lines of `web/` code cannot be delegated, and
-that is the bulk of the remaining port.
+The procedure is written and has been followed by a delegate twice.
 
-## Stage 3 — The feature port (4,978 lines, none started)
+## Stage 3 — Re-fitting authored features (~4,500 lines remaining)
 
-Measured group sizes. Ordering is by dependency, not by size: each group needs
-its imports to exist in staging first, and blocked `src/` files need the
-`DataSource`-equivalent surface they call.
+**Superseded grouping.** This stage previously listed the whole `YOURS` set as
+one port ordered by dependency. That treated the tab glue as movable.
+[ADR-002](../../adr/ADR-002-refit-features-onto-the-mit-tab.md) records why it is
+not: `tableRender`, `constructorInit` and `loadProcessing` reference 123 view
+members, 93 absent here, backed by ~2,644 lines of `BASELINE` substrate.
 
-| Group | Contents                                                                              |         Lines | Depends on                                 |
-| ----- | ------------------------------------------------------------------------------------- | ------------: | ------------------------------------------ |
-| D     | `inlineBlame.ts`, `repositoryGraphCache.ts` (`gitStatusMonitor.ts` done)              | 311 remaining | `DataSource` blame + status surface        |
-| E     | 4 `src/views/tab/*Actions.ts`                                                         |           325 | `DataSource`, message protocol             |
-| C     | `loadProcessing`, `tableRender`, `controlsLayout`, `avatarVisuals`, `constructorInit` |         1,028 | Stage 2 pattern                            |
-| B     | `changesPanel`, `filesPanel`, `fullDiffPanel` + CSS                                   |         1,052 | Stage 2 pattern, group C                   |
-| A     | Activity Bar sidebar — 11 files                                                       |         1,404 | All of the above, plus `contributes.views` |
+The real division is **how much of the old tab a feature needs**:
 
-`repositoryGraphCache.ts` needs its cache **key redesigned**, not moved: it keys
-on the old request shape (multi-branch arrays, `stashKeys`, `hideRemotes`,
-string-enum `commitOrdering`), and the new `loadCommits(git, { branchName,
-maxCommits, ... })` has no stash or ordering concept. That is design work.
+| Category                | Contents                                                                                  |  Lines | Status                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------- | -----: | --------------------------------------------------------------------------------------------------------------------- |
+| Self-contained services | blame, status monitor, avatars, file icons, tag pills                                     |   ~640 | **done**                                                                                                              |
+| Extension-host actions  | `src/views/tab/*Actions.ts` — working tree, misc, commit graph, diff/file content         |    325 | Re-fittable; needs a UI trigger, or it is dead on arrival                                                             |
+| Cache                   | `repositoryGraphCache.ts`                                                                 |    114 | Key must be **redesigned** for `loadCommits(git, { branchName, maxCommits })`, which has no stash or ordering concept |
+| Tab UI glue             | `tableRender`, `constructorInit`, `loadProcessing`, `controlsLayout`, `branchPanelRender` | ~1,230 | **Blocked** behind the baseline substrate                                                                             |
+| Panels                  | `changesPanel`, `filesPanel`, `fullDiffPanel` + CSS                                       | ~1,052 | **Blocked**, same reason                                                                                              |
+| Sidebar                 | `src/views/sidebar/*`, `web/sidebar/*`                                                    | ~1,404 | **Blocked**; also needs `contributes.views`                                                                           |
 
-Group A is last for a real reason: the sidebar's `sidebarView.ts` imports
-`DataSource`, `RepoManager`, `ExtensionState`, `utils.viewDiff`, and `Event` —
-six of its sixteen imports land in modules that must exist first.
+Roughly 2,650 of the remaining lines are blocked, not merely unscheduled. They
+return only if the substrate is reimplemented, which ADR-002 rejected for now.
 
-## Stage 4 — Settings (33 missing)
+**Each action handler needs a caller.** The four `*Actions.ts` files are
+message handlers with no view coupling, so they re-fit cleanly onto
+`messageHandler.ts` — but only for messages the MIT webview actually sends. A
+handler for a button that does not exist is dead code, and the reachability
+check will say so.
+
+## Stage 4 — Settings (18 missing)
 
 Blocked on the features that own them; a setting for a view that does not exist
 is the exact defect the previous cutover shipped. Schedule each with its

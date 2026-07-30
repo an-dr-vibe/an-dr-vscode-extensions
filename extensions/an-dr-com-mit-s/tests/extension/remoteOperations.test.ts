@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -75,14 +76,22 @@ describe("runRemoteOperationWithGit", () => {
   });
 
   it("pushes a new commit to the remote", async () => {
-    const { origin, clone } = makeCloneWithRemote();
-    git(["fetch", "origin"], clone);
+    // A bare remote, as a real one is. Pushing to a non-bare repository makes
+    // Git emit warnings on stderr even on success, which simple-git can
+    // surface as a failure - that made this test flaky before.
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), "ngg-bare-"));
+    cleanup.push(bare);
+    git(["init", "--bare"], bare);
+
+    const clone = makeRepo();
+    cleanup.push(clone);
+    git(["remote", "add", "origin", bare], clone);
+    // Establish the upstream so a bare `git push` has a target.
+    git(["push", "-u", "origin", "main"], clone);
+
     fs.writeFileSync(path.join(clone, "new.txt"), "content");
     git(["add", "."], clone);
     git(["commit", "-m", "add"], clone);
-    git(["branch", "--set-upstream-to=origin/main", "main"], clone);
-    // Pushing to a checked-out branch is refused by default; make it a bare target.
-    git(["config", "receive.denyCurrentBranch", "ignore"], origin);
 
     const run = runRemoteOperationWithGit(() => "git");
     await expect(run("push", clone, {})).resolves.toBeNull();

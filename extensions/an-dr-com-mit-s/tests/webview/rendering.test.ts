@@ -31,7 +31,10 @@ const twoCommits: GitCommitNode[] = [
     email: "alice@example.com",
     date: 1700000000,
     message: "Add feature",
-    refs: [{ hash: "abc123", name: "main", type: "head" }]
+    refs: [
+      { hash: "abc123", name: "main", type: "head" },
+      { hash: "abc123", name: "v1.0.0", type: "tag" }
+    ]
   },
   {
     hash: "def456",
@@ -68,6 +71,21 @@ describe("webview rendering", () => {
 
   it("shows Load More Commits button when more commits are available", () => {
     expect(document.getElementById("loadMoreCommitsBtn")).not.toBeNull();
+  });
+
+  it("renders a tag ref through the shared tag pill", () => {
+    // Drives renderTagPill through the real commit-table render path rather
+    // than calling it directly, so a conversion that compiles but is never
+    // reached would still fail here.
+    const tag = document.querySelector('.gitRef.tag[data-name="v1.0.0"]');
+    expect(tag).not.toBeNull();
+    expect(tag?.getAttribute("data-drag-ref-type")).toBe("tag");
+    expect(tag?.querySelector('.gitRefName[data-fullref="v1.0.0"]')).not.toBeNull();
+  });
+
+  it("still renders non-tag refs with the branch markup", () => {
+    const head = document.querySelector('.gitRef.head[data-name="main"]');
+    expect(head).not.toBeNull();
   });
 
   it("routes rendered external links through the extension host", () => {

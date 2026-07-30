@@ -16,6 +16,7 @@ import { resolveFileIcon } from "./utils/fileIcons";
 import { arraysEqual, ELLIPSIS, refInvalid } from "./utils/git";
 import { escapeHtml, unescapeHtml } from "./utils/html";
 import { svgIcons } from "./utils/icons";
+import { renderTagPill } from "./utils/refPills";
 import { getVSCodeStyle, sendMessage, vscode } from "./utils/vscode";
 
 class GitGraphView {
@@ -418,15 +419,17 @@ class GitGraphView {
           this.commits[i].refs[j].type === "head" &&
           this.commits[i].refs[j].name === this.gitBranchHead;
         refHtml =
-          '<span class="gitRef ' +
-          this.commits[i].refs[j].type +
-          (refActive ? " active" : "") +
-          '" data-name="' +
-          refName +
-          '">' +
-          (this.commits[i].refs[j].type === "tag" ? svgIcons.tag : svgIcons.branch) +
-          refName +
-          "</span>";
+          this.commits[i].refs[j].type === "tag"
+            ? renderTagPill(this.commits[i].refs[j].name)
+            : '<span class="gitRef ' +
+              this.commits[i].refs[j].type +
+              (refActive ? " active" : "") +
+              '" data-name="' +
+              refName +
+              '">' +
+              svgIcons.branch +
+              refName +
+              "</span>";
         refs = refActive ? refHtml + refs : refs + refHtml;
       }
       html +=

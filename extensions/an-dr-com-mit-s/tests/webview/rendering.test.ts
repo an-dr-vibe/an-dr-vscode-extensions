@@ -19,6 +19,7 @@ const defaultViewState: GG.GitGraphViewState = {
   fetchAvatars: false,
   fileIcons: {},
   uiDensity: "Big",
+  refreshShortcutKey: "r",
   columnVisibility: { Committed: true, ID: true },
   graphColours: ["#0085d9"],
   graphStyle: "rounded",

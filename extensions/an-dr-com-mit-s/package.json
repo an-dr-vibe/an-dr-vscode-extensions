@@ -462,6 +462,40 @@
           },
           "additionalProperties": false,
           "description": "Which optional commit table columns are shown."
+        },
+        "an-dr-com-mit-s.keyboardShortcut.refresh": {
+          "type": "string",
+          "default": "CTRL/CMD + R",
+          "enum": [
+            "UNASSIGNED",
+            "CTRL/CMD + A",
+            "CTRL/CMD + B",
+            "CTRL/CMD + C",
+            "CTRL/CMD + D",
+            "CTRL/CMD + E",
+            "CTRL/CMD + F",
+            "CTRL/CMD + G",
+            "CTRL/CMD + H",
+            "CTRL/CMD + I",
+            "CTRL/CMD + J",
+            "CTRL/CMD + K",
+            "CTRL/CMD + L",
+            "CTRL/CMD + M",
+            "CTRL/CMD + N",
+            "CTRL/CMD + O",
+            "CTRL/CMD + P",
+            "CTRL/CMD + Q",
+            "CTRL/CMD + R",
+            "CTRL/CMD + S",
+            "CTRL/CMD + T",
+            "CTRL/CMD + U",
+            "CTRL/CMD + V",
+            "CTRL/CMD + W",
+            "CTRL/CMD + X",
+            "CTRL/CMD + Y",
+            "CTRL/CMD + Z"
+          ],
+          "description": "Keyboard shortcut that refreshes the Commits view while it has focus."
         }
       }
     }

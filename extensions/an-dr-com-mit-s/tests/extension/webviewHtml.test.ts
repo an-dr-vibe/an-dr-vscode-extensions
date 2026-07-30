@@ -24,6 +24,7 @@ function makeConfig(overrides: Partial<WebviewHtmlConfig> = {}): WebviewHtmlConf
     loadMoreCommits: () => 75,
     showCurrentBranchByDefault: () => false,
     uiDensity: () => "Normal",
+    refreshShortcutKey: () => "r",
     columnVisibility: () => ({ Committed: true, ID: true })
   };
   return { ...base, ...overrides };

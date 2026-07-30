@@ -1280,6 +1280,29 @@ let contextMenu = document.getElementById("contextMenu")!,
 let dialog = document.getElementById("dialog")!,
   dialogBacking = document.getElementById("dialogBacking")!,
   dialogMenuSource: HTMLElement | null = null;
+/**
+ * Refreshes on the configured Ctrl/Cmd chord. Registered on the document
+ * because the panel has no single focusable root, and skipped while a text
+ * field has focus so it cannot swallow a keystroke meant for typing.
+ */
+function observeRefreshShortcut(view: GitGraphView) {
+  const shortcut = viewState.refreshShortcutKey;
+  if (shortcut === null) {
+    return;
+  }
+  document.addEventListener("keydown", (e) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === shortcut) {
+      view.refresh(true);
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+}
+
 // Density is a body class so it applies to everything the stylesheet scopes
 // under it, without each renderer having to know the setting.
 if (viewState.uiDensity === "Normal") {
@@ -1308,6 +1331,7 @@ let gitGraph = new GitGraphView(
   vscode.getState()
 );
 observeExternalUrls();
+observeRefreshShortcut(gitGraph);
 
 /* Command Processing */
 window.addEventListener("message", (event) => {

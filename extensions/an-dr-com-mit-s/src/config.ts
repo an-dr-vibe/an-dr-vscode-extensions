@@ -106,6 +106,18 @@ export const config = {
     event.affectsConfiguration(getConfigKey("statusBarIconOnly")) ||
     event.affectsConfiguration(getConfigKey("statusBarIconOnly", TARGET_EXTENSION_ID)),
 
+  /**
+   * The letter of the refresh shortcut, lower-cased for comparison against a
+   * keyboard event, or null when unassigned. The setting stores a label like
+   * "CTRL/CMD + R"; only the letter is meaningful to the webview, which
+   * already knows the modifier is Ctrl or Cmd.
+   */
+  refreshShortcutKey: (): string | null => {
+    const setting = getConfig("keyboardShortcut.refresh", "CTRL/CMD + R");
+    const match = setting.match(/^CTRL\/CMD \+ ([A-Z])$/);
+    return match === null ? null : match[1].toLowerCase();
+  },
+
   uiDensity: (): UiDensity => getConfig("uiDensity", "Normal"),
   columnVisibility: (): ColumnVisibility => {
     const value = getConfig<Partial<ColumnVisibility>>("repository.commits.columnVisibility", {});

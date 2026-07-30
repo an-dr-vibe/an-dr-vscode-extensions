@@ -45,6 +45,7 @@ export type WebviewHtmlConfig = Pick<
   | "initialLoadCommits"
   | "loadMoreCommits"
   | "showCurrentBranchByDefault"
+  | "refreshShortcutKey"
   | "uiDensity"
 >;
 
@@ -77,6 +78,7 @@ export function buildWebviewHtml(opts: {
     fetchAvatars: config.fetchAvatars() && extensionState.isAvatarStorageAvailable(),
     fileIcons: loadFileIcons(),
     uiDensity: config.uiDensity(),
+    refreshShortcutKey: config.refreshShortcutKey(),
     columnVisibility: config.columnVisibility(),
     graphColours: config.graphColours(),
     graphStyle: config.graphStyle(),

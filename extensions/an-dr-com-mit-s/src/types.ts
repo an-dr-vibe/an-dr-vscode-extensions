@@ -21,6 +21,7 @@ export type GitGraphViewState = {
   fetchAvatars: boolean;
   fileIcons: Record<string, string>;
   uiDensity: "Big" | "Normal" | "Compact";
+  refreshShortcutKey: string | null;
   columnVisibility: { Committed: boolean; ID: boolean };
   graphColours: string[];
   graphStyle: GraphStyle;

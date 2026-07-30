@@ -6,6 +6,7 @@ import type * as GG from "@/types";
 import { createVscodeMock, receive, setupHtml } from "./setup";
 
 const REPO = "/workspace/my-repo";
+let vscodeMock: ReturnType<typeof createVscodeMock>;
 
 function makeViewState(overrides: Partial<GG.GitGraphViewState> = {}): GG.GitGraphViewState {
   return {
@@ -18,6 +19,7 @@ function makeViewState(overrides: Partial<GG.GitGraphViewState> = {}): GG.GitGra
     fetchAvatars: false,
     fileIcons: {},
     uiDensity: "Big",
+    refreshShortcutKey: "r",
     columnVisibility: { Committed: true, ID: true },
     graphColours: ["#0085d9"],
     graphStyle: "rounded",
@@ -46,7 +48,7 @@ const commits: GitCommitNode[] = [
 /** Boots the real webview against a view state and renders one commit. */
 async function render(viewState: GG.GitGraphViewState) {
   vi.resetModules();
-  createVscodeMock();
+  vscodeMock = createVscodeMock();
   setupHtml(viewState);
   await import("@/webview/main");
   receive({ command: "loadBranches", branches: ["main"], head: "main", hard: true, isRepo: true });
@@ -57,6 +59,13 @@ async function render(viewState: GG.GitGraphViewState) {
     moreCommitsAvailable: false,
     hard: true
   });
+}
+
+/** Dispatches a keydown as the given element, or the document body. */
+function press(key: string, options: KeyboardEventInit = {}, target?: Element) {
+  (target ?? document.body).dispatchEvent(
+    new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...options })
+  );
 }
 
 describe("tab appearance", () => {
@@ -115,5 +124,63 @@ describe("tab appearance", () => {
       expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(3);
       expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(3);
     });
+  });
+});
+
+describe("refresh shortcut", () => {
+  it("refreshes on the configured chord", async () => {
+    await render(makeViewState({ refreshShortcutKey: "r" }));
+    const before = vscodeMock.sentMessages.length;
+
+    press("r", { ctrlKey: true });
+
+    expect(vscodeMock.sentMessages.length).toBeGreaterThan(before);
+  });
+
+  it("accepts the Cmd modifier as well as Ctrl", async () => {
+    await render(makeViewState({ refreshShortcutKey: "r" }));
+    const before = vscodeMock.sentMessages.length;
+
+    press("r", { metaKey: true });
+
+    expect(vscodeMock.sentMessages.length).toBeGreaterThan(before);
+  });
+
+  it("ignores the key without a modifier", async () => {
+    await render(makeViewState({ refreshShortcutKey: "r" }));
+    const before = vscodeMock.sentMessages.length;
+
+    press("r");
+
+    expect(vscodeMock.sentMessages.length).toBe(before);
+  });
+
+  it("ignores a different letter", async () => {
+    await render(makeViewState({ refreshShortcutKey: "r" }));
+    const before = vscodeMock.sentMessages.length;
+
+    press("q", { ctrlKey: true });
+
+    expect(vscodeMock.sentMessages.length).toBe(before);
+  });
+
+  it("registers nothing when the shortcut is unassigned", async () => {
+    await render(makeViewState({ refreshShortcutKey: null }));
+    const before = vscodeMock.sentMessages.length;
+
+    press("r", { ctrlKey: true });
+
+    expect(vscodeMock.sentMessages.length).toBe(before);
+  });
+
+  it("does not steal the chord while typing in a text field", async () => {
+    await render(makeViewState({ refreshShortcutKey: "r" }));
+    const input = document.createElement("input");
+    document.body.append(input);
+    const before = vscodeMock.sentMessages.length;
+
+    press("r", { ctrlKey: true }, input);
+
+    expect(vscodeMock.sentMessages.length).toBe(before);
   });
 });

@@ -108,8 +108,21 @@ Two levels, both cheap:
 - Confirm the code reaches the shipped bundle:
   `npm run compile && grep -c "gitRef tag" out/web.min.js`.
 
-For anything with visual output, also open the panel once and look at it. No
-automated check in this repository can see the webview's rendered pixels.
+**If the conversion emits new class names, check they are actually styled.**
+No test in this repository can see rendered pixels, so unstyled markup passes
+every gate. The avatar conversion emitted `initials`, `circle`, `square`,
+`small`, `normal` and `empty`; none existed in `media/main.css`, which left two
+of its settings declared but visually inert. Grep the stylesheet for each new
+class before calling the conversion done:
+
+```sh
+for c in initials circle square; do printf "%s " "$c"; grep -c "\.$c\b" media/main.css; done
+```
+
+Avatar-style CSS in the old tree is authored (`+`) and portable, but check with
+`--annotate` before moving any of it.
+
+For anything with visual output, also open the panel once and look at it.
 
 ### 6. Run the gates
 
@@ -119,6 +132,11 @@ npm run typecheck && npm run lint && npm run format && npm test
 
 Then the reachability check from the roadmap: for each newly exported symbol,
 if its only references are its own file and its own test, it is dead.
+
+One nuance: a symbol whose same-file reference is a real call from a sibling
+function is reachable, not dead — `getAuthorVisual` is called by
+`renderAuthorVisualHtml` beside it. Read the match before acting on the count;
+only a match that is nothing but the definition means dead.
 
 ```sh
 grep -rl "renderTagPill" src tests | grep -v node_modules

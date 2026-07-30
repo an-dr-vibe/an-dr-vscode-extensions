@@ -67,4 +67,17 @@ describe("ExtensionState compatibility", () => {
     expect(state.getRepos()).toEqual({ "C:/versioned": { columnWidths: null } });
     expect(state.getLastActiveRepo()).toBe("C:/versioned");
   });
+
+  it("stores external repository paths under a versioned key", () => {
+    const workspaceState = createMemento({ "v2.externalRepos": ["C:/existing"] });
+    const state = new ExtensionState({
+      globalState: createMemento({}),
+      workspaceState,
+      globalStoragePath: storagePath
+    } as never);
+
+    expect(state.getExternalRepos()).toEqual(["C:/existing"]);
+    state.saveExternalRepos(["C:/new"]);
+    expect(workspaceState.update).toHaveBeenCalledWith("v2.externalRepos", ["C:/new"]);
+  });
 });

@@ -10,6 +10,7 @@ const AVATAR_STORAGE_FOLDER = "/avatars";
 const AVATAR_CACHE = "avatarCache";
 const LEGACY_LAST_ACTIVE_REPO = "lastActiveRepo";
 const LEGACY_REPO_STATES = "repoStates";
+const EXTERNAL_REPOS = getVersionedStateKey("externalRepos");
 const LAST_ACTIVE_REPO = getVersionedStateKey(LEGACY_LAST_ACTIVE_REPO);
 const REPO_STATES = getVersionedStateKey(LEGACY_REPO_STATES);
 
@@ -45,6 +46,12 @@ export class ExtensionState {
   }
   public saveRepos(gitRepoSet: GitRepoSet) {
     this.workspaceState.update(REPO_STATES, gitRepoSet);
+  }
+  public getExternalRepos() {
+    return this.workspaceState.get<string[]>(EXTERNAL_REPOS, []);
+  }
+  public saveExternalRepos(repos: string[]) {
+    this.workspaceState.update(EXTERNAL_REPOS, repos);
   }
 
   /* Last Active Repo */

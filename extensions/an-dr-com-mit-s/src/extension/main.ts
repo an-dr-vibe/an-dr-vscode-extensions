@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { findGitRepos } from "@/backend/queries/repoSearch";
 import { getGitVersion } from "@/backend/utils/git";
 import { config } from "@/config";
+import { getVersionedStateKey } from "@/extension/constant/const";
 import { initExtension } from "@/extension/initExtension";
 import { logger } from "@/extension/utils/logger";
 import { watchForRepos } from "@/extension/watchForRepos";
@@ -25,7 +26,9 @@ export async function activate(ctx: vscode.ExtensionContext) {
 
   const paths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
   logger.log(`Searching workspace for new repos (${paths.length} folder(s)) ...`);
-  const repoDirs = await findGitRepos(paths, gitPath, config.maxDepthOfRepoSearch());
+  const discovered = await findGitRepos(paths, gitPath, config.maxDepthOfRepoSearch());
+  const savedExternal = ctx.workspaceState.get<string[]>(getVersionedStateKey("externalRepos"), []);
+  const repoDirs = mergeStartupRepos(discovered, savedExternal);
 
   if (repoDirs.length > 0) {
     logger.log(`Found ${repoDirs.length} repo(s)`);
@@ -40,3 +43,8 @@ export async function activate(ctx: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
+
+/** Merges workspace discoveries with repositories persisted outside the workspace. */
+export function mergeStartupRepos(discovered: string[], savedExternal: string[]) {
+  return [...new Set([...discovered, ...savedExternal])];
+}

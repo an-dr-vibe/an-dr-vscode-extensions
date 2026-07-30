@@ -2,10 +2,11 @@ import * as vscode from "vscode";
 
 import { findGitRepos } from "@/backend/queries/repoSearch";
 import { config } from "@/config";
-import { EXTENSION_NAME, getConfigKey } from "@/extension/constant/const";
+import { EXTENSION_NAME, getConfigKey, getVersionedStateKey } from "@/extension/constant/const";
 import type { InitExtension } from "@/extension/initExtension";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerPublicCommands } from "@/extension/publicCommands";
+import { selectGitRepository } from "@/extension/repositoryCommands";
 import { StatusBarItem } from "@/statusBarItem";
 
 type WatcherState = {
@@ -62,7 +63,18 @@ export function watchForRepos(
     }),
     ...registerPublicCommands(ctx, {
       view: () => showMissingRepo(),
-      clearAvatarCache: () => showMissingRepo()
+      clearAvatarCache: () => showMissingRepo(),
+      addGitRepository: async () => {
+        const repo = await selectGitRepository(config);
+        if (repo === null || state.disposed) {
+          return;
+        }
+        const key = getVersionedStateKey("externalRepos");
+        const existing = ctx.workspaceState.get<string[]>(key, []);
+        await ctx.workspaceState.update(key, [...new Set([...existing, repo])]);
+        dispose(state);
+        onReposFound(ctx, [repo], statusBarItem);
+      }
     })
   );
 

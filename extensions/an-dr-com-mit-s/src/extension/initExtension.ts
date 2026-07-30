@@ -19,6 +19,7 @@ import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerMessageHandlers } from "@/extension/messageHandler";
 import { registerPublicCommands } from "@/extension/publicCommands";
 import { createRepoManager, RepoManager } from "@/extension/repoManager";
+import { createRepositoryCommands } from "@/extension/repositoryCommands";
 import { logger } from "@/extension/utils/logger";
 import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
 import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";
@@ -128,6 +129,7 @@ export function initExtension(
     const repoManager = createRepoManager(extensionState, statusBarItem, config);
     repoManager.setRepos(repos);
     repoManager.sendRepos();
+    void repoManager.checkReposExist();
     const gitStatusMonitor = new GitStatusMonitor(
       dataSource,
       extensionState,
@@ -145,7 +147,12 @@ export function initExtension(
       gitStatusMonitor
     );
     ctx.subscriptions.push(
-      ...registerPublicCommands(ctx, {}, dataSource, new Set(["view", "clearAvatarCache"]))
+      ...registerPublicCommands(
+        ctx,
+        createRepositoryCommands(repoManager, gitStatusMonitor, config),
+        dataSource,
+        new Set(["view", "clearAvatarCache"])
+      )
     );
 
     const gitWatcher = vscode.workspace.createFileSystemWatcher("**/.git");

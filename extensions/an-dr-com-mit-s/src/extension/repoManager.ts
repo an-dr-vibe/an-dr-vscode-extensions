@@ -20,12 +20,13 @@ export function createRepoManager(
   config: Config
 ) {
   let repos = extensionState.getRepos();
+  const externalRepos = new Set(extensionState.getExternalRepos());
   let viewCallback: ((repos: GitRepoSet, numRepos: number) => void) | null = null;
   const repoListeners = new Set<(repos: GitRepoSet) => void>();
 
   function setRepos(repoDirs: string[]) {
     const next: GitRepoSet = {};
-    for (const repo of repoDirs) {
+    for (const repo of [...repoDirs, ...externalRepos]) {
       next[repo] = repos[repo] ?? { columnWidths: null };
     }
     repos = next;
@@ -56,6 +57,9 @@ export function createRepoManager(
 
   function removeRepo(repo: string) {
     delete repos[repo];
+    if (externalRepos.delete(repo)) {
+      extensionState.saveExternalRepos([...externalRepos]);
+    }
     extensionState.saveRepos(repos);
   }
 
@@ -77,7 +81,11 @@ export function createRepoManager(
     return false;
   }
 
-  function addRepo(repo: string) {
+  function addRepo(repo: string, external = false) {
+    if (external && !externalRepos.has(repo)) {
+      externalRepos.add(repo);
+      extensionState.saveExternalRepos([...externalRepos]);
+    }
     if (repos[repo]) {
       return false;
     }

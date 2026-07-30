@@ -154,4 +154,37 @@ describe("GitStatusMonitor", () => {
     });
     monitor.dispose();
   });
+
+  it("falls back to the repository containing the active editor", async () => {
+    const repos = createRepoManager({
+      "C:/alpha": { columnWidths: null },
+      "C:/zeta": { columnWidths: null }
+    });
+    let activeFile = "C:/zeta/src/file.ts";
+    let editorListener: (() => void) | null = null;
+    const monitor = new GitStatusMonitor(
+      {
+        getHeadInfo: vi.fn(() => Promise.resolve(null)),
+        getStatusCounts: vi.fn(() => Promise.resolve({ modified: 0, deleted: 0 }))
+      } as unknown as DataSource,
+      {
+        getLastActiveRepo: () => null,
+        setLastActiveRepo: vi.fn()
+      } as unknown as ExtensionState,
+      repos.manager,
+      { setRepoStatus: vi.fn() } as unknown as StatusBarItem,
+      () => createWatcher(),
+      () => activeFile,
+      (listener) => {
+        editorListener = listener;
+        return { dispose: vi.fn() };
+      }
+    );
+
+    await vi.waitFor(() => expect(monitor.getStatus().repo).toBe("C:/zeta"));
+    activeFile = "C:/alpha/README.md";
+    editorListener?.();
+    await vi.waitFor(() => expect(monitor.getStatus().repo).toBe("C:/alpha"));
+    monitor.dispose();
+  });
 });

@@ -1,3 +1,7 @@
+import * as path from "node:path";
+
+import * as vscode from "vscode";
+
 import type { GitChangeCounts } from "@/data-source/models";
 import { DataSource } from "@/dataSource";
 import { RepoManager } from "@/extension/repoManager";
@@ -21,6 +25,7 @@ interface RepoStatus {
 export class GitStatusMonitor {
   private readonly watcher: StatusWatcher;
   private readonly reposSubscription: { dispose(): void };
+  private readonly editorSubscription: { dispose(): void };
   private selectedRepo: string | null;
   private activeRepo: string | null = null;
   private branchName: string | null = null;
@@ -33,11 +38,16 @@ export class GitStatusMonitor {
     private readonly repoManager: RepoManager,
     private readonly statusBarItem: StatusBarItem,
     createWatcher: (onChange: () => void) => StatusWatcher = (onChange) =>
-      new RepoFileWatcher(onChange)
+      new RepoFileWatcher(onChange),
+    private readonly getActiveFile: () => string | null = () =>
+      vscode.window.activeTextEditor?.document.uri.fsPath ?? null,
+    onDidChangeActiveFile: (listener: () => void) => { dispose(): void } = (listener) =>
+      vscode.window.onDidChangeActiveTextEditor?.(listener) ?? { dispose: () => {} }
   ) {
     this.selectedRepo = extensionState.getLastActiveRepo();
     this.watcher = createWatcher(() => void this.refresh());
     this.reposSubscription = repoManager.onDidChangeRepos(() => this.syncActiveRepo());
+    this.editorSubscription = onDidChangeActiveFile(() => this.syncActiveRepo());
     this.syncActiveRepo();
   }
 
@@ -62,17 +72,19 @@ export class GitStatusMonitor {
     this.activeRepo = null;
     this.watcher.stop();
     this.reposSubscription.dispose();
+    this.editorSubscription.dispose();
   }
 
   private syncActiveRepo() {
     const repos = this.repoManager.getRepos();
     if (this.selectedRepo !== null && !(this.selectedRepo in repos)) {
       this.selectedRepo = null;
+      this.extensionState.setLastActiveRepo(null);
     }
     const next =
       this.selectedRepo !== null && this.selectedRepo in repos
         ? this.selectedRepo
-        : (getSortedRepositoryPaths(repos)[0] ?? null);
+        : (this.getRepoForActiveFile(repos) ?? getSortedRepositoryPaths(repos)[0] ?? null);
     if (next === this.activeRepo) {
       return;
     }
@@ -88,6 +100,21 @@ export class GitStatusMonitor {
     }
     this.watcher.start(next);
     void this.refresh();
+  }
+
+  private getRepoForActiveFile(repos: ReturnType<RepoManager["getRepos"]>) {
+    const file = this.getActiveFile();
+    if (file === null) {
+      return null;
+    }
+    return (
+      getSortedRepositoryPaths(repos)
+        .filter((repo) => {
+          const relative = path.relative(repo, file);
+          return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+        })
+        .toSorted((a, b) => b.length - a.length)[0] ?? null
+    );
   }
 
   private async refresh() {

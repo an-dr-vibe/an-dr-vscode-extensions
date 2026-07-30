@@ -430,6 +430,38 @@
             "Show no indicator."
           ],
           "description": "How the working-tree state is indicated in the status bar."
+        },
+        "an-dr-com-mit-s.uiDensity": {
+          "type": "string",
+          "default": "Normal",
+          "enum": [
+            "Big",
+            "Normal",
+            "Compact"
+          ],
+          "enumDescriptions": [
+            "Full size.",
+            "Denser commit rows and refs.",
+            "Densest commit rows and refs."
+          ],
+          "description": "Density of the commit graph content. Toolbar and dialog controls keep their normal size."
+        },
+        "an-dr-com-mit-s.repository.commits.columnVisibility": {
+          "type": "object",
+          "default": {
+            "Committed": true,
+            "ID": true
+          },
+          "properties": {
+            "Committed": {
+              "type": "boolean"
+            },
+            "ID": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Which optional commit table columns are shown."
         }
       }
     }

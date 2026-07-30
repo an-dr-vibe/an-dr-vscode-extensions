@@ -6,6 +6,81 @@ body {
 body.unableToLoad {
   margin: 0 20px;
 }
+
+/*
+ * Optional content density, applied as a body class from the uiDensity
+ * setting. Toolbar and dialog dimensions stay unchanged on purpose: only
+ * content that repeats per commit shrinks, so the controls stay clickable.
+ */
+body.compactUi #commitTable th,
+body.compactUi #commitTable td {
+  font-size: 12px;
+}
+body.compactUi #commitTable td {
+  line-height: 20px;
+}
+body.compactUi #commitTable th {
+  line-height: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+body.compactUi .commit .avatar.normal {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+body.compactUi .commit .avatar.small {
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+}
+body.compactUi .gitRef,
+body.compactUi .gitRefName {
+  height: 17px;
+  line-height: 17px;
+}
+body.compactUi .gitRef {
+  font-size: 11px;
+}
+body.compactUi #commitDetails {
+  font-size: 11px;
+  line-height: 14px;
+}
+
+body.extraCompactUi #commitTable th,
+body.extraCompactUi #commitTable td {
+  font-size: 11px;
+}
+body.extraCompactUi #commitTable td {
+  line-height: 18px;
+}
+body.extraCompactUi #commitTable th {
+  line-height: 14px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+body.extraCompactUi .commit .avatar.normal {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+body.extraCompactUi .commit .avatar.small {
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+}
+body.extraCompactUi .gitRef,
+body.extraCompactUi .gitRefName {
+  height: 15px;
+  line-height: 15px;
+}
+body.extraCompactUi .gitRef {
+  font-size: 10px;
+}
+body.extraCompactUi #commitDetails {
+  font-size: 10px;
+  line-height: 13px;
+}
 body.unableToLoad h2,
 body.unableToLoad p {
   text-align: center;

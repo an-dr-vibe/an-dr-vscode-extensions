@@ -20,6 +20,8 @@ export type GitGraphViewState = {
   dateFormat: DateFormat;
   fetchAvatars: boolean;
   fileIcons: Record<string, string>;
+  uiDensity: "Big" | "Normal" | "Compact";
+  columnVisibility: { Committed: boolean; ID: boolean };
   graphColours: string[];
   graphStyle: GraphStyle;
   initialLoadCommits: number;

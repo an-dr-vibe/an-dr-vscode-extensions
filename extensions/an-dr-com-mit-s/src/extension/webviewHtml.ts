@@ -41,6 +41,8 @@ export function buildWebviewHtml(opts: {
     dateFormat: config.dateFormat(),
     fetchAvatars: config.fetchAvatars() && extensionState.isAvatarStorageAvailable(),
     fileIcons: loadFileIcons(),
+    uiDensity: config.uiDensity(),
+    columnVisibility: config.columnVisibility(),
     graphColours: config.graphColours(),
     graphStyle: config.graphStyle(),
     initialLoadCommits: config.initialLoadCommits(),

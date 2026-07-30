@@ -10,6 +10,12 @@ type TabIconColourTheme = "colour" | "grey";
 /** Where extended blame information appears on hover. */
 export type BlameHoverMode = "off" | "inline-status" | "inline" | "status";
 
+/** Density of repeating commit-graph content. */
+export type UiDensity = "Big" | "Normal" | "Compact";
+
+/** Which optional commit table columns are shown. */
+export type ColumnVisibility = { Committed: boolean; ID: boolean };
+
 /** How the working-tree state is shown in the status bar. */
 type DirtyIndicator = "+N -M" | "*" | "none";
 type CommittedVisual = "Avatar" | "Initials";
@@ -99,6 +105,16 @@ export const config = {
   affectsStatusBarIconOnly: (event: vscode.ConfigurationChangeEvent): boolean =>
     event.affectsConfiguration(getConfigKey("statusBarIconOnly")) ||
     event.affectsConfiguration(getConfigKey("statusBarIconOnly", TARGET_EXTENSION_ID)),
+
+  uiDensity: (): UiDensity => getConfig("uiDensity", "Normal"),
+  columnVisibility: (): ColumnVisibility => {
+    const value = getConfig<Partial<ColumnVisibility>>("repository.commits.columnVisibility", {});
+    // A partially written object must not hide a column the user never named.
+    return { Committed: value.Committed !== false, ID: value.ID !== false };
+  },
+  affectsTabAppearance: (event: vscode.ConfigurationChangeEvent): boolean =>
+    event.affectsConfiguration(getConfigKey("uiDensity")) ||
+    event.affectsConfiguration(getConfigKey("repository.commits.columnVisibility")),
 
   logLevel: (): LogLevel => getConfig("logLevel", "Info"),
   statusBarDirtyIndicator: (): DirtyIndicator => getConfig("statusBarItem.dirtyIndicator", "+N -M"),

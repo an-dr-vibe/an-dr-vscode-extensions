@@ -408,7 +408,13 @@ class GitGraphView {
     this.graph.render(this.expandedCommit);
   }
   private renderTable() {
-    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${l10n.graph}</th><th class="tableColHeader">${l10n.description}</th><th class="tableColHeader">${l10n.date}</th><th class="tableColHeader">${l10n.author}</th><th class="tableColHeader">${l10n.commit}</th></tr>`,
+    const showCommitted = viewState.columnVisibility.Committed;
+    const showId = viewState.columnVisibility.ID;
+    let html =
+        `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${l10n.graph}</th><th class="tableColHeader">${l10n.description}</th><th class="tableColHeader">${l10n.date}</th>` +
+        (showCommitted ? `<th class="tableColHeader">${l10n.author}</th>` : "") +
+        (showId ? `<th class="tableColHeader">${l10n.commit}</th>` : "") +
+        "</tr>",
       i;
     for (i = 0; i < this.commits.length; i++) {
       let refs = "",
@@ -458,23 +464,30 @@ class GitGraphView {
         date.title +
         '">' +
         date.value +
-        '</td><td title="' +
-        escapeHtml(this.commits[i].author + " <" + this.commits[i].email + ">") +
-        '">' +
-        renderAuthorVisualHtml(
-          this.config,
-          this.commits[i].author,
-          this.commits[i].email,
-          typeof this.avatars[this.commits[i].email] === "string"
-            ? this.avatars[this.commits[i].email]
-            : null
-        ) +
-        escapeHtml(this.commits[i].author) +
-        '</td><td title="' +
-        escapeHtml(this.commits[i].hash) +
-        '">' +
-        abbrevCommit(this.commits[i].hash) +
-        "</td></tr>";
+        "</td>" +
+        (showCommitted
+          ? '<td title="' +
+            escapeHtml(this.commits[i].author + " <" + this.commits[i].email + ">") +
+            '">' +
+            renderAuthorVisualHtml(
+              this.config,
+              this.commits[i].author,
+              this.commits[i].email,
+              typeof this.avatars[this.commits[i].email] === "string"
+                ? this.avatars[this.commits[i].email]
+                : null
+            ) +
+            escapeHtml(this.commits[i].author) +
+            "</td>"
+          : "") +
+        (showId
+          ? '<td title="' +
+            escapeHtml(this.commits[i].hash) +
+            '">' +
+            abbrevCommit(this.commits[i].hash) +
+            "</td>"
+          : "") +
+        "</tr>";
     }
     this.tableElem.innerHTML = "<table>" + html + "</table>";
     this.footerElem.innerHTML = this.moreCommitsAvailable
@@ -931,11 +944,15 @@ class GitGraphView {
       date.title +
       '">' +
       date.value +
+      "</td>" +
       // These asterisks are placeholder display text for the author and
       // commit columns, which have no value until the changes are committed.
       // They are deliberately not UNCOMMITTED: that constant is the commit
-      // hash sentinel, and the two only coincide by accident.
-      '</td><td title="* <>">*</td><td title="*">*</td>';
+      // hash sentinel, and the two only coincide by accident. Both cells are
+      // omitted when their column is hidden, or this row would not line up
+      // with the rest of the table.
+      (viewState.columnVisibility.Committed ? '<td title="* <>">*</td>' : "") +
+      (viewState.columnVisibility.ID ? '<td title="*">*</td>' : "");
   }
   private renderShowLoading() {
     hideDialogAndContextMenu();
@@ -1263,6 +1280,14 @@ let contextMenu = document.getElementById("contextMenu")!,
 let dialog = document.getElementById("dialog")!,
   dialogBacking = document.getElementById("dialogBacking")!,
   dialogMenuSource: HTMLElement | null = null;
+// Density is a body class so it applies to everything the stylesheet scopes
+// under it, without each renderer having to know the setting.
+if (viewState.uiDensity === "Normal") {
+  document.body.classList.add("compactUi");
+} else if (viewState.uiDensity === "Compact") {
+  document.body.classList.add("compactUi", "extraCompactUi");
+}
+
 let gitGraph = new GitGraphView(
   viewState.repos,
   viewState.lastActiveRepo,

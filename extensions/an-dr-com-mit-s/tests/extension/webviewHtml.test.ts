@@ -22,7 +22,9 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     graphStyle: () => "rounded",
     initialLoadCommits: () => 300,
     loadMoreCommits: () => 75,
-    showCurrentBranchByDefault: () => false
+    showCurrentBranchByDefault: () => false,
+    uiDensity: () => "Normal",
+    columnVisibility: () => ({ Committed: true, ID: true })
   };
   return { ...base, ...overrides };
 }

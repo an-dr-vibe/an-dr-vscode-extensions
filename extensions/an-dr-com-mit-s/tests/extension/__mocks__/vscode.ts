@@ -38,3 +38,35 @@ export const l10n = {
   t: (message: string, ...args: unknown[]) =>
     message.replace(/\{(\d+)\}/g, (_match, index: string) => String(args[Number(index)]))
 };
+
+/**
+ * Enough of `vscode.Uri` for code that builds paths and hands them to a
+ * webview. `toString()` returns the path so assertions can match on it.
+ */
+export const Uri = {
+  file: (fsPath: string) => ({
+    scheme: "file",
+    fsPath,
+    path: fsPath,
+    toString: () => fsPath
+  }),
+  joinPath: (base: { fsPath: string }, ...parts: string[]) =>
+    Uri.file([base.fsPath, ...parts].join("/"))
+};
+
+/**
+ * A stand-in for the webview a panel owns. `asWebviewUri` mirrors the real
+ * one's job — rewriting a local path into a URI the webview may load — using a
+ * recognisable scheme so tests can assert the rewrite happened.
+ */
+export function createWebviewStub(cspSource = "vscode-webview://test") {
+  return {
+    cspSource,
+    asWebviewUri: (uri: { toString(): string }) => ({
+      toString: () => `https://file+.vscode-resource/${uri.toString()}`
+    }),
+    postMessage: () => Promise.resolve(true),
+    onDidReceiveMessage: () => ({ dispose: () => {} }),
+    html: ""
+  };
+}

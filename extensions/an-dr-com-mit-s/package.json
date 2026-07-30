@@ -94,17 +94,20 @@
       {
         "category": "an-dr: Commits (MIT)",
         "command": "an-dr-com-mit-s.fetch",
-        "title": "%command.fetch%"
+        "title": "%command.fetch%",
+        "icon": "$(cloud-download)"
       },
       {
         "category": "an-dr: Commits (MIT)",
         "command": "an-dr-com-mit-s.pull",
-        "title": "%command.pull%"
+        "title": "%command.pull%",
+        "icon": "$(arrow-down)"
       },
       {
         "category": "an-dr: Commits (MIT)",
         "command": "an-dr-com-mit-s.push",
-        "title": "%command.push%"
+        "title": "%command.push%",
+        "icon": "$(arrow-up)"
       },
       {
         "category": "an-dr: Commits (MIT)",
@@ -128,6 +131,21 @@
           "command": "an-dr-com-mit-s.view",
           "group": "navigation",
           "when": "scmProvider == git"
+        },
+        {
+          "command": "an-dr-com-mit-s.fetch",
+          "group": "navigation",
+          "when": "scmProvider == git && config.an-dr-com-mit-s.scmButtons.fetch"
+        },
+        {
+          "command": "an-dr-com-mit-s.pull",
+          "group": "navigation",
+          "when": "scmProvider == git && config.an-dr-com-mit-s.scmButtons.pull"
+        },
+        {
+          "command": "an-dr-com-mit-s.push",
+          "group": "navigation",
+          "when": "scmProvider == git && config.an-dr-com-mit-s.scmButtons.push"
         }
       ]
     },
@@ -139,6 +157,21 @@
           "type": "boolean",
           "default": true,
           "description": "%config.autoCenterCommitDetailsView%"
+        },
+        "an-dr-com-mit-s.scmButtons.fetch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a Fetch button in the Source Control panel title bar."
+        },
+        "an-dr-com-mit-s.scmButtons.pull": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a Pull button in the Source Control panel title bar."
+        },
+        "an-dr-com-mit-s.scmButtons.push": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a Push button in the Source Control panel title bar."
         },
         "an-dr-com-mit-s.repository.commits.committedVisual": {
           "type": "string",

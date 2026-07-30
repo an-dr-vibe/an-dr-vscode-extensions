@@ -31,12 +31,17 @@ export const extensions = {
 };
 
 export const env = {
-  language: "en"
+  language: "en",
+  clipboard: {
+    writeText: () => Promise.resolve()
+  }
 };
 
 export const l10n = {
   t: (message: string, ...args: unknown[]) =>
-    message.replace(/\{(\d+)\}/g, (_match, index: string) => String(args[Number(index)]))
+    message.replace(/\{(\d+)\}/g, (match, index: string) =>
+      args[Number(index)] === undefined ? match : String(args[Number(index)])
+    )
 };
 
 /**
@@ -60,13 +65,23 @@ export const Uri = {
  * recognisable scheme so tests can assert the rewrite happened.
  */
 export function createWebviewStub(cspSource = "vscode-webview://test") {
+  const postedMessages: unknown[] = [];
+  let messageHandler: ((message: unknown) => void | Promise<void>) | undefined;
   return {
     cspSource,
     asWebviewUri: (uri: { toString(): string }) => ({
       toString: () => `https://file+.vscode-resource/${uri.toString()}`
     }),
-    postMessage: () => Promise.resolve(true),
-    onDidReceiveMessage: () => ({ dispose: () => {} }),
+    postMessage: (message: unknown) => {
+      postedMessages.push(message);
+      return Promise.resolve(true);
+    },
+    onDidReceiveMessage: (handler: (message: unknown) => void | Promise<void>) => {
+      messageHandler = handler;
+      return { dispose: () => {} };
+    },
+    receiveMessage: async (message: unknown) => messageHandler?.(message),
+    postedMessages,
     html: ""
   };
 }

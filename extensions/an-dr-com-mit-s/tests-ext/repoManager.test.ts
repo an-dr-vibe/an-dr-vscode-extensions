@@ -25,27 +25,47 @@ async function removeRepoDirectory(repo: string) {
   }
 }
 
-function makeManager(initialRepos: GitRepoSet = {}) {
-  const store = { repos: { ...initialRepos } };
+/**
+ * The members of the real collaborators that createRepoManager actually uses.
+ * Declared as Pick<> rather than cast through `unknown`, so adding a
+ * dependency to createRepoManager fails this file at compile time instead of
+ * at runtime — the external-repo API was added without updating this stub and
+ * broke every test in the suite before that was caught.
+ */
+type RepoManagerState = Pick<
+  ExtensionState,
+  "getRepos" | "saveRepos" | "getExternalRepos" | "saveExternalRepos"
+>;
+type RepoManagerStatusBar = Pick<StatusBarItem, "setNumRepos">;
+type RepoManagerConfig = Pick<Config, "gitPath">;
+
+function makeManager(initialRepos: GitRepoSet = {}, initialExternalRepos: string[] = []) {
+  const store = { repos: { ...initialRepos }, externalRepos: [...initialExternalRepos] };
   let saveCount = 0;
-  const extensionState = {
+  const extensionState: RepoManagerState = {
     getRepos: () => store.repos,
     saveRepos: (r: GitRepoSet) => {
       store.repos = r;
       saveCount++;
+    },
+    getExternalRepos: () => store.externalRepos,
+    saveExternalRepos: (repos: string[]) => {
+      store.externalRepos = repos;
     }
   };
-  const statusBar = {
+  // StatusBarItem is a class with private fields, so a structural Pick cannot
+  // be asserted to it directly; this one still needs the wider cast.
+  const statusBar: RepoManagerStatusBar & { lastCount: number } = {
     lastCount: -1,
     setNumRepos(n: number) {
       this.lastCount = n;
     }
   };
-  const config = { gitPath: () => "git" };
+  const config: RepoManagerConfig = { gitPath: () => "git" };
   const manager = createRepoManager(
-    extensionState as unknown as ExtensionState,
+    extensionState as ExtensionState,
     statusBar as unknown as StatusBarItem,
-    config as unknown as Config
+    config as Config
   );
   return { manager, store, statusBar, getSaveCount: () => saveCount };
 }

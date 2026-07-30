@@ -28,6 +28,7 @@ import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
 import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";
 import { ExtensionState } from "@/extensionState";
 import { GitStatusMonitor } from "@/gitStatusMonitor";
+import { InlineBlameController } from "@/inlineBlame";
 import { RepoFileWatcher } from "@/repoFileWatcher";
 import { StatusBarItem } from "@/statusBarItem";
 import { showErrorMessage } from "@/utils";
@@ -140,6 +141,7 @@ export function initExtension(
       statusBarItem
     );
     ctx.subscriptions.push(gitStatusMonitor);
+    ctx.subscriptions.push(new InlineBlameController(dataSource, repoManager, config));
     registerViewCommand(
       ctx,
       repoManager,

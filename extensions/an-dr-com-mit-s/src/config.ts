@@ -5,6 +5,9 @@ import { EXTENSION_ID, getConfigKey, TARGET_EXTENSION_ID } from "./extension/con
 import { DateFormat, GraphStyle } from "./types";
 
 type TabIconColourTheme = "colour" | "grey";
+
+/** Where extended blame information appears on hover. */
+export type BlameHoverMode = "off" | "inline-status" | "inline" | "status";
 type CommittedVisual = "Avatar" | "Initials";
 type AvatarMode =
   | "Auto (Fetched then Pattern)"
@@ -91,7 +94,34 @@ export const config = {
   gitPath: (): string => vscode.workspace.getConfiguration("git").get("path", null) ?? "git",
   affectsStatusBarIconOnly: (event: vscode.ConfigurationChangeEvent): boolean =>
     event.affectsConfiguration(getConfigKey("statusBarIconOnly")) ||
-    event.affectsConfiguration(getConfigKey("statusBarIconOnly", TARGET_EXTENSION_ID))
+    event.affectsConfiguration(getConfigKey("statusBarIconOnly", TARGET_EXTENSION_ID)),
+
+  /* Inline blame */
+
+  /**
+   * Inline blame is on when either key is set, so the deprecated alias keeps
+   * working for anyone who set it before the rename.
+   */
+  inlineBlameEnabled: (): boolean =>
+    getConfig("blame.inlineMessageEnabled", false) || getConfig("inlineBlame.enabled", false),
+  blameInlineMessageFormat: (): string =>
+    // The ${...} placeholders are literal: formatBlameText substitutes them.
+    // eslint-disable-next-line no-template-curly-in-string
+    getConfig("blame.inlineMessageFormat", "Blame ${author.name} (${time.ago})"),
+  blameInlineMessageNoCommit: (): string =>
+    getConfig("blame.inlineMessageNoCommit", "Not Committed Yet"),
+  blameInlineMessageMargin: (): number => getConfig("blame.inlineMessageMargin", 2),
+  blameCurrentUserAlias: (): string => getConfig("blame.currentUserAlias", ""),
+  blameIgnoreWhitespace: (): boolean => getConfig("blame.ignoreWhitespace", false),
+  blameDelay: (): number => getConfig("blame.delayBlame", 0),
+  blameMaxLineCount: (): number => getConfig("blame.maxLineCount", 16384),
+  blameExtendedHoverInformation: (): BlameHoverMode =>
+    getConfig("blame.extendedHoverInformation", "off"),
+  blameDetectMoveOrCopyFromOtherFiles: (): number =>
+    getConfig("blame.detectMoveOrCopyFromOtherFiles", 0),
+  affectsBlame: (event: vscode.ConfigurationChangeEvent): boolean =>
+    event.affectsConfiguration(getConfigKey("blame")) ||
+    event.affectsConfiguration(getConfigKey("inlineBlame.enabled"))
 };
 
 export type Config = typeof config;

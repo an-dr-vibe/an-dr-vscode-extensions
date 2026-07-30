@@ -26,6 +26,8 @@
   "Select a Git repository to remove": "Select a Git repository to remove",
   "Add Git Repository": "Add Git Repository",
   "{0} is not a Git repository.": "{0} is not a Git repository.",
+  "Select a Git repository before running {0}.": "Select a Git repository before running {0}.",
+  "Git {0} failed: {1}": "Git {0} failed: {1}",
   "an-dr: Commits (MIT) version {0}": "an-dr: Commits (MIT) version {0}",
   "Unable to open file: the command requires an an-dr: Commits diff editor.": "Unable to open file: the command requires an an-dr: Commits diff editor.",
   "Unable to open file: {0}": "Unable to open file: {0}",
@@ -122,5 +124,6 @@
   "{0} addition": "{0} addition",
   "{0} additions": "{0} additions",
   "{0} deletion": "{0} deletion",
-  "{0} deletions": "{0} deletions"
+  "{0} deletions": "{0} deletions",
+  "Git is requesting credentials": "Git is requesting credentials"
 }

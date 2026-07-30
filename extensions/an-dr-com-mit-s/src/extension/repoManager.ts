@@ -1,4 +1,5 @@
 import { isGitRepository } from "@/backend/utils/git";
+import { getPathFromStr } from "@/backend/utils/path";
 import { evalPromises } from "@/backend/utils/promise";
 import { Config } from "@/config";
 import { ExtensionState } from "@/extensionState";
@@ -35,6 +36,26 @@ export function createRepoManager(
 
   function getRepos() {
     return sortRepos(repos);
+  }
+
+  /**
+   * Finds the known repository containing a file, preferring the deepest match
+   * so a file inside a nested repository resolves to that one rather than its
+   * parent.
+   */
+  function getRepoContainingFile(filePath: string) {
+    const normalized = getPathFromStr(filePath);
+    let match: string | null = null;
+    for (const repo of Object.keys(repos)) {
+      const root = getPathFromStr(repo);
+      if (
+        (normalized === root || normalized.startsWith(root + "/")) &&
+        (match === null || root.length > match.length)
+      ) {
+        match = repo;
+      }
+    }
+    return match;
   }
 
   function sendRepos() {
@@ -139,6 +160,7 @@ export function createRepoManager(
     onDidChangeRepos,
     isDirectoryWithinRepos,
     getRepos,
+    getRepoContainingFile,
     sendRepos,
     setRepos,
     addRepo,

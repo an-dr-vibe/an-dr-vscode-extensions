@@ -287,4 +287,34 @@ suite("repoManager", () => {
       assert.ok(statusBar.lastCount >= 0);
     });
   });
+
+  suite("getRepoContainingFile", () => {
+    test("finds the repo a file belongs to", () => {
+      const { manager } = makeManager({ "/ws/a": { columnWidths: null } });
+      assert.strictEqual(manager.getRepoContainingFile("/ws/a/src/index.ts"), "/ws/a");
+    });
+
+    test("returns the repo itself for its own root", () => {
+      const { manager } = makeManager({ "/ws/a": { columnWidths: null } });
+      assert.strictEqual(manager.getRepoContainingFile("/ws/a"), "/ws/a");
+    });
+
+    test("prefers the deepest repo for a nested checkout", () => {
+      const { manager } = makeManager({
+        "/ws/a": { columnWidths: null },
+        "/ws/a/nested": { columnWidths: null }
+      });
+      assert.strictEqual(manager.getRepoContainingFile("/ws/a/nested/f.ts"), "/ws/a/nested");
+    });
+
+    test("does not match a sibling sharing a path prefix", () => {
+      const { manager } = makeManager({ "/ws/a": { columnWidths: null } });
+      assert.strictEqual(manager.getRepoContainingFile("/ws/ab/f.ts"), null);
+    });
+
+    test("returns null when no repo contains the file", () => {
+      const { manager } = makeManager({ "/ws/a": { columnWidths: null } });
+      assert.strictEqual(manager.getRepoContainingFile("/elsewhere/f.ts"), null);
+    });
+  });
 });

@@ -304,6 +304,73 @@
           ],
           "default": "colour",
           "description": "%config.tabIconColourTheme%"
+        },
+        "an-dr-com-mit-s.blame.inlineMessageEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show blame information inline next to the active line."
+        },
+        "an-dr-com-mit-s.inlineBlame.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Deprecated compatibility alias for an-dr-com-mit-s.blame.inlineMessageEnabled."
+        },
+        "an-dr-com-mit-s.blame.inlineMessageFormat": {
+          "type": "string",
+          "default": "Blame ${author.name} (${time.ago})",
+          "description": "Customize the inline blame message. Supports ${author.name}, ${author.mail}, ${commit.hash}, ${commit.hash_short}, ${commit.summary} and ${time.ago}."
+        },
+        "an-dr-com-mit-s.blame.inlineMessageNoCommit": {
+          "type": "string",
+          "default": "Not Committed Yet",
+          "description": "Customize the inline blame message for uncommitted lines."
+        },
+        "an-dr-com-mit-s.blame.inlineMessageMargin": {
+          "type": "number",
+          "default": 2,
+          "description": "The amount of margin, in rem, between the line and the inline blame message."
+        },
+        "an-dr-com-mit-s.blame.currentUserAlias": {
+          "type": "string",
+          "default": "",
+          "description": "Alias shown instead of your own name in blame messages. Empty disables the alias."
+        },
+        "an-dr-com-mit-s.blame.ignoreWhitespace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ignore whitespace changes when blaming (the -w flag)."
+        },
+        "an-dr-com-mit-s.blame.delayBlame": {
+          "type": "number",
+          "default": 0,
+          "description": "Delay in milliseconds before inline blame is displayed."
+        },
+        "an-dr-com-mit-s.blame.maxLineCount": {
+          "type": "number",
+          "default": 16384,
+          "description": "Skip blame for files with more lines than this value."
+        },
+        "an-dr-com-mit-s.blame.extendedHoverInformation": {
+          "type": "string",
+          "default": "off",
+          "enum": [
+            "off",
+            "inline-status",
+            "inline",
+            "status"
+          ],
+          "description": "Where to show extended blame information on hover."
+        },
+        "an-dr-com-mit-s.blame.detectMoveOrCopyFromOtherFiles": {
+          "type": "number",
+          "default": 0,
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "description": "How aggressively to detect lines moved or copied from other files. Each level adds a -C flag."
         }
       }
     }

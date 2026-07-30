@@ -23,3 +23,13 @@ export interface GitChangeCounts {
   readonly modified: number;
   readonly deleted: number;
 }
+
+/** Authorship of one blamed line. */
+export interface BlameLineInfo {
+  readonly author: string;
+  readonly authorEmail: string;
+  readonly authorTime: number;
+  readonly committed: boolean;
+  readonly hash: string;
+  readonly summary: string;
+}

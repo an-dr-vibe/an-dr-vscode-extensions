@@ -30,6 +30,10 @@ export const extensions = {
   getExtension: () => undefined
 };
 
+export const env = {
+  language: "en"
+};
+
 export const l10n = {
   t: (message: string, ...args: unknown[]) =>
     message.replace(/\{(\d+)\}/g, (_match, index: string) => String(args[Number(index)]))

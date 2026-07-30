@@ -122,5 +122,8 @@
   "{0} addition": "{0} 处添加",
   "{0} additions": "{0} 处添加",
   "{0} deletion": "{0} 处删除",
-  "{0} deletions": "{0} 处删除"
+  "{0} deletions": "{0} 处删除",
+  "Select a Git repository before running {0}.": "运行 {0} 前请先选择一个 Git 仓库。",
+  "Git {0} failed: {1}": "Git {0} 失败：{1}",
+  "Git is requesting credentials": "Git 正在请求凭据"
 }

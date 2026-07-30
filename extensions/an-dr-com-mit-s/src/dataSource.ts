@@ -1,12 +1,42 @@
+import { spawn } from "node:child_process";
+
 import type { FileStatusResult, SimpleGit } from "simple-git";
 import { simpleGit } from "simple-git";
+import * as vscode from "vscode";
 
 import type { GitClient } from "@/backend/gitClient";
 import { loadBranches } from "@/backend/queries/loadBranches";
 import { loadCommits } from "@/backend/queries/loadCommits";
-import { GitChangeCounts, GitWorkingTreeChange, HeadInfo } from "@/data-source/models";
+import { getPathFromStr } from "@/backend/utils/path";
+import {
+  BlameLineInfo,
+  GitChangeCounts,
+  GitWorkingTreeChange,
+  HeadInfo
+} from "@/data-source/models";
+import { parseBlameIncrementalOutput } from "@/data-source/parsers";
 
 type GitFactory = (repo: string, gitPath: string) => SimpleGit;
+
+/** Blame flags that change Git's output, drawn from the blame settings. */
+export type BlameOptions = {
+  readonly ignoreWhitespace: boolean;
+  /** How many `-C` flags to pass; each widens move/copy detection. */
+  readonly detectMoveOrCopyFromOtherFiles: number;
+};
+
+/** The names and emails Git would attribute a commit to in one repository. */
+export type CurrentUserIdentity = {
+  readonly emails: ReadonlySet<string>;
+  readonly names: ReadonlySet<string>;
+};
+
+/** Git blames paths relative to the repository root. */
+function toRepoRelativePath(repo: string, filePath: string) {
+  const normalized = getPathFromStr(filePath);
+  const root = getPathFromStr(repo);
+  return normalized.startsWith(root + "/") ? normalized.substring(root.length + 1) : normalized;
+}
 
 function createGit(repo: string, gitPath: string) {
   return simpleGit({ baseDir: repo, binary: gitPath, maxConcurrentProcesses: 6, trimmed: false });
@@ -179,5 +209,102 @@ export class DataSource {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Reads the identities Git would attribute a commit to in this repository.
+   *
+   * Both local and global values are collected because either can match a
+   * blamed author. Emails are lower-cased for comparison; names are not, since
+   * Git treats them as free text.
+   */
+  public async getCurrentUserIdentity(repo: string): Promise<CurrentUserIdentity | null> {
+    const git = this.gitFactory(repo, this.getGitPath());
+    const read = async (scope: "--local" | "--global", key: string) => {
+      try {
+        return (await git.raw(["config", scope, "--get", key])).trim() || null;
+      } catch {
+        // Git exits non-zero when a key is simply unset.
+        return null;
+      }
+    };
+    try {
+      const [localEmail, globalEmail, localName, globalName] = await Promise.all([
+        read("--local", "user.email"),
+        read("--global", "user.email"),
+        read("--local", "user.name"),
+        read("--global", "user.name")
+      ]);
+      const emails = new Set<string>();
+      const names = new Set<string>();
+      for (const email of [localEmail, globalEmail]) {
+        if (email !== null) {
+          emails.add(email.toLowerCase());
+        }
+      }
+      for (const name of [localName, globalName]) {
+        if (name !== null) {
+          names.add(name);
+        }
+      }
+      return { emails, names };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Reads per-line authorship for a file.
+   *
+   * Spawned directly rather than through simple-git because blame on a large
+   * file must be abandonable: the caller re-blames on every document change,
+   * so a superseded run has to be killed rather than left to finish. Resolves
+   * to an empty map when cancelled or when Git fails, so callers render
+   * nothing instead of stale authorship.
+   */
+  public getBlameFile(
+    repo: string,
+    filePath: string,
+    options: BlameOptions,
+    token?: vscode.CancellationToken
+  ): Promise<ReadonlyMap<number, BlameLineInfo>> {
+    const relativeFilePath = toRepoRelativePath(repo, filePath);
+    const args = ["blame", "--incremental"];
+    if (options.ignoreWhitespace) {
+      args.push("-w");
+    }
+    for (let i = 0; i < options.detectMoveOrCopyFromOtherFiles; i++) {
+      args.push("-C");
+    }
+    args.push("--", relativeFilePath);
+
+    return new Promise((resolve) => {
+      const child = spawn(this.getGitPath(), args, { cwd: repo });
+      let stdout = "";
+      let settled = false;
+
+      const finish = (value: ReadonlyMap<number, BlameLineInfo>) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        subscription?.dispose();
+        resolve(value);
+      };
+
+      const subscription = token?.onCancellationRequested(() => {
+        child.kill();
+        finish(new Map());
+      });
+
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        stdout += chunk;
+      });
+      child.on("error", () => finish(new Map()));
+      child.on("close", (code) => {
+        finish(code === 0 ? parseBlameIncrementalOutput(stdout) : new Map());
+      });
+    });
   }
 }

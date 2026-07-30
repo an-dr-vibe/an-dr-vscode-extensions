@@ -66,6 +66,15 @@ export class GitStatusMonitor {
     this.syncActiveRepo();
   }
 
+  /**
+   * Re-reads the active repository's branch and dirty counts. Used after an
+   * operation that changed the repository from outside the file watcher's
+   * view, such as a completed fetch, pull, or push.
+   */
+  public refreshStatus() {
+    void this.refresh();
+  }
+
   /** Stops repository observation and ignores pending refreshes. */
   public dispose() {
     this.refreshSequence++;

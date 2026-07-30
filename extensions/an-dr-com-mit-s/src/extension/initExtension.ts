@@ -2,6 +2,8 @@ import * as path from "path";
 
 import * as vscode from "vscode";
 
+import { createAskpass } from "@/askpass/askpass";
+import { promptForCredential } from "@/askpass/credentialPrompt";
 import { AvatarManager } from "@/avatarManager";
 import { GitClient, gitClientFactory } from "@/backend/gitClient";
 import { findGitRepos } from "@/backend/queries/repoSearch";
@@ -18,6 +20,7 @@ import {
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerMessageHandlers } from "@/extension/messageHandler";
 import { registerPublicCommands } from "@/extension/publicCommands";
+import { createRemoteCommands, runRemoteOperationWithGit } from "@/extension/remoteOperations";
 import { createRepoManager, RepoManager } from "@/extension/repoManager";
 import { createRepositoryCommands } from "@/extension/repositoryCommands";
 import { logger } from "@/extension/utils/logger";
@@ -146,10 +149,31 @@ export function initExtension(
       dataSource,
       gitStatusMonitor
     );
+    // Git prompts for credentials through this endpoint; without it an
+    // authenticated fetch, pull, or push would block on a terminal the
+    // extension host does not have.
+    let askpassEnv: Readonly<Record<string, string>> = {};
+    void createAskpass(ctx.extensionPath, promptForCredential).then(
+      (askpass) => {
+        askpassEnv = askpass.env;
+        ctx.subscriptions.push(askpass);
+      },
+      (error: unknown) => {
+        logger.log(`Askpass unavailable: ${error instanceof Error ? error.message : error}`);
+      }
+    );
+
     ctx.subscriptions.push(
       ...registerPublicCommands(
         ctx,
-        createRepositoryCommands(repoManager, gitStatusMonitor, config),
+        {
+          ...createRepositoryCommands(repoManager, gitStatusMonitor, config),
+          ...createRemoteCommands(
+            gitStatusMonitor,
+            () => askpassEnv,
+            runRemoteOperationWithGit(config.gitPath)
+          )
+        },
         dataSource,
         new Set(["view", "clearAvatarCache"])
       )

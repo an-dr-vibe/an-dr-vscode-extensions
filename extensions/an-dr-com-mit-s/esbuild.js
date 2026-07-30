@@ -1,9 +1,22 @@
+const fs = require("node:fs");
 const path = require("node:path");
 
 const esbuild = require("esbuild");
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
+
+/**
+ * Ships the GIT_ASKPASS wrapper beside the compiled helper. It is copied
+ * rather than bundled because Git executes it as a shell script, and it is
+ * marked executable so Git can run it on Linux and macOS.
+ */
+function copyAskpassShellWrapper() {
+  const target = path.join(__dirname, "out", "askpass.sh");
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(path.join(__dirname, "src", "askpass", "askpass.sh"), target);
+  fs.chmodSync(target, 0o755);
+}
 
 const esbuildProblemMatcherPlugin = {
   name: "esbuild-problem-matcher",
@@ -60,13 +73,33 @@ async function main() {
     plugins: [aliasPlugin, esbuildProblemMatcherPlugin]
   });
 
+  // Git spawns this one as its own process, so it is a separate entry point
+  // rather than part of the extension bundle.
+  const askpass = await esbuild.context({
+    entryPoints: ["src/askpass/askpassMain.ts"],
+    bundle: true,
+    format: "cjs",
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: "node",
+    target: "es6",
+    outfile: "out/askpass.js",
+    logLevel: "silent",
+    plugins: [aliasPlugin, esbuildProblemMatcherPlugin]
+  });
+
+  copyAskpassShellWrapper();
+
   if (watch) {
-    await Promise.all([extension.watch(), webview.watch()]);
+    await Promise.all([extension.watch(), webview.watch(), askpass.watch()]);
   } else {
     await extension.rebuild();
     await extension.dispose();
     await webview.rebuild();
     await webview.dispose();
+    await askpass.rebuild();
+    await askpass.dispose();
   }
 }
 

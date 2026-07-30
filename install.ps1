@@ -282,6 +282,16 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
         Remove-ManagedLink $legacyDst
     }
 
+    # Remove links this extension left behind under an earlier version. VS Code
+    # keys directories by publisher.name-version, so without this a version bump
+    # leaves two directories claiming the same extension ID — and the registry
+    # keeps pointing at whichever one it saw first.
+    if ($extId) {
+        Get-ChildItem -Path $VscodeExtensions -Directory -Filter "$extId-*" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -ne $dst -and (Test-ManagedLink $_.FullName) } |
+            ForEach-Object { Remove-ManagedLink $_.FullName }
+    }
+
     if (Test-Path $dst) {
         if (Test-ManagedLink $dst) {
             Remove-ManagedLink $dst

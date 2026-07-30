@@ -20,13 +20,13 @@ const mock = vi.hoisted(() => {
       l10n: {
         t: (message: string, ...args: unknown[]) =>
           args.reduce(
-            (result, value, index) => result.replace(`{${index}}`, String(value)),
+            (result: string, value, index) => result.replace(`{${index}}`, String(value)),
             message
           )
       },
       window: {
         activeTextEditor: undefined,
-        showInformationMessage: (...args: unknown[]) => mock.showInformationMessage(...args)
+        showInformationMessage: (...args: unknown[]) => mock.showInformationMessage(...(args as []))
       }
     }
   };
@@ -34,8 +34,8 @@ const mock = vi.hoisted(() => {
 
 vi.mock("vscode", () => mock.vscode);
 vi.mock("@/utils", () => ({
-  openFile: (...args: unknown[]) => mock.openFile(...args),
-  showErrorMessage: (...args: unknown[]) => mock.showErrorMessage(...args)
+  openFile: (...args: unknown[]) => mock.openFile(...(args as [])),
+  showErrorMessage: (...args: unknown[]) => mock.showErrorMessage(...(args as []))
 }));
 
 import { PUBLIC_COMMAND_NAMES, registerPublicCommands } from "@/extension/publicCommands";

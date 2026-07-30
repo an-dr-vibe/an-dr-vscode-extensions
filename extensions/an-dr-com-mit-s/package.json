@@ -33,7 +33,7 @@
   "publisher": "an-dr",
   "main": "./out/extension.js",
   "scripts": {
-    "typecheck": "tsc -p ./src --noEmit && tsc -p ./src/webview --noEmit",
+    "typecheck": "tsc -p ./src --noEmit && tsc -p ./src/webview --noEmit && tsc -p tests/tsconfig.json --noEmit && tsc -p tests-ext/tsconfig.json --noEmit",
     "vscode:prepublish": "npm run package",
     "package": "npm run typecheck && node esbuild.js --production",
     "clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\"",

@@ -22,12 +22,47 @@ function escapeJsonForHtml(obj: object): string {
     .replace(/&/g, "\\u0026");
 }
 
+/**
+ * Exactly the configuration this module reads.
+ *
+ * Declared narrowly rather than taking the whole `Config` so a test can supply
+ * a matching object with no type assertion. Reading a new setting here means
+ * widening this type, which then fails any caller that has not supplied it —
+ * the compile-time check a cast would have thrown away.
+ */
+export type WebviewHtmlConfig = Pick<
+  Config,
+  | "autoCenterCommitDetailsView"
+  | "avatarMode"
+  | "avatarShape"
+  | "avatarSize"
+  | "columnVisibility"
+  | "committedVisual"
+  | "dateFormat"
+  | "fetchAvatars"
+  | "graphColours"
+  | "graphStyle"
+  | "initialLoadCommits"
+  | "loadMoreCommits"
+  | "showCurrentBranchByDefault"
+  | "uiDensity"
+>;
+
+/** The extension state this module reads. */
+export type WebviewHtmlState = Pick<
+  ExtensionState,
+  "getLastActiveRepo" | "isAvatarStorageAvailable"
+>;
+
+/** The repository lookup this module reads. */
+export type WebviewHtmlRepos = Pick<RepoManager, "getRepos">;
+
 export function buildWebviewHtml(opts: {
   webview: vscode.Webview;
-  config: Config;
+  config: WebviewHtmlConfig;
   extensionPath: string;
-  extensionState: ExtensionState;
-  repoManager: RepoManager;
+  extensionState: WebviewHtmlState;
+  repoManager: WebviewHtmlRepos;
 }): { html: string; isGraphLoaded: boolean } {
   const { webview, config, extensionPath, extensionState, repoManager } = opts;
   const nonce = getNonce();

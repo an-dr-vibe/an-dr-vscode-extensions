@@ -161,7 +161,9 @@ describe("GitStatusMonitor", () => {
       "C:/zeta": { columnWidths: null }
     });
     let activeFile = "C:/zeta/src/file.ts";
-    let editorListener: (() => void) | null = null;
+    // Held in an object so TypeScript does not narrow it to null: the
+    // assignment below happens inside a callback it cannot prove runs.
+    const captured: { editorListener: (() => void) | null } = { editorListener: null };
     const monitor = new GitStatusMonitor(
       {
         getHeadInfo: vi.fn(() => Promise.resolve(null)),
@@ -176,14 +178,14 @@ describe("GitStatusMonitor", () => {
       () => createWatcher(),
       () => activeFile,
       (listener) => {
-        editorListener = listener;
+        captured.editorListener = listener;
         return { dispose: vi.fn() };
       }
     );
 
     await vi.waitFor(() => expect(monitor.getStatus().repo).toBe("C:/zeta"));
     activeFile = "C:/alpha/README.md";
-    editorListener?.();
+    captured.editorListener?.();
     await vi.waitFor(() => expect(monitor.getStatus().repo).toBe("C:/alpha"));
     monitor.dispose();
   });

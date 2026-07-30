@@ -13,12 +13,15 @@ const mock = vi.hoisted(() => ({
 vi.mock("vscode", () => ({
   l10n: {
     t: (message: string, ...args: unknown[]) =>
-      args.reduce((result, value, index) => result.replace(`{${index}}`, String(value)), message)
+      args.reduce(
+        (result: string, value, index) => result.replace(`{${index}}`, String(value)),
+        message
+      )
   },
   window: {
     showOpenDialog: () => Promise.resolve(mock.openResult),
     showQuickPick: () => Promise.resolve(mock.quickPickResult),
-    showErrorMessage: (...args: unknown[]) => mock.showErrorMessage(...args)
+    showErrorMessage: (...args: unknown[]) => mock.showErrorMessage(...(args as []))
   }
 }));
 

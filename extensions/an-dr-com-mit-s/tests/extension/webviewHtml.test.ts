@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { buildWebviewHtml } from "@/extension/webviewHtml";
+import { buildWebviewHtml, type WebviewHtmlConfig } from "@/extension/webviewHtml";
 
 import { createWebviewStub } from "./__mocks__/vscode";
 
 /**
- * The config surface `buildWebviewHtml` reads. Declared as a partial rather
- * than cast through `unknown`, so adding a config dependency fails this file
- * at compile time instead of at runtime.
+ * Typed as the exact surface buildWebviewHtml declares, and passed with no
+ * assertion. If that module starts reading another setting, WebviewHtmlConfig
+ * gains a member and this object stops compiling — which is the point.
  */
-function makeConfig(overrides: Record<string, unknown> = {}) {
-  const base = {
+function makeConfig(overrides: Partial<WebviewHtmlConfig> = {}): WebviewHtmlConfig {
+  const base: WebviewHtmlConfig = {
     autoCenterCommitDetailsView: () => true,
     committedVisual: () => "Avatar",
     avatarMode: () => "Auto (Fetched then Pattern)",
@@ -30,18 +30,18 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
 }
 
 function build(
-  options: { repos?: Record<string, unknown>; config?: Record<string, unknown> } = {}
+  options: { repos?: Record<string, unknown>; config?: Partial<WebviewHtmlConfig> } = {}
 ) {
   const repos = options.repos ?? { "/ws/a": { columnWidths: null } };
   return buildWebviewHtml({
     webview: createWebviewStub() as never,
-    config: makeConfig(options.config) as never,
+    config: makeConfig(options.config),
     extensionPath: "/ext",
     extensionState: {
       getLastActiveRepo: () => "/ws/a",
       isAvatarStorageAvailable: () => true
-    } as never,
-    repoManager: { getRepos: () => repos } as never
+    },
+    repoManager: { getRepos: () => repos as never }
   });
 }
 
@@ -92,7 +92,8 @@ describe("buildWebviewHtml", () => {
 
   it("embeds the view state as JSON the webview can read", () => {
     const { html } = build();
-    const match = html.match(/var viewState = (\{.*?\});<\/script>/s);
+    // [\s\S] rather than the s flag, which the tests tsconfig target predates.
+    const match = html.match(/var viewState = (\{[\s\S]*?\});<\/script>/);
     expect(match).not.toBeNull();
 
     const state = JSON.parse(
@@ -116,13 +117,13 @@ describe("buildWebviewHtml", () => {
   it("disables avatar fetching when the storage folder is unavailable", () => {
     const html = buildWebviewHtml({
       webview: createWebviewStub() as never,
-      config: makeConfig({ fetchAvatars: () => true }) as never,
+      config: makeConfig({ fetchAvatars: () => true }),
       extensionPath: "/ext",
       extensionState: {
         getLastActiveRepo: () => null,
         isAvatarStorageAvailable: () => false
-      } as never,
-      repoManager: { getRepos: () => ({ "/ws/a": {} }) } as never
+      },
+      repoManager: { getRepos: () => ({ "/ws/a": {} }) as never }
     }).html;
 
     expect(html).toMatch(/"fetchAvatars":\s*false/);

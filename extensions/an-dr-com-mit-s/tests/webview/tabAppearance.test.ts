@@ -93,7 +93,7 @@ describe("tab appearance", () => {
     it("drops the Committed column and its cells together", async () => {
       await render(makeViewState({ columnVisibility: { Committed: false, ID: true } }));
 
-      const headers = [...document.querySelectorAll("#tableColHeaders th")];
+      const headers = Array.from(document.querySelectorAll("#tableColHeaders th"));
       expect(headers).toHaveLength(4);
       // Every row must lose the same cell, or the table misaligns.
       const row = document.querySelector("tr.commit");

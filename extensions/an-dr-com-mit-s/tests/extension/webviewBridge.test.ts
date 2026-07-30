@@ -34,7 +34,7 @@ describe("webviewBridgeFactory", () => {
     const webview = createWebviewStub();
     const watcher = { mute: vi.fn(), unmute: vi.fn() };
     const bridge = webviewBridgeFactory(webview as never, watcher as never);
-    const message = { command: "refresh" };
+    const message = { command: "refresh" } as const;
 
     await expect(bridge.post(message)).resolves.toBe(true);
     expect(webview.postedMessages).toEqual([message]);

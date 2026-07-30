@@ -7,6 +7,7 @@ import { createVscodeMock, receive, setupHtml } from "./setup";
 
 const REPO = "/workspace/my-repo";
 let vscodeMock: ReturnType<typeof createVscodeMock>;
+let messageListener: EventListenerOrEventListenerObject | null = null;
 
 function makeViewState(overrides: Partial<GG.GitGraphViewState> = {}): GG.GitGraphViewState {
   return {
@@ -47,10 +48,16 @@ const commits: GitCommitNode[] = [
 
 /** Boots the real webview against a view state and renders one commit. */
 async function render(viewState: GG.GitGraphViewState) {
+  if (messageListener !== null) {
+    window.removeEventListener("message", messageListener);
+  }
   vi.resetModules();
   vscodeMock = createVscodeMock();
   setupHtml(viewState);
+  const addEventListener = vi.spyOn(window, "addEventListener");
   await import("@/webview/main");
+  messageListener = addEventListener.mock.calls.find(([type]) => type === "message")?.[1] ?? null;
+  addEventListener.mockRestore();
   receive({ command: "loadBranches", branches: ["main"], head: "main", hard: true, isRepo: true });
   receive({
     command: "loadCommits",

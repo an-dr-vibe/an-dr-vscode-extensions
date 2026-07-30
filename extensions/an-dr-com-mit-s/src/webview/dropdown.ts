@@ -126,7 +126,10 @@ export class Dropdown {
 
   private render() {
     this.elem.classList.add("loaded");
-    this.currentValueElem.innerHTML = escapeHtml(this.options[this.selectedOption].name);
+    // An empty option list has no selected entry; render blank rather than
+    // dereferencing a missing option.
+    const selected = this.options[this.selectedOption];
+    this.currentValueElem.innerHTML = selected === undefined ? "" : escapeHtml(selected.name);
     let html = "";
     for (let i = 0; i < this.options.length; i++) {
       html +=

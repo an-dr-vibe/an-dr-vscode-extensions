@@ -92,14 +92,14 @@ class GitGraphView {
       this.refresh(true);
     });
     this.branchDropdown = new Dropdown("branchSelect", false, l10n.branch, (value) => {
-      this.currentBranch = value;
-      this.maxCommits = this.config.initialLoadCommits;
-      this.expandedCommit = null;
-      this.saveState();
-      this.renderShowLoading();
-      this.requestLoadCommits(true, () => {});
+      this.selectBranch(value, false);
     });
-    this.branchPanel = new BranchPanel(prevState?.branchPanel, () => this.saveState());
+    this.branchPanel = new BranchPanel(
+      prevState?.branchPanel,
+      () => this.saveState(),
+      (value) => this.selectBranch(value, true),
+      (value, kind, source, event) => this.handleBranchPanelAction(value, kind, source, event)
+    );
     this.showRemoteBranchesElem = <HTMLInputElement>(
       document.getElementById("showRemoteBranchesCheckbox")!
     );
@@ -245,6 +245,133 @@ class GitGraphView {
       this.loadBranchesCallback(changes, isRepo);
       this.loadBranchesCallback = null;
     }
+  }
+
+  private selectBranch(value: string, fromPanel: boolean) {
+    this.currentBranch = value;
+    this.maxCommits = this.config.initialLoadCommits;
+    this.expandedCommit = null;
+    if (fromPanel) {
+      this.branchDropdown.setSelected(value);
+    } else {
+      this.branchPanel.setSelected(value);
+    }
+    this.saveState();
+    this.renderShowLoading();
+    this.requestLoadCommits(true, () => {});
+  }
+
+  private handleBranchPanelAction(
+    value: string,
+    kind: "doubleClick" | "contextMenu",
+    source: HTMLElement,
+    event: MouseEvent
+  ) {
+    const remote = value.startsWith("remotes/");
+    const current = source.classList.contains("currentBranch");
+    const name = remote ? value.slice("remotes/".length) : value;
+    const checkout = () => {
+      if (remote) {
+        const parts = name.split("/");
+        showRefInputDialog(
+          l10n.dialogCreateBranchTitle.replace("{0}", `<b><i>${escapeHtml(name)}</i></b>`),
+          parts.at(-1)!,
+          l10n.checkoutBranch,
+          (newBranch) =>
+            sendMessage({
+              command: "checkoutBranch",
+              repo: this.currentRepo,
+              branchName: newBranch,
+              remoteBranch: name
+            }),
+          source
+        );
+      } else {
+        sendMessage({
+          command: "checkoutBranch",
+          repo: this.currentRepo,
+          branchName: name,
+          remoteBranch: null
+        });
+      }
+    };
+    if (kind === "doubleClick") {
+      if (!current) {
+        checkout();
+      }
+      return;
+    }
+    const menu: ContextMenuElement[] = current
+      ? []
+      : [{ title: l10n.checkoutBranch, onClick: checkout }];
+    if (!remote) {
+      menu.push({
+        title: l10n.renameBranch + ELLIPSIS,
+        onClick: () =>
+          showRefInputDialog(
+            l10n.dialogRenameBranchTitle.replace("{0}", `<b><i>${escapeHtml(name)}</i></b>`),
+            name,
+            l10n.dialogRenameBranchSubmit,
+            (newName) =>
+              sendMessage({
+                command: "renameBranch",
+                repo: this.currentRepo,
+                oldName: name,
+                newName
+              }),
+            source
+          )
+      });
+      if (!current) {
+        menu.push(
+          {
+            title: l10n.deleteBranch + ELLIPSIS,
+            onClick: () =>
+              showCheckboxDialog(
+                l10n.dialogDeleteConfirm
+                  .replace("{0}", l10n.labelBranch)
+                  .replace("{1}", `<b><i>${escapeHtml(name)}</i></b>`),
+                l10n.dialogDeleteForceDelete,
+                false,
+                l10n.deleteBranch,
+                (forceDelete) =>
+                  sendMessage({
+                    command: "deleteBranch",
+                    repo: this.currentRepo,
+                    branchName: name,
+                    forceDelete
+                  }),
+                source
+              )
+          },
+          {
+            title: l10n.merge + ELLIPSIS,
+            onClick: () =>
+              showCheckboxDialog(
+                l10n.dialogMergeConfirm
+                  .replace("{0}", `<b><i>${escapeHtml(name)}</i></b>`)
+                  .replace("{1}", l10n.labelCurrentBranch),
+                l10n.dialogMergeNoFastForward,
+                true,
+                l10n.dialogYesMerge,
+                (createNewCommit) =>
+                  sendMessage({
+                    command: "mergeBranch",
+                    repo: this.currentRepo,
+                    branchName: name,
+                    createNewCommit
+                  }),
+                source
+              )
+          }
+        );
+      }
+    }
+    menu.push(null, {
+      title: l10n.copyBranchName,
+      onClick: () => sendMessage({ command: "copyToClipboard", type: "Branch Name", data: name })
+    });
+    showContextMenu(event, menu, source);
   }
 
   public loadCommits(

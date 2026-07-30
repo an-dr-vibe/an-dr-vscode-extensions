@@ -47,6 +47,15 @@ body.branchPanelHidden #branchPanelSidebar {
   text-transform: uppercase;
   opacity: 0.7;
 }
+.branchPanelFilterInput {
+  width: calc(100% - 12px);
+  margin: 6px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.5));
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
 .branchPanelItem,
 .branchPanelFolder {
   display: flex;
@@ -55,6 +64,10 @@ body.branchPanelHidden #branchPanelSidebar {
   padding-right: 6px;
   box-sizing: border-box;
   white-space: nowrap;
+}
+.branchPanelItem:hover,
+.branchPanelFolder:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 }
 .branchPanelItem.selected {
   background: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.2));

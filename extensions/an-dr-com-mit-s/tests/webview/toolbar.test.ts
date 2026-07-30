@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitCommitNode } from "@/backend/types";
 import { UNCOMMITTED } from "@/webview/utils/graphConstants";
 
-import { viewStateFixture } from "./fixtures";
+import { FIXTURE_REPO, viewStateFixture } from "./fixtures";
 import { createVscodeMock, receive, setupHtml } from "./setup";
 
 let vscodeMock: ReturnType<typeof createVscodeMock>;
@@ -75,6 +75,65 @@ describe("tab toolbar", () => {
       hard: true
     });
     vscodeMock.clearMessages();
+  });
+
+  describe("branch panel actions", () => {
+    it("offers the complete local branch action set", () => {
+      receive({
+        command: "loadBranches",
+        branches: ["main", "feature"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+      document
+        .querySelector<HTMLElement>('[data-value="feature"]')!
+        .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+      expect(document.querySelectorAll("#contextMenu .contextMenuItem")).toHaveLength(5);
+      expect(document.getElementById("contextMenu")!.textContent).toContain(l10n.renameBranch);
+      expect(document.getElementById("contextMenu")!.textContent).toContain(l10n.deleteBranch);
+      expect(document.getElementById("contextMenu")!.textContent).toContain(l10n.merge);
+    });
+
+    it("checks out a local branch on double-click", () => {
+      receive({
+        command: "loadBranches",
+        branches: ["main", "feature"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+      document
+        .querySelector<HTMLElement>('[data-value="feature"]')!
+        .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+      expect(vscodeMock.sentMessages).toContainEqual({
+        command: "checkoutBranch",
+        repo: FIXTURE_REPO,
+        branchName: "feature",
+        remoteBranch: null
+      });
+    });
+
+    it("does not offer destructive actions for the current branch", () => {
+      receive({
+        command: "loadBranches",
+        branches: ["main", "feature"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+      document
+        .querySelector<HTMLElement>('[data-value="main"]')!
+        .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+      const menu = document.getElementById("contextMenu")!.textContent!;
+      expect(menu).toContain(l10n.renameBranch);
+      expect(menu).not.toContain(l10n.deleteBranch);
+      expect(menu).not.toContain(l10n.merge);
+      expect(menu).not.toContain(l10n.checkoutBranch);
+    });
   });
 
   describe("remote operation buttons", () => {

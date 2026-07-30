@@ -17,6 +17,8 @@ export interface BranchPanelRenderOption {
 
 export interface BranchPanelRenderModel {
   options: readonly BranchPanelRenderOption[];
+  filter: string;
+  collapsedFolders: ReadonlySet<string>;
 }
 
 /** Owns the branch sidebar layout; behavior is added separately. */
@@ -25,24 +27,43 @@ export class BranchPanel {
   private readonly sidebar: HTMLElement;
   private readonly toggle: HTMLElement;
   private readonly onLayoutChange: (state: BranchPanelState) => void;
+  private readonly onSelect: (value: string) => void;
+  private readonly onAction: (
+    value: string,
+    kind: "doubleClick" | "contextMenu",
+    source: HTMLElement,
+    event: MouseEvent
+  ) => void;
   private width: number;
   private hidden: boolean;
+  private filter = "";
+  private readonly collapsedFolders = new Set<string>();
   private options: BranchPanelRenderOption[] = [];
 
   constructor(
     state: Partial<BranchPanelState> | undefined,
-    onLayoutChange: (state: BranchPanelState) => void
+    onLayoutChange: (state: BranchPanelState) => void,
+    onSelect: (value: string) => void,
+    onAction: (
+      value: string,
+      kind: "doubleClick" | "contextMenu",
+      source: HTMLElement,
+      event: MouseEvent
+    ) => void
   ) {
     this.sidebar = document.getElementById("branchPanelSidebar")!;
     this.list = document.getElementById("branchPanel")!;
     this.toggle = document.getElementById("branchPanelToggle")!;
     this.onLayoutChange = onLayoutChange;
+    this.onSelect = onSelect;
+    this.onAction = onAction;
     this.width = state?.width ?? DEFAULT_BRANCH_PANEL_WIDTH;
     this.hidden = state?.hidden ?? false;
 
     this.toggle.innerHTML = svgIcons.branch;
     this.toggle.addEventListener("click", () => this.setHidden(!this.hidden));
     this.setupResize(document.getElementById("branchPanelResizeHandle")!);
+    this.setupBehavior();
     this.applyLayout(false);
   }
 
@@ -58,6 +79,13 @@ export class BranchPanel {
   public setCurrentBranch(branch: string | null) {
     for (const option of this.options) {
       option.current = option.value === branch;
+    }
+    this.render();
+  }
+
+  public setSelected(value: string) {
+    for (const option of this.options) {
+      option.selected = option.value === value;
     }
     this.render();
   }
@@ -100,7 +128,60 @@ export class BranchPanel {
     });
   }
 
+  private setupBehavior() {
+    const filter = document.createElement("input");
+    filter.className = "branchPanelFilterInput";
+    filter.type = "search";
+    filter.placeholder = l10n.filterPlaceholder.replace("{0}", l10n.branch);
+    filter.addEventListener("input", () => {
+      this.filter = filter.value;
+      this.render();
+    });
+    filter.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        filter.value = "";
+        this.filter = "";
+        this.render();
+      }
+    });
+    this.sidebar.insertBefore(filter, this.list);
+
+    this.list.addEventListener("click", (event) => {
+      const folder = (event.target as Element).closest<HTMLElement>(".branchPanelFolder");
+      if (folder?.dataset.folder !== undefined) {
+        if (this.collapsedFolders.has(folder.dataset.folder)) {
+          this.collapsedFolders.delete(folder.dataset.folder);
+        } else {
+          this.collapsedFolders.add(folder.dataset.folder);
+        }
+        this.render();
+        return;
+      }
+      const item = (event.target as Element).closest<HTMLElement>(".branchPanelItem");
+      if (item?.dataset.value === undefined) {
+        return;
+      }
+      this.setSelected(item.dataset.value);
+      this.onSelect(item.dataset.value);
+    });
+    this.list.addEventListener("dblclick", (event) => this.dispatchAction(event, "doubleClick"));
+    this.list.addEventListener("contextmenu", (event) => this.dispatchAction(event, "contextMenu"));
+  }
+
+  private dispatchAction(event: MouseEvent, kind: "doubleClick" | "contextMenu") {
+    const item = (event.target as Element).closest<HTMLElement>(".branchPanelItem");
+    if (item?.dataset.value === undefined || item.dataset.value === "") {
+      return;
+    }
+    event.stopPropagation();
+    this.onAction(item.dataset.value, kind, item, event);
+  }
+
   private render() {
-    this.list.innerHTML = renderBranchPanel({ options: this.options });
+    this.list.innerHTML = renderBranchPanel({
+      options: this.options,
+      filter: this.filter,
+      collapsedFolders: this.collapsedFolders
+    });
   }
 }

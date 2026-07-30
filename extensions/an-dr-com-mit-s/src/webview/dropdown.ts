@@ -124,6 +124,14 @@ export class Dropdown {
     }
   }
 
+  public setSelected(value: string) {
+    const selected = this.options.findIndex((option) => option.value === value);
+    if (selected > -1) {
+      this.selectedOption = selected;
+      this.render();
+    }
+  }
+
   private render() {
     this.elem.classList.add("loaded");
     // An empty option list has no selected entry; render blank rather than

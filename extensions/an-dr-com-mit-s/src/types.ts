@@ -163,9 +163,15 @@ export type ResponseRefresh = {
 
 /** Asks for the operation the repository is part-way through. */
 export type RequestRepoInProgress = { command: "repoInProgress" };
+export type RequestInProgressAction = {
+  command: "inProgressAction";
+  operationType: RepoInProgressState["type"];
+  action: "continue" | "abort";
+};
 
 export type RequestMessage =
   | RequestRepoInProgress
+  | RequestInProgressAction
   | ActionRequest
   | QueryRequest
   | RequestFetchAvatar
@@ -182,9 +188,14 @@ export type ResponseRepoInProgress = {
   command: "repoInProgress";
   state: RepoInProgressState | null;
 };
+export type ResponseInProgressAction = {
+  command: "inProgressAction";
+  status: string | null;
+};
 
 export type ResponseMessage =
   | ResponseRepoInProgress
+  | ResponseInProgressAction
   | ActionResponse
   | QueryResponse
   | ResponseFetchAvatar

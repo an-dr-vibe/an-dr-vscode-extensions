@@ -110,7 +110,18 @@ class GitGraphView {
     });
     this.scrollShadowElem = <HTMLInputElement>document.getElementById("scrollShadow")!;
     this.filesPanelWidth = prevState?.filesPanelWidth ?? DEFAULT_FILES_PANEL_WIDTH;
-    this.repoInProgressBanner = new RepoInProgressBanner();
+    this.repoInProgressBanner = new RepoInProgressBanner((type, action) => {
+      const run = () => sendMessage({ command: "inProgressAction", operationType: type, action });
+      if (action === "abort") {
+        showConfirmationDialog(
+          l10n.repoInProgressAbortConfirm.replace("{0}", type),
+          run,
+          document.getElementById("repoInProgressBanner")
+        );
+      } else {
+        run();
+      }
+    });
     this.filesPanel = new FilesPanel(this.filesPanelWidth, (width) => {
       this.filesPanelWidth = width;
       this.saveState();
@@ -1623,6 +1634,13 @@ window.addEventListener("message", (event) => {
       break;
     case "repoInProgress":
       gitGraph.renderRepoInProgress(msg.state);
+      break;
+    case "inProgressAction":
+      if (msg.status === null) {
+        gitGraph.refresh(true);
+      } else {
+        showErrorDialog(l10n.repoInProgressActionFailed, msg.status, null);
+      }
       break;
     case "loadCommits":
       gitGraph.loadCommits(msg.commits, msg.head, msg.moreCommitsAvailable, msg.hard);

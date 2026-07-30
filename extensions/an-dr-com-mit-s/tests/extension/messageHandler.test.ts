@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
 import { registerMessageHandlers } from "@/extension/messageHandler";
 import type { RequestMessage, ResponseMessage } from "@/types";
 
@@ -26,21 +27,39 @@ function createHarness() {
     post
   };
   const gitStatusMonitor = { selectRepo: vi.fn() };
-  const gitClient = { setRepo: vi.fn() };
+  const raw = vi.fn(async () => "");
+  const gitClient = { setRepo: vi.fn(), getInstance: () => ({ raw }) };
+  const getRepoInProgress = vi.fn<() => Promise<RepoInProgressState>>(async () => ({
+    type: "rebase" as const,
+    subject: null,
+    rebaseProgress: null,
+    rebaseContext: null,
+    workingTreeStatus: null
+  }));
   const repoFileWatcher = { start: vi.fn() };
   const runRemoteOperation = vi.fn(async () => {});
+  const runInProgressOperation = vi.fn(async () => {});
   registerMessageHandlers(bridge as never, {
-    config: {} as never,
+    config: { gitPath: () => "git-custom" } as never,
     gitClient: gitClient as never,
-    dataSource: {} as never,
+    dataSource: { getRepoInProgress } as never,
     gitStatusMonitor: gitStatusMonitor as never,
     repoManager: {} as never,
     extensionState: {} as never,
     avatarManager: {} as never,
     repoFileWatcher: repoFileWatcher as never,
-    runRemoteOperation
+    runRemoteOperation,
+    runInProgressOperation
   });
-  return { gitStatusMonitor, handlers, post, runRemoteOperation };
+  return {
+    getRepoInProgress,
+    gitStatusMonitor,
+    handlers,
+    post,
+    raw,
+    runInProgressOperation,
+    runRemoteOperation
+  };
 }
 
 describe("registerMessageHandlers utility actions", () => {
@@ -113,5 +132,60 @@ describe("registerMessageHandlers utility actions", () => {
     } as never);
 
     expect(runRemoteOperation).not.toHaveBeenCalled();
+  });
+
+  it("runs an in-progress action only against the reported operation", async () => {
+    const { handlers, post, runInProgressOperation } = createHarness();
+    await handlers.get("selectRepo")!({ command: "selectRepo", repo: "C:/repo" });
+
+    await handlers.get("inProgressAction")!({
+      command: "inProgressAction",
+      operationType: "rebase",
+      action: "continue"
+    });
+
+    expect(runInProgressOperation).toHaveBeenCalledWith("C:/repo", "rebase", "continue");
+    expect(post).toHaveBeenCalledWith({ command: "inProgressAction", status: null });
+  });
+
+  it("rejects an action from a stale banner", async () => {
+    const { getRepoInProgress, handlers, post, runInProgressOperation } = createHarness();
+    getRepoInProgress.mockResolvedValue({
+      type: "merge",
+      subject: null,
+      rebaseProgress: null,
+      rebaseContext: null,
+      workingTreeStatus: null
+    });
+    await handlers.get("selectRepo")!({ command: "selectRepo", repo: "C:/repo" });
+
+    await handlers.get("inProgressAction")!({
+      command: "inProgressAction",
+      operationType: "rebase",
+      action: "abort"
+    });
+
+    expect(runInProgressOperation).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledWith({
+      command: "inProgressAction",
+      status: expect.stringContaining("changed")
+    });
+  });
+
+  it("rejects an unknown in-progress action at the message boundary", async () => {
+    const { handlers, post, runInProgressOperation } = createHarness();
+    await handlers.get("selectRepo")!({ command: "selectRepo", repo: "C:/repo" });
+
+    await handlers.get("inProgressAction")!({
+      command: "inProgressAction",
+      operationType: "rebase",
+      action: "exec=calc"
+    } as never);
+
+    expect(runInProgressOperation).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledWith({
+      command: "inProgressAction",
+      status: expect.stringContaining("Unsupported")
+    });
   });
 });

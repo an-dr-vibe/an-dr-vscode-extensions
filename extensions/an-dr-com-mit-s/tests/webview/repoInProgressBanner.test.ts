@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
 import { RepoInProgressBanner } from "@/webview/repoInProgressBanner";
@@ -35,7 +35,7 @@ describe("repo in-progress banner", () => {
   });
 
   it("stays inactive for a repository in a normal state", () => {
-    const view = new RepoInProgressBanner();
+    const view = new RepoInProgressBanner(vi.fn());
     view.render(null);
 
     expect(view.isActive()).toBe(false);
@@ -166,5 +166,23 @@ describe("repo in-progress banner", () => {
     const line = document.getElementById("repoInProgressBannerSecondary")!;
     expect(line.querySelector("b")).toBeNull();
     expect(line.textContent).toContain("<b>x</b>");
+  });
+
+  it("dispatches continue and abort for the rendered operation", () => {
+    const action = vi.fn();
+    const view = new RepoInProgressBanner(action);
+    view.render(state({ type: "cherry-pick" }));
+
+    document
+      .querySelector<HTMLElement>('[data-action="continue"]')!
+      .dispatchEvent(new MouseEvent("click"));
+    document
+      .querySelector<HTMLElement>('[data-action="abort"]')!
+      .dispatchEvent(new MouseEvent("click"));
+
+    expect(action.mock.calls).toEqual([
+      ["cherry-pick", "continue"],
+      ["cherry-pick", "abort"]
+    ]);
   });
 });

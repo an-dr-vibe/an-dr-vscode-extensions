@@ -74,15 +74,35 @@ export class RepoInProgressBanner {
   private readonly banner: HTMLElement;
   private readonly primaryElem: HTMLElement;
   private readonly secondaryElem: HTMLElement;
+  private readonly actionsElem: HTMLElement;
+  private currentType: RepoInProgressType | null = null;
 
-  constructor() {
+  constructor(
+    onAction: (type: RepoInProgressType, action: "continue" | "abort") => void = () => {}
+  ) {
     this.banner = document.getElementById("repoInProgressBanner")!;
     this.primaryElem = document.createElement("div");
     this.primaryElem.id = "repoInProgressBannerPrimary";
     this.secondaryElem = document.createElement("div");
     this.secondaryElem.id = "repoInProgressBannerSecondary";
+    this.actionsElem = document.createElement("div");
+    this.actionsElem.id = "repoInProgressBannerActions";
+    for (const action of ["continue", "abort"] as const) {
+      const button = document.createElement("button");
+      button.className = "roundedBtn";
+      button.dataset.action = action;
+      button.textContent =
+        action === "continue" ? l10n.repoInProgressContinue : l10n.repoInProgressAbort;
+      button.addEventListener("click", () => {
+        if (this.currentType !== null) {
+          onAction(this.currentType, action);
+        }
+      });
+      this.actionsElem.appendChild(button);
+    }
     this.banner.appendChild(this.primaryElem);
     this.banner.appendChild(this.secondaryElem);
+    this.banner.appendChild(this.actionsElem);
   }
 
   public render(state: RepoInProgressState | null) {
@@ -90,6 +110,7 @@ export class RepoInProgressBanner {
       this.banner.classList.remove("active", "conflicted");
       this.primaryElem.textContent = "";
       this.secondaryElem.textContent = "";
+      this.currentType = null;
       return;
     }
 
@@ -104,6 +125,7 @@ export class RepoInProgressBanner {
     // Set as text, not markup: the subject and branch names come from the
     // repository and are not trusted to be free of HTML.
     this.secondaryElem.textContent = formatSecondaryLine(state);
+    this.currentType = state.type;
 
     const conflicted = state.workingTreeStatus !== null && state.workingTreeStatus.conflicts > 0;
     this.banner.classList.toggle("conflicted", conflicted);

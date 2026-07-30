@@ -217,6 +217,11 @@ body.unableToLoad p {
   margin-top: 2px;
   word-break: break-word;
 }
+#repoInProgressBannerActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
 
 /* Changed-files panel */
 #filesPanel {

@@ -136,6 +136,54 @@ describe("tab toolbar", () => {
     });
   });
 
+  describe("in-progress operation actions", () => {
+    beforeEach(() => {
+      receive({
+        command: "repoInProgress",
+        state: {
+          type: "rebase",
+          subject: null,
+          rebaseProgress: null,
+          rebaseContext: null,
+          workingTreeStatus: null
+        }
+      });
+    });
+
+    it("continues immediately", () => {
+      document.querySelector<HTMLElement>('[data-action="continue"]')!.click();
+      expect(vscodeMock.sentMessages).toContainEqual({
+        command: "inProgressAction",
+        operationType: "rebase",
+        action: "continue"
+      });
+    });
+
+    it("confirms before aborting", () => {
+      document.querySelector<HTMLElement>('[data-action="abort"]')!.click();
+      expect(vscodeMock.sentMessages).not.toContainEqual(
+        expect.objectContaining({ command: "inProgressAction", action: "abort" })
+      );
+
+      document.getElementById("dialogAction")!.click();
+      expect(vscodeMock.sentMessages).toContainEqual({
+        command: "inProgressAction",
+        operationType: "rebase",
+        action: "abort"
+      });
+    });
+
+    it("refreshes after success and shows Git failures", () => {
+      receive({ command: "inProgressAction", status: null });
+      expect(vscodeMock.sentMessages).toContainEqual(
+        expect.objectContaining({ command: "loadBranches" })
+      );
+
+      receive({ command: "inProgressAction", status: "resolve conflicts first" });
+      expect(document.getElementById("dialog")!.textContent).toContain("resolve conflicts first");
+    });
+  });
+
   describe("remote operation buttons", () => {
     // The toolbar and the command palette run the same handlers in the
     // extension, so a button only has to name the operation correctly.

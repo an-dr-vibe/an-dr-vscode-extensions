@@ -8,10 +8,12 @@ import {
   resetToCommit,
   revertCommit
 } from "@/backend/actions/commit";
+import { runInProgressOperation } from "@/backend/actions/inProgress";
 import { mergeBranch, mergeCommit } from "@/backend/actions/merge";
 import { addTag, deleteTag, pushTag } from "@/backend/actions/tag";
 import { GitClient } from "@/backend/gitClient";
 import { commitDetails } from "@/backend/queries/commitDetails";
+import type { RepoInProgressType } from "@/backend/queries/repoInProgress";
 import { GitFileChangeType } from "@/backend/types";
 import { abbrevCommit } from "@/backend/utils/string";
 import { Config } from "@/config";
@@ -82,6 +84,12 @@ export function registerMessageHandlers(
     repoFileWatcher: RepoFileWatcher;
     /** Runs a remote operation, supplied by the caller that owns askpass. */
     runRemoteOperation: (operation: "fetch" | "pull" | "push") => Promise<void>;
+    /** Test seam for the non-interactive Git operation runner. */
+    runInProgressOperation?: (
+      repo: string,
+      type: RepoInProgressType,
+      action: "continue" | "abort"
+    ) => Promise<void>;
   }
 ) {
   const {
@@ -127,6 +135,25 @@ export function registerMessageHandlers(
   registerAction("resetToCommit", (msg) => resetToCommit(gitClient.getInstance(), msg));
   registerAction("mergeBranch", (msg) => mergeBranch(gitClient.getInstance(), msg));
   registerAction("mergeCommit", (msg) => mergeCommit(gitClient.getInstance(), msg));
+  registerAction("inProgressAction", async (msg) => {
+    if (msg.action !== "continue" && msg.action !== "abort") {
+      throw new Error(vscode.l10n.t("Unsupported repository operation action."));
+    }
+    if (currentRepo === null) {
+      throw new Error(vscode.l10n.t("No repository is selected."));
+    }
+    const state = await dataSource.getRepoInProgress(currentRepo);
+    if (state === null || state.type !== msg.operationType) {
+      throw new Error(
+        vscode.l10n.t("The repository operation has changed. Refresh and try again.")
+      );
+    }
+    if (deps.runInProgressOperation) {
+      await deps.runInProgressOperation(currentRepo, msg.operationType, msg.action);
+    } else {
+      await runInProgressOperation(config.gitPath(), currentRepo, msg.operationType, msg.action);
+    }
+  });
 
   // --- Query handlers ---
 

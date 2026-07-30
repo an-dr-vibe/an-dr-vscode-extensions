@@ -29,22 +29,22 @@ Git Graph project.
 
 All settings use the `an-dr-com-mit-s` prefix.
 
-| Setting                       | Default         | Description                                      |
-| ----------------------------- | --------------- | ------------------------------------------------ |
-| `autoCenterCommitDetailsView` | `true`          | Center commit details when opened                |
-| `dateFormat`                  | `"Date & Time"` | `"Date & Time"`, `"Date Only"`, or `"Relative"`  |
-| `dateType`                    | `"Author Date"` | `"Author Date"` or `"Commit Date"`               |
-| `fetchAvatars`                | `false`         | Fetch avatars (sends email to external services) |
-| `graphColours`                | 12 defaults     | Colors for graph lines                           |
-| `graphStyle`                  | `"rounded"`     | `"rounded"` or `"angular"`                       |
-| `initialLoadCommits`          | `300`           | Commits to load on open                          |
-| `loadMoreCommits`             | `100`           | Commits to load on demand                        |
-| `maxDepthOfRepoSearch`        | `0`             | Folder depth for repo search                     |
-| `showCurrentBranchByDefault`  | `false`         | Show only current branch on open                 |
-| `showStatusBarItem`           | `true`          | Show status bar button                           |
-| `statusBarIconOnly`           | `true`          | Show only the status bar icon                    |
-| `showUncommittedChanges`      | `true`          | Show uncommitted changes node                    |
-| `tabIconColourTheme`          | `"colour"`      | `"colour"` or `"grey"`                           |
+| Setting                       | Default         | Description                                         |
+| ----------------------------- | --------------- | --------------------------------------------------- |
+| `autoCenterCommitDetailsView` | `true`          | Center commit details when opened                   |
+| `dateFormat`                  | `"Date & Time"` | `"Date & Time"`, `"Date Only"`, or `"Relative"`     |
+| `dateType`                    | `"Author Date"` | `"Author Date"` or `"Commit Date"`                  |
+| `fetchAvatars`                | `false`         | Fetch avatars (sends email to external services)    |
+| `graphColours`                | 12 defaults     | Colors for graph lines                              |
+| `graphStyle`                  | `"rounded"`     | `"rounded"` or `"angular"`                          |
+| `initialLoadCommits`          | `300`           | Commits to load on open                             |
+| `loadMoreCommits`             | `100`           | Commits to load on demand                           |
+| `maxDepthOfRepoSearch`        | `0`             | Folder depth for repo search                        |
+| `showCurrentBranchByDefault`  | `false`         | Show only current branch on open                    |
+| `showStatusBarItem`           | `true`          | Show status bar button                              |
+| `statusBarIconOnly`           | `true`          | Hide the branch label; retain icon and dirty counts |
+| `showUncommittedChanges`      | `true`          | Show uncommitted changes node                       |
+| `tabIconColourTheme`          | `"colour"`      | `"colour"` or `"grey"`                              |
 
 ## Installation
 

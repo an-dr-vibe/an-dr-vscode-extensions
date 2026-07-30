@@ -17,6 +17,7 @@ import { logger } from "@/extension/utils/logger";
 import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
 import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";
 import { ExtensionState } from "@/extensionState";
+import { GitStatusMonitor } from "@/gitStatusMonitor";
 import { RepoFileWatcher } from "@/repoFileWatcher";
 import { StatusBarItem } from "@/statusBarItem";
 import { showErrorMessage } from "@/utils";
@@ -29,7 +30,8 @@ function registerViewCommand(
   extensionState: ExtensionState,
   avatarManager: AvatarManager,
   gitClient: GitClient,
-  dataSource: DataSource
+  dataSource: DataSource,
+  gitStatusMonitor: GitStatusMonitor
 ) {
   let currentPanel: WebviewPanel | undefined;
   ctx.subscriptions.push(
@@ -65,6 +67,7 @@ function registerViewCommand(
         config,
         gitClient,
         dataSource,
+        gitStatusMonitor,
         repoManager,
         extensionState,
         avatarManager,
@@ -119,7 +122,22 @@ export function initExtension(
     const repoManager = createRepoManager(extensionState, statusBarItem, config);
     repoManager.setRepos(repos);
     repoManager.sendRepos();
-    registerViewCommand(ctx, repoManager, extensionState, avatarManager, gitClient, dataSource);
+    const gitStatusMonitor = new GitStatusMonitor(
+      dataSource,
+      extensionState,
+      repoManager,
+      statusBarItem
+    );
+    ctx.subscriptions.push(gitStatusMonitor);
+    registerViewCommand(
+      ctx,
+      repoManager,
+      extensionState,
+      avatarManager,
+      gitClient,
+      dataSource,
+      gitStatusMonitor
+    );
 
     const gitWatcher = vscode.workspace.createFileSystemWatcher("**/.git");
     ctx.subscriptions.push(

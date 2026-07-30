@@ -19,6 +19,7 @@ import { DataSource } from "@/dataSource";
 import { encodeDiffDocUri } from "@/diffDocProvider";
 import { copyToClipboard } from "@/extension/utils/clipboard";
 import { ExtensionState } from "@/extensionState";
+import { GitStatusMonitor } from "@/gitStatusMonitor";
 import { RepoFileWatcher } from "@/repoFileWatcher";
 import { RequestMessage, ResponseMessage } from "@/types";
 import {
@@ -73,6 +74,7 @@ export function registerMessageHandlers(
     config: Config;
     gitClient: GitClient;
     dataSource: DataSource;
+    gitStatusMonitor: GitStatusMonitor;
     repoManager: RepoManager;
     extensionState: ExtensionState;
     avatarManager: AvatarManager;
@@ -83,6 +85,7 @@ export function registerMessageHandlers(
     config,
     gitClient,
     dataSource,
+    gitStatusMonitor,
     repoManager,
     extensionState,
     avatarManager,
@@ -168,7 +171,7 @@ export function registerMessageHandlers(
     }
     currentRepo = msg.repo;
     gitClient.setRepo(msg.repo);
-    extensionState.setLastActiveRepo(msg.repo);
+    gitStatusMonitor.selectRepo(msg.repo);
     repoFileWatcher.start(msg.repo);
   });
 

@@ -21,6 +21,7 @@ export function createRepoManager(
 ) {
   let repos = extensionState.getRepos();
   let viewCallback: ((repos: GitRepoSet, numRepos: number) => void) | null = null;
+  const repoListeners = new Set<(repos: GitRepoSet) => void>();
 
   function setRepos(repoDirs: string[]) {
     const next: GitRepoSet = {};
@@ -39,9 +40,18 @@ export function createRepoManager(
     const sorted = getRepos();
     const numRepos = Object.keys(sorted).length;
     statusBarItem.setNumRepos(numRepos);
+    for (const listener of repoListeners) {
+      listener(sorted);
+    }
     if (viewCallback !== null) {
       viewCallback(sorted, numRepos);
     }
+  }
+
+  /** Subscribes to published repository-list changes. */
+  function onDidChangeRepos(listener: (repos: GitRepoSet) => void) {
+    repoListeners.add(listener);
+    return { dispose: () => repoListeners.delete(listener) };
   }
 
   function removeRepo(repo: string) {
@@ -118,6 +128,7 @@ export function createRepoManager(
   return {
     registerViewCallback,
     deregisterViewCallback,
+    onDidChangeRepos,
     isDirectoryWithinRepos,
     getRepos,
     sendRepos,

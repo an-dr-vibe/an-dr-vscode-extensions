@@ -25,16 +25,20 @@ function createHarness() {
     },
     post
   };
+  const gitStatusMonitor = { selectRepo: vi.fn() };
+  const gitClient = { setRepo: vi.fn() };
+  const repoFileWatcher = { start: vi.fn() };
   registerMessageHandlers(bridge as never, {
     config: {} as never,
-    gitClient: {} as never,
+    gitClient: gitClient as never,
     dataSource: {} as never,
+    gitStatusMonitor: gitStatusMonitor as never,
     repoManager: {} as never,
     extensionState: {} as never,
     avatarManager: {} as never,
-    repoFileWatcher: {} as never
+    repoFileWatcher: repoFileWatcher as never
   });
-  return { handlers, post };
+  return { gitStatusMonitor, handlers, post };
 }
 
 describe("registerMessageHandlers utility actions", () => {
@@ -76,5 +80,16 @@ describe("registerMessageHandlers utility actions", () => {
       command: "getRelativeTimeDiff",
       value: "3 minutes ago"
     });
+  });
+
+  it("publishes repository selection to the status monitor", async () => {
+    const { gitStatusMonitor, handlers } = createHarness();
+
+    await handlers.get("selectRepo")!({
+      command: "selectRepo",
+      repo: "C:/repo"
+    });
+
+    expect(gitStatusMonitor.selectRepo).toHaveBeenCalledWith("C:/repo");
   });
 });

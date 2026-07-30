@@ -1,12 +1,15 @@
 import * as vscode from "vscode";
 
 import { Config } from "./config";
+import type { GitChangeCounts } from "./data-source/models";
 import { EXTENSION_ID, EXTENSION_NAME } from "./extension/constant/const";
 import { logger } from "./extension/utils/logger";
 
 export class StatusBarItem {
   private statusBarItem: vscode.StatusBarItem;
   private numRepos: number = 0;
+  private branchName: string | null = null;
+  private changes: GitChangeCounts = { modified: 0, deleted: 0 };
   private config: Config;
 
   constructor(context: vscode.ExtensionContext, config: Config) {
@@ -26,6 +29,13 @@ export class StatusBarItem {
     this.refresh();
   }
 
+  /** Updates the active branch and working-tree counts shown by the item. */
+  public setRepoStatus(branchName: string | null, changes: GitChangeCounts) {
+    this.branchName = branchName;
+    this.changes = changes;
+    this.refresh();
+  }
+
   public refresh() {
     const show = this.config.showStatusBarItem();
     if (show) {
@@ -36,15 +46,31 @@ export class StatusBarItem {
           : `$(eye) ${EXTENSION_NAME}`;
         this.statusBarItem.tooltip = vscode.l10n.t("No Git repository found — watching for one");
       } else {
+        const dirty = this.formatDirty();
+        const label = this.branchName ?? EXTENSION_NAME;
         this.statusBarItem.text = this.config.statusBarIconOnly()
-          ? "$(type-hierarchy)"
-          : `$(type-hierarchy) ${EXTENSION_NAME}`;
-        this.statusBarItem.tooltip = vscode.l10n.t("View Git Graph");
+          ? `$(git-branch)${dirty}`
+          : `$(git-branch) ${label}${dirty}`;
+        this.statusBarItem.tooltip =
+          this.branchName === null
+            ? vscode.l10n.t("View Git Graph")
+            : `${vscode.l10n.t("View Git Graph")}: ${this.branchName}`;
       }
       this.statusBarItem.show();
     } else {
       logger.log(`StatusBarItem.hide() (showStatusBarItem=${show}, numRepos=${this.numRepos})`);
       this.statusBarItem.hide();
     }
+  }
+
+  private formatDirty() {
+    const parts: string[] = [];
+    if (this.changes.modified > 0) {
+      parts.push(`+${this.changes.modified}`);
+    }
+    if (this.changes.deleted > 0) {
+      parts.push(`-${this.changes.deleted}`);
+    }
+    return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
   }
 }

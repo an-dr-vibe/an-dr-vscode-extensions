@@ -1,35 +1,14 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { GitCommitNode } from "@/backend/types";
-import type * as GG from "@/types";
 import { UNCOMMITTED } from "@/webview/utils/graphConstants";
 
+import { viewStateFixture } from "./fixtures";
 import { createVscodeMock, receive, setupHtml } from "./setup";
 
-const REPO = "/workspace/my-repo";
 let vscodeMock: ReturnType<typeof createVscodeMock>;
 
-const defaultViewState: GG.GitGraphViewState = {
-  autoCenterCommitDetailsView: true,
-  committedVisual: "Initials",
-  avatarMode: "Auto (Fetched then Pattern)",
-  avatarSize: "Normal",
-  avatarShape: "Circle",
-  dateFormat: "Date & Time",
-  fetchAvatars: false,
-  fileIcons: {},
-  uiDensity: "Big",
-  refreshShortcutKey: "r",
-  columnVisibility: { Committed: true, ID: true },
-  graphColours: ["#0085d9"],
-  graphStyle: "rounded",
-  initialLoadCommits: 300,
-  lastActiveRepo: null,
-  loadMoreCommits: 75,
-  locale: "en",
-  repos: { [REPO]: { columnWidths: null } },
-  showCurrentBranchByDefault: false
-};
+const defaultViewState = viewStateFixture();
 
 const twoCommits: GitCommitNode[] = [
   {

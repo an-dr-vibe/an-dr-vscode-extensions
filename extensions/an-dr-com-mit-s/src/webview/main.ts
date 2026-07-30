@@ -7,6 +7,18 @@ import type {
   GitResetMode
 } from "@/backend/types";
 
+import { hideContextMenuIfOpen, showContextMenu } from "./contextMenu";
+import {
+  hideDialog,
+  isDialogOpen,
+  showActionRunningDialog,
+  showCheckboxDialog,
+  showConfirmationDialog,
+  showErrorDialog,
+  showFormDialog,
+  showRefInputDialog,
+  showSelectDialog
+} from "./dialog";
 import { Dropdown } from "./dropdown";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
@@ -14,7 +26,7 @@ import { renderAuthorVisualHtml } from "./utils/avatarVisuals";
 import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
 import { resolveFileIcon } from "./utils/fileIcons";
-import { arraysEqual, ELLIPSIS, refInvalid } from "./utils/git";
+import { arraysEqual, ELLIPSIS } from "./utils/git";
 import { UNCOMMITTED } from "./utils/graphConstants";
 import { escapeHtml, unescapeHtml } from "./utils/html";
 import { svgIcons } from "./utils/icons";
@@ -1335,11 +1347,6 @@ class GitGraphView {
   }
 }
 
-let contextMenu = document.getElementById("contextMenu")!,
-  contextMenuSource: HTMLElement | null = null;
-let dialog = document.getElementById("dialog")!,
-  dialogBacking = document.getElementById("dialogBacking")!,
-  dialogMenuSource: HTMLElement | null = null;
 /**
  * Refreshes on the configured Ctrl/Cmd chord. Registered on the document
  * because the panel has no single focusable root, and skipped while a text
@@ -1677,286 +1684,6 @@ function abbrevCommit(commitHash: string) {
 }
 
 /* Context Menu */
-function showContextMenu(e: MouseEvent, items: ContextMenuElement[], sourceElem: HTMLElement) {
-  // Suppress the host's native context menu. Required in browser-based VS Code
-  // (vscode.dev / Codespaces), where it would otherwise render on top of ours.
-  e.preventDefault();
-
-  let html = "",
-    i: number,
-    event = <MouseEvent>e;
-  for (i = 0; i < items.length; i++) {
-    html +=
-      items[i] !== null
-        ? '<li class="contextMenuItem" data-index="' + i + '">' + items[i]!.title + "</li>"
-        : '<li class="contextMenuDivider"></li>';
-  }
-
-  hideContextMenuListener();
-  contextMenu.style.opacity = "0";
-  contextMenu.className = "active";
-  contextMenu.innerHTML = html;
-  let bounds = contextMenu.getBoundingClientRect();
-  contextMenu.style.left =
-    (event.pageX - window.pageXOffset + bounds.width < window.innerWidth
-      ? event.pageX - 2
-      : event.pageX - bounds.width + 2) + "px";
-  contextMenu.style.top =
-    (event.pageY - window.pageYOffset + bounds.height < window.innerHeight
-      ? event.pageY - 2
-      : event.pageY - bounds.height + 2) + "px";
-  contextMenu.style.opacity = "1";
-
-  addListenerToClass("contextMenuItem", "click", (ev) => {
-    ev.stopPropagation();
-    hideContextMenu();
-    items[parseInt((<HTMLElement>ev.target).dataset.index!)]!.onClick();
-  });
-
-  contextMenuSource = sourceElem;
-  contextMenuSource.classList.add("contextMenuActive");
-}
-function hideContextMenu() {
-  contextMenu.className = "";
-  contextMenu.innerHTML = "";
-  contextMenu.style.left = "0px";
-  contextMenu.style.top = "0px";
-  if (contextMenuSource !== null) {
-    contextMenuSource.classList.remove("contextMenuActive");
-    contextMenuSource = null;
-  }
-}
-
-/* Dialogs */
-function showConfirmationDialog(
-  message: string,
-  confirmed: () => void,
-  sourceElem: HTMLElement | null
-) {
-  showDialog(
-    message,
-    l10n.dialogYes,
-    l10n.dialogCancel,
-    () => {
-      hideDialog();
-      confirmed();
-    },
-    sourceElem
-  );
-}
-function showRefInputDialog(
-  message: string,
-  defaultValue: string,
-  actionName: string,
-  actioned: (value: string) => void,
-  sourceElem: HTMLElement | null
-) {
-  showFormDialog(
-    message,
-    [{ type: "text-ref", name: "", default: defaultValue }],
-    actionName,
-    (values) => actioned(values[0]),
-    sourceElem
-  );
-}
-function showCheckboxDialog(
-  message: string,
-  checkboxLabel: string,
-  checkboxValue: boolean,
-  actionName: string,
-  actioned: (value: boolean) => void,
-  sourceElem: HTMLElement | null
-) {
-  showFormDialog(
-    message,
-    [{ type: "checkbox", name: checkboxLabel, value: checkboxValue }],
-    actionName,
-    (values) => actioned(values[0] === "checked"),
-    sourceElem
-  );
-}
-function showSelectDialog(
-  message: string,
-  defaultValue: string,
-  options: { name: string; value: string }[],
-  actionName: string,
-  actioned: (value: string) => void,
-  sourceElem: HTMLElement | null
-) {
-  showFormDialog(
-    message,
-    [{ type: "select", name: "", options: options, default: defaultValue }],
-    actionName,
-    (values) => actioned(values[0]),
-    sourceElem
-  );
-}
-function showFormDialog(
-  message: string,
-  inputs: DialogInput[],
-  actionName: string,
-  actioned: (values: string[]) => void,
-  sourceElem: HTMLElement | null
-) {
-  let textRefInput = -1,
-    multiElementForm = inputs.length > 1;
-  let html =
-    message + '<br><table class="dialogForm ' + (multiElementForm ? "multi" : "single") + '">';
-  for (let i = 0; i < inputs.length; i++) {
-    let input = inputs[i];
-    html += "<tr>" + (multiElementForm ? "<td>" + input.name + "</td>" : "") + "<td>";
-    if (input.type === "select") {
-      html += '<select id="dialogInput' + i + '">';
-      for (let j = 0; j < input.options.length; j++) {
-        html +=
-          '<option value="' +
-          input.options[j].value +
-          '"' +
-          (input.options[j].value === input.default ? " selected" : "") +
-          ">" +
-          escapeHtml(input.options[j].name) +
-          "</option>";
-      }
-      html += "</select>";
-    } else if (input.type === "checkbox") {
-      html +=
-        '<span class="dialogFormCheckbox"><label><input id="dialogInput' +
-        i +
-        '" type="checkbox"' +
-        (input.value ? " checked" : "") +
-        "/>" +
-        (multiElementForm ? "" : input.name) +
-        "</label></span>";
-    } else {
-      html +=
-        '<input id="dialogInput' +
-        i +
-        '" type="text" value="' +
-        escapeHtml(input.default) +
-        '"' +
-        (input.type === "text" && input.placeholder !== null
-          ? ' placeholder="' + escapeHtml(input.placeholder) + '"'
-          : "") +
-        "/>";
-      if (input.type === "text-ref") {
-        textRefInput = i;
-      }
-    }
-    html += "</td></tr>";
-  }
-  html += "</table>";
-  showDialog(
-    html,
-    actionName,
-    l10n.dialogCancel,
-    () => {
-      if (dialog.className === "active noInput" || dialog.className === "active inputInvalid") {
-        return;
-      }
-      let values = [];
-      for (let i = 0; i < inputs.length; i++) {
-        let input = inputs[i],
-          elem = document.getElementById("dialogInput" + i);
-        if (input.type === "select") {
-          values.push((<HTMLSelectElement>elem).value);
-        } else if (input.type === "checkbox") {
-          values.push((<HTMLInputElement>elem).checked ? "checked" : "unchecked");
-        } else {
-          values.push((<HTMLInputElement>elem).value);
-        }
-      }
-      hideDialog();
-      actioned(values);
-    },
-    sourceElem
-  );
-
-  if (textRefInput > -1) {
-    let dialogInput = <HTMLInputElement>document.getElementById("dialogInput" + textRefInput),
-      dialogAction = document.getElementById("dialogAction")!;
-    if (dialogInput.value === "") {
-      dialog.className = "active noInput";
-    }
-    dialogInput.focus();
-    dialogInput.addEventListener("keyup", () => {
-      let noInput = dialogInput.value === "",
-        invalidInput = dialogInput.value.match(refInvalid) !== null;
-      let newClassName = "active" + (noInput ? " noInput" : invalidInput ? " inputInvalid" : "");
-      if (dialog.className !== newClassName) {
-        dialog.className = newClassName;
-        dialogAction.title = invalidInput ? l10n.invalidCharacters.replace("{0}", actionName) : "";
-      }
-    });
-  }
-}
-function showErrorDialog(message: string, reason: string | null, sourceElem: HTMLElement | null) {
-  showDialog(
-    svgIcons.alert +
-      message +
-      (reason !== null
-        ? '<br><span class="errorReason">' + escapeHtml(reason).split("\n").join("<br>") + "</span>"
-        : ""),
-    null,
-    l10n.dialogDismiss,
-    null,
-    sourceElem
-  );
-}
-function showActionRunningDialog(command: string) {
-  showDialog(
-    '<span id="actionRunning">' + svgIcons.loading + command + " ...</span>",
-    null,
-    l10n.dialogDismiss,
-    null,
-    null
-  );
-}
-function showDialog(
-  html: string,
-  actionName: string | null,
-  dismissName: string,
-  actioned: (() => void) | null,
-  sourceElem: HTMLElement | null
-) {
-  dialogBacking.className = "active";
-  dialog.className = "active";
-  dialog.innerHTML =
-    html +
-    "<br>" +
-    (actionName !== null
-      ? '<div id="dialogAction" class="roundedBtn">' + actionName + "</div>"
-      : "") +
-    '<div id="dialogDismiss" class="roundedBtn">' +
-    dismissName +
-    "</div>";
-  if (actionName !== null && actioned !== null) {
-    document.getElementById("dialogAction")!.addEventListener("click", actioned);
-  }
-  document.getElementById("dialogDismiss")!.addEventListener("click", hideDialog);
-
-  dialogMenuSource = sourceElem;
-  if (dialogMenuSource !== null) {
-    dialogMenuSource.classList.add("dialogActive");
-  }
-}
-function hideDialog() {
-  dialogBacking.className = "";
-  dialog.className = "";
-  dialog.innerHTML = "";
-  if (dialogMenuSource !== null) {
-    dialogMenuSource.classList.remove("dialogActive");
-    dialogMenuSource = null;
-  }
-}
-
-function hideDialogAndContextMenu() {
-  if (dialog.classList.contains("active")) {
-    hideDialog();
-  }
-  if (contextMenu.classList.contains("active")) {
-    hideContextMenu();
-  }
-}
 
 /* Global Listeners */
 document.addEventListener("keyup", (e) => {
@@ -1964,11 +1691,14 @@ document.addEventListener("keyup", (e) => {
     hideDialogAndContextMenu();
   }
 });
-document.addEventListener("click", hideContextMenuListener);
-document.addEventListener("contextmenu", hideContextMenuListener);
-document.addEventListener("mouseleave", hideContextMenuListener);
-function hideContextMenuListener() {
-  if (contextMenu.classList.contains("active")) {
-    hideContextMenu();
+document.addEventListener("click", hideContextMenuIfOpen);
+document.addEventListener("contextmenu", hideContextMenuIfOpen);
+document.addEventListener("mouseleave", hideContextMenuIfOpen);
+
+/** Closes whichever of the two overlays is open, so Escape dismisses either. */
+function hideDialogAndContextMenu() {
+  if (isDialogOpen()) {
+    hideDialog();
   }
+  hideContextMenuIfOpen();
 }

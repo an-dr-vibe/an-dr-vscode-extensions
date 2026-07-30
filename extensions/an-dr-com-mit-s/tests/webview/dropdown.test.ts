@@ -1,32 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as GG from "@/types";
 import { Dropdown } from "@/webview/dropdown";
 
+import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";
 
-const viewState: GG.GitGraphViewState = {
-  autoCenterCommitDetailsView: true,
-  committedVisual: "Avatar",
-  avatarMode: "Auto (Fetched then Pattern)",
-  avatarSize: "Normal",
-  avatarShape: "Circle",
-  dateFormat: "Date & Time",
-  fetchAvatars: false,
-  fileIcons: {},
-  uiDensity: "Big",
-  refreshShortcutKey: "r",
-  columnVisibility: { Committed: true, ID: true },
-  graphColours: ["#0085d9"],
-  graphStyle: "rounded",
-  initialLoadCommits: 300,
-  lastActiveRepo: null,
-  loadMoreCommits: 75,
-  locale: "en",
-  // The builder only emits the panel controls when a repo exists.
-  repos: { "/workspace/repo": { columnWidths: null } },
-  showCurrentBranchByDefault: false
-};
+const viewState = viewStateFixture();
 
 function createDropdown(showInfo = false) {
   const onChange = vi.fn();

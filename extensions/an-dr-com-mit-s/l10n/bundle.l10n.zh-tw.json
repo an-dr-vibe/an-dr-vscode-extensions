@@ -133,5 +133,7 @@
   "Pull Current Branch": "提取目前分支",
   "Pull": "提取",
   "Push Current Branch": "推送目前分支",
-  "Push": "推送"
+  "Push": "推送",
+  "Select a commit to see the files it changed": "選擇一個提交以查看其變更的檔案",
+  "Changed Files": "變更的檔案"
 }

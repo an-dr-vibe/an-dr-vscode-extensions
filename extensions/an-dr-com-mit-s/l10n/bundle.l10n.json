@@ -44,6 +44,8 @@
   "Deleted in {0}": "Deleted in {0}",
   "Commits could not finish loading. Please retry.": "Commits could not finish loading. Please retry.",
   "Loading ...": "Loading ...",
+  "Select a commit to see the files it changed": "Select a commit to see the files it changed",
+  "Changed Files": "Changed Files",
   "Load More Commits": "Load More Commits",
   "Show All": "Show All",
   "Filter {0}...": "Filter {0}...",

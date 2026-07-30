@@ -98,6 +98,66 @@ body.unableToLoad p {
 /* Content */
 #content {
   position: relative;
+  /* The panel is fixed, so the content is inset by the width it reserves.
+     The variable is 0px while the panel is hidden. */
+  margin-right: var(--files-panel-width, 0px);
+}
+
+/* Changed-files panel */
+#filesPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--files-panel-inline-width, 280px);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-left: 1px solid rgba(128, 128, 128, 0.5);
+  z-index: 1;
+}
+/* Kept in the layout rather than display:none so its width survives a hide. */
+body.filesPanelHidden #filesPanel {
+  transform: translateX(100%);
+  visibility: hidden;
+}
+#filesPanelResizeHandle {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+#filesPanelHeader,
+#filesPanelFooter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  overflow: hidden;
+}
+#filesPanelHeader {
+  top: 0;
+}
+#filesPanelFooter {
+  bottom: 0;
+}
+/* Inset by the header and footer heights, which the panel sets inline. */
+#filesPanelContent {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow: auto;
+  padding: 4px 8px;
+}
+#filesPanelPlaceholder,
+.filesPanelPlaceholder {
+  opacity: 0.7;
+  font-size: 12px;
+  padding: 8px 4px;
 }
 
 /* Commit Graph */

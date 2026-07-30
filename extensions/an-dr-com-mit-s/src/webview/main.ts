@@ -20,6 +20,7 @@ import {
   showSelectDialog
 } from "./dialog";
 import { Dropdown } from "./dropdown";
+import { DEFAULT_FILES_PANEL_WIDTH, FilesPanel } from "./filesPanel";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
 import { renderAuthorVisualHtml } from "./utils/avatarVisuals";
@@ -58,6 +59,8 @@ class GitGraphView {
   private branchDropdown: Dropdown;
   private showRemoteBranchesElem: HTMLInputElement;
   private scrollShadowElem: HTMLElement;
+  private filesPanel: FilesPanel;
+  private filesPanelWidth: number;
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
@@ -100,6 +103,11 @@ class GitGraphView {
       this.refresh(true);
     });
     this.scrollShadowElem = <HTMLInputElement>document.getElementById("scrollShadow")!;
+    this.filesPanelWidth = prevState?.filesPanelWidth ?? DEFAULT_FILES_PANEL_WIDTH;
+    this.filesPanel = new FilesPanel(this.filesPanelWidth, (width) => {
+      this.filesPanelWidth = width;
+      this.saveState();
+    });
     document.getElementById("refreshBtn")!.addEventListener("click", () => {
       this.refresh(true);
     });
@@ -443,7 +451,8 @@ class GitGraphView {
       moreCommitsAvailable: this.moreCommitsAvailable,
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
-      expandedCommit: this.expandedCommit
+      expandedCommit: this.expandedCommit,
+      filesPanelWidth: this.filesPanelWidth
     });
   }
 
@@ -1231,6 +1240,8 @@ class GitGraphView {
         this.expandedCommit.srcElem.classList.remove("commitDetailsOpen");
       }
       this.expandedCommit = null;
+      this.filesPanel.clear();
+      this.filesPanel.hide();
       this.saveState();
       this.renderGraph();
     }
@@ -1314,6 +1325,16 @@ class GitGraphView {
     document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
       this.hideCommitDetails();
     });
+
+    // The side panel shows the same change list as the inline view, so it is
+    // filled from the same tree rather than from a second request.
+    this.filesPanel.setHeader(
+      `<b>${l10n.filesPanelTitle}</b> &mdash; ${escapeHtml(abbrevCommit(commitDetails.hash))}`
+    );
+    this.filesPanel.setContent(
+      generateGitFileTreeHtml(fileTree, commitDetails.fileChanges) + "</table>"
+    );
+    this.filesPanel.show();
     addListenerToClass("gitFolder", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
       let parent = sourceElem.parentElement!;

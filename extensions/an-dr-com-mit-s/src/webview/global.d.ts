@@ -118,6 +118,8 @@ declare global {
     maxCommits: number;
     showRemoteBranches: boolean;
     expandedCommit: ExpandedCommit | null;
+    /** Absent in state saved before the changed-files panel existed. */
+    filesPanelWidth?: number;
   }
 }
 

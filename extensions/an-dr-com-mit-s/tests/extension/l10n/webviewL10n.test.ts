@@ -7,7 +7,7 @@ describe("getWebviewLocalizedStrings", () => {
     const strings = getWebviewLocalizedStrings();
     const values = Object.values(strings);
 
-    expect(Object.keys(strings)).toHaveLength(95);
+    expect(Object.keys(strings)).toHaveLength(97);
     expect(strings).toMatchObject({
       repo: "Repo",
       unableToLoadCommitDetails: "Unable to load commit details",

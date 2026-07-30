@@ -122,6 +122,7 @@ export function buildWebviewHtml(opts: {
 			<div id="commitGraph"></div>
 			<div id="commitTable"></div>
 		</div>
+		<div id="filesPanel"></div>
 		<div id="footer"></div>
 		<ul id="contextMenu"></ul>
 		<div id="dialogBacking"></div>

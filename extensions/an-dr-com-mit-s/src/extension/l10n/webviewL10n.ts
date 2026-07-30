@@ -13,6 +13,8 @@ export function getWebviewLocalizedStrings() {
     repo: vscode.l10n.t("Repo"),
     branch: vscode.l10n.t("Branch"),
     loading: vscode.l10n.t("Loading ..."),
+    filesPanelPlaceholder: vscode.l10n.t("Select a commit to see the files it changed"),
+    filesPanelTitle: vscode.l10n.t("Changed Files"),
     loadMore: vscode.l10n.t("Load More Commits"),
     showAll: vscode.l10n.t("Show All"),
     filterPlaceholder: vscode.l10n.t("Filter {0}..."),

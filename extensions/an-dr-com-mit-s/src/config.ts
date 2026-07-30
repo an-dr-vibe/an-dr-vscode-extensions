@@ -2,12 +2,16 @@ import * as vscode from "vscode";
 
 import { DateType } from "./backend/types";
 import { EXTENSION_ID, getConfigKey, TARGET_EXTENSION_ID } from "./extension/constant/const";
+import { LogLevel } from "./extension/utils/logger";
 import { DateFormat, GraphStyle } from "./types";
 
 type TabIconColourTheme = "colour" | "grey";
 
 /** Where extended blame information appears on hover. */
 export type BlameHoverMode = "off" | "inline-status" | "inline" | "status";
+
+/** How the working-tree state is shown in the status bar. */
+type DirtyIndicator = "+N -M" | "*" | "none";
 type CommittedVisual = "Avatar" | "Initials";
 type AvatarMode =
   | "Auto (Fetched then Pattern)"
@@ -95,6 +99,11 @@ export const config = {
   affectsStatusBarIconOnly: (event: vscode.ConfigurationChangeEvent): boolean =>
     event.affectsConfiguration(getConfigKey("statusBarIconOnly")) ||
     event.affectsConfiguration(getConfigKey("statusBarIconOnly", TARGET_EXTENSION_ID)),
+
+  logLevel: (): LogLevel => getConfig("logLevel", "Info"),
+  statusBarDirtyIndicator: (): DirtyIndicator => getConfig("statusBarItem.dirtyIndicator", "+N -M"),
+  affectsLogLevel: (event: vscode.ConfigurationChangeEvent): boolean =>
+    event.affectsConfiguration(getConfigKey("logLevel")),
 
   /* Inline blame */
 

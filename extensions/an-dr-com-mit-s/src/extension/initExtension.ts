@@ -226,6 +226,7 @@ export function initExtension(
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (
           e.affectsConfiguration(getConfigKey("showStatusBarItem")) ||
+          e.affectsConfiguration(getConfigKey("statusBarItem.dirtyIndicator")) ||
           config.affectsStatusBarIconOnly(e)
         ) {
           statusBarItem.refresh();

@@ -63,7 +63,21 @@ export class StatusBarItem {
     }
   }
 
+  /**
+   * Renders the working-tree indicator in the configured style: counted
+   * (`+2 -1`), a single asterisk for any change at all, or nothing.
+   */
   private formatDirty() {
+    const style = this.config.statusBarDirtyIndicator();
+    if (style === "none") {
+      return "";
+    }
+
+    const isDirty = this.changes.modified > 0 || this.changes.deleted > 0;
+    if (style === "*") {
+      return isDirty ? " *" : "";
+    }
+
     const parts: string[] = [];
     if (this.changes.modified > 0) {
       parts.push(`+${this.changes.modified}`);

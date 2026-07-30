@@ -11,6 +11,14 @@ import { StatusBarItem } from "@/statusBarItem";
 
 export async function activate(ctx: vscode.ExtensionContext) {
   logger.init(ctx);
+  logger.setLevel(config.logLevel());
+  ctx.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (config.affectsLogLevel(event)) {
+        logger.setLevel(config.logLevel());
+      }
+    })
+  );
   logger.log("Starting an-dr: Commits (MIT) ...");
 
   const gitPath = config.gitPath();

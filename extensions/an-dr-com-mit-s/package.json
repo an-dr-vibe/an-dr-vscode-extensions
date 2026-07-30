@@ -371,6 +371,32 @@
             3
           ],
           "description": "How aggressively to detect lines moved or copied from other files. Each level adds a -C flag."
+        },
+        "an-dr-com-mit-s.logLevel": {
+          "type": "string",
+          "default": "Info",
+          "enum": [
+            "Debug",
+            "Info",
+            "Warning",
+            "Error"
+          ],
+          "description": "Lowest severity written to the extension output channel."
+        },
+        "an-dr-com-mit-s.statusBarItem.dirtyIndicator": {
+          "type": "string",
+          "default": "+N -M",
+          "enum": [
+            "+N -M",
+            "*",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Show counts of modified and deleted files.",
+            "Show a single asterisk when the working tree is dirty.",
+            "Show no indicator."
+          ],
+          "description": "How the working-tree state is indicated in the status bar."
         }
       }
     }

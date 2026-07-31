@@ -1,6 +1,7 @@
 import * as path from "node:path";
 
 import type * as GG from "@an-dr/commits-core/types";
+import { setWebviewHost } from "@an-dr/commits-core/webview/utils/host";
 
 import { getWebviewLocalizedStrings } from "@/extension/l10n/webviewL10n";
 import { buildWebviewHtml, WebviewHtmlConfig } from "@/extension/webviewHtml";
@@ -46,6 +47,14 @@ export function createVscodeMock() {
   };
 
   global.acquireVsCodeApi = () => mock;
+  // The core reaches its host through the injected transport, so installing
+  // the mock means installing that too - not only the VS Code global.
+  setWebviewHost({
+    postMessage: mock.postMessage,
+    getState: mock.getState,
+    setState: mock.setState,
+    getStyleValue: (name: string) => document.documentElement.style.getPropertyValue(name)
+  });
 
   return {
     sentMessages: sent,

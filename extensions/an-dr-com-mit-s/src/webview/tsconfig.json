@@ -2,5 +2,6 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "lib": ["es2023", "dom"]
-  }
+  },
+  "include": ["**/*.ts", "../../packages/core/src/webview/**/*.ts"]
 }

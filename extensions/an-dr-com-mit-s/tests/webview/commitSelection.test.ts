@@ -1,6 +1,5 @@
+import { CommitSelection, readSelectionGesture } from "@an-dr/commits-core/webview/commitSelection";
 import { describe, expect, it } from "vitest";
-
-import { CommitSelection, readSelectionGesture } from "@/webview/commitSelection";
 
 /** Table order runs newest-first, which is what makes index 2 older than 0. */
 const HASHES = ["aaa", "bbb", "ccc", "ddd"];

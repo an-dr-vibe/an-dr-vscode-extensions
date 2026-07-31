@@ -1,3 +1,4 @@
+import type { LocalizedStrings } from "@an-dr/commits-core/webview/l10nContract";
 import * as vscode from "vscode";
 
 /**
@@ -7,7 +8,7 @@ import * as vscode from "vscode";
  * object (see webviewHtml.ts). Every user-facing webview string must be
  * declared here — `@vscode/l10n-dev export` extracts them from this file.
  */
-export function getWebviewLocalizedStrings() {
+export function getWebviewLocalizedStrings(): LocalizedStrings {
   return {
     // UI labels
     repo: vscode.l10n.t("Repo"),
@@ -163,5 +164,3 @@ export function getWebviewLocalizedStrings() {
     tooltipDeletions: vscode.l10n.t("{0} deletions")
   };
 }
-
-export type LocalizedStrings = ReturnType<typeof getWebviewLocalizedStrings>;

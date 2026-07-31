@@ -1,6 +1,5 @@
+import { escapeHtml, unescapeHtml } from "@an-dr/commits-core/webview/utils/html";
 import { describe, expect, it } from "vitest";
-
-import { escapeHtml, unescapeHtml } from "@/webview/utils/html";
 
 describe("escapeHtml", () => {
   // 1. Passthrough — safe content is not mangled

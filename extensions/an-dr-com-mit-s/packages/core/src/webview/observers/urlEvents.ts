@@ -1,4 +1,4 @@
-import { sendMessage } from "@/webview/utils/vscode";
+import { sendMessage } from "@an-dr/commits-core/webview/utils/host";
 
 const EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 

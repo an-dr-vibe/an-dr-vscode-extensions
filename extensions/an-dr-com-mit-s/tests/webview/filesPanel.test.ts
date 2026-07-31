@@ -1,6 +1,5 @@
+import { DEFAULT_FILES_PANEL_WIDTH, FilesPanel } from "@an-dr/commits-core/webview/filesPanel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { DEFAULT_FILES_PANEL_WIDTH, FilesPanel } from "@/webview/filesPanel";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

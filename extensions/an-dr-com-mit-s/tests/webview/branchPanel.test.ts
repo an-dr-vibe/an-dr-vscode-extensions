@@ -1,7 +1,6 @@
+import { BranchPanel, DEFAULT_BRANCH_PANEL_WIDTH } from "@an-dr/commits-core/webview/branchPanel";
+import { renderBranchPanel } from "@an-dr/commits-core/webview/branchPanelRender";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { BranchPanel, DEFAULT_BRANCH_PANEL_WIDTH } from "@/webview/branchPanel";
-import { renderBranchPanel } from "@/webview/branchPanelRender";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml, setupL10n } from "./setup";

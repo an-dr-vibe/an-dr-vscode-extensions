@@ -1,7 +1,6 @@
 import type { GitCommitNode } from "@an-dr/commits-core/backend/types";
+import { UNCOMMITTED } from "@an-dr/commits-core/webview/utils/graphConstants";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { UNCOMMITTED } from "@/webview/utils/graphConstants";
 
 import { FIXTURE_REPO, viewStateFixture } from "./fixtures";
 import { createVscodeMock, receive, setupHtml } from "./setup";

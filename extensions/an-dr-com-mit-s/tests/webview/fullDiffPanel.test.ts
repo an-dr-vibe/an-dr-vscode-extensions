@@ -1,6 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { DEFAULT_FULL_DIFF_HEIGHT, FullDiffPanel } from "@/webview/fullDiffPanel";
+import { DEFAULT_FULL_DIFF_HEIGHT, FullDiffPanel } from "@an-dr/commits-core/webview/fullDiffPanel";
 import {
   buildUnifiedRows,
   compactRows,
@@ -8,7 +6,8 @@ import {
   parseUnifiedDiffHunks,
   renderFullDiff,
   toDisplayLines
-} from "@/webview/fullDiffRender";
+} from "@an-dr/commits-core/webview/fullDiffRender";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml, setupL10n } from "./setup";

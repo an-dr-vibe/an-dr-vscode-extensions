@@ -1,6 +1,5 @@
+import { renderTagPill } from "@an-dr/commits-core/webview/utils/refPills";
 import { describe, expect, it } from "vitest";
-
-import { renderTagPill } from "@/webview/utils/refPills";
 
 describe("reference labels", () => {
   it("wraps a tag name so the shared label padding applies", () => {

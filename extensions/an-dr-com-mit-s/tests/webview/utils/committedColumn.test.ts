@@ -1,9 +1,8 @@
-import { describe, expect, it } from "vitest";
-
 import {
   getCommittedAuthorInitials,
   getCommittedInitialsBackgroundColor
-} from "@/webview/utils/committedColumn";
+} from "@an-dr/commits-core/webview/utils/committedColumn";
+import { describe, expect, it } from "vitest";
 
 describe("getCommittedAuthorInitials", () => {
   it("uses the first letters of a first and last name", () => {

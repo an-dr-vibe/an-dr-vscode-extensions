@@ -1,6 +1,5 @@
+import { formatRelativeDate } from "@an-dr/commits-core/webview/utils/date";
 import { describe, expect, it } from "vitest";
-
-import { formatRelativeDate } from "@/webview/utils/date";
 
 /** `seconds` in the past, relative to a fixed "now". */
 const NOW = new Date("2026-07-24T12:00:00Z");

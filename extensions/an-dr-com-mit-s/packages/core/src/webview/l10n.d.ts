@@ -3,7 +3,7 @@
  * This file is generated based on webviewL10n.ts
  */
 
-import type { LocalizedStrings } from "@/extension/l10n/webviewL10n";
+import type { LocalizedStrings } from "@an-dr/commits-core/webview/l10nContract";
 
 declare global {
   /**

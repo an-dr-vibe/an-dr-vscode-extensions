@@ -1,7 +1,6 @@
+import { Toolbar } from "@an-dr/commits-core/webview/toolbar";
+import { toolbarIcons } from "@an-dr/commits-core/webview/utils/icons";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { Toolbar } from "@/webview/toolbar";
-import { toolbarIcons } from "@/webview/utils/icons";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

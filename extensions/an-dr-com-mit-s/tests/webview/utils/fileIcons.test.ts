@@ -1,6 +1,5 @@
+import { resolveFileIcon } from "@an-dr/commits-core/webview/utils/fileIcons";
 import { describe, expect, it } from "vitest";
-
-import { resolveFileIcon } from "@/webview/utils/fileIcons";
 
 const icons = {
   ts: "<svg>ts</svg>",

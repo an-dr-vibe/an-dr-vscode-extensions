@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import {
   hideContextMenu,
   hideContextMenuIfOpen,
   isContextMenuOpen,
   showContextMenu
-} from "@/webview/contextMenu";
+} from "@an-dr/commits-core/webview/contextMenu";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

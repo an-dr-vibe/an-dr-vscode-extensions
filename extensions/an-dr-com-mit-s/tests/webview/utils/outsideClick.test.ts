@@ -1,6 +1,5 @@
+import { addOutsideClickListener } from "@an-dr/commits-core/webview/utils/outsideClick";
 import { describe, expect, it, vi } from "vitest";
-
-import { addOutsideClickListener } from "@/webview/utils/outsideClick";
 
 describe("addOutsideClickListener", () => {
   it("reports inside and outside clicks, then removes its listener", () => {

@@ -1,6 +1,5 @@
+import { Dropdown } from "@an-dr/commits-core/webview/dropdown";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { Dropdown } from "@/webview/dropdown";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

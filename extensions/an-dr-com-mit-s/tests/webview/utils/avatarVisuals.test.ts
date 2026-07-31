@@ -1,10 +1,9 @@
-import { describe, expect, it } from "vitest";
-
 import {
   getAuthorVisual,
   renderAuthorVisualHtml,
   type AvatarConfig
-} from "@/webview/utils/avatarVisuals";
+} from "@an-dr/commits-core/webview/utils/avatarVisuals";
+import { describe, expect, it } from "vitest";
 
 const baseConfig: AvatarConfig = {
   committedVisual: "Avatar",

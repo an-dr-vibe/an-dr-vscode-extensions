@@ -1,7 +1,6 @@
 import type { RepoInProgressState } from "@an-dr/commits-core/backend/queries/repoInProgress";
+import { RepoInProgressBanner } from "@an-dr/commits-core/webview/repoInProgressBanner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { RepoInProgressBanner } from "@/webview/repoInProgressBanner";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

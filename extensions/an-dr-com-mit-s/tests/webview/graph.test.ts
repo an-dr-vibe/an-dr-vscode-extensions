@@ -1,7 +1,6 @@
 import type { GitCommitNode } from "@an-dr/commits-core/backend/types";
+import { Graph } from "@an-dr/commits-core/webview/graph";
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { Graph } from "@/webview/graph";
 
 const config: Config = {
   autoCenterCommitDetailsView: true,

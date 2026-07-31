@@ -1,6 +1,5 @@
+import { FindWidget } from "@an-dr/commits-core/webview/findWidget";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-
-import { FindWidget } from "@/webview/findWidget";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

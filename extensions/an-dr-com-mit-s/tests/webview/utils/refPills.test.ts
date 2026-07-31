@@ -1,6 +1,5 @@
+import { renderTagPill } from "@an-dr/commits-core/webview/utils/refPills";
 import { describe, expect, it } from "vitest";
-
-import { renderTagPill } from "@/webview/utils/refPills";
 
 describe("renderTagPill", () => {
   it("renders the shared .gitRef.tag markup contract", () => {

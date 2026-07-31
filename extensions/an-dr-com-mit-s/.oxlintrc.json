@@ -81,10 +81,17 @@
       }
     },
     {
-      "files": ["src/webview/**/*.ts"],
+      "files": ["src/webview/**/*.ts", "packages/core/src/webview/**/*.ts"],
       "env": {
         "node": false,
         "browser": true
+      },
+      // Injected into the page by the host before the bundle runs, and declared
+      // ambiently in the webview's .d.ts files.
+      "globals": {
+        "l10n": "readonly",
+        "viewState": "readonly",
+        "acquireVsCodeApi": "readonly"
       }
     },
     {

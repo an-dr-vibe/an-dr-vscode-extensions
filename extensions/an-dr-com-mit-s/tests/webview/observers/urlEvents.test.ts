@@ -12,7 +12,16 @@ describe("observeExternalUrls", () => {
     const vscode = createVscodeMock();
     document.body.innerHTML =
       '<a href="https://example.test/docs"><span id="label">Documentation</span></a>';
-    const { observeExternalUrls } = await import("@/webview/observers/urlEvents");
+    // resetModules gives this import a fresh module graph, so the transport
+    // has to be installed into that graph rather than an earlier one.
+    const { setWebviewHost } = await import("@an-dr/commits-core/webview/utils/host");
+    setWebviewHost({
+      postMessage: (message) => void vscode.sentMessages.push(message),
+      getState: () => null,
+      setState: () => undefined,
+      getStyleValue: () => ""
+    });
+    const { observeExternalUrls } = await import("@an-dr/commits-core/webview/observers/urlEvents");
     const dispose = observeExternalUrls();
     const event = new MouseEvent("click", { bubbles: true, cancelable: true });
 
@@ -28,7 +37,16 @@ describe("observeExternalUrls", () => {
   it("leaves unsupported protocols to the webview", async () => {
     const vscode = createVscodeMock();
     document.body.innerHTML = '<a id="link" href="command:unsafe">Unsupported</a>';
-    const { observeExternalUrls } = await import("@/webview/observers/urlEvents");
+    // resetModules gives this import a fresh module graph, so the transport
+    // has to be installed into that graph rather than an earlier one.
+    const { setWebviewHost } = await import("@an-dr/commits-core/webview/utils/host");
+    setWebviewHost({
+      postMessage: (message) => void vscode.sentMessages.push(message),
+      getState: () => null,
+      setState: () => undefined,
+      getStyleValue: () => ""
+    });
+    const { observeExternalUrls } = await import("@an-dr/commits-core/webview/observers/urlEvents");
     observeExternalUrls();
     const event = new MouseEvent("click", { bubbles: true, cancelable: true });
     const link = document.getElementById("link")!;

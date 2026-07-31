@@ -1,5 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import {
   hideDialog,
   isDialogOpen,
@@ -8,7 +6,8 @@ import {
   showErrorDialog,
   showRefInputDialog,
   showSelectDialog
-} from "@/webview/dialog";
+} from "@an-dr/commits-core/webview/dialog";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";

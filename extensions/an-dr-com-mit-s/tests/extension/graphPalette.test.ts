@@ -3,7 +3,7 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { config } from "@/config";
+import { config } from "@/extension/utils/vscodeConfigPort";
 
 /**
  * The palette is declared twice: in the manifest, which the settings UI shows,

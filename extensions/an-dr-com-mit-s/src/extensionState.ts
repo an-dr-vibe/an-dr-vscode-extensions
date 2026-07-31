@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 
 import { getPathFromStr } from "@an-dr/commits-core/backend/utils/path";
+import type { KeyValueStore, StoragePort } from "@an-dr/commits-core/host/port";
 import { Avatar, AvatarCache, GitRepoSet } from "@an-dr/commits-core/types";
-import { ExtensionContext, Memento } from "vscode";
 
 import { getVersionedStateKey, shouldReadStagingLegacyState } from "./extension/constant/const";
 
@@ -15,16 +15,16 @@ const LAST_ACTIVE_REPO = getVersionedStateKey(LEGACY_LAST_ACTIVE_REPO);
 const REPO_STATES = getVersionedStateKey(LEGACY_REPO_STATES);
 
 export class ExtensionState {
-  private globalState: Memento;
-  private workspaceState: Memento;
+  private globalState: KeyValueStore;
+  private workspaceState: KeyValueStore;
   private globalStoragePath: string;
   private avatarStorageAvailable: boolean = false;
 
-  constructor(context: ExtensionContext) {
-    this.globalState = context.globalState;
-    this.workspaceState = context.workspaceState;
+  constructor(storage: StoragePort) {
+    this.globalState = storage.global;
+    this.workspaceState = storage.workspace;
 
-    this.globalStoragePath = getPathFromStr(context.globalStoragePath);
+    this.globalStoragePath = getPathFromStr(storage.globalStoragePath);
     fs.stat(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err) => {
       if (!err) {
         this.avatarStorageAvailable = true;

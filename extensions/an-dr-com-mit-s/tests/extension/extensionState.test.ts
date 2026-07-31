@@ -36,10 +36,10 @@ describe("ExtensionState compatibility", () => {
       lastActiveRepo: "C:/legacy"
     });
     const state = new ExtensionState({
-      globalState: createMemento({}),
-      workspaceState,
+      global: createMemento({}),
+      workspace: workspaceState,
       globalStoragePath: storagePath
-    } as never);
+    });
 
     expect(state.getRepos()).toEqual({ "C:/legacy": { columnWidths: null } });
     expect(state.getLastActiveRepo()).toBe("C:/legacy");
@@ -54,15 +54,15 @@ describe("ExtensionState compatibility", () => {
 
   it("prefers versioned state when both shapes exist", () => {
     const state = new ExtensionState({
-      globalState: createMemento({}),
-      workspaceState: createMemento({
+      global: createMemento({}),
+      workspace: createMemento({
         repoStates: { "C:/legacy": { columnWidths: null } },
         "v2.repoStates": { "C:/versioned": { columnWidths: null } },
         lastActiveRepo: "C:/legacy",
         "v2.lastActiveRepo": "C:/versioned"
       }),
       globalStoragePath: storagePath
-    } as never);
+    });
 
     expect(state.getRepos()).toEqual({ "C:/versioned": { columnWidths: null } });
     expect(state.getLastActiveRepo()).toBe("C:/versioned");
@@ -71,10 +71,10 @@ describe("ExtensionState compatibility", () => {
   it("stores external repository paths under a versioned key", () => {
     const workspaceState = createMemento({ "v2.externalRepos": ["C:/existing"] });
     const state = new ExtensionState({
-      globalState: createMemento({}),
-      workspaceState,
+      global: createMemento({}),
+      workspace: workspaceState,
       globalStoragePath: storagePath
-    } as never);
+    });
 
     expect(state.getExternalRepos()).toEqual(["C:/existing"]);
     state.saveExternalRepos(["C:/new"]);

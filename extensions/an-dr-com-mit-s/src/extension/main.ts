@@ -2,10 +2,10 @@ import { findGitRepos } from "@an-dr/commits-core/backend/queries/repoSearch";
 import { getGitVersion } from "@an-dr/commits-core/backend/utils/git";
 import * as vscode from "vscode";
 
-import { config } from "@/config";
 import { getVersionedStateKey } from "@/extension/constant/const";
 import { initExtension } from "@/extension/initExtension";
 import { logger } from "@/extension/utils/logger";
+import { config, vscodeConfigPort } from "@/extension/utils/vscodeConfigPort";
 import { watchForRepos } from "@/extension/watchForRepos";
 import { StatusBarItem } from "@/statusBarItem";
 
@@ -13,7 +13,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
   logger.init(ctx);
   logger.setLevel(config.logLevel());
   ctx.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((event) => {
+    vscodeConfigPort.onDidChange((event) => {
       if (config.affectsLogLevel(event)) {
         logger.setLevel(config.logLevel());
       }

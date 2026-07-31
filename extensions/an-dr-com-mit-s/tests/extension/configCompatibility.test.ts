@@ -23,7 +23,7 @@ const mock = vi.hoisted(() => {
 
 vi.mock("vscode", () => ({ workspace: mock.workspace }));
 
-import { config } from "@/config";
+import { config } from "@/extension/utils/vscodeConfigPort";
 
 describe("compatibility configuration", () => {
   beforeEach(() => {
@@ -47,14 +47,14 @@ describe("compatibility configuration", () => {
   });
 
   it("reacts to both staging and compatibility status-bar keys", () => {
-    for (const changedKey of [
-      "an-dr-com-mit-s.statusBarIconOnly",
-      "an-dr-commits.statusBarIconOnly"
-    ]) {
+    // The change event now arrives through the host port, which reports a
+    // namespace and key rather than one dotted string.
+    for (const changed of ["an-dr-com-mit-s", "an-dr-commits"]) {
       expect(
         config.affectsStatusBarIconOnly({
-          affectsConfiguration: (key: string) => key === changedKey
-        } as never)
+          affects: (namespace: string, key?: string) =>
+            namespace === changed && key === "statusBarIconOnly"
+        })
       ).toBe(true);
     }
   });

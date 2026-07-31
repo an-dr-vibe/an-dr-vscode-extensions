@@ -7,6 +7,7 @@ import { CurrentUserIdentity, DataSource } from "@/dataSource";
 import { RepoManager } from "@/extension/repoManager";
 import { getPathFromUri } from "@/extension/utils/hostPaths";
 import { logger } from "@/extension/utils/logger";
+import { vscodeConfigPort } from "@/extension/utils/vscodeConfigPort";
 import { getRelativeTimeDiff } from "@/utils";
 
 /**
@@ -111,7 +112,7 @@ export class InlineBlameController {
           this.clear(active);
         }
       }),
-      vscode.workspace.onDidChangeConfiguration((event) => {
+      vscodeConfigPort.onDidChange((event) => {
         if (this.config.affectsBlame(event)) {
           this.currentUserCache.clear();
           this.invalidateBlameCache();

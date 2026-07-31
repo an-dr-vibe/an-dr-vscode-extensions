@@ -7,15 +7,9 @@ import * as vscode from "vscode";
 import { createAskpass } from "@/askpass/askpass";
 import { promptForCredential } from "@/askpass/credentialPrompt";
 import { AvatarManager } from "@/avatarManager";
-import { config } from "@/config";
 import { DataSource } from "@/dataSource";
 import { DiffDocProvider } from "@/diffDocProvider";
-import {
-  EXTENSION_ID,
-  EXTENSION_NAME,
-  getCommandId,
-  getConfigKey
-} from "@/extension/constant/const";
+import { EXTENSION_ID, EXTENSION_NAME, getCommandId } from "@/extension/constant/const";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerMessageHandlers } from "@/extension/messageHandler";
 import { registerPublicCommands } from "@/extension/publicCommands";
@@ -24,6 +18,8 @@ import { createRepoManager, RepoManager } from "@/extension/repoManager";
 import { createRepositoryCommands } from "@/extension/repositoryCommands";
 import { buildExtensionUri } from "@/extension/utils/hostPaths";
 import { logger } from "@/extension/utils/logger";
+import { config, vscodeConfigPort } from "@/extension/utils/vscodeConfigPort";
+import { createVscodeStoragePort } from "@/extension/utils/vscodeStoragePort";
 import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
 import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";
 import { ExtensionState } from "@/extensionState";
@@ -113,7 +109,7 @@ export function initExtension(
   try {
     logger.log(`Initializing extension with ${repos.length} repo(s)`);
 
-    const extensionState = new ExtensionState(ctx);
+    const extensionState = new ExtensionState(createVscodeStoragePort(ctx));
     const avatarManager = new AvatarManager(config.gitPath, extensionState);
 
     ctx.subscriptions.push(
@@ -229,16 +225,16 @@ export function initExtension(
           }
         }
       }),
-      vscode.workspace.onDidChangeConfiguration((e) => {
+      vscodeConfigPort.onDidChange((e) => {
         if (
-          e.affectsConfiguration(getConfigKey("showStatusBarItem")) ||
-          e.affectsConfiguration(getConfigKey("statusBarItem.dirtyIndicator")) ||
+          e.affects(EXTENSION_ID, "showStatusBarItem") ||
+          e.affects(EXTENSION_ID, "statusBarItem.dirtyIndicator") ||
           config.affectsStatusBarIconOnly(e)
         ) {
           statusBarItem.refresh();
-        } else if (e.affectsConfiguration("git.path")) {
+        } else if (e.affects("git", "path")) {
           gitClient.setGitPath(config.gitPath());
-        } else if (e.affectsConfiguration(getConfigKey("maxDepthOfRepoSearch"))) {
+        } else if (e.affects(EXTENSION_ID, "maxDepthOfRepoSearch")) {
           if (maxDepth.increased(config.maxDepthOfRepoSearch())) {
             const paths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
             void findGitRepos(paths, config.gitPath(), config.maxDepthOfRepoSearch()).then(

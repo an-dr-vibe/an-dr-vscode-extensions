@@ -1,12 +1,12 @@
 import { findGitRepos } from "@an-dr/commits-core/backend/queries/repoSearch";
 import * as vscode from "vscode";
 
-import { config } from "@/config";
 import { EXTENSION_NAME, getConfigKey, getVersionedStateKey } from "@/extension/constant/const";
 import type { InitExtension } from "@/extension/initExtension";
 import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerPublicCommands } from "@/extension/publicCommands";
 import { selectGitRepository } from "@/extension/repositoryCommands";
+import { config } from "@/extension/utils/vscodeConfigPort";
 import { StatusBarItem } from "@/statusBarItem";
 
 type WatcherState = {

@@ -1417,17 +1417,25 @@ class GitGraphView {
   private makeTableResizable() {
     let colHeadersElem = document.getElementById("tableColHeaders")!,
       cols = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName("tableColHeader");
+    // Every column carries an explicit width except the message column, which
+    // absorbs the slack. Deriving the list rather than hard-coding indices is
+    // what keeps this working as columns are hidden or the layout changes.
+    const sizedCols = Array.from(cols, (_col, index) => index).filter((index) => index !== 1);
     let columnWidths = this.gitRepos[this.currentRepo].columnWidths,
       mouseX = -1,
       col = -1;
+    if (columnWidths !== null && columnWidths.length !== sizedCols.length) {
+      // Widths saved against a different set of columns cannot be applied to
+      // this one; falling back to auto layout re-measures them.
+      columnWidths = null;
+    }
 
     const makeTableFixedLayout = () => {
       if (columnWidths !== null) {
-        cols[0].style.width = columnWidths[0] + "px";
+        for (const [widthIndex, colIndex] of sizedCols.entries()) {
+          cols[colIndex].style.width = columnWidths[widthIndex] + "px";
+        }
         cols[0].style.padding = "";
-        cols[2].style.width = columnWidths[1] + "px";
-        cols[3].style.width = columnWidths[2] + "px";
-        cols[4].style.width = columnWidths[3] + "px";
         this.tableElem.className = "fixedLayout";
         this.graph.limitMaxWidth(columnWidths[0] + 16);
       }
@@ -1466,12 +1474,7 @@ class GitGraphView {
       col = parseInt((<HTMLElement>e.target).dataset.col!);
       mouseX = (<MouseEvent>e).clientX;
       if (columnWidths === null) {
-        columnWidths = [
-          cols[0].clientWidth - 24,
-          cols[2].clientWidth - 24,
-          cols[3].clientWidth - 24,
-          cols[4].clientWidth - 24
-        ];
+        columnWidths = sizedCols.map((colIndex) => cols[colIndex].clientWidth - 24);
         makeTableFixedLayout();
       }
       colHeadersElem.classList.add("resizing");
@@ -1493,6 +1496,9 @@ class GitGraphView {
             this.graph.limitMaxWidth(columnWidths[0] + 16);
             break;
           case 1:
+            if (columnWidths[1] === undefined || cols[2] === undefined) {
+              break;
+            }
             if (cols[1].clientWidth + mouseDeltaX < 64) {
               mouseDeltaX = -cols[1].clientWidth + 64;
             }
@@ -1503,6 +1509,14 @@ class GitGraphView {
             cols[2].style.width = columnWidths[1] + "px";
             break;
           default:
+            // Dragging between two fixed columns trades width between them.
+            if (
+              columnWidths[col - 1] === undefined ||
+              columnWidths[col] === undefined ||
+              cols[col + 1] === undefined
+            ) {
+              break;
+            }
             if (columnWidths[col - 1] + mouseDeltaX < 40) {
               mouseDeltaX = -columnWidths[col - 1] + 40;
             }

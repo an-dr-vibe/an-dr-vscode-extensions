@@ -57,8 +57,8 @@ export function getWebviewLocalizedStrings() {
     graph: vscode.l10n.t("Graph"),
     description: vscode.l10n.t("Description"),
     date: vscode.l10n.t("Date"),
-    author: vscode.l10n.t("Author"),
-    commit: vscode.l10n.t("Commit"),
+    dev: vscode.l10n.t("Dev"),
+    id: vscode.l10n.t("ID"),
 
     // Error messages
     unableToLoadCommitDetails: vscode.l10n.t("Unable to load commit details"),

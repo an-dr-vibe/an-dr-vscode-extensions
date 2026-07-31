@@ -104,26 +104,30 @@ describe("tab appearance", () => {
   });
 
   describe("columnVisibility", () => {
-    it("renders all five columns by default", async () => {
+    // The graph gutter and the message share one cell spanning two columns, so
+    // a row always has one fewer <td> than the header has <th>.
+    it("renders all four columns by default", async () => {
       await render(makeViewState());
-      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(5);
+
+      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(4);
+      expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(3);
+      expect(document.querySelector("tr.commit td")?.getAttribute("colspan")).toBe("2");
     });
 
-    it("drops the Committed column and its cells together", async () => {
+    it("drops the Dev column and its cells together", async () => {
       await render(makeViewState({ columnVisibility: { Committed: false, ID: true } }));
 
-      const headers = Array.from(document.querySelectorAll("#tableColHeaders th"));
-      expect(headers).toHaveLength(4);
+      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(3);
       // Every row must lose the same cell, or the table misaligns.
-      const row = document.querySelector("tr.commit");
-      expect(row?.querySelectorAll("td")).toHaveLength(4);
+      expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(2);
+      expect(document.querySelector(".committedCol")).toBeNull();
     });
 
     it("drops the ID column and its cells together", async () => {
       await render(makeViewState({ columnVisibility: { Committed: true, ID: false } }));
 
-      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(4);
-      expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(4);
+      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(3);
+      expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(2);
       // The abbreviated hash lived in the dropped column.
       expect(document.querySelector("tr.commit")?.textContent).not.toContain("abc123de");
     });
@@ -131,8 +135,15 @@ describe("tab appearance", () => {
     it("drops both optional columns at once", async () => {
       await render(makeViewState({ columnVisibility: { Committed: false, ID: false } }));
 
-      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(3);
-      expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(3);
+      expect(document.querySelectorAll("#tableColHeaders th")).toHaveLength(2);
+      expect(document.querySelector("tr.commit")?.querySelectorAll("td")).toHaveLength(1);
+    });
+
+    it("indents each row's text to its own graph lane", async () => {
+      await render(makeViewState());
+
+      const description = document.querySelector<HTMLElement>("tr.commit .description")!;
+      expect(description.style.paddingLeft).toMatch(/^\d+px$/);
     });
   });
 });

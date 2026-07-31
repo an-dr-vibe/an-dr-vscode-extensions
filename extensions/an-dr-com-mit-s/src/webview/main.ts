@@ -790,10 +790,13 @@ class GitGraphView {
   private renderTable() {
     const showCommitted = viewState.columnVisibility.Committed;
     const showId = viewState.columnVisibility.ID;
+    // The graph gutter and the message share one cell per row, so the header
+    // spans them with an unnamed column and the labelled one beside it.
+    const laneOffsets = this.graph.getLaneOffsets();
     let html =
-        `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${l10n.graph}</th><th class="tableColHeader">${l10n.description}</th><th class="tableColHeader">${l10n.date}</th>` +
-        (showCommitted ? `<th class="tableColHeader">${l10n.author}</th>` : "") +
-        (showId ? `<th class="tableColHeader">${l10n.commit}</th>` : "") +
+        `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader"></th><th class="tableColHeader">${l10n.graph}</th>` +
+        (showCommitted ? `<th class="tableColHeader committedCol">${l10n.dev}</th>` : "") +
+        (showId ? `<th class="tableColHeader idCol">${l10n.id}</th>` : "") +
         "</tr>",
       i;
     for (i = 0; i < this.commits.length; i++) {
@@ -849,18 +852,16 @@ class GitGraphView {
         i +
         '" data-color="' +
         this.graph.getVertexColour(i) +
-        '"><td></td><td>' +
+        '"><td colspan="2"><span class="description" style="padding-left:' +
+        Math.max((laneOffsets[i] ?? 0) - 4, 0) +
+        'px">' +
         (this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : "") +
         refs +
         (this.commits[i].hash === this.commitHead ? "<b>" + message + "</b>" : message) +
-        '</td><td title="' +
-        date.title +
-        '">' +
-        date.value +
-        "</td>" +
+        "</span></td>" +
         (showCommitted
-          ? '<td title="' +
-            escapeHtml(this.commits[i].author + " <" + this.commits[i].email + ">") +
+          ? '<td class="committedCol text" title="' +
+            escapeHtml(this.commits[i].author + " • " + date.title) +
             '">' +
             renderAuthorVisualHtml(
               this.config,
@@ -870,11 +871,12 @@ class GitGraphView {
                 ? this.avatars[this.commits[i].email]
                 : null
             ) +
-            escapeHtml(this.commits[i].author) +
-            "</td>"
+            '<span class="committedMeta"><span class="committedDate">' +
+            escapeHtml(date.value) +
+            "</span></span></td>"
           : "") +
         (showId
-          ? '<td title="' +
+          ? '<td class="idCol text" title="' +
             escapeHtml(this.commits[i].hash) +
             '">' +
             abbrevCommit(this.commits[i].hash) +
@@ -1358,21 +1360,23 @@ class GitGraphView {
   private renderUncommitedChanges() {
     let date = getCommitDate(this.commits[0].date);
     document.getElementsByClassName("unsavedChanges")[0].innerHTML =
-      "<td></td><td><b>" +
+      '<td colspan="2"><span class="description"><b>' +
       escapeHtml(this.commits[0].message) +
-      '</b></td><td title="' +
-      date.title +
-      '">' +
-      date.value +
-      "</td>" +
-      // These asterisks are placeholder display text for the author and
-      // commit columns, which have no value until the changes are committed.
-      // They are deliberately not UNCOMMITTED: that constant is the commit
-      // hash sentinel, and the two only coincide by accident. Both cells are
+      "</b></span></td>" +
+      // The asterisks are placeholder display text for the Dev and ID columns,
+      // which have no value until the changes are committed. They are
+      // deliberately not UNCOMMITTED: that constant is the commit hash
+      // sentinel, and the two only coincide by accident. Both cells are
       // omitted when their column is hidden, or this row would not line up
       // with the rest of the table.
-      (viewState.columnVisibility.Committed ? '<td title="* <>">*</td>' : "") +
-      (viewState.columnVisibility.ID ? '<td title="*">*</td>' : "");
+      (viewState.columnVisibility.Committed
+        ? '<td class="committedCol text" title="' +
+          escapeHtml(date.title) +
+          '"><span class="committedMeta"><span class="committedDate">' +
+          escapeHtml(date.value) +
+          "</span></span></td>"
+        : "") +
+      (viewState.columnVisibility.ID ? '<td class="idCol text" title="*">*</td>' : "");
   }
   private renderShowLoading() {
     hideDialogAndContextMenu();

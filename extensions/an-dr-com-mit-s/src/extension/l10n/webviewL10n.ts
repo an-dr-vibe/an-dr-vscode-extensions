@@ -55,8 +55,6 @@ export function getWebviewLocalizedStrings() {
     filterPlaceholder: vscode.l10n.t("Filter {0}..."),
     noResultsFound: vscode.l10n.t("No results found."),
     graph: vscode.l10n.t("Graph"),
-    description: vscode.l10n.t("Description"),
-    date: vscode.l10n.t("Date"),
     dev: vscode.l10n.t("Dev"),
     id: vscode.l10n.t("ID"),
 

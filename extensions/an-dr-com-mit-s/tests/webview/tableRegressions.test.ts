@@ -45,4 +45,12 @@ describe("commit table stylesheet", () => {
   it("caps the Dev column so the ID column stays on screen", () => {
     expect(css).toContain("max-width: 190px");
   });
+
+  it("targets the merged cell by position, not by the old column index", () => {
+    // A row is now [merged graph/message, Dev, ID], so td:nth-child(2) is the
+    // Dev cell. Rules meant for the message must say td:first-child.
+    expect(css).toContain("#commitTable tr.commit.head td:first-child {");
+    expect(css).not.toContain("#commitTable td:nth-child(2) {");
+    expect(css).not.toContain("#commitTable tr.commit.head td:nth-child(2) {");
+  });
 });

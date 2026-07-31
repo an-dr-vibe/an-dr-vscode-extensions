@@ -47,7 +47,6 @@ body.unableToLoad {
   position: fixed;
   top: var(--top-bar-height);
   bottom: var(--full-diff-height, 0px);
-  z-index: 10;
   left: 0;
   z-index: 10;
   overflow: auto;
@@ -537,7 +536,7 @@ body.filesPanelHidden #filesPanel {
 #commitTable.fixedLayout table {
   table-layout: fixed;
 }
-#commitTable.autoLayout td:nth-child(2),
+#commitTable.autoLayout td:first-child,
 #commitTable.autoLayout th:nth-child(2) {
   width: 100%;
   max-width: 0;
@@ -771,13 +770,15 @@ svg.fileIcon {
 #commitTable tr.commit.head td:not(:first-child) {
   background-color: var(--vscode-list-inactiveSelectionBackground);
 }
-#commitTable td:nth-child(2) {
+#commitTable td:first-child {
   padding-left: 10px;
 }
-#commitTable tr.commit.head td:nth-child(2) {
+/* Marks the checked-out branch's commit down the message cell, which is the
+   first cell now that it spans the graph gutter too. */
+#commitTable tr.commit.head td:first-child {
   box-shadow: inset 2px 0 0 var(--git-graph-color);
 }
-#commitTable tr.commit.head:hover td:not(:first-child) {
+#commitTable tr.commit.head:hover td {
   background-color: var(--vscode-list-hoverBackground);
 }
 

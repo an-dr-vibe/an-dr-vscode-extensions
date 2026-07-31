@@ -25,6 +25,9 @@ function makeConfig(overrides: Partial<WebviewHtmlConfig> = {}): WebviewHtmlConf
     showCurrentBranchByDefault: () => false,
     uiDensity: () => "Normal",
     refreshShortcutKey: () => "r",
+    branchPanelGroupsFirst: () => true,
+    branchPanelFlattenSingleChildGroups: () => true,
+    confirmAbortRepoInProgress: () => true,
     columnVisibility: () => ({ Committed: true, ID: true })
   };
   return { ...base, ...overrides };

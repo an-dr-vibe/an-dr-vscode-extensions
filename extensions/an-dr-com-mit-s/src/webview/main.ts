@@ -117,7 +117,7 @@ class GitGraphView {
     this.filesPanelWidth = prevState?.filesPanelWidth ?? DEFAULT_FILES_PANEL_WIDTH;
     this.repoInProgressBanner = new RepoInProgressBanner((type, action) => {
       const run = () => sendMessage({ command: "inProgressAction", operationType: type, action });
-      if (action === "abort") {
+      if (action === "abort" && viewState.confirmAbortRepoInProgress) {
         showConfirmationDialog(
           l10n.repoInProgressAbortConfirm.replace("{0}", type),
           run,

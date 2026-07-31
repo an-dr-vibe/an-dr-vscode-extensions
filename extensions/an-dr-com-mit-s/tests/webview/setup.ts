@@ -25,7 +25,10 @@ function viewStateConfig(viewState: GG.GitGraphViewState): WebviewHtmlConfig {
     loadMoreCommits: () => viewState.loadMoreCommits,
     showCurrentBranchByDefault: () => viewState.showCurrentBranchByDefault,
     refreshShortcutKey: () => viewState.refreshShortcutKey,
-    uiDensity: () => viewState.uiDensity
+    uiDensity: () => viewState.uiDensity,
+    branchPanelGroupsFirst: () => viewState.branchPanelGroupsFirst,
+    branchPanelFlattenSingleChildGroups: () => viewState.branchPanelFlattenSingleChildGroups,
+    confirmAbortRepoInProgress: () => viewState.confirmAbortRepoInProgress
   };
 }
 

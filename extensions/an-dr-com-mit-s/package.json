@@ -431,6 +431,21 @@
           ],
           "description": "How the working-tree state is indicated in the status bar."
         },
+        "an-dr-com-mit-s.branchPanel.groupsFirst": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show grouped refs above plain refs in the branch panel, like directories before files."
+        },
+        "an-dr-com-mit-s.branchPanel.flattenSingleChildGroups": {
+          "type": "boolean",
+          "default": true,
+          "description": "Flatten single-child groups in the branch panel, so a single grouped ref can appear as e.g. \"release/7.0\" instead of nested folders."
+        },
+        "an-dr-com-mit-s.dialog.repoInProgress.confirmAbort": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, confirm before aborting an in-progress repository operation."
+        },
         "an-dr-com-mit-s.uiDensity": {
           "type": "string",
           "default": "Normal",

@@ -1,6 +1,7 @@
 import type { FullDiffData, FullDiffViewMode } from "./fullDiffRender";
 import { renderFullDiff } from "./fullDiffRender";
 import { escapeHtml } from "./utils/html";
+import { clamp } from "./utils/math";
 
 /** Shortest and tallest the panel may be dragged, in pixels. */
 const MIN_HEIGHT = 80;
@@ -213,7 +214,7 @@ export class FullDiffPanel {
     if (this.changes.length === 0) {
       return;
     }
-    this.changeIndex = Math.max(0, Math.min(this.changeIndex + delta, this.changes.length - 1));
+    this.changeIndex = clamp(this.changeIndex + delta, 0, this.changes.length - 1);
     this.getScrollElem().scrollTop = this.changes[this.changeIndex].offsetTop - NAV_MARGIN;
     this.updateCounter();
   }
@@ -251,8 +252,11 @@ export class FullDiffPanel {
 }
 
 function clampHeight(height: number): number {
-  return Math.max(
+  // A very short viewport can push the upper bound below the lower one, so the
+  // maximum is itself held at or above the minimum before clamping.
+  return clamp(
+    height,
     MIN_HEIGHT,
-    Math.min(Math.max(MIN_HEIGHT, window.innerHeight - MAX_VIEWPORT_REMAINDER), height)
+    Math.max(MIN_HEIGHT, window.innerHeight - MAX_VIEWPORT_REMAINDER)
   );
 }

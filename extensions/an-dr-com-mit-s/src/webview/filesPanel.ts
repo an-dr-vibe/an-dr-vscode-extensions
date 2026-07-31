@@ -1,3 +1,5 @@
+import { clamp } from "./utils/math";
+
 /** Narrowest and widest the panel may be dragged, in pixels. */
 const MIN_WIDTH = 140;
 const MAX_WIDTH = 600;
@@ -174,5 +176,5 @@ export class FilesPanel {
 }
 
 function clampWidth(width: number): number {
-  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
+  return clamp(width, MIN_WIDTH, MAX_WIDTH);
 }

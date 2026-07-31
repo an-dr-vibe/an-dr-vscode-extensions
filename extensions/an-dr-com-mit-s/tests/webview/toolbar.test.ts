@@ -174,6 +174,24 @@ describe("tab toolbar", () => {
       });
     });
 
+    it("aborts without a dialog when the confirmation setting is off", () => {
+      // Read at click time from the injected view state, so the setting can be
+      // flipped on the live view rather than rebuilding it.
+      globalThis.viewState.confirmAbortRepoInProgress = false;
+      try {
+        document.querySelector<HTMLElement>('[data-action="abort"]')!.click();
+
+        expect(document.getElementById("dialog")!.classList.contains("active")).toBe(false);
+        expect(vscodeMock.sentMessages).toContainEqual({
+          command: "inProgressAction",
+          operationType: "rebase",
+          action: "abort"
+        });
+      } finally {
+        globalThis.viewState.confirmAbortRepoInProgress = true;
+      }
+    });
+
     it("refreshes after success and shows Git failures", () => {
       receive({ command: "inProgressAction", status: null });
       expect(vscodeMock.sentMessages).toContainEqual(

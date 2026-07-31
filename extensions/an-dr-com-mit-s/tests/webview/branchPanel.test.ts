@@ -15,6 +15,8 @@ describe("renderBranchPanel", () => {
     const html = renderBranchPanel({
       filter: "",
       collapsedFolders: new Set(),
+      groupsFirst: true,
+      flattenSingleChildGroups: true,
       options: [
         { name: "Show All", value: "", selected: true, current: false },
         { name: "feature/one", value: "feature/one", selected: false, current: false },
@@ -38,6 +40,8 @@ describe("renderBranchPanel", () => {
     const html = renderBranchPanel({
       filter: "",
       collapsedFolders: new Set(),
+      groupsFirst: true,
+      flattenSingleChildGroups: true,
       options: [
         {
           name: "<img src=x>",
@@ -53,22 +57,90 @@ describe("renderBranchPanel", () => {
   });
 
   it("takes every user-visible string from the injected l10n object", () => {
-    expect(renderBranchPanel({ filter: "", collapsedFolders: new Set(), options: [] })).toContain(
-      l10n.branchPanelNoBranches
-    );
+    expect(
+      renderBranchPanel({
+        filter: "",
+        collapsedFolders: new Set(),
+        groupsFirst: true,
+        flattenSingleChildGroups: true,
+        options: []
+      })
+    ).toContain(l10n.branchPanelNoBranches);
     expect(
       renderBranchPanel({
         filter: "zzz",
         collapsedFolders: new Set(),
+        groupsFirst: true,
+        flattenSingleChildGroups: true,
         options: [{ name: "main", value: "main", selected: false, current: false }]
       })
     ).toContain(l10n.branchPanelNoMatchingBranches);
+  });
+
+  it("puts folders above plain refs only when groupsFirst is on", () => {
+    const options = [
+      { name: "zzz", value: "zzz", selected: false, current: false },
+      { name: "aaa/one", value: "aaa/one", selected: false, current: false }
+    ];
+    const grouped = renderBranchPanel({
+      filter: "",
+      collapsedFolders: new Set(),
+      groupsFirst: true,
+      flattenSingleChildGroups: false,
+      options
+    });
+    expect(grouped.indexOf('data-folder="local&#x2F;aaa"')).toBeLessThan(
+      grouped.indexOf('data-value="zzz"')
+    );
+
+    // With the setting off, plain alphabetical order puts "aaa" first anyway,
+    // so the comparison uses a folder that sorts after the ref.
+    const html = renderBranchPanel({
+      filter: "",
+      collapsedFolders: new Set(),
+      groupsFirst: false,
+      flattenSingleChildGroups: false,
+      options: [
+        { name: "aaa", value: "aaa", selected: false, current: false },
+        { name: "zzz/one", value: "zzz/one", selected: false, current: false }
+      ]
+    });
+    expect(html.indexOf('data-value="aaa"')).toBeLessThan(
+      html.indexOf('data-folder="local&#x2F;zzz"')
+    );
+  });
+
+  it("folds a chain of single-child folders into one row", () => {
+    const options = [
+      { name: "release/7.0/hotfix", value: "release/7.0/hotfix", selected: false, current: false }
+    ];
+
+    const flattened = renderBranchPanel({
+      filter: "",
+      collapsedFolders: new Set(),
+      groupsFirst: true,
+      flattenSingleChildGroups: true,
+      options
+    });
+    expect(flattened).toContain('data-folder="local&#x2F;release&#x2F;7.0"');
+    expect(flattened.match(/branchPanelFolder"/g)).toHaveLength(1);
+
+    const nested = renderBranchPanel({
+      filter: "",
+      collapsedFolders: new Set(),
+      groupsFirst: true,
+      flattenSingleChildGroups: false,
+      options
+    });
+    expect(nested.match(/branchPanelFolder"/g)).toHaveLength(2);
   });
 
   it("keeps the Show All row matchable through the localized label", () => {
     const html = renderBranchPanel({
       filter: l10n.showAll.slice(0, 3),
       collapsedFolders: new Set(),
+      groupsFirst: true,
+      flattenSingleChildGroups: true,
       options: [
         { name: l10n.showAll, value: "", selected: true, current: false },
         { name: "main", value: "main", selected: false, current: false }
@@ -139,10 +211,26 @@ describe("BranchPanel", () => {
     const panel = new BranchPanel(undefined, vi.fn(), vi.fn(), vi.fn());
     panel.setOptions([{ name: "feature/one", value: "feature/one" }], "");
 
-    document.querySelector<HTMLElement>('[data-folder="feature"]')!.click();
+    document.querySelector<HTMLElement>('[data-folder="local/feature"]')!.click();
     expect(document.querySelector('[data-value="feature/one"]')).toBeNull();
 
-    document.querySelector<HTMLElement>('[data-folder="feature"]')!.click();
+    document.querySelector<HTMLElement>('[data-folder="local/feature"]')!.click();
     expect(document.querySelector('[data-value="feature/one"]')).not.toBeNull();
+  });
+
+  it("collapses a local folder without collapsing the remote folder of the same name", () => {
+    const panel = new BranchPanel(undefined, vi.fn(), vi.fn(), vi.fn());
+    panel.setOptions(
+      [
+        { name: "feature/one", value: "feature/one" },
+        { name: "origin/feature/one", value: "remotes/origin/feature/one" }
+      ],
+      ""
+    );
+
+    document.querySelector<HTMLElement>('[data-folder="local/feature"]')!.click();
+
+    expect(document.querySelector('[data-value="feature/one"]')).toBeNull();
+    expect(document.querySelector('[data-value="remotes/origin/feature/one"]')).not.toBeNull();
   });
 });

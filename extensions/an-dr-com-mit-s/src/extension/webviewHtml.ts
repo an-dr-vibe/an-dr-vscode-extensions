@@ -47,6 +47,9 @@ export type WebviewHtmlConfig = Pick<
   | "showCurrentBranchByDefault"
   | "refreshShortcutKey"
   | "uiDensity"
+  | "branchPanelGroupsFirst"
+  | "branchPanelFlattenSingleChildGroups"
+  | "confirmAbortRepoInProgress"
 >;
 
 /** The extension state this module reads. */
@@ -79,6 +82,9 @@ export function buildWebviewHtml(opts: {
     fileIcons: loadFileIcons(),
     uiDensity: config.uiDensity(),
     refreshShortcutKey: config.refreshShortcutKey(),
+    branchPanelGroupsFirst: config.branchPanelGroupsFirst(),
+    branchPanelFlattenSingleChildGroups: config.branchPanelFlattenSingleChildGroups(),
+    confirmAbortRepoInProgress: config.confirmAbortRepoInProgress(),
     columnVisibility: config.columnVisibility(),
     graphColours: config.graphColours(),
     graphStyle: config.graphStyle(),

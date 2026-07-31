@@ -41,27 +41,53 @@ function insertNode(
   insertNode(folder.children, parts.slice(1), option, path);
 }
 
-function buildTree(options: readonly BranchPanelRenderOption[]): BranchTreeNode[] {
+/**
+ * The section key prefixes every folder path, because the two sections build
+ * separate trees and a shared collapse set would otherwise fold a local and a
+ * remote folder of the same name together.
+ */
+function buildTree(
+  options: readonly BranchPanelRenderOption[],
+  sectionKey: string
+): BranchTreeNode[] {
   const root: BranchTreeNode[] = [];
   for (const option of options) {
-    insertNode(root, option.name.split("/"), option, "");
+    insertNode(root, option.name.split("/"), option, sectionKey);
   }
   return root;
 }
 
-function sortTree(nodes: BranchTreeNode[]): BranchTreeNode[] {
+function sortTree(nodes: BranchTreeNode[], groupsFirst: boolean): BranchTreeNode[] {
   for (const node of nodes) {
     if (node.type === "folder") {
-      sortTree(node.children);
+      node.children = sortTree(node.children, groupsFirst);
     }
   }
   return nodes.toSorted((left, right) => {
-    if (left.type !== right.type) {
+    if (groupsFirst && left.type !== right.type) {
       return left.type === "folder" ? -1 : 1;
     }
     const leftName = left.type === "folder" ? left.name : left.displayName;
     const rightName = right.type === "folder" ? right.name : right.displayName;
     return leftName.localeCompare(rightName, undefined, { sensitivity: "base" });
+  });
+}
+
+/**
+ * Folds a folder holding exactly one folder into its child, so a chain like
+ * `release` → `7.0` renders as the single row `release/7.0`.
+ */
+function flattenSingleChildFolders(nodes: BranchTreeNode[]): BranchTreeNode[] {
+  return nodes.map((node) => {
+    if (node.type !== "folder") {
+      return node;
+    }
+    let folder: BranchTreeFolder = { ...node, children: flattenSingleChildFolders(node.children) };
+    while (folder.children.length === 1 && folder.children[0].type === "folder") {
+      const only = folder.children[0];
+      folder = { ...only, name: `${folder.name}/${only.name}` };
+    }
+    return folder;
   });
 }
 
@@ -105,16 +131,21 @@ function renderTree(
 
 function renderSection(
   label: string,
+  sectionKey: string,
   options: readonly BranchPanelRenderOption[],
-  collapsed: ReadonlySet<string>
+  model: BranchPanelRenderModel
 ): string {
   if (options.length === 0) {
     return "";
   }
+  let tree = sortTree(buildTree(options, sectionKey), model.groupsFirst);
+  if (model.flattenSingleChildGroups) {
+    tree = flattenSingleChildFolders(tree);
+  }
   return `<div class="branchPanelSectionHeader">${escapeHtml(label)} (${options.length})</div>${renderTree(
-    sortTree(buildTree(options)),
+    tree,
     1,
-    collapsed
+    model.collapsedFolders
   )}`;
 }
 
@@ -145,8 +176,8 @@ export function renderBranchPanel(model: BranchPanelRenderModel): string {
 
   return (
     (showAll ? renderItem(showAll, showAll.name, 0) : "") +
-      renderSection(l10n.branchPanelLocal, locals, model.collapsedFolders) +
-      renderSection(l10n.branchPanelRemote, remotes, model.collapsedFolders) ||
+      renderSection(l10n.branchPanelLocal, "local", locals, model) +
+      renderSection(l10n.branchPanelRemote, "remote", remotes, model) ||
     `<div class="branchPanelEmpty">${escapeHtml(l10n.branchPanelNoMatchingBranches)}</div>`
   );
 }

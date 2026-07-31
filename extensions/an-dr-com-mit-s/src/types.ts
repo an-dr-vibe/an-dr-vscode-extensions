@@ -23,6 +23,9 @@ export type GitGraphViewState = {
   fileIcons: Record<string, string>;
   uiDensity: "Big" | "Normal" | "Compact";
   refreshShortcutKey: string | null;
+  branchPanelGroupsFirst: boolean;
+  branchPanelFlattenSingleChildGroups: boolean;
+  confirmAbortRepoInProgress: boolean;
   columnVisibility: { Committed: boolean; ID: boolean };
   graphColours: string[];
   graphStyle: GraphStyle;

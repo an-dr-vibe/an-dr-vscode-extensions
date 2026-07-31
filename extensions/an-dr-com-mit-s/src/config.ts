@@ -119,6 +119,10 @@ export const config = {
   },
 
   uiDensity: (): UiDensity => getConfig("uiDensity", "Normal"),
+  branchPanelGroupsFirst: (): boolean => getConfig("branchPanel.groupsFirst", true),
+  branchPanelFlattenSingleChildGroups: (): boolean =>
+    getConfig("branchPanel.flattenSingleChildGroups", true),
+  confirmAbortRepoInProgress: (): boolean => getConfig("dialog.repoInProgress.confirmAbort", true),
   columnVisibility: (): ColumnVisibility => {
     const value = getConfig<Partial<ColumnVisibility>>("repository.commits.columnVisibility", {});
     // A partially written object must not hide a column the user never named.

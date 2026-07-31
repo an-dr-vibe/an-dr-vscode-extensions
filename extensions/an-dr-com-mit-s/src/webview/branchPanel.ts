@@ -1,7 +1,12 @@
 import { renderBranchPanel } from "./branchPanelRender";
 import { svgIcons } from "./utils/icons";
+import { clamp } from "./utils/math";
 
 export const DEFAULT_BRANCH_PANEL_WIDTH = 220;
+
+/** Narrowest and widest the panel may be dragged, in pixels. */
+const MIN_WIDTH = 140;
+const MAX_WIDTH = 600;
 
 export interface BranchPanelState {
   hidden: boolean;
@@ -19,6 +24,10 @@ export interface BranchPanelRenderModel {
   options: readonly BranchPanelRenderOption[];
   filter: string;
   collapsedFolders: ReadonlySet<string>;
+  /** Sorts folders above plain refs; matches `branchPanel.groupsFirst`. */
+  groupsFirst: boolean;
+  /** Collapses a chain of single-child folders into one row. */
+  flattenSingleChildGroups: boolean;
 }
 
 /** Owns the branch sidebar layout; behavior is added separately. */
@@ -115,7 +124,7 @@ export class BranchPanel {
       const startX = event.clientX;
       const startWidth = this.width;
       const move = (moveEvent: MouseEvent) => {
-        this.width = Math.max(140, Math.min(600, startWidth + moveEvent.clientX - startX));
+        this.width = clamp(startWidth + moveEvent.clientX - startX, MIN_WIDTH, MAX_WIDTH);
         this.applyLayout(false);
       };
       const up = () => {
@@ -181,7 +190,9 @@ export class BranchPanel {
     this.list.innerHTML = renderBranchPanel({
       options: this.options,
       filter: this.filter,
-      collapsedFolders: this.collapsedFolders
+      collapsedFolders: this.collapsedFolders,
+      groupsFirst: viewState.branchPanelGroupsFirst,
+      flattenSingleChildGroups: viewState.branchPanelFlattenSingleChildGroups
     });
   }
 }

@@ -85,6 +85,41 @@ describe("fullDiffContent", () => {
     }
   });
 
+  it("diffs the root commit against the empty tree instead of failing", async () => {
+    const rootHash = cp
+      .execFileSync("git", ["rev-list", "--max-parents=0", "HEAD"], { cwd: repo })
+      .toString()
+      .trim();
+
+    const result = await fullDiffContent(simpleGit(repo), {
+      repo,
+      fromHash: rootHash,
+      toHash: rootHash,
+      oldFilePath: "f",
+      newFilePath: "f",
+      type: "A"
+    });
+
+    expect(result.diff).not.toBeNull();
+    expect(result.diff).toContain("+x");
+    expect(result.oldExists).toBe(false);
+    expect(result.newExists).toBe(true);
+  });
+
+  it("refuses a working-tree path that escapes the repository", async () => {
+    const result = await fullDiffContent(simpleGit(repo), {
+      repo,
+      fromHash: UNCOMMITTED,
+      toHash: UNCOMMITTED,
+      oldFilePath: "f",
+      newFilePath: "../outside.txt",
+      type: "M"
+    });
+
+    expect(result.newExists).toBe(false);
+    expect(result.newContent).toBeNull();
+  });
+
   it("returns a null diff rather than throwing when the path is unknown", async () => {
     const result = await fullDiffContent(simpleGit(repo), {
       repo,

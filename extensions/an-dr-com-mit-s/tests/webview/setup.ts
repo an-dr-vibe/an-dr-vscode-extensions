@@ -83,6 +83,14 @@ export function setupHtml(viewState: GG.GitGraphViewState) {
   global["l10n"] = getWebviewLocalizedStrings();
 }
 
+/**
+ * Installs only the injected `l10n` global, for pure renderers that read it
+ * without touching the DOM.
+ */
+export function setupL10n() {
+  global["l10n"] = getWebviewLocalizedStrings();
+}
+
 export function receive(msg: GG.ResponseMessage) {
   window.dispatchEvent(new MessageEvent("message", { data: msg }));
 }

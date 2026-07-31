@@ -7,9 +7,13 @@ describe("getWebviewLocalizedStrings", () => {
     const strings = getWebviewLocalizedStrings();
     const values = Object.values(strings);
 
-    expect(Object.keys(strings)).toHaveLength(117);
+    expect(Object.keys(strings)).toHaveLength(121);
     expect(strings).toMatchObject({
       repo: "Repo",
+      branchPanelLocal: "Local",
+      branchPanelRemote: "Remote",
+      branchPanelNoBranches: "No branches",
+      branchPanelNoMatchingBranches: "No matching branches",
       repoInProgressContinue: "Continue",
       repoInProgressAbort: "Abort",
       repoInProgressAbortConfirm: "Abort the {0} operation?",

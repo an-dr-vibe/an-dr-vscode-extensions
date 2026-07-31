@@ -4,9 +4,13 @@ import { BranchPanel, DEFAULT_BRANCH_PANEL_WIDTH } from "@/webview/branchPanel";
 import { renderBranchPanel } from "@/webview/branchPanelRender";
 
 import { viewStateFixture } from "./fixtures";
-import { setupHtml } from "./setup";
+import { setupHtml, setupL10n } from "./setup";
 
 describe("renderBranchPanel", () => {
+  beforeEach(() => {
+    setupL10n();
+  });
+
   it("groups local and remote branches into folder trees", () => {
     const html = renderBranchPanel({
       filter: "",
@@ -23,8 +27,8 @@ describe("renderBranchPanel", () => {
       ]
     });
 
-    expect(html).toContain("Local (1)");
-    expect(html).toContain("Remote (1)");
+    expect(html).toContain(`${l10n.branchPanelLocal} (1)`);
+    expect(html).toContain(`${l10n.branchPanelRemote} (1)`);
     expect(html).toContain("feature/");
     expect(html).toContain("origin/");
     expect(html).toContain("HEAD");
@@ -46,6 +50,32 @@ describe("renderBranchPanel", () => {
 
     expect(html).not.toContain("<img");
     expect(html).not.toContain('data-value="" onclick');
+  });
+
+  it("takes every user-visible string from the injected l10n object", () => {
+    expect(renderBranchPanel({ filter: "", collapsedFolders: new Set(), options: [] })).toContain(
+      l10n.branchPanelNoBranches
+    );
+    expect(
+      renderBranchPanel({
+        filter: "zzz",
+        collapsedFolders: new Set(),
+        options: [{ name: "main", value: "main", selected: false, current: false }]
+      })
+    ).toContain(l10n.branchPanelNoMatchingBranches);
+  });
+
+  it("keeps the Show All row matchable through the localized label", () => {
+    const html = renderBranchPanel({
+      filter: l10n.showAll.slice(0, 3),
+      collapsedFolders: new Set(),
+      options: [
+        { name: l10n.showAll, value: "", selected: true, current: false },
+        { name: "main", value: "main", selected: false, current: false }
+      ]
+    });
+
+    expect(html).toContain('data-value=""');
   });
 });
 

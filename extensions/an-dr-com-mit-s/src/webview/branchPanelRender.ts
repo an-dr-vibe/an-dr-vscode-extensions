@@ -111,7 +111,7 @@ function renderSection(
   if (options.length === 0) {
     return "";
   }
-  return `<div class="branchPanelSectionHeader">${label} (${options.length})</div>${renderTree(
+  return `<div class="branchPanelSectionHeader">${escapeHtml(label)} (${options.length})</div>${renderTree(
     sortTree(buildTree(options)),
     1,
     collapsed
@@ -121,14 +121,15 @@ function renderSection(
 /** Builds the branch-panel list without attaching interaction behavior. */
 export function renderBranchPanel(model: BranchPanelRenderModel): string {
   if (model.options.length === 0) {
-    return '<div class="branchPanelEmpty">No branches</div>';
+    return `<div class="branchPanelEmpty">${escapeHtml(l10n.branchPanelNoBranches)}</div>`;
   }
 
   const filter = model.filter.trim().toLocaleLowerCase();
   const matches = (option: BranchPanelRenderOption) =>
     filter === "" || option.name.toLocaleLowerCase().includes(filter);
   const showAll = model.options.find(
-    (option) => option.value === "" && (filter === "" || "show all".includes(filter))
+    (option) =>
+      option.value === "" && (filter === "" || l10n.showAll.toLocaleLowerCase().includes(filter))
   );
   const locals = model.options.filter(
     (option) => option.value !== "" && !option.value.startsWith("remotes/") && matches(option)
@@ -144,8 +145,8 @@ export function renderBranchPanel(model: BranchPanelRenderModel): string {
 
   return (
     (showAll ? renderItem(showAll, showAll.name, 0) : "") +
-      renderSection("Local", locals, model.collapsedFolders) +
-      renderSection("Remote", remotes, model.collapsedFolders) ||
-    '<div class="branchPanelEmpty">No matching branches</div>'
+      renderSection(l10n.branchPanelLocal, locals, model.collapsedFolders) +
+      renderSection(l10n.branchPanelRemote, remotes, model.collapsedFolders) ||
+    `<div class="branchPanelEmpty">${escapeHtml(l10n.branchPanelNoMatchingBranches)}</div>`
   );
 }

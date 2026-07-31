@@ -16,7 +16,7 @@ const COMMANDS: Record<RepoInProgressType, string> = {
   revert: "revert"
 };
 
-/** Continues or aborts the Git operation currently owning the working tree. */
+/** Default runner: spawns Git directly, resolving only on a zero exit. */
 function executeGit(
   gitPath: string,
   args: string[],
@@ -27,6 +27,10 @@ function executeGit(
   });
 }
 
+/**
+ * Continues or aborts the Git operation currently owning the working tree.
+ * The editor variables keep the sequencer non-interactive so the call cannot hang.
+ */
 export async function runInProgressOperation(
   gitPath: string,
   repo: string,

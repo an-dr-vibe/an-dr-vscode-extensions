@@ -74,6 +74,8 @@ class GitGraphView {
   private readonly selection = new CommitSelection();
   /** The two commits being compared, or null when not comparing. */
   private comparison: { from: string; to: string } | null = null;
+  /** Commit whose files the panel is previewing, when no row is open. */
+  private previewHash: string | null = null;
   private scrollShadowElem: HTMLElement;
   private filesPanel: FilesPanel;
   private fullDiffPanel: FullDiffPanel;
@@ -258,6 +260,22 @@ class GitGraphView {
     }
   }
 
+  /**
+   * Closes whatever Escape should close next: the diff panel, then an open
+   * commit, then the selection itself.
+   */
+  public dismissTopLayer() {
+    if (!this.fullDiffPanel.isHidden()) {
+      this.fullDiffPanel.close();
+      return;
+    }
+    if (this.expandedCommit !== null) {
+      this.hideCommitDetails();
+      return;
+    }
+    this.clearSelection();
+  }
+
   /** Drops the selection, returning the panel to the open commit's own files. */
   public clearSelection() {
     if (this.selection.size() === 0) {
@@ -265,6 +283,7 @@ class GitGraphView {
     }
     this.selection.clear();
     this.comparison = null;
+    this.previewHash = null;
     this.renderSelection();
     this.filesPanel.clear();
     this.filesPanel.hide();
@@ -1167,9 +1186,16 @@ class GitGraphView {
       this.selection.apply(gesture, hashes.indexOf(hash), hashes);
       this.renderSelection();
 
-      // A modified click is picking commits out to compare, so it must not also
-      // open a commit; only a plain click still toggles the details.
-      if (gesture !== "replace") {
+      // Clicking picks commits out; it never opens one. Opening is the double
+      // click, so a first click can always be the start of a selection.
+      if (this.selection.size() === 1 && this.selection.has(hash)) {
+        this.previewCommitFiles(hash);
+      }
+    });
+    addListenerToClass("commit", "dblclick", (e: Event) => {
+      const sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
+      const hash = sourceElem.dataset.hash;
+      if (hash === undefined) {
         return;
       }
       if (this.expandedCommit !== null && this.expandedCommit.hash === hash) {
@@ -1523,6 +1549,38 @@ class GitGraphView {
   }
 
   /* Commit Details */
+  /** Lists a commit's changed files in the side panel without opening the row. */
+  private previewCommitFiles(hash: string) {
+    this.previewHash = hash;
+    sendMessage({ command: "commitDetails", repo: this.currentRepo!, commitHash: hash });
+  }
+
+  /**
+   * Routes one commitDetails reply. The same request backs both opening a
+   * commit and previewing its files, so the pending intent decides which.
+   */
+  public renderCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder) {
+    if (this.expandedCommit !== null && this.expandedCommit.hash === commitDetails.hash) {
+      this.showCommitDetails(commitDetails, fileTree);
+      return;
+    }
+    if (this.previewHash === commitDetails.hash) {
+      this.fillFilesPanel(commitDetails, fileTree, commitDetails.hash);
+    }
+  }
+
+  /** Fills the side panel with one revision's changed files. */
+  private fillFilesPanel(commitDetails: GitCommitDetails, fileTree: GitFolder, hash: string) {
+    this.filesPanel.setHeader(
+      `<b>${l10n.filesPanelTitle}</b> &mdash; ${escapeHtml(abbrevCommit(hash))}`
+    );
+    this.filesPanel.setContent(
+      generateGitFileTreeHtml(fileTree, commitDetails.fileChanges) + "</table>"
+    );
+    this.filesPanel.show();
+    this.registerFileTreeListeners(fileTree, hash, hash);
+  }
+
   private loadCommitDetails(sourceElem: HTMLElement) {
     this.hideCommitDetails();
     this.expandedCommit = {
@@ -1549,8 +1607,6 @@ class GitGraphView {
         this.expandedCommit.srcElem.classList.remove("commitDetailsOpen");
       }
       this.expandedCommit = null;
-      this.filesPanel.clear();
-      this.filesPanel.hide();
       this.saveState();
       this.renderGraph();
     }
@@ -1635,14 +1691,7 @@ class GitGraphView {
     });
 
     // The side panel is the only place the change list appears.
-    this.filesPanel.setHeader(
-      `<b>${l10n.filesPanelTitle}</b> &mdash; ${escapeHtml(abbrevCommit(commitDetails.hash))}`
-    );
-    this.filesPanel.setContent(
-      generateGitFileTreeHtml(fileTree, commitDetails.fileChanges) + "</table>"
-    );
-    this.filesPanel.show();
-    this.registerFileTreeListeners(fileTree, this.expandedCommit.hash, this.expandedCommit.hash);
+    this.fillFilesPanel(commitDetails, fileTree, this.expandedCommit.hash);
   }
 
   /**
@@ -1784,7 +1833,7 @@ window.addEventListener("message", (event) => {
         gitGraph.hideCommitDetails();
         showErrorDialog(l10n.unableToLoadCommitDetails, null, null);
       } else {
-        gitGraph.showCommitDetails(
+        gitGraph.renderCommitDetails(
           msg.commitDetails,
           generateGitFileTree(msg.commitDetails.fileChanges)
         );
@@ -2069,13 +2118,13 @@ document.addEventListener("keyup", (e) => {
   if (e.key !== "Escape") {
     return;
   }
-  // An overlay takes the key first; only once nothing is open does Escape
-  // fall through to dropping the commit selection.
+  // Escape unwinds one layer at a time, innermost first, so it never throws
+  // away more than the user asked it to.
   if (isDialogOpen() || isContextMenuOpen()) {
     hideDialogAndContextMenu();
     return;
   }
-  gitGraph.clearSelection();
+  gitGraph.dismissTopLayer();
 });
 document.addEventListener("click", hideContextMenuIfOpen);
 document.addEventListener("contextmenu", hideContextMenuIfOpen);

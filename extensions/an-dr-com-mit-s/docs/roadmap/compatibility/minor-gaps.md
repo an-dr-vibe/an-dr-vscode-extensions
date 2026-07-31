@@ -32,6 +32,14 @@ building a larger feature has been.
 | 12  | `graph.showTagsInActivityBar`                                                       | Needs `contributes.views` and the activity bar graph.                                                                    |
 | 13  | `repository.onLoad.*` (2 settings)                                                  | Initial branch selection is decided webview-side and has no config input yet.                                            |
 
+## Decided against
+
+- **Settings widget** (`web/settingsWidget.ts`, 87% baseline, plus
+  `customSelect.ts` at 83%). Planned as a clean-room reimplementation, then
+  dropped by the maintainer: the extension's settings are reachable through the
+  VS Code settings UI, so an in-webview panel duplicates them. Not a gap —
+  a deliberate difference from `an-dr-commits`.
+
 ## Not gaps
 
 - `src/commandIds.ts` — superseded by `getCommandId` in `src/extension/constant/const.ts`.

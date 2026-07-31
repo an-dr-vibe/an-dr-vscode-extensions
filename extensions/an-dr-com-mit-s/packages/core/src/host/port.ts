@@ -81,10 +81,31 @@ export interface WatcherPort {
   watch(repoPath: string, onChange: (changedPath: string) => void): Disposable;
 }
 
+/** A save-file prompt, described without naming any toolkit's dialog type. */
+export interface SavePrompt {
+  /** Where the dialog opens and what it suggests saving as. */
+  defaultPath: string;
+  /** Button label, already localized by the caller. */
+  saveLabel: string;
+  /** Extension lists keyed by their localized description. */
+  filters: Record<string, string[]>;
+}
+
+export interface UiPort {
+  /** Reports a failure to the user. Never rejects. */
+  showError(message: string): Promise<void>;
+  copyToClipboard(text: string): Promise<boolean>;
+  /** Opens a URL outside the application. Resolves false when refused. */
+  openExternal(url: string): Promise<boolean>;
+  /** Absolute path the user chose, or null when they cancelled. */
+  promptForSavePath(prompt: SavePrompt): Promise<string | null>;
+}
+
 /** The whole host surface. Grows as each concern moves onto it. */
 export interface HostPort {
   readonly config: ConfigPort;
   readonly storage: StoragePort;
   readonly workspace: WorkspacePort;
   readonly watcher: WatcherPort;
+  readonly ui: UiPort;
 }

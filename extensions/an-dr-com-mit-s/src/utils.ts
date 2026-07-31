@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { DataSource } from "@/dataSource";
 import { encodeDiffDocUri } from "@/diffDocProvider";
 import { EXTENSION_ID } from "@/extension/constant/const";
+import { vscodeUiPort } from "@/extension/utils/vscodeUiPort";
 
 export type ErrorInfo = string | null;
 
@@ -19,23 +20,23 @@ export async function archive(
   ref: string,
   dataSource: DataSource
 ): Promise<ErrorInfo> {
-  const uri = await vscode.window.showSaveDialog({
-    defaultUri: vscode.Uri.file(repo),
+  const savePath = await vscodeUiPort.promptForSavePath({
+    defaultPath: repo,
     saveLabel: vscode.l10n.t("Create Archive"),
     filters: {
       [vscode.l10n.t("TAR Archive")]: ["tar"],
       [vscode.l10n.t("ZIP Archive")]: ["zip"]
     }
   });
-  if (!uri) {
+  if (savePath === null) {
     return null;
   }
-  const type = path.extname(uri.fsPath).slice(1).toLowerCase();
+  const type = path.extname(savePath).slice(1).toLowerCase();
   if (type !== "tar" && type !== "zip") {
     return vscode.l10n.t("The archive file must use a .tar or .zip extension.");
   }
   try {
-    await dataSource.archive(repo, ref, uri.fsPath, type);
+    await dataSource.archive(repo, ref, savePath, type);
     return null;
   } catch {
     return vscode.l10n.t("Unable to create the archive.");
@@ -134,7 +135,7 @@ export async function openExternalUrl(
   type = vscode.l10n.t("external URL")
 ): Promise<ErrorInfo> {
   try {
-    const success = await vscode.env.openExternal(vscode.Uri.parse(url));
+    const success = await vscodeUiPort.openExternal(url);
     return success ? null : commandError(vscode.l10n.t("open the {0}", type));
   } catch {
     return commandError(vscode.l10n.t("open the {0}", type));
@@ -154,12 +155,9 @@ export async function openExtensionSettings(): Promise<ErrorInfo> {
   }
 }
 
-/** Shows an error without leaking VS Code notification rejections. */
+/** Shows an error through the host. */
 export function showErrorMessage(message: string) {
-  return vscode.window.showErrorMessage(message).then(
-    () => undefined,
-    () => undefined
-  );
+  return vscodeUiPort.showError(message);
 }
 
 /** Returns repository paths in stable path order. */

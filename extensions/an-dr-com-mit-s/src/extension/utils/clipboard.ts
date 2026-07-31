@@ -1,10 +1,5 @@
-import * as vscode from "vscode";
+import { vscodeUiPort } from "@/extension/utils/vscodeUiPort";
 
 export function copyToClipboard(text: string) {
-  return new Promise<boolean>((resolve) => {
-    vscode.env.clipboard.writeText(text).then(
-      () => resolve(true),
-      () => resolve(false)
-    );
-  });
+  return vscodeUiPort.copyToClipboard(text);
 }

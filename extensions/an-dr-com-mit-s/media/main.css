@@ -727,6 +727,57 @@ svg.fileIcon {
   line-height: 22px;
   border-radius: 11px;
 }
+#findWidget {
+  position: fixed;
+  z-index: 8;
+  top: 34px;
+  right: 10px;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
+  border-radius: 4px;
+  background: var(--vscode-editorWidget-background);
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+}
+#findWidget.active {
+  display: flex;
+}
+#findInput {
+  width: 220px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+#findMatchCount {
+  min-width: 64px;
+  text-align: center;
+  white-space: nowrap;
+}
+#findWidget button {
+  width: 25px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+#findWidget button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+#commitTable tr.commit.findMatch td {
+  background: var(--vscode-editor-findMatchHighlightBackground);
+}
+#commitTable tr.commit.findCurrentMatch td {
+  background: var(--vscode-editor-findMatchBackground);
+  outline: 1px solid var(--vscode-editor-findMatchBorder, var(--vscode-focusBorder));
+  outline-offset: -1px;
+}
 /* Rows filtered out stay in the table so clearing the filter restores them. */
 tr.filterHidden {
   display: none;

@@ -23,6 +23,7 @@ import {
 } from "./dialog";
 import { Dropdown } from "./dropdown";
 import { DEFAULT_FILES_PANEL_WIDTH, FilesPanel } from "./filesPanel";
+import { FindWidget } from "./findWidget";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
 import { RepoInProgressBanner } from "./repoInProgressBanner";
@@ -57,6 +58,7 @@ class GitGraphView {
   private maxCommits: number;
 
   private tableElem: HTMLElement;
+  private findWidget: FindWidget;
   private footerElem: HTMLElement;
   private repoDropdown: Dropdown;
   private branchDropdown: Dropdown;
@@ -81,6 +83,7 @@ class GitGraphView {
     this.maxCommits = config.initialLoadCommits;
     this.graph = new Graph("commitGraph", this.config);
     this.tableElem = document.getElementById("commitTable")!;
+    this.findWidget = new FindWidget(this.tableElem);
     this.footerElem = document.getElementById("footer")!;
     this.repoDropdown = new Dropdown("repoSelect", true, l10n.repo, (value) => {
       this.currentRepo = value;
@@ -500,6 +503,7 @@ class GitGraphView {
       for (let i = 0; i < rows.length; i++) {
         rows[i].classList.remove("filterHidden");
       }
+      this.findWidget.refresh();
       return;
     }
 
@@ -516,6 +520,7 @@ class GitGraphView {
         commit.email.toLowerCase().includes(lower);
       rows[i].classList.toggle("filterHidden", !match);
     }
+    this.findWidget.refresh();
   }
 
   public renderRepoInProgress(state: RepoInProgressState | null) {
@@ -683,7 +688,17 @@ class GitGraphView {
             this.commits[i].hash +
             '"'
           : 'class="unsavedChanges"') +
-        ' data-id="' +
+        ' data-find-text="' +
+        escapeHtml(
+          [
+            this.commits[i].message,
+            this.commits[i].author,
+            this.commits[i].email,
+            this.commits[i].hash,
+            ...this.commits[i].refs.map((ref) => ref.name)
+          ].join(" ")
+        ) +
+        '" data-id="' +
         i +
         '" data-color="' +
         this.graph.getVertexColour(i) +
@@ -730,6 +745,7 @@ class GitGraphView {
     if (this.commitFilterText !== "") {
       this.applyCommitFilter(this.commitFilterText);
     }
+    this.findWidget.refresh();
 
     if (this.moreCommitsAvailable) {
       document.getElementById("loadMoreCommitsBtn")!.addEventListener("click", () => {

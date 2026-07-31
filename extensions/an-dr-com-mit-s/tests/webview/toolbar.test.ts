@@ -66,6 +66,7 @@ describe("tab toolbar", () => {
   });
 
   beforeEach(() => {
+    document.getElementById("findCloseBtn")?.click();
     typeFilter("");
     receive({
       command: "loadCommits",
@@ -202,7 +203,7 @@ describe("tab toolbar", () => {
     it("renders the buttons through the real panel HTML", () => {
       const btns = document.getElementById("controlsBtns");
       expect(btns).not.toBeNull();
-      expect(btns!.querySelectorAll(".roundedBtn")).toHaveLength(4);
+      expect(btns!.querySelectorAll(".roundedBtn")).toHaveLength(5);
     });
   });
 
@@ -297,6 +298,32 @@ describe("tab toolbar", () => {
         hard: true
       });
       expect(visibleHashes()).toEqual([commits[0].hash]);
+    });
+  });
+
+  describe("find widget wiring", () => {
+    it("finds metadata that is attached to the rendered commit row", () => {
+      document.getElementById("findBtn")!.click();
+      const findInput = document.getElementById("findInput") as HTMLInputElement;
+      findInput.value = "alice@example.com";
+      findInput.dispatchEvent(new Event("input"));
+
+      expect(document.querySelectorAll("tr.findMatch")).toHaveLength(1);
+      expect(document.querySelector("tr.findCurrentMatch")?.getAttribute("data-hash")).toBe(
+        commits[0].hash
+      );
+    });
+
+    it("searches only rows left visible by the commit filter", () => {
+      document.getElementById("findBtn")!.click();
+      const findInput = document.getElementById("findInput") as HTMLInputElement;
+      findInput.value = "toolbar";
+      findInput.dispatchEvent(new Event("input"));
+      expect(document.querySelectorAll("tr.findMatch")).toHaveLength(1);
+
+      typeFilter("initial");
+      expect(document.querySelectorAll("tr.findMatch")).toHaveLength(0);
+      expect(document.getElementById("findMatchCount")!.textContent).toBe(l10n.findNoMatches);
     });
   });
 });

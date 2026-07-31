@@ -7,13 +7,15 @@ describe("getWebviewLocalizedStrings", () => {
     const strings = getWebviewLocalizedStrings();
     const values = Object.values(strings);
 
-    expect(Object.keys(strings)).toHaveLength(115);
+    expect(Object.keys(strings)).toHaveLength(117);
     expect(strings).toMatchObject({
       repo: "Repo",
       repoInProgressContinue: "Continue",
       repoInProgressAbort: "Abort",
       repoInProgressAbortConfirm: "Abort the {0} operation?",
       repoInProgressActionFailed: "Unable to update the repository operation",
+      findNoMatches: "No matches",
+      findMatchCount: "{0} of {1}",
       unableToLoadCommitDetails: "Unable to load commit details",
       dialogCancel: "Cancel",
       tooltipDeletions: "{0} deletions"

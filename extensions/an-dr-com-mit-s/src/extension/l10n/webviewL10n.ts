@@ -33,6 +33,8 @@ export function getWebviewLocalizedStrings() {
     repoInProgressAbort: vscode.l10n.t("Abort"),
     repoInProgressAbortConfirm: vscode.l10n.t("Abort the {0} operation?"),
     repoInProgressActionFailed: vscode.l10n.t("Unable to update the repository operation"),
+    findNoMatches: vscode.l10n.t("No matches"),
+    findMatchCount: vscode.l10n.t("{0} of {1}"),
     loadMore: vscode.l10n.t("Load More Commits"),
     showAll: vscode.l10n.t("Show All"),
     filterPlaceholder: vscode.l10n.t("Filter {0}..."),

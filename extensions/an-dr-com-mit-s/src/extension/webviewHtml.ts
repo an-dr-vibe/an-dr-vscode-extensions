@@ -113,11 +113,19 @@ export function buildWebviewHtml(opts: {
 			<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>${vscode.l10n.t("Show Remote Branches")}</label>
 			<span id="commitFilterControl"><input id="commitFilter" type="search" spellcheck="false" placeholder="${vscode.l10n.t("Filter commits...")}" title="${vscode.l10n.t("Filter by message, author, email, or hash")}"></span>
 			<span id="controlsBtns">
+				<div id="findBtn" class="roundedBtn" title="${vscode.l10n.t("Find Commits")}">${vscode.l10n.t("Find")}</div>
 				<div id="fetchBtn" class="roundedBtn" title="${vscode.l10n.t("Fetch from Remote(s)")}">${vscode.l10n.t("Fetch")}</div>
 				<div id="pullBtn" class="roundedBtn" title="${vscode.l10n.t("Pull Current Branch")}">${vscode.l10n.t("Pull")}</div>
 				<div id="pushBtn" class="roundedBtn" title="${vscode.l10n.t("Push Current Branch")}">${vscode.l10n.t("Push")}</div>
 				<div id="refreshBtn" class="roundedBtn">${vscode.l10n.t("Refresh")}</div>
 			</span>
+		</div>
+		<div id="findWidget" aria-hidden="true">
+			<input id="findInput" type="search" spellcheck="false" placeholder="${vscode.l10n.t("Find commits...")}">
+			<span id="findMatchCount" aria-live="polite"></span>
+			<button id="findPreviousBtn" title="${vscode.l10n.t("Previous Match")}" aria-label="${vscode.l10n.t("Previous Match")}">↑</button>
+			<button id="findNextBtn" title="${vscode.l10n.t("Next Match")}" aria-label="${vscode.l10n.t("Next Match")}">↓</button>
+			<button id="findCloseBtn" title="${vscode.l10n.t("Close")}" aria-label="${vscode.l10n.t("Close")}">×</button>
 		</div>
 		<aside id="branchPanelSidebar">
 			<div id="branchPanel"></div>

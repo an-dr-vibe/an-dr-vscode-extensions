@@ -141,6 +141,15 @@ export function buildWebviewHtml(opts: {
 			<div id="fullDiffResizeHandle"></div>
 			<div id="fullDiffHeader">
 				<span id="fullDiffFilename"></span>
+				<span id="fullDiffControls">
+					<button id="fullDiffMode-unified" title="${vscode.l10n.t("Unified full file view")}">${vscode.l10n.t("Unified")}</button>
+					<button id="fullDiffMode-sideBySide" title="${vscode.l10n.t("Side by side full file view")}">${vscode.l10n.t("Split")}</button>
+					<button id="fullDiffMode-raw" title="${vscode.l10n.t("Raw git diff output")}">${vscode.l10n.t("Raw")}</button>
+					<button id="fullDiffCompactBtn" title="${vscode.l10n.t("Fold long runs of unchanged lines")}">${vscode.l10n.t("Compact")}</button>
+					<button id="fullDiffPrevChangeBtn" title="${vscode.l10n.t("Previous Change")}" aria-label="${vscode.l10n.t("Previous Change")}">▲</button>
+					<span id="fullDiffChangeCounter" aria-live="polite"></span>
+					<button id="fullDiffNextChangeBtn" title="${vscode.l10n.t("Next Change")}" aria-label="${vscode.l10n.t("Next Change")}">▼</button>
+				</span>
 				<button id="fullDiffCloseBtn" title="${vscode.l10n.t("Close")}" aria-label="${vscode.l10n.t("Close")}">×</button>
 			</div>
 			<div id="fullDiffContent"></div>

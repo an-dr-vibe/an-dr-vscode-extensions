@@ -267,19 +267,35 @@ body.fullDiffPanelHidden #fullDiffPanel {
   direction: rtl;
   text-align: left;
 }
-#fullDiffCloseBtn {
+#fullDiffControls {
   flex: 0 0 auto;
-  width: 22px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+#fullDiffChangeCounter {
+  min-width: 52px;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+#fullDiffHeader button {
+  flex: 0 0 auto;
   height: 22px;
-  padding: 0;
+  min-width: 22px;
+  padding: 0 6px;
   border: 0;
   border-radius: 3px;
   background: transparent;
   color: var(--vscode-foreground);
   cursor: pointer;
 }
-#fullDiffCloseBtn:hover {
+#fullDiffHeader button:hover {
   background: var(--vscode-toolbar-hoverBackground);
+}
+#fullDiffHeader button.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
 }
 #fullDiffContent {
   flex: 1 1 auto;
@@ -314,11 +330,43 @@ body.fullDiffPanelHidden #fullDiffPanel {
 .diffRowContent {
   flex: 1 1 auto;
 }
-.diffRow.diffAdded {
+.diffAdded {
   background: var(--vscode-diffEditor-insertedTextBackground, rgba(0, 255, 0, 0.12));
 }
-.diffRow.diffRemoved {
+.diffRemoved {
   background: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.12));
+}
+.diffSpacer {
+  opacity: 0.5;
+  font-style: italic;
+  padding-left: 8px;
+}
+.diffHunkHeader,
+.diffFileHeader {
+  opacity: 0.7;
+}
+
+/* Side-by-side mode: two independently scrolling panes kept in step. */
+.diffSbsContainer {
+  display: flex;
+  height: 100%;
+}
+.diffSbsPane {
+  flex: 1 1 50%;
+  min-width: 0;
+  overflow: auto;
+}
+.diffSbsPaneNew {
+  border-left: 1px solid rgba(128, 128, 128, 0.35);
+}
+.diffSbsRow {
+  display: flex;
+  align-items: flex-start;
+  white-space: pre;
+}
+/* Keeps both panes on the same row height where one side has no counterpart. */
+.diffSbsPlaceholder::after {
+  content: " ";
 }
 
 /* Changed-files panel */

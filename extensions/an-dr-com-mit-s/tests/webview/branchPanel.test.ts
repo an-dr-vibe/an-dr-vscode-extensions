@@ -164,7 +164,7 @@ describe("BranchPanel", () => {
     expect(document.body.classList.contains("branchPanelHidden")).toBe(true);
     expect(document.body.style.getPropertyValue("--branch-panel-width")).toBe("0px");
 
-    document.getElementById("branchPanelToggle")!.click();
+    document.getElementById("sidebarToggleBtn")!.click();
     expect(changed).toHaveBeenCalledWith({ hidden: false, width: 321 });
   });
 

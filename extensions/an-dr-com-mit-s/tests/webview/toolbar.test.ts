@@ -211,17 +211,36 @@ describe("tab toolbar", () => {
       ["pullBtn", "pull"],
       ["pushBtn", "push"]
     ])("%s requests the %s operation", (id, operation) => {
-      document.getElementById(id)!.dispatchEvent(new MouseEvent("click"));
+      document.getElementById(id)!.click();
       expect(vscodeMock.sentMessages).toContainEqual({
         command: "remoteOperation",
         operation
       });
     });
 
-    it("renders the buttons through the real panel HTML", () => {
-      const btns = document.getElementById("controlsBtns");
-      expect(btns).not.toBeNull();
-      expect(btns!.querySelectorAll(".roundedBtn")).toHaveLength(5);
+    it("renders icon-only buttons through the real panel HTML", () => {
+      const btns = document.getElementById("controlsBtns")!;
+      const buttons = Array.from(btns.querySelectorAll<HTMLElement>(".iconBtn"));
+
+      expect(buttons.map((button) => button.id)).toEqual([
+        "refreshBtn",
+        "resetBtn",
+        "fetchBtn",
+        "pullBtn",
+        "pushBtn",
+        "moreBtn"
+      ]);
+      // Icon-only: the label lives in the tooltip, never as visible text.
+      for (const button of buttons) {
+        expect(button.textContent).toBe("");
+        expect(button.querySelector("svg")).not.toBeNull();
+        expect(button.title).not.toBe("");
+      }
+    });
+
+    it("drops the controls the branch panel replaces", () => {
+      expect(document.getElementById("branchSelect")).toBeNull();
+      expect(document.getElementById("showRemoteBranchesCheckbox")).toBeNull();
     });
   });
 

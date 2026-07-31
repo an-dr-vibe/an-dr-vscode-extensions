@@ -1,5 +1,5 @@
 import { renderBranchPanel } from "./branchPanelRender";
-import { svgIcons } from "./utils/icons";
+import { toolbarIcons } from "./utils/icons";
 import { clamp } from "./utils/math";
 
 export const DEFAULT_BRANCH_PANEL_WIDTH = 220;
@@ -62,14 +62,14 @@ export class BranchPanel {
   ) {
     this.sidebar = document.getElementById("branchPanelSidebar")!;
     this.list = document.getElementById("branchPanel")!;
-    this.toggle = document.getElementById("branchPanelToggle")!;
+    this.toggle = document.getElementById("sidebarToggleBtn")!;
     this.onLayoutChange = onLayoutChange;
     this.onSelect = onSelect;
     this.onAction = onAction;
     this.width = state?.width ?? DEFAULT_BRANCH_PANEL_WIDTH;
     this.hidden = state?.hidden ?? false;
 
-    this.toggle.innerHTML = svgIcons.branch;
+    this.toggle.innerHTML = toolbarIcons.sidebar;
     this.toggle.addEventListener("click", () => this.setHidden(!this.hidden));
     this.setupResize(document.getElementById("branchPanelResizeHandle")!);
     this.setupBehavior();

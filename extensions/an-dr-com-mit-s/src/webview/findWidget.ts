@@ -1,3 +1,5 @@
+import { toolbarIcons } from "./utils/icons";
+
 const MATCH_CLASS = "findMatch";
 const CURRENT_CLASS = "findCurrentMatch";
 
@@ -20,7 +22,9 @@ export class FindWidget {
     this.input = document.getElementById("findInput") as HTMLInputElement;
     this.count = document.getElementById("findMatchCount")!;
 
-    document.getElementById("findBtn")!.addEventListener("click", () => this.open());
+    const findBtn = document.getElementById("findBtn")!;
+    findBtn.innerHTML = toolbarIcons.search;
+    findBtn.addEventListener("click", () => this.open());
     document.getElementById("findPreviousBtn")!.addEventListener("click", () => this.move(-1));
     document.getElementById("findNextBtn")!.addEventListener("click", () => this.move(1));
     document.getElementById("findCloseBtn")!.addEventListener("click", () => this.close());

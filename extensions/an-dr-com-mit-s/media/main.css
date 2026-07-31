@@ -2,6 +2,8 @@
 body {
   margin: 0;
   padding: 0;
+  /* Height of #topBar: a 26px icon button plus its 4px padding and the rule. */
+  --top-bar-height: 35px;
   /* Keeps the page's own bottom clear of the docked full diff panel. */
   padding-bottom: var(--full-diff-height, 0px);
 }
@@ -12,7 +14,7 @@ body.unableToLoad {
 /* Branch panel */
 #branchPanelSidebar {
   position: fixed;
-  top: 38px;
+  top: var(--top-bar-height);
   bottom: var(--full-diff-height, 0px);
   left: 0;
   z-index: 10;
@@ -27,20 +29,11 @@ body.branchPanelHidden #branchPanelSidebar {
 }
 #branchPanelResizeHandle {
   position: fixed;
-  top: 38px;
+  top: var(--top-bar-height);
   bottom: var(--full-diff-height, 0px);
   left: calc(var(--branch-panel-width, 220px) - 3px);
   width: 6px;
   cursor: col-resize;
-}
-#branchPanelToggle {
-  width: 26px;
-  min-width: 26px;
-  padding: 3px;
-  opacity: 0.55;
-}
-#branchPanelToggle.active {
-  opacity: 1;
 }
 .branchPanelSectionHeader {
   padding: 8px 6px 3px;
@@ -813,35 +806,79 @@ svg.fileIcon {
   }
 }
 
-/* Controls */
-#controls {
+/* Top bar: the repo dropdown sits over the sidebar, the controls over the
+   commit table, so the two columns line up down the whole view. */
+#topBar {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+}
+#sidebarTop {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: var(--branch-panel-width, 0px);
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  padding: 4px 6px;
+  overflow: hidden;
+}
+body.branchPanelHidden #sidebarTop {
+  display: none;
+}
+#sidebarTop #repoSelect {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#controls {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
   line-height: 32px;
   font-weight: 700;
   font-size: 13px;
 }
-#repoControl,
-#branchControl,
-#showRemoteBranchesControl {
-  white-space: nowrap;
-  margin: 0 10px;
+#controlsLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
-#repoSelect,
-#branchSelect {
-  margin-left: 3px;
+/* Icon buttons: square, borderless, and dimmed until hovered, so a row of
+   them reads as one toolbar rather than six separate controls. */
+.iconBtn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0.7;
+  color: var(--vscode-foreground);
 }
-#showRemoteBranchesCheckbox {
-  width: 14px;
-  vertical-align: text-top;
+.iconBtn svg {
+  width: 16px;
+  height: 16px;
+}
+.iconBtn:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+.iconBtn.active {
+  opacity: 1;
+}
+/* Folded into the more menu; still in the DOM so it can come back. */
+.iconBtn.overflowHidden {
+  display: none;
 }
 #commitFilterControl {
-  margin: 0 10px;
   flex: 1 1 120px;
-  min-width: 120px;
+  min-width: 80px;
   display: flex;
 }
 #commitFilter {
@@ -860,23 +897,17 @@ svg.fileIcon {
   border-color: var(--vscode-focusBorder);
 }
 /* Pushed to the trailing edge so the buttons stay grouped away from the
-   selectors, and kept from wrapping apart when the toolbar is narrow. */
+   filter, and never allowed to shrink — they fold into the more menu instead. */
 #controlsBtns {
   margin-left: auto;
   display: flex;
-  gap: 6px;
+  gap: 2px;
   flex-shrink: 0;
-}
-#controlsBtns .roundedBtn {
-  width: 80px;
-  height: 22px;
-  line-height: 22px;
-  border-radius: 11px;
 }
 #findWidget {
   position: fixed;
   z-index: 8;
-  top: 34px;
+  top: var(--top-bar-height);
   right: 10px;
   display: none;
   align-items: center;

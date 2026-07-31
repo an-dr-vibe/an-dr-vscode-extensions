@@ -28,6 +28,7 @@ import { FullDiffPanel } from "./fullDiffPanel";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
 import { RepoInProgressBanner } from "./repoInProgressBanner";
+import { Toolbar } from "./toolbar";
 import { renderAuthorVisualHtml } from "./utils/avatarVisuals";
 import { formatRelativeDate, formatShortDate, pad2 } from "./utils/date";
 import { addListenerToClass, insertAfter } from "./utils/dom";
@@ -35,9 +36,14 @@ import { resolveFileIcon } from "./utils/fileIcons";
 import { arraysEqual, ELLIPSIS } from "./utils/git";
 import { UNCOMMITTED } from "./utils/graphConstants";
 import { escapeHtml, unescapeHtml } from "./utils/html";
-import { svgIcons } from "./utils/icons";
+import { svgIcons, toolbarIcons } from "./utils/icons";
 import { renderTagPill } from "./utils/refPills";
 import { getVSCodeStyle, sendMessage, vscode } from "./utils/vscode";
+
+/** Asks the extension host to run a remote operation for the selected repository. */
+function requestRemoteOperation(operation: "fetch" | "pull" | "push") {
+  sendMessage({ command: "remoteOperation", operation });
+}
 
 class GitGraphView {
   private gitRepos: GG.GitRepoSet;
@@ -62,9 +68,8 @@ class GitGraphView {
   private findWidget: FindWidget;
   private footerElem: HTMLElement;
   private repoDropdown: Dropdown;
-  private branchDropdown: Dropdown;
   private branchPanel: BranchPanel;
-  private showRemoteBranchesElem: HTMLInputElement;
+  private toolbar: Toolbar;
   private scrollShadowElem: HTMLElement;
   private filesPanel: FilesPanel;
   private fullDiffPanel: FullDiffPanel;
@@ -96,23 +101,12 @@ class GitGraphView {
       sendMessage({ command: "selectRepo", repo: value });
       this.refresh(true);
     });
-    this.branchDropdown = new Dropdown("branchSelect", false, l10n.branch, (value) => {
-      this.selectBranch(value, false);
-    });
     this.branchPanel = new BranchPanel(
       prevState?.branchPanel,
       () => this.saveState(),
-      (value) => this.selectBranch(value, true),
+      (value) => this.selectBranch(value),
       (value, kind, source, event) => this.handleBranchPanelAction(value, kind, source, event)
     );
-    this.showRemoteBranchesElem = <HTMLInputElement>(
-      document.getElementById("showRemoteBranchesCheckbox")!
-    );
-    this.showRemoteBranchesElem.addEventListener("change", () => {
-      this.showRemoteBranches = this.showRemoteBranchesElem.checked;
-      this.saveState();
-      this.refresh(true);
-    });
     this.scrollShadowElem = <HTMLInputElement>document.getElementById("scrollShadow")!;
     this.filesPanelWidth = prevState?.filesPanelWidth ?? DEFAULT_FILES_PANEL_WIDTH;
     this.repoInProgressBanner = new RepoInProgressBanner((type, action) => {
@@ -132,14 +126,10 @@ class GitGraphView {
       this.saveState();
     });
     this.fullDiffPanel = new FullDiffPanel(prevState?.fullDiffPanel, () => this.saveState());
-    document.getElementById("refreshBtn")!.addEventListener("click", () => {
-      this.refresh(true);
-    });
-    for (const operation of ["fetch", "pull", "push"] as const) {
-      document.getElementById(`${operation}Btn`)?.addEventListener("click", () => {
-        sendMessage({ command: "remoteOperation", operation });
-      });
-    }
+    // The branch panel owns the sidebar toggle button, including its icon and
+    // active state, so the toolbar only holds the buttons on the right.
+    this.toolbar = new Toolbar();
+    this.renderToolbar();
     const filterElem = <HTMLInputElement | null>document.getElementById("commitFilter");
     if (filterElem !== null) {
       filterElem.addEventListener("input", () => this.applyCommitFilter(filterElem.value));
@@ -158,7 +148,6 @@ class GitGraphView {
     if (prevState) {
       this.currentBranch = prevState.currentBranch;
       this.showRemoteBranches = prevState.showRemoteBranches;
-      this.showRemoteBranchesElem.checked = this.showRemoteBranches;
       if (typeof this.gitRepos[prevState.currentRepo] !== "undefined") {
         this.currentRepo = prevState.currentRepo;
         this.maxCommits = prevState.maxCommits;
@@ -200,8 +189,9 @@ class GitGraphView {
       repoComps = repoPaths[i].split("/");
       options.push({ name: repoComps[repoComps.length - 1], value: repoPaths[i] });
     }
-    document.getElementById("repoControl")!.style.display =
-      repoPaths.length > 1 ? "inline" : "none";
+    // A single repository needs no selector, and hiding it lets the sidebar
+    // header collapse rather than showing a dropdown with one entry.
+    document.getElementById("sidebarTop")!.style.display = repoPaths.length > 1 ? "flex" : "none";
     this.repoDropdown.setOptions(options, this.currentRepo);
 
     if (changedRepo) {
@@ -251,9 +241,9 @@ class GitGraphView {
         value: this.gitBranches[i]
       });
     }
-    this.branchDropdown.setOptions(options, this.currentBranch);
     this.branchPanel.setOptions(options, this.currentBranch);
     this.branchPanel.setCurrentBranch(this.gitBranchHead);
+    this.renderToolbar();
 
     this.triggerLoadBranchesCallback(true, isRepo);
   }
@@ -282,18 +272,85 @@ class GitGraphView {
     this.fullDiffPanel.render(data);
   }
 
-  private selectBranch(value: string, fromPanel: boolean) {
+  private selectBranch(value: string) {
     this.currentBranch = value;
     this.maxCommits = this.config.initialLoadCommits;
     this.expandedCommit = null;
-    if (fromPanel) {
-      this.branchDropdown.setSelected(value);
-    } else {
-      this.branchPanel.setSelected(value);
-    }
     this.saveState();
     this.renderShowLoading();
     this.requestLoadCommits(true, () => {});
+  }
+
+  /**
+   * Declares the toolbar's buttons. Rebuilt whenever repository state changes,
+   * because which remote actions apply depends on the branch and its remotes.
+   */
+  private renderToolbar() {
+    const remoteAvailable = this.gitBranchHead !== null && this.gitBranchHead !== "HEAD";
+    this.toolbar.setButtons([
+      {
+        id: "refreshBtn",
+        icon: toolbarIcons.refresh,
+        title: l10n.refresh,
+        visible: true,
+        onClick: () => this.refresh(true)
+      },
+      {
+        id: "resetBtn",
+        icon: toolbarIcons.discard,
+        title: l10n.resetToHead,
+        visible: remoteAvailable,
+        onClick: () => this.resetToHead()
+      },
+      {
+        id: "fetchBtn",
+        icon: toolbarIcons.refresh,
+        title: l10n.fetchFromRemotes,
+        visible: true,
+        onClick: () => requestRemoteOperation("fetch")
+      },
+      {
+        id: "pullBtn",
+        icon: toolbarIcons.arrowDown,
+        title: l10n.pullCurrentBranch,
+        visible: remoteAvailable,
+        onClick: () => requestRemoteOperation("pull")
+      },
+      {
+        id: "pushBtn",
+        icon: toolbarIcons.arrowUp,
+        title: l10n.pushCurrentBranch,
+        visible: remoteAvailable,
+        onClick: () => requestRemoteOperation("push")
+      }
+    ]);
+  }
+
+  /** Resets the current branch to HEAD, discarding the working tree. */
+  private resetToHead() {
+    if (this.gitBranchHead === null) {
+      return;
+    }
+    showSelectDialog(
+      l10n.dialogResetConfirm
+        .replace("{0}", `<b><i>${escapeHtml(this.gitBranchHead)}</i></b>`)
+        .replace("{1}", "<b><i>HEAD</i></b>"),
+      "hard",
+      [
+        { name: l10n.dialogResetSoft, value: "soft" },
+        { name: l10n.dialogResetMixed, value: "mixed" },
+        { name: l10n.dialogResetHard, value: "hard" }
+      ],
+      l10n.dialogYesReset,
+      (mode) =>
+        sendMessage({
+          command: "resetToCommit",
+          repo: this.currentRepo!,
+          commitHash: "HEAD",
+          resetMode: <GitResetMode>mode
+        }),
+      document.getElementById("resetBtn")
+    );
   }
 
   private handleBranchPanelAction(
@@ -1391,7 +1448,6 @@ class GitGraphView {
       if (ff !== fontFamily) {
         fontFamily = ff;
         this.repoDropdown.refresh();
-        this.branchDropdown.refresh();
       }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
   }

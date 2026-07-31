@@ -112,19 +112,25 @@ export function buildWebviewHtml(opts: {
   let body: string;
   if (numRepos > 0) {
     body = `<body style="${colorVars}">
-		<div id="controls">
-			<div id="branchPanelToggle" class="roundedBtn" title="${vscode.l10n.t("Toggle Branch Panel")}"></div>
-			<span id="repoControl"><span class="unselectable">${vscode.l10n.t("Repo")}: </span><div id="repoSelect" class="dropdown"></div></span>
-			<span id="branchControl"><span class="unselectable">${vscode.l10n.t("Branch")}: </span><div id="branchSelect" class="dropdown"></div></span>
-			<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>${vscode.l10n.t("Show Remote Branches")}</label>
-			<span id="commitFilterControl"><input id="commitFilter" type="search" spellcheck="false" placeholder="${vscode.l10n.t("Filter commits...")}" title="${vscode.l10n.t("Filter by message, author, email, or hash")}"></span>
-			<span id="controlsBtns">
-				<div id="findBtn" class="roundedBtn" title="${vscode.l10n.t("Find Commits")}">${vscode.l10n.t("Find")}</div>
-				<div id="fetchBtn" class="roundedBtn" title="${vscode.l10n.t("Fetch from Remote(s)")}">${vscode.l10n.t("Fetch")}</div>
-				<div id="pullBtn" class="roundedBtn" title="${vscode.l10n.t("Pull Current Branch")}">${vscode.l10n.t("Pull")}</div>
-				<div id="pushBtn" class="roundedBtn" title="${vscode.l10n.t("Push Current Branch")}">${vscode.l10n.t("Push")}</div>
-				<div id="refreshBtn" class="roundedBtn">${vscode.l10n.t("Refresh")}</div>
-			</span>
+		<div id="topBar">
+			<div id="sidebarTop">
+				<div id="repoSelect" class="dropdown"></div>
+			</div>
+			<div id="controls">
+				<div id="controlsLeft">
+					<div id="sidebarToggleBtn" class="iconBtn" title="${vscode.l10n.t("Toggle Branch Panel")}"></div>
+					<div id="findBtn" class="iconBtn" title="${vscode.l10n.t("Find Commits")}"></div>
+					<span id="commitFilterControl"><input id="commitFilter" type="search" spellcheck="false" placeholder="${vscode.l10n.t("Filter commits...")}" title="${vscode.l10n.t("Filter by message, author, email, or hash")}"></span>
+				</div>
+				<div id="controlsBtns">
+					<div id="refreshBtn" class="iconBtn" title="${vscode.l10n.t("Refresh")}"></div>
+					<div id="resetBtn" class="iconBtn" title="${vscode.l10n.t("Reset to HEAD")}"></div>
+					<div id="fetchBtn" class="iconBtn" title="${vscode.l10n.t("Fetch from Remote(s)")}"></div>
+					<div id="pullBtn" class="iconBtn" title="${vscode.l10n.t("Pull Current Branch")}"></div>
+					<div id="pushBtn" class="iconBtn" title="${vscode.l10n.t("Push Current Branch")}"></div>
+					<div id="moreBtn" class="iconBtn" title="${vscode.l10n.t("More Actions")}"></div>
+				</div>
+			</div>
 		</div>
 		<div id="findWidget" aria-hidden="true">
 			<input id="findInput" type="search" spellcheck="false" placeholder="${vscode.l10n.t("Find commits...")}">

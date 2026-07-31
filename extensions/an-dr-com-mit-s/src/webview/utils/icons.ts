@@ -1,3 +1,36 @@
+/**
+ * Toolbar glyphs, drawn on a 16x16 grid with a 1.6 unit stroke so they sit
+ * evenly next to each other. Authored here rather than taken from the 2.0
+ * icon set, which is baseline-derived and cannot be copied.
+ */
+const toolbarIcon = (body: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+
+export const toolbarIcons = {
+  /** Circular arrow: refresh. */
+  refresh: toolbarIcon('<path d="M13.5 7a5.5 5.5 0 1 0-1.4 4.3"/><path d="M13.5 3v4h-4"/>'),
+  /** Arrow curving back to a bar: discard local changes. */
+  discard: toolbarIcon('<path d="M2.5 8a5.5 5.5 0 1 1 1.4 3.7"/><path d="M2.5 12V8h4"/>'),
+  /** Downward arrow onto a line: pull. */
+  arrowDown: toolbarIcon(
+    '<path d="M8 2v8"/><path d="M4.5 6.5 8 10l3.5-3.5"/><path d="M3 13.5h10"/>'
+  ),
+  /** Upward arrow off a line: push. */
+  arrowUp: toolbarIcon('<path d="M8 14V6"/><path d="M4.5 9.5 8 6l3.5 3.5"/><path d="M3 2.5h10"/>'),
+  /** Magnifier: find. */
+  search: toolbarIcon('<circle cx="7" cy="7" r="4.2"/><path d="m10.2 10.2 3.3 3.3"/>'),
+  /** Panel with a filled rail: toggle the branch sidebar. */
+  sidebar: toolbarIcon(
+    '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6.5 3v10"/><path d="M4.2 5.5h.1M4.2 8h.1M4.2 10.5h.1"/>'
+  ),
+  /** Horizontal ellipsis: the overflow menu. */
+  more: toolbarIcon('<path d="M3.5 8h.1M8 8h.1M12.5 8h.1"/>'),
+  /** Two commits joined by a check: send the selection to review. */
+  review: toolbarIcon(
+    '<circle cx="4" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><path d="M4 6v4"/><path d="m8.5 8.5 2 2 4-4.5"/>'
+  )
+};
+
 export const svgIcons = {
   alert:
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"/></svg>',

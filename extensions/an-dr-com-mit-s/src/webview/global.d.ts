@@ -1,5 +1,5 @@
-import type { GitCommitDetails, GitCommitNode } from "@/backend/types";
-import * as GG from "@/types";
+import type { GitCommitDetails, GitCommitNode } from "@an-dr/commits-core/backend/types";
+import * as GG from "@an-dr/commits-core/types";
 
 declare global {
   function acquireVsCodeApi(): {

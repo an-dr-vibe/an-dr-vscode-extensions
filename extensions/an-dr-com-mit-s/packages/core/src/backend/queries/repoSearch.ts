@@ -1,4 +1,4 @@
-import { searchDirectoryForRepos } from "@/backend/utils/repoSearch";
+import { searchDirectoryForRepos } from "@an-dr/commits-core/backend/utils/repoSearch";
 
 export async function findGitRepos(
   paths: string[],

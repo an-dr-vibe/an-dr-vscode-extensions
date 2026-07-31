@@ -1,11 +1,11 @@
 import * as path from "node:path";
 
+import { GitRepoSet } from "@an-dr/commits-core/types";
 import * as vscode from "vscode";
 
 import { DataSource } from "@/dataSource";
 import { encodeDiffDocUri } from "@/diffDocProvider";
 import { EXTENSION_ID } from "@/extension/constant/const";
-import { GitRepoSet } from "@/types";
 
 export type ErrorInfo = string | null;
 

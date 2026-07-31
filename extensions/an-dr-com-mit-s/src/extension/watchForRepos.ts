@@ -1,6 +1,6 @@
+import { findGitRepos } from "@an-dr/commits-core/backend/queries/repoSearch";
 import * as vscode from "vscode";
 
-import { findGitRepos } from "@/backend/queries/repoSearch";
 import { config } from "@/config";
 import { EXTENSION_NAME, getConfigKey, getVersionedStateKey } from "@/extension/constant/const";
 import type { InitExtension } from "@/extension/initExtension";

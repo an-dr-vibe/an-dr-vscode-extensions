@@ -1,11 +1,11 @@
+import { abbrevCommit } from "@an-dr/commits-core/backend/utils/string";
+import { BlameLineInfo } from "@an-dr/commits-core/data-source/models";
 import * as vscode from "vscode";
 
-import { getPathFromUri } from "@/backend/utils/path";
-import { abbrevCommit } from "@/backend/utils/string";
 import { Config } from "@/config";
-import { BlameLineInfo } from "@/data-source/models";
 import { CurrentUserIdentity, DataSource } from "@/dataSource";
 import { RepoManager } from "@/extension/repoManager";
+import { getPathFromUri } from "@/extension/utils/hostPaths";
 import { logger } from "@/extension/utils/logger";
 import { getRelativeTimeDiff } from "@/utils";
 

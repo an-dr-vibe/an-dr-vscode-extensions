@@ -25,8 +25,11 @@ Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commi
 
 - Extensions are junctioned, not copied. `install.ps1` always recompiles on every run
   (the `out/` directory existing is not a skip condition — it used to be and that was a bug).
-- No monorepo tooling. Each extension under `extensions/` is fully self-contained with its
-  own `package.json`, `tsconfig.json`, `node_modules/`, and `out/`.
+- No monorepo tooling **at the repository root**. Each extension under `extensions/` is
+  fully self-contained with its own `package.json`, `tsconfig.json`, `node_modules/`, and
+  `out/`. An extension may declare its own nested workspace to split a host-independent
+  core out of its source, which keeps that extension one installable unit and leaves
+  `install.ps1` unchanged — see an-dr-com-mit-s' ADR-003.
 - `install.ps1` picks up new extensions automatically — just add a dir under `extensions/`.
   An extension opts out by containing a `.installignore` file; the installer then skips the
   build, removes any link a previous run created, and leaves it out of the

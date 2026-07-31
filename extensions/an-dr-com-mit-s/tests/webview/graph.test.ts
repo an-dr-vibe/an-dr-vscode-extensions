@@ -1,6 +1,6 @@
+import type { GitCommitNode } from "@an-dr/commits-core/backend/types";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { GitCommitNode } from "@/backend/types";
 import { Graph } from "@/webview/graph";
 
 const config: Config = {

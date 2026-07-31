@@ -2,9 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { findGitRepos } from "@an-dr/commits-core/backend/queries/repoSearch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { findGitRepos } from "@/backend/queries/repoSearch";
 
 import { git } from "@tests/backend/helpers";
 

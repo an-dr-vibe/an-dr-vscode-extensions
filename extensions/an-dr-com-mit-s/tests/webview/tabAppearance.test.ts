@@ -1,7 +1,6 @@
+import type { GitCommitNode } from "@an-dr/commits-core/backend/types";
+import type * as GG from "@an-dr/commits-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { GitCommitNode } from "@/backend/types";
-import type * as GG from "@/types";
 
 import { createVscodeMock, receive, setupHtml } from "./setup";
 

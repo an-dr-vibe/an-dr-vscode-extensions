@@ -1,4 +1,4 @@
-import type * as GG from "@/types";
+import type * as GG from "@an-dr/commits-core/types";
 
 /** Repository path used by the webview fixtures. */
 export const FIXTURE_REPO = "/workspace/my-repo";

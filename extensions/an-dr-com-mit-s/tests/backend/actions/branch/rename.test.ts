@@ -1,10 +1,9 @@
 import * as cp from "node:child_process";
 import * as fs from "node:fs";
 
+import { renameBranch } from "@an-dr/commits-core/backend/actions/branch";
 import { simpleGit } from "simple-git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { renameBranch } from "@/backend/actions/branch";
 
 import { git, makeRepo } from "@tests/backend/helpers";
 

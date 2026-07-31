@@ -1,10 +1,9 @@
 import * as cp from "node:child_process";
 import * as fs from "node:fs";
 
+import { checkoutCommit } from "@an-dr/commits-core/backend/actions/commit";
 import { simpleGit } from "simple-git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { checkoutCommit } from "@/backend/actions/commit";
 
 import { makeRepo } from "@tests/backend/helpers";
 

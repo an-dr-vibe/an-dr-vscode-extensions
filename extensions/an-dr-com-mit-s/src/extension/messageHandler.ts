@@ -1,23 +1,29 @@
-import * as vscode from "vscode";
-
-import { AvatarManager } from "@/avatarManager";
-import { checkoutBranch, createBranch, deleteBranch, renameBranch } from "@/backend/actions/branch";
+import {
+  checkoutBranch,
+  createBranch,
+  deleteBranch,
+  renameBranch
+} from "@an-dr/commits-core/backend/actions/branch";
 import {
   checkoutCommit,
   cherrypickCommit,
   resetToCommit,
   revertCommit
-} from "@/backend/actions/commit";
-import { runInProgressOperation } from "@/backend/actions/inProgress";
-import { mergeBranch, mergeCommit } from "@/backend/actions/merge";
-import { addTag, deleteTag, pushTag } from "@/backend/actions/tag";
-import { GitClient } from "@/backend/gitClient";
-import { commitComparison } from "@/backend/queries/commitComparison";
-import { commitDetails } from "@/backend/queries/commitDetails";
-import { fullDiffContent } from "@/backend/queries/fullDiffContent";
-import type { RepoInProgressType } from "@/backend/queries/repoInProgress";
-import { GitFileChangeType } from "@/backend/types";
-import { abbrevCommit } from "@/backend/utils/string";
+} from "@an-dr/commits-core/backend/actions/commit";
+import { runInProgressOperation } from "@an-dr/commits-core/backend/actions/inProgress";
+import { mergeBranch, mergeCommit } from "@an-dr/commits-core/backend/actions/merge";
+import { addTag, deleteTag, pushTag } from "@an-dr/commits-core/backend/actions/tag";
+import { GitClient } from "@an-dr/commits-core/backend/gitClient";
+import { commitComparison } from "@an-dr/commits-core/backend/queries/commitComparison";
+import { commitDetails } from "@an-dr/commits-core/backend/queries/commitDetails";
+import { fullDiffContent } from "@an-dr/commits-core/backend/queries/fullDiffContent";
+import type { RepoInProgressType } from "@an-dr/commits-core/backend/queries/repoInProgress";
+import { GitFileChangeType } from "@an-dr/commits-core/backend/types";
+import { abbrevCommit } from "@an-dr/commits-core/backend/utils/string";
+import { RequestMessage, ResponseMessage } from "@an-dr/commits-core/types";
+import * as vscode from "vscode";
+
+import { AvatarManager } from "@/avatarManager";
 import { Config } from "@/config";
 import { DataSource } from "@/dataSource";
 import { encodeDiffDocUri } from "@/diffDocProvider";
@@ -26,7 +32,6 @@ import { logger } from "@/extension/utils/logger";
 import { ExtensionState } from "@/extensionState";
 import { GitStatusMonitor } from "@/gitStatusMonitor";
 import { RepoFileWatcher } from "@/repoFileWatcher";
-import { RequestMessage, ResponseMessage } from "@/types";
 import {
   archive,
   getRelativeTimeDiff,

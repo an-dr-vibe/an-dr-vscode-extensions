@@ -1,10 +1,11 @@
-import { isGitRepository } from "@/backend/utils/git";
-import { getPathFromStr } from "@/backend/utils/path";
-import { evalPromises } from "@/backend/utils/promise";
+import { isGitRepository } from "@an-dr/commits-core/backend/utils/git";
+import { getPathFromStr } from "@an-dr/commits-core/backend/utils/path";
+import { evalPromises } from "@an-dr/commits-core/backend/utils/promise";
+import { GitRepoSet, GitRepoState } from "@an-dr/commits-core/types";
+
 import { Config } from "@/config";
 import { ExtensionState } from "@/extensionState";
 import { StatusBarItem } from "@/statusBarItem";
-import { GitRepoSet, GitRepoState } from "@/types";
 import { getSortedRepositoryPaths } from "@/utils";
 
 function sortRepos(repos: GitRepoSet) {

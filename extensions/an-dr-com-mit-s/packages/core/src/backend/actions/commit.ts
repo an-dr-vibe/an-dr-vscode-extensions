@@ -1,6 +1,5 @@
+import type { ActionPayload } from "@an-dr/commits-core/backend/types";
 import type { SimpleGit } from "simple-git";
-
-import type { ActionPayload } from "@/backend/types";
 
 export async function checkoutCommit(
   git: SimpleGit,

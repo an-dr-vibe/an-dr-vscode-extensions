@@ -1,11 +1,12 @@
 import * as assert from "node:assert";
 import * as fs from "node:fs";
 
+import { GitRepoSet } from "@an-dr/commits-core/types";
+
 import { Config } from "@/config";
 import { createRepoManager } from "@/extension/repoManager";
 import { ExtensionState } from "@/extensionState";
 import { StatusBarItem } from "@/statusBarItem";
-import { GitRepoSet } from "@/types";
 
 import { makeRepo } from "@tests/backend/helpers";
 

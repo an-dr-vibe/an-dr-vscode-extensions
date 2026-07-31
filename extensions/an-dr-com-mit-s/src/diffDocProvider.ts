@@ -1,7 +1,7 @@
+import { GitInstance } from "@an-dr/commits-core/backend/gitClient";
+import { getPathFromStr } from "@an-dr/commits-core/backend/utils/path";
 import * as vscode from "vscode";
 
-import { GitInstance } from "./backend/gitClient";
-import { getPathFromStr } from "./backend/utils/path";
 import { getVirtualDocumentScheme } from "./extension/constant/const";
 
 export class DiffDocProvider implements vscode.TextDocumentContentProvider {

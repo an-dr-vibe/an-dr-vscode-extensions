@@ -1,11 +1,11 @@
+import { GitRepoSet } from "@an-dr/commits-core/types";
 import * as vscode from "vscode";
 
 import { AvatarManager } from "@/avatarManager";
-import { buildExtensionUri } from "@/backend/utils/path";
 import { Config } from "@/config";
+import { buildExtensionUri } from "@/extension/utils/hostPaths";
 import { ExtensionState } from "@/extensionState";
 import { RepoFileWatcher } from "@/repoFileWatcher";
-import { GitRepoSet } from "@/types";
 
 import { RepoManager } from "./repoManager";
 import { WebviewBridge } from "./webviewBridge";

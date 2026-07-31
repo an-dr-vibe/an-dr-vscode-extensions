@@ -1,13 +1,12 @@
 import * as path from "path";
 
+import { GitClient, gitClientFactory } from "@an-dr/commits-core/backend/gitClient";
+import { findGitRepos } from "@an-dr/commits-core/backend/queries/repoSearch";
 import * as vscode from "vscode";
 
 import { createAskpass } from "@/askpass/askpass";
 import { promptForCredential } from "@/askpass/credentialPrompt";
 import { AvatarManager } from "@/avatarManager";
-import { GitClient, gitClientFactory } from "@/backend/gitClient";
-import { findGitRepos } from "@/backend/queries/repoSearch";
-import { buildExtensionUri } from "@/backend/utils/path";
 import { config } from "@/config";
 import { DataSource } from "@/dataSource";
 import { DiffDocProvider } from "@/diffDocProvider";
@@ -23,6 +22,7 @@ import { registerPublicCommands } from "@/extension/publicCommands";
 import { createRemoteCommands, runRemoteOperationWithGit } from "@/extension/remoteOperations";
 import { createRepoManager, RepoManager } from "@/extension/repoManager";
 import { createRepositoryCommands } from "@/extension/repositoryCommands";
+import { buildExtensionUri } from "@/extension/utils/hostPaths";
 import { logger } from "@/extension/utils/logger";
 import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
 import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";

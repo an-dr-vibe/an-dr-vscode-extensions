@@ -34,9 +34,21 @@ const esbuildProblemMatcherPlugin = {
   }
 };
 
+const CORE_SPECIFIER = "@an-dr/commits-core/";
+
 const aliasPlugin = {
   name: "alias",
   setup(build) {
+    // The core is a workspace package rather than a folder under src, so it
+    // resolves by package name and keeps its own boundary.
+    build.onResolve({ filter: /^@an-dr\/commits-core\// }, async (args) => {
+      const resolved = path.resolve(
+        __dirname,
+        "packages/core/src",
+        args.path.slice(CORE_SPECIFIER.length)
+      );
+      return build.resolve(resolved, { kind: args.kind, resolveDir: path.dirname(resolved) });
+    });
     build.onResolve({ filter: /^@\// }, async (args) => {
       const resolved = path.resolve(__dirname, "src", args.path.slice(2));
       return build.resolve(resolved, { kind: args.kind, resolveDir: path.dirname(resolved) });

@@ -1,8 +1,7 @@
 import * as fs from "node:fs";
 
+import { getRemoteUrl } from "@an-dr/commits-core/backend/utils/git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { getRemoteUrl } from "@/backend/utils/git";
 
 import { git, makeRepo } from "@tests/backend/helpers";
 

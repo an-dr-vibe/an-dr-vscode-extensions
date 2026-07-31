@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 
+import { getPathFromStr } from "@an-dr/commits-core/backend/utils/path";
+import { Avatar, AvatarCache, GitRepoSet } from "@an-dr/commits-core/types";
 import { ExtensionContext, Memento } from "vscode";
 
-import { getPathFromStr } from "./backend/utils/path";
 import { getVersionedStateKey, shouldReadStagingLegacyState } from "./extension/constant/const";
-import { Avatar, AvatarCache, GitRepoSet } from "./types";
 
 const AVATAR_STORAGE_FOLDER = "/avatars";
 const AVATAR_CACHE = "avatarCache";

@@ -1,4 +1,4 @@
-import { abbrevCommit } from "@/backend/utils/string";
+import { abbrevCommit } from "@an-dr/commits-core/backend/utils/string";
 
 /** Operation the working tree is part-way through. */
 export type RepoInProgressType = "rebase" | "merge" | "cherry-pick" | "revert";

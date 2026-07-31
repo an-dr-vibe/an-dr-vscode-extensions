@@ -2,9 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { searchDirectoryForRepos } from "@an-dr/commits-core/backend/utils/repoSearch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { searchDirectoryForRepos } from "@/backend/utils/repoSearch";
 
 import { git } from "@tests/backend/helpers";
 

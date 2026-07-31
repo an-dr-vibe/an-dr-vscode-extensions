@@ -2,10 +2,9 @@ import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { resetToCommit } from "@an-dr/commits-core/backend/actions/commit";
 import { simpleGit } from "simple-git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { resetToCommit } from "@/backend/actions/commit";
 
 import { git, makeRepo } from "@tests/backend/helpers";
 

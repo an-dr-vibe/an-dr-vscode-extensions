@@ -1,8 +1,9 @@
 import * as path from "node:path";
 
+import type * as GG from "@an-dr/commits-core/types";
+
 import { getWebviewLocalizedStrings } from "@/extension/l10n/webviewL10n";
 import { buildWebviewHtml, WebviewHtmlConfig } from "@/extension/webviewHtml";
-import type * as GG from "@/types";
 
 /**
  * Presents a view state as the configuration the HTML builder reads, so a test

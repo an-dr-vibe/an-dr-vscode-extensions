@@ -1,7 +1,7 @@
+import type { GitChangeCounts } from "@an-dr/commits-core/data-source/models";
 import * as vscode from "vscode";
 
 import { Config } from "./config";
-import type { GitChangeCounts } from "./data-source/models";
 import { EXTENSION_NAME, getCommandId } from "./extension/constant/const";
 import { logger } from "./extension/utils/logger";
 

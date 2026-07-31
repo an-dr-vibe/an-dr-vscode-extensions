@@ -2,22 +2,24 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import type { FileStatusResult, SimpleGit } from "simple-git";
-import { simpleGit } from "simple-git";
-import * as vscode from "vscode";
-
-import type { GitClient } from "@/backend/gitClient";
-import { loadBranches } from "@/backend/queries/loadBranches";
-import { loadCommits } from "@/backend/queries/loadCommits";
-import { getRepoInProgressState, RepoInProgressState } from "@/backend/queries/repoInProgress";
-import { getPathFromStr } from "@/backend/utils/path";
+import type { GitClient } from "@an-dr/commits-core/backend/gitClient";
+import { loadBranches } from "@an-dr/commits-core/backend/queries/loadBranches";
+import { loadCommits } from "@an-dr/commits-core/backend/queries/loadCommits";
+import {
+  getRepoInProgressState,
+  RepoInProgressState
+} from "@an-dr/commits-core/backend/queries/repoInProgress";
+import { getPathFromStr } from "@an-dr/commits-core/backend/utils/path";
 import {
   BlameLineInfo,
   GitChangeCounts,
   GitWorkingTreeChange,
   HeadInfo
-} from "@/data-source/models";
-import { parseBlameIncrementalOutput } from "@/data-source/parsers";
+} from "@an-dr/commits-core/data-source/models";
+import { parseBlameIncrementalOutput } from "@an-dr/commits-core/data-source/parsers";
+import { simpleGit } from "simple-git";
+import type { FileStatusResult, SimpleGit } from "simple-git";
+import * as vscode from "vscode";
 
 type GitFactory = (repo: string, gitPath: string) => SimpleGit;
 

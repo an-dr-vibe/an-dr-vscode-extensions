@@ -1,4 +1,4 @@
-import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
+import type { RepoInProgressState } from "@an-dr/commits-core/backend/queries/repoInProgress";
 import type {
   GitCommandStatus,
   GitCommitDetails,
@@ -6,7 +6,7 @@ import type {
   GitFileChange,
   GitFileChangeType,
   GitResetMode
-} from "@/backend/types";
+} from "@an-dr/commits-core/backend/types";
 
 import { BranchPanel } from "./branchPanel";
 import { CommitSelection, readSelectionGesture } from "./commitSelection";

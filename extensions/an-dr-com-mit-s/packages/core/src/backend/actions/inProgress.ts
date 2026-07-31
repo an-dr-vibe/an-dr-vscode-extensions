@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 
-import type { RepoInProgressType } from "@/backend/queries/repoInProgress";
+import type { RepoInProgressType } from "@an-dr/commits-core/backend/queries/repoInProgress";
 
 export type InProgressAction = "continue" | "abort";
 export type InProgressGitRunner = (

@@ -1,10 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import {
+  type InProgressAction,
+  runInProgressOperation
+} from "@an-dr/commits-core/backend/actions/inProgress";
+import type { RepoInProgressType } from "@an-dr/commits-core/backend/queries/repoInProgress";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { type InProgressAction, runInProgressOperation } from "@/backend/actions/inProgress";
-import type { RepoInProgressType } from "@/backend/queries/repoInProgress";
 
 import { git, makeRepo } from "@tests/backend/helpers";
 

@@ -31,6 +31,9 @@
     "url": "https://github.com/an-dr/an-dr-vscode-extensions.git"
   },
   "publisher": "an-dr",
+  "workspaces": [
+    "packages/*"
+  ],
   "main": "./out/extension.js",
   "scripts": {
     "typecheck": "tsc -p ./src --noEmit && tsc -p ./src/webview --noEmit && tsc -p tests/tsconfig.json --noEmit && tsc -p tests-ext/tsconfig.json --noEmit",
@@ -51,6 +54,7 @@
     "l10n:check": "npm run l10n:export && git diff --exit-code ./l10n/bundle.l10n.json && node scripts/check-l10n.js"
   },
   "dependencies": {
+    "@an-dr/commits-core": "*",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {

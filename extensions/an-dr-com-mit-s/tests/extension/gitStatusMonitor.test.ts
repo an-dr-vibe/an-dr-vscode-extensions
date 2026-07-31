@@ -1,3 +1,4 @@
+import type { GitRepoSet } from "@an-dr/commits-core/types";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DataSource } from "@/dataSource";
@@ -5,7 +6,6 @@ import type { RepoManager } from "@/extension/repoManager";
 import type { ExtensionState } from "@/extensionState";
 import { GitStatusMonitor } from "@/gitStatusMonitor";
 import type { StatusBarItem } from "@/statusBarItem";
-import type { GitRepoSet } from "@/types";
 
 function createRepoManager(initial: GitRepoSet) {
   let repos = initial;

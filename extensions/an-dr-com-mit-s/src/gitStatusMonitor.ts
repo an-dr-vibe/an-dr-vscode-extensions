@@ -1,8 +1,8 @@
 import * as path from "node:path";
 
+import type { GitChangeCounts } from "@an-dr/commits-core/data-source/models";
 import * as vscode from "vscode";
 
-import type { GitChangeCounts } from "@/data-source/models";
 import { DataSource } from "@/dataSource";
 import { RepoManager } from "@/extension/repoManager";
 import { ExtensionState } from "@/extensionState";

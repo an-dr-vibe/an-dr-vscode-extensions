@@ -3,6 +3,10 @@ import path from "node:path";
 import { defineConfig } from "vitest/config";
 
 const alias = [
+  {
+    find: /^@an-dr\/commits-core\//,
+    replacement: path.resolve(__dirname, "packages/core/src") + "/"
+  },
   { find: /^@\//, replacement: path.resolve(__dirname, "src") + "/" },
   { find: /^@tests\//, replacement: path.resolve(__dirname, "tests") + "/" }
 ];

@@ -1,8 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import { isGitRepository } from "@/backend/utils/git";
-import { evalPromises } from "@/backend/utils/promise";
+import { isGitRepository } from "@an-dr/commits-core/backend/utils/git";
+import { evalPromises } from "@an-dr/commits-core/backend/utils/promise";
 
 async function isDirectory(directoryPath: string): Promise<boolean> {
   return fs
@@ -46,6 +46,10 @@ export async function searchDirectoryForRepos(
   const dirs: string[] = [];
   for (let i = 0; i < dirContents.length; i++) {
     const childDirectory = path.join(directory, dirContents[i]);
+    // Deliberately sequential: the search is concurrency-limited on purpose
+    // (see evalPromises below), and statting every entry at once would defeat
+    // that on a large tree.
+    // eslint-disable-next-line no-await-in-loop
     if (dirContents[i] !== ".git" && (await isDirectory(childDirectory))) {
       dirs.push(childDirectory);
     }

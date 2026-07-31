@@ -1,11 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-
 import {
   getRepoInProgressState,
   parseWorkingTreeStatus,
   pickSubjectLine,
   RepoInProgressIo
-} from "@/backend/queries/repoInProgress";
+} from "@an-dr/commits-core/backend/queries/repoInProgress";
+import { describe, expect, it, vi } from "vitest";
 
 const GIT_PATHS = [
   "/repo/.git/rebase-merge",

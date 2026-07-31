@@ -1,9 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
+import type { GitFileChangeType, QueryResult } from "@an-dr/commits-core/backend/types";
 import type { SimpleGit } from "simple-git";
-
-import type { GitFileChangeType, QueryResult } from "@/backend/types";
 
 /** Hash the webview uses for the synthetic uncommitted-changes row. */
 export const UNCOMMITTED = "*";

@@ -1,6 +1,5 @@
+import { parseBlameIncrementalOutput } from "@an-dr/commits-core/data-source/parsers";
 import { describe, expect, it } from "vitest";
-
-import { parseBlameIncrementalOutput } from "@/data-source/parsers";
 
 const HASH = "a".repeat(40);
 const OTHER = "b".repeat(40);

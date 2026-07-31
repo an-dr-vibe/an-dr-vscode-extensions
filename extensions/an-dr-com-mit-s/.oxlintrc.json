@@ -86,6 +86,14 @@
         "node": false,
         "browser": true
       }
+    },
+    {
+      // The core must run without VS Code present. Importing vscode here would
+      // compile and pass tests, and only fail when a non-VS Code host loads it.
+      "files": ["packages/core/**/*.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": ["error", { "paths": ["vscode"] }]
+      }
     }
   ]
 }

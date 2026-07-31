@@ -1,10 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { loadCommits } from "@an-dr/commits-core/backend/queries/loadCommits";
 import { simpleGit } from "simple-git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { loadCommits } from "@/backend/queries/loadCommits";
 
 import { git, makeRepo } from "@tests/backend/helpers";
 

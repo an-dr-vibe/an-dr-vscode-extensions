@@ -1,8 +1,8 @@
+import type { RepoInProgressState } from "@an-dr/commits-core/backend/queries/repoInProgress";
+import type { RequestMessage, ResponseMessage } from "@an-dr/commits-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
 import { registerMessageHandlers } from "@/extension/messageHandler";
-import type { RequestMessage, ResponseMessage } from "@/types";
 
 const utilityMocks = vi.hoisted(() => ({
   archive: vi.fn(),

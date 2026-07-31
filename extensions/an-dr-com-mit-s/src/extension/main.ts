@@ -1,7 +1,7 @@
+import { findGitRepos } from "@an-dr/commits-core/backend/queries/repoSearch";
+import { getGitVersion } from "@an-dr/commits-core/backend/utils/git";
 import * as vscode from "vscode";
 
-import { findGitRepos } from "@/backend/queries/repoSearch";
-import { getGitVersion } from "@/backend/utils/git";
 import { config } from "@/config";
 import { getVersionedStateKey } from "@/extension/constant/const";
 import { initExtension } from "@/extension/initExtension";

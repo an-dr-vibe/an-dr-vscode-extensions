@@ -1,6 +1,5 @@
+import { abbrevCommit } from "@an-dr/commits-core/backend/utils/string";
 import { describe, expect, it } from "vitest";
-
-import { abbrevCommit } from "@/backend/utils/string";
 
 describe("abbrevCommit", () => {
   it("shortens a full commit hash to eight characters", () => {

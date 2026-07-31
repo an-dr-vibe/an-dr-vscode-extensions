@@ -1,6 +1,9 @@
+import type {
+  GitFileChange,
+  GitFileChangeType,
+  QueryResult
+} from "@an-dr/commits-core/backend/types";
 import type { SimpleGit } from "simple-git";
-
-import type { GitFileChange, GitFileChangeType, QueryResult } from "@/backend/types";
 
 const eolRegex = /\r\n|\r|\n/g;
 

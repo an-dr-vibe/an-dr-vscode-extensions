@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string -- blame templates use literal ${...} placeholders. */
+import { BlameLineInfo } from "@an-dr/commits-core/data-source/models";
 import { describe, expect, it } from "vitest";
 
-import { BlameLineInfo } from "@/data-source/models";
 import { formatBlameText, shouldShowInlineHover } from "@/inlineBlame";
 
 const blame: BlameLineInfo = {

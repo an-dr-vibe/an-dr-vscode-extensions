@@ -1,10 +1,9 @@
 import * as cp from "node:child_process";
 import * as fs from "node:fs";
 
+import { addTag } from "@an-dr/commits-core/backend/actions/tag";
 import { simpleGit } from "simple-git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { addTag } from "@/backend/actions/tag";
 
 import { makeRepo } from "@tests/backend/helpers";
 

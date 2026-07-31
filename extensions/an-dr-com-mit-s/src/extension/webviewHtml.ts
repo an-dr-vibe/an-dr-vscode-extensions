@@ -1,10 +1,10 @@
+import { getNonce } from "@an-dr/commits-core/backend/utils/nonce";
+import { GitGraphViewState } from "@an-dr/commits-core/types";
 import * as vscode from "vscode";
 
-import { getNonce } from "@/backend/utils/nonce";
-import { buildExtensionUri } from "@/backend/utils/path";
 import { Config } from "@/config";
+import { buildExtensionUri } from "@/extension/utils/hostPaths";
 import { ExtensionState } from "@/extensionState";
-import { GitGraphViewState } from "@/types";
 
 import { EXTENSION_NAME } from "./constant/const";
 import { loadFileIcons } from "./fileIcons";

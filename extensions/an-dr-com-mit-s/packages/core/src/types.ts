@@ -1,11 +1,11 @@
-import type { RepoInProgressState } from "@/backend/queries/repoInProgress";
+import type { RepoInProgressState } from "@an-dr/commits-core/backend/queries/repoInProgress";
 import {
   ActionRequest,
   ActionResponse,
   GitFileChangeType,
   QueryRequest,
   QueryResponse
-} from "@/backend/types";
+} from "@an-dr/commits-core/backend/types";
 
 export type GitRepoSet = { [repo: string]: GitRepoState };
 export type GitRepoState = {

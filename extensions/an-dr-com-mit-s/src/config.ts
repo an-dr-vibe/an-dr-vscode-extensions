@@ -1,9 +1,9 @@
+import { DateType } from "@an-dr/commits-core/backend/types";
+import { DateFormat, GraphStyle } from "@an-dr/commits-core/types";
 import * as vscode from "vscode";
 
-import { DateType } from "./backend/types";
 import { EXTENSION_ID, getConfigKey, TARGET_EXTENSION_ID } from "./extension/constant/const";
 import { LogLevel } from "./extension/utils/logger";
-import { DateFormat, GraphStyle } from "./types";
 
 type TabIconColourTheme = "colour" | "grey";
 

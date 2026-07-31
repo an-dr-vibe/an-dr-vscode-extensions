@@ -1,9 +1,8 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 
+import { isGitRepository } from "@an-dr/commits-core/backend/utils/git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { isGitRepository } from "@/backend/utils/git";
 
 import { makeRepo } from "@tests/backend/helpers";
 

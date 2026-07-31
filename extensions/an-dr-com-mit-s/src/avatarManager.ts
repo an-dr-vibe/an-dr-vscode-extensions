@@ -4,9 +4,10 @@ import * as http from "node:http";
 import * as https from "node:https";
 import * as url from "node:url";
 
-import { getRemoteUrl } from "./backend/utils/git";
+import { getRemoteUrl } from "@an-dr/commits-core/backend/utils/git";
+import { AvatarCache, ResponseMessage } from "@an-dr/commits-core/types";
+
 import { ExtensionState } from "./extensionState";
-import { AvatarCache, ResponseMessage } from "./types";
 
 export class AvatarManager {
   private readonly gitPath: () => string;

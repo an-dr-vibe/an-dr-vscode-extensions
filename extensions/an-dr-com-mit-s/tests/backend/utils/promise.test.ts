@@ -1,6 +1,5 @@
+import { evalPromises } from "@an-dr/commits-core/backend/utils/promise";
 import { describe, expect, it } from "vitest";
-
-import { evalPromises } from "@/backend/utils/promise";
 
 describe("evalPromises", () => {
   it("preserves input order while respecting the concurrency limit", async () => {

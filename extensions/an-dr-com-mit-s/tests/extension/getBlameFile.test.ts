@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { gitClientFactory } from "@an-dr/commits-core/backend/gitClient";
 import { afterEach, describe, expect, it } from "vitest";
 import * as vscode from "vscode";
 
-import { gitClientFactory } from "@/backend/gitClient";
 import { DataSource } from "@/dataSource";
 
 import { git, makeRepo } from "@tests/backend/helpers";

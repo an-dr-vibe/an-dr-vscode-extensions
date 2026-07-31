@@ -2,10 +2,9 @@ import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { mergeBranch } from "@an-dr/commits-core/backend/actions/merge";
 import { simpleGit } from "simple-git";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { mergeBranch } from "@/backend/actions/merge";
 
 import { git, makeRepo } from "@tests/backend/helpers";
 

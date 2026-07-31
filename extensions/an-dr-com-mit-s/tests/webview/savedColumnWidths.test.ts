@@ -1,6 +1,5 @@
+import type { GitCommitNode } from "@an-dr/commits-core/backend/types";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-
-import type { GitCommitNode } from "@/backend/types";
 
 import { FIXTURE_REPO, viewStateFixture } from "./fixtures";
 import { createVscodeMock, receive, setupHtml } from "./setup";

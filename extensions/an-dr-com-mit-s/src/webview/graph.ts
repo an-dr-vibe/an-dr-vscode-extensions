@@ -1,4 +1,4 @@
-import type { GitCommitNode } from "@/backend/types";
+import type { GitCommitNode } from "@an-dr/commits-core/backend/types";
 
 interface UnavailablePoint {
   connectsTo: VertexOrNull;

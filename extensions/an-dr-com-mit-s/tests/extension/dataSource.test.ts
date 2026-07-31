@@ -1,6 +1,6 @@
+import type { GitClient } from "@an-dr/commits-core/backend/gitClient";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GitClient } from "@/backend/gitClient";
 import { DataSource } from "@/dataSource";
 
 function createSubject(git: Record<string, unknown>) {

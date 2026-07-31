@@ -2,7 +2,7 @@ import type {
   RepoInProgressState,
   RepoInProgressType,
   WorkingTreeStatus
-} from "@/backend/queries/repoInProgress";
+} from "@an-dr/commits-core/backend/queries/repoInProgress";
 
 import { escapeHtml } from "./utils/html";
 

@@ -1,7 +1,7 @@
+import { isGitRepository } from "@an-dr/commits-core/backend/utils/git";
+import { getPathFromStr } from "@an-dr/commits-core/backend/utils/path";
 import * as vscode from "vscode";
 
-import { isGitRepository } from "@/backend/utils/git";
-import { getPathFromStr } from "@/backend/utils/path";
 import { Config } from "@/config";
 import { RepoManager } from "@/extension/repoManager";
 import { GitStatusMonitor } from "@/gitStatusMonitor";

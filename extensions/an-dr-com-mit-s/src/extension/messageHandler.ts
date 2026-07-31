@@ -13,6 +13,7 @@ import { mergeBranch, mergeCommit } from "@/backend/actions/merge";
 import { addTag, deleteTag, pushTag } from "@/backend/actions/tag";
 import { GitClient } from "@/backend/gitClient";
 import { commitDetails } from "@/backend/queries/commitDetails";
+import { fullDiffContent } from "@/backend/queries/fullDiffContent";
 import type { RepoInProgressType } from "@/backend/queries/repoInProgress";
 import { GitFileChangeType } from "@/backend/types";
 import { abbrevCommit } from "@/backend/utils/string";
@@ -196,6 +197,20 @@ export function registerMessageHandlers(
       ...(await commitDetails(gitClient.getInstance(), {
         commitHash: msg.commitHash,
         dateType: config.dateType()
+      }))
+    });
+  });
+
+  bridge.onMessage("fullDiffContent", async (msg) => {
+    bridge.post({
+      command: "fullDiffContent",
+      ...(await fullDiffContent(gitClient.getInstance(), {
+        repo: msg.repo,
+        fromHash: msg.fromHash,
+        toHash: msg.toHash,
+        oldFilePath: msg.oldFilePath,
+        newFilePath: msg.newFilePath,
+        type: msg.type
       }))
     });
   });

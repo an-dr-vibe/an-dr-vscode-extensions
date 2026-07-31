@@ -37,6 +37,8 @@ export function getWebviewLocalizedStrings() {
     branchPanelRemote: vscode.l10n.t("Remote"),
     branchPanelNoBranches: vscode.l10n.t("No branches"),
     branchPanelNoMatchingBranches: vscode.l10n.t("No matching branches"),
+    fullDiffUnableToLoad: vscode.l10n.t("Unable to load the file contents"),
+    fullDiffNoChanges: vscode.l10n.t("This file has no contents to show"),
     findNoMatches: vscode.l10n.t("No matches"),
     findMatchCount: vscode.l10n.t("{0} of {1}"),
     loadMore: vscode.l10n.t("Load More Commits"),

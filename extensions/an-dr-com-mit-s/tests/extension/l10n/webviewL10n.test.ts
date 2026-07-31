@@ -7,7 +7,7 @@ describe("getWebviewLocalizedStrings", () => {
     const strings = getWebviewLocalizedStrings();
     const values = Object.values(strings);
 
-    expect(Object.keys(strings)).toHaveLength(121);
+    expect(Object.keys(strings)).toHaveLength(123);
     expect(strings).toMatchObject({
       repo: "Repo",
       branchPanelLocal: "Local",

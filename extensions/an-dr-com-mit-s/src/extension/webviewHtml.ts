@@ -137,6 +137,14 @@ export function buildWebviewHtml(opts: {
 			<div id="commitTable"></div>
 		</div>
 		<div id="filesPanel"></div>
+		<div id="fullDiffPanel">
+			<div id="fullDiffResizeHandle"></div>
+			<div id="fullDiffHeader">
+				<span id="fullDiffFilename"></span>
+				<button id="fullDiffCloseBtn" title="${vscode.l10n.t("Close")}" aria-label="${vscode.l10n.t("Close")}">×</button>
+			</div>
+			<div id="fullDiffContent"></div>
+		</div>
 		<div id="footer"></div>
 		<ul id="contextMenu"></ul>
 		<div id="dialogBacking"></div>

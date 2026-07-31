@@ -122,6 +122,8 @@ declare global {
     filesPanelWidth?: number;
     /** Absent in state saved before the branch panel existed. */
     branchPanel?: import("./branchPanel").BranchPanelState;
+    /** Absent in state saved before the full diff panel existed. */
+    fullDiffPanel?: import("./fullDiffPanel").FullDiffPanelState;
   }
 }
 

@@ -78,6 +78,8 @@
   "Remote": "Remote",
   "No branches": "No branches",
   "No matching branches": "No matching branches",
+  "Unable to load the file contents": "Unable to load the file contents",
+  "This file has no contents to show": "This file has no contents to show",
   "No matches": "No matches",
   "{0} of {1}": "{0} of {1}",
   "Load More Commits": "Load More Commits",

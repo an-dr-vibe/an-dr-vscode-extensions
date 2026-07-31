@@ -1,9 +1,26 @@
-import type { GitCommitDetails, GitCommitNode } from "./git.types";
+import type { GitCommitDetails, GitCommitNode, GitFileChangeType } from "./git.types";
 
 type QueryPayloads = {
   commitDetails: {
     request: { repo: string; commitHash: string };
     response: { commitDetails: GitCommitDetails | null };
+  };
+  fullDiffContent: {
+    request: {
+      repo: string;
+      fromHash: string;
+      toHash: string;
+      oldFilePath: string;
+      newFilePath: string;
+      type: GitFileChangeType;
+    };
+    response: {
+      diff: string | null;
+      oldContent: string | null;
+      newContent: string | null;
+      oldExists: boolean;
+      newExists: boolean;
+    };
   };
   loadBranches: {
     request: { showRemoteBranches: boolean; hard: boolean };

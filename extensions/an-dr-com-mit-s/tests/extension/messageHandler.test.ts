@@ -28,7 +28,8 @@ function createHarness() {
   };
   const gitStatusMonitor = { selectRepo: vi.fn() };
   const raw = vi.fn(async () => "");
-  const gitClient = { setRepo: vi.fn(), getInstance: () => ({ raw }) };
+  const show = vi.fn(async () => "");
+  const gitClient = { setRepo: vi.fn(), getInstance: () => ({ raw, show }) };
   const getRepoInProgress = vi.fn<() => Promise<RepoInProgressState>>(async () => ({
     type: "rebase" as const,
     subject: null,
@@ -57,10 +58,44 @@ function createHarness() {
     handlers,
     post,
     raw,
+    show,
     runInProgressOperation,
     runRemoteOperation
   };
 }
+
+describe("registerMessageHandlers full diff content", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("answers with the diff and both endpoints under the same command", async () => {
+    const { handlers, post, raw, show } = createHarness();
+    raw.mockResolvedValue("@@ -1,1 +1,1 @@\n-a\n+b\n");
+    show.mockResolvedValueOnce("a\n").mockResolvedValueOnce("b\n");
+
+    await handlers.get("fullDiffContent")!({
+      command: "fullDiffContent",
+      repo: "/repo",
+      fromHash: "abc",
+      toHash: "abc",
+      oldFilePath: "f.txt",
+      newFilePath: "f.txt",
+      type: "M"
+    });
+
+    expect(show).toHaveBeenCalledWith(["abc^:f.txt"]);
+    expect(show).toHaveBeenCalledWith(["abc:f.txt"]);
+    expect(post).toHaveBeenCalledWith({
+      command: "fullDiffContent",
+      diff: "@@ -1,1 +1,1 @@\n-a\n+b\n",
+      oldContent: "a\n",
+      newContent: "b\n",
+      oldExists: true,
+      newExists: true
+    });
+  });
+});
 
 describe("registerMessageHandlers utility actions", () => {
   beforeEach(() => {

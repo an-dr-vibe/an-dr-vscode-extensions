@@ -24,6 +24,7 @@ import {
 import { Dropdown } from "./dropdown";
 import { DEFAULT_FILES_PANEL_WIDTH, FilesPanel } from "./filesPanel";
 import { FindWidget } from "./findWidget";
+import { FullDiffPanel } from "./fullDiffPanel";
 import { Graph } from "./graph";
 import { observeExternalUrls } from "./observers/urlEvents";
 import { RepoInProgressBanner } from "./repoInProgressBanner";
@@ -66,6 +67,7 @@ class GitGraphView {
   private showRemoteBranchesElem: HTMLInputElement;
   private scrollShadowElem: HTMLElement;
   private filesPanel: FilesPanel;
+  private fullDiffPanel: FullDiffPanel;
   private filesPanelWidth: number;
   private repoInProgressBanner: RepoInProgressBanner;
 
@@ -129,6 +131,7 @@ class GitGraphView {
       this.filesPanelWidth = width;
       this.saveState();
     });
+    this.fullDiffPanel = new FullDiffPanel(prevState?.fullDiffPanel, () => this.saveState());
     document.getElementById("refreshBtn")!.addEventListener("click", () => {
       this.refresh(true);
     });
@@ -259,6 +262,24 @@ class GitGraphView {
       this.loadBranchesCallback(changes, isRepo);
       this.loadBranchesCallback = null;
     }
+  }
+
+  /** The change a click landed on, or null when the row has no viewable diff. */
+  private resolveClickedFile(e: Event) {
+    const sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
+    if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) {
+      return null;
+    }
+    return {
+      commitHash: this.expandedCommit.hash,
+      oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
+      newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
+      type: <GitFileChangeType>sourceElem.dataset.type
+    };
+  }
+
+  public renderFullDiff(data: Parameters<FullDiffPanel["render"]>[0]) {
+    this.fullDiffPanel.render(data);
   }
 
   private selectBranch(value: string, fromPanel: boolean) {
@@ -612,7 +633,8 @@ class GitGraphView {
       showRemoteBranches: this.showRemoteBranches,
       expandedCommit: this.expandedCommit,
       filesPanelWidth: this.filesPanelWidth,
-      branchPanel: this.branchPanel.getState()
+      branchPanel: this.branchPanel.getState(),
+      fullDiffPanel: this.fullDiffPanel.getState()
     });
   }
 
@@ -1522,18 +1544,36 @@ class GitGraphView {
       );
       this.saveState();
     });
+    // A single click shows the file in the docked panel; a double click hands
+    // it to the editor's own diff view, which is the only way to edit it.
     addListenerToClass("gitFile", "click", (e) => {
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
-      if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) {
+      const file = this.resolveClickedFile(e);
+      if (file === null) {
+        return;
+      }
+      this.fullDiffPanel.open(file.newFilePath);
+      sendMessage({
+        command: "fullDiffContent",
+        repo: this.currentRepo!,
+        fromHash: file.commitHash,
+        toHash: file.commitHash,
+        oldFilePath: file.oldFilePath,
+        newFilePath: file.newFilePath,
+        type: file.type
+      });
+    });
+    addListenerToClass("gitFile", "dblclick", (e) => {
+      const file = this.resolveClickedFile(e);
+      if (file === null) {
         return;
       }
       sendMessage({
         command: "viewDiff",
         repo: this.currentRepo!,
-        commitHash: this.expandedCommit.hash,
-        oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
-        newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
-        type: <GitFileChangeType>sourceElem.dataset.type
+        commitHash: file.commitHash,
+        oldFilePath: file.oldFilePath,
+        newFilePath: file.newFilePath,
+        type: file.type
       });
     });
   }
@@ -1657,6 +1697,9 @@ window.addEventListener("message", (event) => {
       } else {
         showErrorDialog(l10n.repoInProgressActionFailed, msg.status, null);
       }
+      break;
+    case "fullDiffContent":
+      gitGraph.renderFullDiff(msg);
       break;
     case "loadCommits":
       gitGraph.loadCommits(msg.commits, msg.head, msg.moreCommitsAvailable, msg.hard);

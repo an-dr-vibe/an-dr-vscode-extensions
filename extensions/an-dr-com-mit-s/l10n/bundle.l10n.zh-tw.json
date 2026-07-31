@@ -35,6 +35,8 @@
   "Remote": "遠端",
   "No branches": "沒有分支",
   "No matching branches": "沒有相符的分支",
+  "Unable to load the file contents": "無法載入檔案內容",
+  "This file has no contents to show": "此檔案沒有可顯示的內容",
   "No matches": "沒有相符項目",
   "{0} of {1}": "第 {0} 個，共 {1} 個",
   "Repo": "存放庫",

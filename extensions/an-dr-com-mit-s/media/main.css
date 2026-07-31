@@ -2,6 +2,8 @@
 body {
   margin: 0;
   padding: 0;
+  /* Keeps the page's own bottom clear of the docked full diff panel. */
+  padding-bottom: var(--full-diff-height, 0px);
 }
 body.unableToLoad {
   margin: 0 20px;
@@ -11,7 +13,7 @@ body.unableToLoad {
 #branchPanelSidebar {
   position: fixed;
   top: 38px;
-  bottom: 0;
+  bottom: var(--full-diff-height, 0px);
   left: 0;
   z-index: 10;
   overflow: auto;
@@ -26,7 +28,7 @@ body.branchPanelHidden #branchPanelSidebar {
 #branchPanelResizeHandle {
   position: fixed;
   top: 38px;
-  bottom: 0;
+  bottom: var(--full-diff-height, 0px);
   left: calc(var(--branch-panel-width, 220px) - 3px);
   width: 6px;
   cursor: col-resize;
@@ -223,12 +225,108 @@ body.unableToLoad p {
   margin-top: 6px;
 }
 
+/* Full diff panel, docked to the bottom of the view.
+   Everything that reaches the bottom edge insets itself by the height the
+   panel reserves, so opening it never hides content behind it. */
+#fullDiffPanel {
+  position: fixed;
+  left: var(--branch-panel-width, 0px);
+  right: var(--files-panel-width, 0px);
+  bottom: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(128, 128, 128, 0.5);
+  background: var(--vscode-editor-background);
+}
+body.fullDiffPanelHidden #fullDiffPanel {
+  display: none;
+}
+#fullDiffResizeHandle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+  z-index: 2;
+}
+#fullDiffHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.35);
+  font-size: 12px;
+}
+#fullDiffFilename {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+#fullDiffCloseBtn {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+#fullDiffCloseBtn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+#fullDiffContent {
+  flex: 1 1 auto;
+  overflow: auto;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 12px);
+}
+.fullDiffMessage {
+  padding: 10px;
+  opacity: 0.75;
+}
+.diffRow {
+  display: flex;
+  align-items: flex-start;
+  white-space: pre;
+}
+.diffLnOld,
+.diffLnNew {
+  flex: 0 0 auto;
+  width: 44px;
+  padding-right: 6px;
+  text-align: right;
+  opacity: 0.5;
+  user-select: none;
+}
+.diffLnSep {
+  flex: 0 0 auto;
+  padding-right: 6px;
+  opacity: 0.35;
+  user-select: none;
+}
+.diffRowContent {
+  flex: 1 1 auto;
+}
+.diffRow.diffAdded {
+  background: var(--vscode-diffEditor-insertedTextBackground, rgba(0, 255, 0, 0.12));
+}
+.diffRow.diffRemoved {
+  background: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.12));
+}
+
 /* Changed-files panel */
 #filesPanel {
   position: fixed;
   top: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--full-diff-height, 0px);
   width: var(--files-panel-inline-width, 280px);
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
   border-left: 1px solid rgba(128, 128, 128, 0.5);

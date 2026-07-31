@@ -112,6 +112,7 @@ export function buildWebviewHtml(opts: {
   let body: string;
   if (numRepos > 0) {
     body = `<body style="${colorVars}">
+		<div id="view" tabindex="-1">
 		<div id="topBar">
 			<div id="sidebarTop">
 				<div id="repoSelect" class="dropdown"></div>
@@ -147,6 +148,8 @@ export function buildWebviewHtml(opts: {
 			<div id="commitGraph"></div>
 			<div id="commitTable"></div>
 		</div>
+		<div id="footer"></div>
+		</div>
 		<div id="filesPanel"></div>
 		<div id="fullDiffPanel">
 			<div id="fullDiffResizeHandle"></div>
@@ -165,7 +168,6 @@ export function buildWebviewHtml(opts: {
 			</div>
 			<div id="fullDiffContent"></div>
 		</div>
-		<div id="footer"></div>
 		<ul id="contextMenu"></ul>
 		<div id="dialogBacking"></div>
 		<div id="dialog"></div>

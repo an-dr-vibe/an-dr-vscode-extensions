@@ -1,11 +1,42 @@
 /* Body */
+/*
+ * The tab fills the viewport and never scrolls itself: #view is the one
+ * scrolling box, so the top bar can stay pinned above the commit table while
+ * the sidebar and the docked panels sit outside the scroll entirely.
+ */
 body {
+  position: fixed;
+  inset: 0;
   margin: 0;
   padding: 0;
   /* Height of #topBar: a 26px icon button plus its 4px padding and the rule. */
   --top-bar-height: 35px;
-  /* Keeps the page's own bottom clear of the docked full diff panel. */
-  padding-bottom: var(--full-diff-height, 0px);
+  /* Defaults until the panels report their own widths. */
+  --branch-panel-width: 220px;
+  --files-panel-width: 0px;
+}
+#view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: var(--files-panel-width, 0px);
+  bottom: var(--full-diff-height, 0px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--vscode-editor-background);
+}
+#view:focus {
+  outline: none;
+}
+/* Pinned inside the scroller, so it stays put while the table scrolls. */
+#topBar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  align-items: stretch;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
 }
 body.unableToLoad {
   margin: 0 20px;
@@ -16,6 +47,7 @@ body.unableToLoad {
   position: fixed;
   top: var(--top-bar-height);
   bottom: var(--full-diff-height, 0px);
+  z-index: 10;
   left: 0;
   z-index: 10;
   overflow: auto;
@@ -184,18 +216,16 @@ body.unableToLoad p {
 /* Content */
 #content {
   position: relative;
-  /* The panel is fixed, so the content is inset by the width it reserves.
-     The variable is 0px while the panel is hidden. */
-  margin-right: var(--files-panel-width, 0px);
-  margin-left: var(--branch-panel-width, 220px);
+  /* Only the sidebar overlaps the scroller; #view is already inset on the
+     right by the files panel. */
+  margin-left: var(--branch-panel-width);
 }
 
 /* Repository in-progress banner */
 #repoInProgressBanner {
   display: none;
   padding: 6px 10px;
-  margin-right: var(--files-panel-width, 0px);
-  margin-left: var(--branch-panel-width, 220px);
+  margin-left: var(--branch-panel-width);
   border-bottom: 1px solid rgba(128, 128, 128, 0.5);
   background: var(--vscode-editorWarning-background, rgba(255, 166, 0, 0.12));
   font-size: 12px;
@@ -780,15 +810,14 @@ svg.fileIcon {
 
 /* Top bar: the repo dropdown sits over the sidebar, the controls over the
    commit table, so the two columns line up down the whole view. */
-#topBar {
-  display: flex;
-  align-items: stretch;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
-}
 #sidebarTop {
-  flex: 0 0 auto;
+  flex: 0 0 var(--branch-panel-width, 0px);
   box-sizing: border-box;
   width: var(--branch-panel-width, 0px);
+  height: var(--top-bar-height);
+  border-right: 1px solid rgba(128, 128, 128, 0.5);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  z-index: 20;
   display: flex;
   align-items: center;
   padding: 4px 6px;
@@ -807,6 +836,8 @@ body.branchPanelHidden #sidebarTop {
   display: flex;
   align-items: center;
   gap: 6px;
+  box-sizing: border-box;
+  min-height: var(--top-bar-height);
   padding: 4px 8px;
   line-height: 32px;
   font-weight: 700;

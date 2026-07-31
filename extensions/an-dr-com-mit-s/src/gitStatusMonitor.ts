@@ -1,10 +1,11 @@
 import * as path from "node:path";
 
 import type { GitChangeCounts } from "@an-dr/commits-core/data-source/models";
-import * as vscode from "vscode";
+import type { WorkspacePort } from "@an-dr/commits-core/host/port";
 
 import { DataSource } from "@/dataSource";
 import { RepoManager } from "@/extension/repoManager";
+import { vscodeWatcherPort } from "@/extension/utils/vscodeHostPorts";
 import { ExtensionState } from "@/extensionState";
 import { RepoFileWatcher } from "@/repoFileWatcher";
 import { StatusBarItem } from "@/statusBarItem";
@@ -37,17 +38,14 @@ export class GitStatusMonitor {
     private readonly extensionState: ExtensionState,
     private readonly repoManager: RepoManager,
     private readonly statusBarItem: StatusBarItem,
+    private readonly workspace: WorkspacePort,
     createWatcher: (onChange: () => void) => StatusWatcher = (onChange) =>
-      new RepoFileWatcher(onChange),
-    private readonly getActiveFile: () => string | null = () =>
-      vscode.window.activeTextEditor?.document.uri.fsPath ?? null,
-    onDidChangeActiveFile: (listener: () => void) => { dispose(): void } = (listener) =>
-      vscode.window.onDidChangeActiveTextEditor?.(listener) ?? { dispose: () => {} }
+      new RepoFileWatcher(vscodeWatcherPort, onChange)
   ) {
     this.selectedRepo = extensionState.getLastActiveRepo();
     this.watcher = createWatcher(() => void this.refresh());
     this.reposSubscription = repoManager.onDidChangeRepos(() => this.syncActiveRepo());
-    this.editorSubscription = onDidChangeActiveFile(() => this.syncActiveRepo());
+    this.editorSubscription = workspace.onDidChangeActiveRepoHint(() => this.syncActiveRepo());
     this.syncActiveRepo();
   }
 
@@ -112,7 +110,7 @@ export class GitStatusMonitor {
   }
 
   private getRepoForActiveFile(repos: ReturnType<RepoManager["getRepos"]>) {
-    const file = this.getActiveFile();
+    const file = this.workspace.getActiveRepoHint();
     if (file === null) {
       return null;
     }

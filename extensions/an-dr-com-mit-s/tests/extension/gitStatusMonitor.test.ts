@@ -1,3 +1,4 @@
+import type { WorkspacePort } from "@an-dr/commits-core/host/port";
 import type { GitRepoSet } from "@an-dr/commits-core/types";
 import { describe, expect, it, vi } from "vitest";
 
@@ -27,6 +28,16 @@ function createRepoManager(initial: GitRepoSet) {
 
 function createWatcher() {
   return { start: vi.fn(), stop: vi.fn() };
+}
+
+/** A workspace host that reports no active path and no roots. */
+function idleWorkspace(): WorkspacePort {
+  return {
+    getRootPaths: () => [],
+    onDidChangeRootPaths: () => ({ dispose: vi.fn() }),
+    getActiveRepoHint: () => null,
+    onDidChangeActiveRepoHint: () => ({ dispose: vi.fn() })
+  };
 }
 
 describe("GitStatusMonitor", () => {
@@ -62,6 +73,7 @@ describe("GitStatusMonitor", () => {
       extensionState as unknown as ExtensionState,
       repos.manager,
       statusBar as unknown as StatusBarItem,
+      idleWorkspace(),
       () => watcher
     );
 
@@ -132,6 +144,7 @@ describe("GitStatusMonitor", () => {
       } as unknown as ExtensionState,
       repos.manager,
       statusBar as unknown as StatusBarItem,
+      idleWorkspace(),
       () => createWatcher()
     );
 
@@ -175,12 +188,16 @@ describe("GitStatusMonitor", () => {
       } as unknown as ExtensionState,
       repos.manager,
       { setRepoStatus: vi.fn() } as unknown as StatusBarItem,
-      () => createWatcher(),
-      () => activeFile,
-      (listener) => {
-        captured.editorListener = listener;
-        return { dispose: vi.fn() };
-      }
+      {
+        getRootPaths: () => [],
+        onDidChangeRootPaths: () => ({ dispose: vi.fn() }),
+        getActiveRepoHint: () => activeFile,
+        onDidChangeActiveRepoHint: (listener: () => void) => {
+          captured.editorListener = listener;
+          return { dispose: vi.fn() };
+        }
+      },
+      () => createWatcher()
     );
 
     await vi.waitFor(() => expect(monitor.getStatus().repo).toBe("C:/zeta"));

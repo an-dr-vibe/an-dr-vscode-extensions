@@ -7,6 +7,7 @@ import { createMaxDepthTracker } from "@/extension/maxDepthTracker";
 import { registerPublicCommands } from "@/extension/publicCommands";
 import { selectGitRepository } from "@/extension/repositoryCommands";
 import { config } from "@/extension/utils/vscodeConfigPort";
+import { vscodeWorkspacePort } from "@/extension/utils/vscodeHostPorts";
 import { StatusBarItem } from "@/statusBarItem";
 
 type WatcherState = {
@@ -31,7 +32,7 @@ async function check(
   if (state.disposed) {
     return;
   }
-  const paths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+  const paths = vscodeWorkspacePort.getRootPaths();
   const repoDirs = await findGitRepos(paths, config.gitPath(), config.maxDepthOfRepoSearch());
   if (repoDirs.length === 0 || state.disposed) {
     return;
@@ -51,9 +52,7 @@ export function watchForRepos(
 
   state.disposables.push(
     gitWatcher.onDidCreate(() => check(ctx, state, onReposFound, statusBarItem)),
-    vscode.workspace.onDidChangeWorkspaceFolders(() =>
-      check(ctx, state, onReposFound, statusBarItem)
-    ),
+    vscodeWorkspacePort.onDidChangeRootPaths(() => check(ctx, state, onReposFound, statusBarItem)),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration(getConfigKey("maxDepthOfRepoSearch"))) {
         if (maxDepth.increased(config.maxDepthOfRepoSearch())) {

@@ -52,8 +52,39 @@ export interface StoragePort {
   readonly globalStoragePath: string;
 }
 
+export interface RootPathsChange {
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+}
+
+export interface WorkspacePort {
+  /** Directories to search for repositories. */
+  getRootPaths(): string[];
+  /** Reports which roots appeared and disappeared, so a scan can be incremental. */
+  onDidChangeRootPaths(listener: (change: RootPathsChange) => void): Disposable;
+  /**
+   * An absolute path the user is currently working in, or null when the host
+   * cannot tell. It need not be a repository root — the caller resolves it to
+   * the repository containing it. VS Code answers with the active editor's
+   * file; a standalone client answers with its selected repository.
+   */
+  getActiveRepoHint(): string | null;
+  onDidChangeActiveRepoHint(listener: () => void): Disposable;
+}
+
+export interface WatcherPort {
+  /**
+   * Watches a repository for changes.
+   * @param repoPath Absolute path of the repository root.
+   * @param onChange Receives the absolute path of whatever changed.
+   */
+  watch(repoPath: string, onChange: (changedPath: string) => void): Disposable;
+}
+
 /** The whole host surface. Grows as each concern moves onto it. */
 export interface HostPort {
   readonly config: ConfigPort;
   readonly storage: StoragePort;
+  readonly workspace: WorkspacePort;
+  readonly watcher: WatcherPort;
 }

@@ -19,6 +19,7 @@ import { createRepositoryCommands } from "@/extension/repositoryCommands";
 import { buildExtensionUri } from "@/extension/utils/hostPaths";
 import { logger } from "@/extension/utils/logger";
 import { config, vscodeConfigPort } from "@/extension/utils/vscodeConfigPort";
+import { vscodeWatcherPort, vscodeWorkspacePort } from "@/extension/utils/vscodeHostPorts";
 import { createVscodeStoragePort } from "@/extension/utils/vscodeStoragePort";
 import { WebviewBridge, webviewBridgeFactory } from "@/extension/webviewBridge";
 import { createWebviewPanel, WebviewPanel } from "@/extension/webviewPanel";
@@ -63,7 +64,7 @@ function registerViewCommand(
       );
 
       let bridge!: WebviewBridge;
-      const repoFileWatcher = new RepoFileWatcher(() => {
+      const repoFileWatcher = new RepoFileWatcher(vscodeWatcherPort, () => {
         if (vsPanel.visible) {
           bridge.post({ command: "refresh" });
         }
@@ -136,7 +137,8 @@ export function initExtension(
       dataSource,
       extensionState,
       repoManager,
-      statusBarItem
+      statusBarItem,
+      vscodeWorkspacePort
     );
     ctx.subscriptions.push(gitStatusMonitor);
     ctx.subscriptions.push(new InlineBlameController(dataSource, repoManager, config));
@@ -198,11 +200,10 @@ export function initExtension(
           repoManager.sendRepos();
         }
       }),
-      vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
-        if (e.added.length > 0) {
-          const paths = e.added.map((f) => f.uri.fsPath);
+      vscodeWorkspacePort.onDidChangeRootPaths(async (change) => {
+        if (change.added.length > 0) {
           const repoDirs = await findGitRepos(
-            paths,
+            [...change.added],
             config.gitPath(),
             config.maxDepthOfRepoSearch()
           );
@@ -213,10 +214,10 @@ export function initExtension(
             repoManager.sendRepos();
           }
         }
-        if (e.removed.length > 0) {
+        if (change.removed.length > 0) {
           let changes = false;
-          for (const folder of e.removed) {
-            if (repoManager.removeReposWithinFolder(folder.uri.fsPath)) {
+          for (const folder of change.removed) {
+            if (repoManager.removeReposWithinFolder(folder)) {
               changes = true;
             }
           }
@@ -236,7 +237,7 @@ export function initExtension(
           gitClient.setGitPath(config.gitPath());
         } else if (e.affects(EXTENSION_ID, "maxDepthOfRepoSearch")) {
           if (maxDepth.increased(config.maxDepthOfRepoSearch())) {
-            const paths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+            const paths = vscodeWorkspacePort.getRootPaths();
             void findGitRepos(paths, config.gitPath(), config.maxDepthOfRepoSearch()).then(
               (repoDirs) => {
                 if (repoDirs.length > 0) {

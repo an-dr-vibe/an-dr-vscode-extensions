@@ -6,6 +6,7 @@ import { getVersionedStateKey } from "@/extension/constant/const";
 import { initExtension } from "@/extension/initExtension";
 import { logger } from "@/extension/utils/logger";
 import { config, vscodeConfigPort } from "@/extension/utils/vscodeConfigPort";
+import { vscodeWorkspacePort } from "@/extension/utils/vscodeHostPorts";
 import { watchForRepos } from "@/extension/watchForRepos";
 import { StatusBarItem } from "@/statusBarItem";
 
@@ -32,7 +33,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
   const statusBarItem = new StatusBarItem(ctx, config);
   statusBarItem.refresh();
 
-  const paths = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+  const paths = vscodeWorkspacePort.getRootPaths();
   logger.log(`Searching workspace for new repos (${paths.length} folder(s)) ...`);
   const discovered = await findGitRepos(paths, gitPath, config.maxDepthOfRepoSearch());
   const savedExternal = ctx.workspaceState.get<string[]>(getVersionedStateKey("externalRepos"), []);

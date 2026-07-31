@@ -19,7 +19,7 @@ const mock = vi.hoisted(() => {
   let maxDepthVal = 0;
 
   let onCreateCb: (() => void) | undefined;
-  let onFolderChangeCb: (() => void) | undefined;
+  let onFolderChangeCb: ((event: { added: unknown[]; removed: unknown[] }) => void) | undefined;
   let onConfigChangeCb: ((e: { affectsConfiguration(k: string): boolean }) => void) | undefined;
   const commands: Record<string, () => Promise<void>> = {};
   const showErrorMessage = vi.fn();
@@ -47,7 +47,9 @@ const mock = vi.hoisted(() => {
         },
         dispose: vi.fn()
       }),
-      onDidChangeWorkspaceFolders: (cb: () => void) => {
+      onDidChangeWorkspaceFolders: (
+        cb: (event: { added: unknown[]; removed: unknown[] }) => void
+      ) => {
         onFolderChangeCb = cb;
         return { dispose: vi.fn() };
       },
@@ -76,7 +78,8 @@ const mock = vi.hoisted(() => {
       onCreateCb?.();
     },
     fireFolderChange() {
-      onFolderChangeCb?.();
+      // The port maps the event to plain paths, so it needs a real shape.
+      onFolderChangeCb?.({ added: [], removed: [] });
     },
     fireConfigChange(key: string) {
       onConfigChangeCb?.({ affectsConfiguration: (k) => k === key });

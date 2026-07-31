@@ -819,8 +819,11 @@ class GitGraphView {
               refName +
               '">' +
               svgIcons.branch +
+              '<span class="gitRefName" data-fullref="' +
               refName +
-              "</span>";
+              '">' +
+              refName +
+              "</span></span>";
         refs = refActive ? refHtml + refs : refs + refHtml;
       }
       html +=

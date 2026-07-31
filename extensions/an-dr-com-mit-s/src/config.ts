@@ -78,14 +78,7 @@ export const config = {
   fetchAvatars: (): boolean =>
     getCompatibleConfig("fetchAvatars", "repository.commits.fetchAvatars", false),
   graphColours: (): string[] =>
-    getConfig("graphColours", [
-      "#0085d9",
-      "#d9008f",
-      "#00d90a",
-      "#d98500",
-      "#a300d9",
-      "#ff0000"
-    ]).filter(
+    getConfig("graphColours", ["#6ba2f2", "#ca3a7d", "#f3b33e", "#61aea6", "#ac70f7"]).filter(
       (v: string) =>
         v.match(
           /^\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{8}|rgb[a]?\s*\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\))\s*$/

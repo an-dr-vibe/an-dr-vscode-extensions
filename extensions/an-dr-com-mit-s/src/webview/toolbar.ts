@@ -11,16 +11,24 @@ export interface ToolbarButton {
   /** False keeps the button out of the toolbar and out of the more menu. */
   visible: boolean;
   onClick: () => void;
+  /**
+   * Runs instead of a second onClick when the button is double-clicked, for a
+   * button that carries a related pair of actions.
+   */
+  onDoubleClick?: () => void;
   /** Extra entries the more menu offers for this button. */
   overflowActions?: () => ContextMenuElement[];
 }
+
+/** Window within which a second click counts as a double click, in ms. */
+const DOUBLE_CLICK_MS = 250;
 
 /**
  * The order buttons give up their place as the toolbar narrows. Refresh goes
  * first because it is the most redundant, and reset last because it is the
  * hardest to find elsewhere. Matches the 2.0 collapse order.
  */
-const COLLAPSE_ORDER = ["refreshBtn", "pushBtn", "pullBtn", "fetchBtn", "resetBtn"];
+const COLLAPSE_ORDER = ["refreshBtn", "pushBtn", "pullBtn", "resetBtn"];
 
 /**
  * The tab's top-right button group.
@@ -35,6 +43,8 @@ export class Toolbar {
   private readonly group: HTMLElement;
   private readonly moreBtn: HTMLElement;
   private buttons: ToolbarButton[] = [];
+  /** Timer for a single-click action waiting out the double-click window. */
+  private pendingClick: number | null = null;
 
   constructor() {
     this.controls = document.getElementById("controls")!;
@@ -47,9 +57,36 @@ export class Toolbar {
     this.group.addEventListener("click", (event) => {
       const elem = (event.target as Element).closest<HTMLElement>(".iconBtn");
       const button = this.buttons.find((candidate) => candidate.id === elem?.id);
-      if (button !== undefined && button.visible) {
-        button.onClick();
+      if (button === undefined || !button.visible) {
+        return;
       }
+      if (button.onDoubleClick === undefined) {
+        button.onClick();
+        return;
+      }
+      // A button carrying two actions cannot run the first one immediately, or
+      // a double click would run both. The single-click action waits out the
+      // double-click window instead.
+      if (this.pendingClick !== null) {
+        window.clearTimeout(this.pendingClick);
+        this.pendingClick = null;
+        button.onDoubleClick();
+        return;
+      }
+      this.pendingClick = window.setTimeout(() => {
+        this.pendingClick = null;
+        button.onClick();
+      }, DOUBLE_CLICK_MS);
+    });
+    this.group.addEventListener("contextmenu", (event) => {
+      const elem = (event.target as Element).closest<HTMLElement>(".iconBtn");
+      const button = this.buttons.find((candidate) => candidate.id === elem?.id);
+      if (button === undefined || !button.visible || button.overflowActions === undefined) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      showContextMenu(event, button.overflowActions(), elem!);
     });
     window.addEventListener("resize", () => this.applyLayout());
   }

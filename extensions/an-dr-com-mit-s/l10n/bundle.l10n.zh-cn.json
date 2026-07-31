@@ -179,5 +179,6 @@
   "{0} untracked": "{0} 项未跟踪",
   "rebasing {0}": "正在变基 {0}",
   "rebasing {0} onto {1}": "正在将 {0} 变基到 {1}",
-  "rebasing onto {0}": "正在变基到 {0}"
+  "rebasing onto {0}": "正在变基到 {0}",
+  "Fetch from Remote(s) · Double-click to Pull": "从远程获取 · 双击以拉取"
 }

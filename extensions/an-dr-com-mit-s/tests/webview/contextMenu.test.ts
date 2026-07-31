@@ -85,7 +85,7 @@ describe("context menu", () => {
   it("closes an already-open menu when a second one opens", () => {
     openAt(10, 10, [{ title: "First", onClick: () => {} }]);
     const first = document.getElementById("refreshBtn")!;
-    const second = document.getElementById("fetchBtn")!;
+    const second = document.getElementById("pushBtn")!;
 
     const event = new MouseEvent("contextmenu", { cancelable: true });
     Object.defineProperty(event, "pageX", { value: 40 });

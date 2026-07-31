@@ -125,8 +125,7 @@ export function buildWebviewHtml(opts: {
 				<div id="controlsBtns">
 					<div id="refreshBtn" class="iconBtn" title="${vscode.l10n.t("Refresh")}"></div>
 					<div id="resetBtn" class="iconBtn" title="${vscode.l10n.t("Reset to HEAD")}"></div>
-					<div id="fetchBtn" class="iconBtn" title="${vscode.l10n.t("Fetch from Remote(s)")}"></div>
-					<div id="pullBtn" class="iconBtn" title="${vscode.l10n.t("Pull Current Branch")}"></div>
+					<div id="pullBtn" class="iconBtn"></div>
 					<div id="pushBtn" class="iconBtn" title="${vscode.l10n.t("Push Current Branch")}"></div>
 					<div id="moreBtn" class="iconBtn" title="${vscode.l10n.t("More Actions")}"></div>
 				</div>

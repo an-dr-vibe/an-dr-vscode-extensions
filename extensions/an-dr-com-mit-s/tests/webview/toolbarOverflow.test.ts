@@ -6,7 +6,7 @@ import { toolbarIcons } from "@/webview/utils/icons";
 import { viewStateFixture } from "./fixtures";
 import { setupHtml } from "./setup";
 
-const IDS = ["refreshBtn", "resetBtn", "fetchBtn", "pullBtn", "pushBtn"];
+const IDS = ["refreshBtn", "resetBtn", "pullBtn", "pushBtn"];
 
 function makeButtons(overrides: Record<string, boolean> = {}) {
   return IDS.map((id) => ({
@@ -60,7 +60,7 @@ describe("Toolbar overflow", () => {
     setWidths({ controls: 200, leftRight: 300, groupLeft: 100 });
     new Toolbar().setButtons(makeButtons());
 
-    // refresh, push, pull, fetch, then reset — reset survives longest.
+    // refresh, push, pull, then reset — reset survives longest.
     expect(visibleIds()).toEqual([]);
     expect(moreIsShown()).toBe(true);
   });
@@ -82,7 +82,7 @@ describe("Toolbar overflow", () => {
     setWidths({ controls: 900, leftRight: 100, groupLeft: 700 });
     new Toolbar().setButtons(makeButtons({ pullBtn: false, pushBtn: false }));
 
-    expect(visibleIds()).toEqual(["refreshBtn", "resetBtn", "fetchBtn"]);
+    expect(visibleIds()).toEqual(["refreshBtn", "resetBtn"]);
     // Hidden by state, not by width, so the more menu stays closed.
     expect(moreIsShown()).toBe(false);
   });
@@ -95,6 +95,64 @@ describe("Toolbar overflow", () => {
     document.getElementById("resetBtn")!.click();
 
     expect(buttons.find((button) => button.id === "resetBtn")!.onClick).toHaveBeenCalledOnce();
+  });
+
+  it("waits out the double-click window before running a dual-action button", () => {
+    vi.useFakeTimers();
+    try {
+      setWidths({ controls: 900, leftRight: 100, groupLeft: 700 });
+      const single = vi.fn();
+      const double = vi.fn();
+      new Toolbar().setButtons([
+        {
+          id: "pullBtn",
+          icon: toolbarIcons.arrowDown,
+          title: "fetch/pull",
+          visible: true,
+          onClick: single,
+          onDoubleClick: double
+        }
+      ]);
+
+      document.getElementById("pullBtn")!.click();
+      // Still pending: a second click within the window means the other action.
+      expect(single).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(300);
+      expect(single).toHaveBeenCalledOnce();
+      expect(double).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("runs the double-click action and cancels the single one", () => {
+    vi.useFakeTimers();
+    try {
+      setWidths({ controls: 900, leftRight: 100, groupLeft: 700 });
+      const single = vi.fn();
+      const double = vi.fn();
+      new Toolbar().setButtons([
+        {
+          id: "pullBtn",
+          icon: toolbarIcons.arrowDown,
+          title: "fetch/pull",
+          visible: true,
+          onClick: single,
+          onDoubleClick: double
+        }
+      ]);
+
+      const button = document.getElementById("pullBtn")!;
+      button.click();
+      button.click();
+      vi.advanceTimersByTime(300);
+
+      expect(double).toHaveBeenCalledOnce();
+      expect(single).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ignores a click on a button its state marks unavailable", () => {

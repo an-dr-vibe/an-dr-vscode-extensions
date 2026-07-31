@@ -44,6 +44,7 @@ export function getWebviewLocalizedStrings() {
     refresh: vscode.l10n.t("Refresh"),
     resetToHead: vscode.l10n.t("Reset to HEAD"),
     fetchFromRemotes: vscode.l10n.t("Fetch from Remote(s)"),
+    fetchPullTitle: vscode.l10n.t("Fetch from Remote(s) · Double-click to Pull"),
     pullCurrentBranch: vscode.l10n.t("Pull Current Branch"),
     pushCurrentBranch: vscode.l10n.t("Push Current Branch"),
     findNoMatches: vscode.l10n.t("No matches"),

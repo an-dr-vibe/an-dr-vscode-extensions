@@ -206,15 +206,11 @@ describe("tab toolbar", () => {
   describe("remote operation buttons", () => {
     // The toolbar and the command palette run the same handlers in the
     // extension, so a button only has to name the operation correctly.
-    it.each([
-      ["fetchBtn", "fetch"],
-      ["pullBtn", "pull"],
-      ["pushBtn", "push"]
-    ])("%s requests the %s operation", (id, operation) => {
-      document.getElementById(id)!.click();
+    it("pushBtn requests the push operation", () => {
+      document.getElementById("pushBtn")!.click();
       expect(vscodeMock.sentMessages).toContainEqual({
         command: "remoteOperation",
-        operation
+        operation: "push"
       });
     });
 
@@ -225,7 +221,6 @@ describe("tab toolbar", () => {
       expect(buttons.map((button) => button.id)).toEqual([
         "refreshBtn",
         "resetBtn",
-        "fetchBtn",
         "pullBtn",
         "pushBtn",
         "moreBtn"

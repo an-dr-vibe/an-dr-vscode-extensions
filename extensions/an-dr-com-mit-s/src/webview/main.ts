@@ -302,19 +302,21 @@ class GitGraphView {
         visible: remoteAvailable,
         onClick: () => this.resetToHead()
       },
-      {
-        id: "fetchBtn",
-        icon: toolbarIcons.refresh,
-        title: l10n.fetchFromRemotes,
-        visible: true,
-        onClick: () => requestRemoteOperation("fetch")
-      },
+      // One button for both directions inward, as in 2.0: a click fetches, a
+      // double click pulls, and the menu carries both plus the advanced form.
       {
         id: "pullBtn",
         icon: toolbarIcons.arrowDown,
-        title: l10n.pullCurrentBranch,
-        visible: remoteAvailable,
-        onClick: () => requestRemoteOperation("pull")
+        title: l10n.fetchPullTitle,
+        visible: true,
+        onClick: () => requestRemoteOperation("fetch"),
+        onDoubleClick: remoteAvailable ? () => requestRemoteOperation("pull") : undefined,
+        overflowActions: () => [
+          { title: l10n.fetchFromRemotes, onClick: () => requestRemoteOperation("fetch") },
+          ...(remoteAvailable
+            ? [{ title: l10n.pullCurrentBranch, onClick: () => requestRemoteOperation("pull") }]
+            : [])
+        ]
       },
       {
         id: "pushBtn",
@@ -1541,10 +1543,9 @@ class GitGraphView {
     }
     html += "</span></span><br><br>";
     html += escapeHtml(commitDetails.body).replace(/\n/g, "<br>") + "</div>";
-    html +=
-      '<div id="commitDetailsFiles">' +
-      generateGitFileTreeHtml(fileTree, commitDetails.fileChanges) +
-      "</table></div>";
+    // The changed files live in the side panel only. Rendering the same tree
+    // inline as well gave two copies of one list, and the inline copy is the
+    // one with no room for it.
     html += '<div id="commitDetailsClose">' + svgIcons.close + "</div>";
     html += "</td>";
 
@@ -1575,8 +1576,7 @@ class GitGraphView {
       this.hideCommitDetails();
     });
 
-    // The side panel shows the same change list as the inline view, so it is
-    // filled from the same tree rather than from a second request.
+    // The side panel is the only place the change list appears.
     this.filesPanel.setHeader(
       `<b>${l10n.filesPanelTitle}</b> &mdash; ${escapeHtml(abbrevCommit(commitDetails.hash))}`
     );

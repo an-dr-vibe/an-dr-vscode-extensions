@@ -15,6 +15,7 @@ export function getWebviewLocalizedStrings() {
     loading: vscode.l10n.t("Loading ..."),
     filesPanelPlaceholder: vscode.l10n.t("Select a commit to see the files it changed"),
     filesPanelTitle: vscode.l10n.t("Changed Files"),
+    comparisonTitle: vscode.l10n.t("Comparing"),
     repoInProgressPrimary: vscode.l10n.t("The working tree is in {0}-state."),
     repoInProgressRebase: vscode.l10n.t("Rebase"),
     repoInProgressMerge: vscode.l10n.t("Merge"),

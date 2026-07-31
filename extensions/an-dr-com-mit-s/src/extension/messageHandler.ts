@@ -12,6 +12,7 @@ import { runInProgressOperation } from "@/backend/actions/inProgress";
 import { mergeBranch, mergeCommit } from "@/backend/actions/merge";
 import { addTag, deleteTag, pushTag } from "@/backend/actions/tag";
 import { GitClient } from "@/backend/gitClient";
+import { commitComparison } from "@/backend/queries/commitComparison";
 import { commitDetails } from "@/backend/queries/commitDetails";
 import { fullDiffContent } from "@/backend/queries/fullDiffContent";
 import type { RepoInProgressType } from "@/backend/queries/repoInProgress";
@@ -197,6 +198,16 @@ export function registerMessageHandlers(
       ...(await commitDetails(gitClient.getInstance(), {
         commitHash: msg.commitHash,
         dateType: config.dateType()
+      }))
+    });
+  });
+
+  bridge.onMessage("commitComparison", async (msg) => {
+    bridge.post({
+      command: "commitComparison",
+      ...(await commitComparison(gitClient.getInstance(), {
+        fromHash: msg.fromHash,
+        toHash: msg.toHash
       }))
     });
   });

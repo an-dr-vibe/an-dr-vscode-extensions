@@ -9,7 +9,8 @@ import type {
 } from "@/backend/types";
 
 import { BranchPanel } from "./branchPanel";
-import { hideContextMenuIfOpen, showContextMenu } from "./contextMenu";
+import { CommitSelection, readSelectionGesture } from "./commitSelection";
+import { hideContextMenuIfOpen, isContextMenuOpen, showContextMenu } from "./contextMenu";
 import {
   hideDialog,
   isDialogOpen,
@@ -70,6 +71,9 @@ class GitGraphView {
   private repoDropdown: Dropdown;
   private branchPanel: BranchPanel;
   private toolbar: Toolbar;
+  private readonly selection = new CommitSelection();
+  /** The two commits being compared, or null when not comparing. */
+  private comparison: { from: string; to: string } | null = null;
   private scrollShadowElem: HTMLElement;
   private filesPanel: FilesPanel;
   private fullDiffPanel: FullDiffPanel;
@@ -254,18 +258,58 @@ class GitGraphView {
     }
   }
 
-  /** The change a click landed on, or null when the row has no viewable diff. */
-  private resolveClickedFile(e: Event) {
-    const sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
-    if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) {
-      return null;
+  /** Drops the selection, returning the panel to the open commit's own files. */
+  public clearSelection() {
+    if (this.selection.size() === 0) {
+      return;
     }
-    return {
-      commitHash: this.expandedCommit.hash,
-      oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
-      newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
-      type: <GitFileChangeType>sourceElem.dataset.type
-    };
+    this.selection.clear();
+    this.comparison = null;
+    this.renderSelection();
+    this.filesPanel.clear();
+    this.filesPanel.hide();
+  }
+
+  /**
+   * Paints the selection onto the table and, once exactly two commits are
+   * picked, asks for what changed between them.
+   */
+  private renderSelection() {
+    for (const row of Array.from(document.querySelectorAll<HTMLElement>("tr.commit"))) {
+      row.classList.toggle("selected", this.selection.has(row.dataset.hash ?? ""));
+    }
+    const hashes = this.commits.map((commit) => commit.hash);
+    const comparison = this.selection.getComparison(hashes);
+    this.comparison = comparison;
+    if (comparison === null) {
+      return;
+    }
+    this.hideCommitDetails();
+    this.filesPanel.setHeader(
+      `<b>${l10n.comparisonTitle}</b> &mdash; ${escapeHtml(abbrevCommit(comparison.from))} … ${escapeHtml(abbrevCommit(comparison.to))}`
+    );
+    this.filesPanel.setContentLoading();
+    this.filesPanel.show();
+    sendMessage({
+      command: "commitComparison",
+      repo: this.currentRepo!,
+      fromHash: comparison.from,
+      toHash: comparison.to
+    });
+  }
+
+  /** Renders the file list for the two selected commits. */
+  public renderComparison(fileChanges: GitFileChange[], error: string | null) {
+    if (this.comparison === null) {
+      return;
+    }
+    if (error !== null) {
+      this.filesPanel.setContent(`<div class="filesPanelPlaceholder">${escapeHtml(error)}</div>`);
+      return;
+    }
+    const fileTree = generateGitFileTree(fileChanges);
+    this.filesPanel.setContent(generateGitFileTreeHtml(fileTree, fileChanges) + "</table>");
+    this.registerFileTreeListeners(fileTree, this.comparison.from, this.comparison.to);
   }
 
   public renderFullDiff(data: Parameters<FullDiffPanel["render"]>[0]) {
@@ -1113,8 +1157,22 @@ class GitGraphView {
       );
     });
     addListenerToClass("commit", "click", (e: Event) => {
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
-      if (this.expandedCommit !== null && this.expandedCommit.hash === sourceElem.dataset.hash!) {
+      const sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
+      const hash = sourceElem.dataset.hash;
+      if (hash === undefined) {
+        return;
+      }
+      const gesture = readSelectionGesture(<MouseEvent>e);
+      const hashes = this.commits.map((commit) => commit.hash);
+      this.selection.apply(gesture, hashes.indexOf(hash), hashes);
+      this.renderSelection();
+
+      // A modified click is picking commits out to compare, so it must not also
+      // open a commit; only a plain click still toggles the details.
+      if (gesture !== "replace") {
+        return;
+      }
+      if (this.expandedCommit !== null && this.expandedCommit.hash === hash) {
         this.hideCommitDetails();
       } else {
         this.loadCommitDetails(sourceElem);
@@ -1584,26 +1642,30 @@ class GitGraphView {
       generateGitFileTreeHtml(fileTree, commitDetails.fileChanges) + "</table>"
     );
     this.filesPanel.show();
+    this.registerFileTreeListeners(fileTree, this.expandedCommit.hash, this.expandedCommit.hash);
+  }
+
+  /**
+   * Wires the changed-file list in the side panel. The revisions are passed in
+   * because the same list serves one commit and a two-commit comparison.
+   */
+  private registerFileTreeListeners(fileTree: GitFolder, fromHash: string, toHash: string) {
     addListenerToClass("gitFolder", "click", (e) => {
-      let sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
-      let parent = sourceElem.parentElement!;
+      const sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
+      const parent = sourceElem.parentElement!;
       parent.classList.toggle("closed");
-      let isOpen = !parent.classList.contains("closed");
+      const isOpen = !parent.classList.contains("closed");
       parent.children[0].children[0].innerHTML = isOpen
         ? svgIcons.openFolder
         : svgIcons.closedFolder;
       parent.children[1].classList.toggle("hidden");
-      alterGitFileTree(
-        this.expandedCommit!.fileTree!,
-        decodeURIComponent(sourceElem.dataset.folderpath!),
-        isOpen
-      );
+      alterGitFileTree(fileTree, decodeURIComponent(sourceElem.dataset.folderpath!), isOpen);
       this.saveState();
     });
     // A single click shows the file in the docked panel; a double click hands
     // it to the editor's own diff view, which is the only way to edit it.
     addListenerToClass("gitFile", "click", (e) => {
-      const file = this.resolveClickedFile(e);
+      const file = readClickedFile(e);
       if (file === null) {
         return;
       }
@@ -1611,28 +1673,41 @@ class GitGraphView {
       sendMessage({
         command: "fullDiffContent",
         repo: this.currentRepo!,
-        fromHash: file.commitHash,
-        toHash: file.commitHash,
+        fromHash,
+        toHash,
         oldFilePath: file.oldFilePath,
         newFilePath: file.newFilePath,
         type: file.type
       });
     });
     addListenerToClass("gitFile", "dblclick", (e) => {
-      const file = this.resolveClickedFile(e);
+      const file = readClickedFile(e);
       if (file === null) {
         return;
       }
       sendMessage({
         command: "viewDiff",
         repo: this.currentRepo!,
-        commitHash: file.commitHash,
+        commitHash: toHash,
         oldFilePath: file.oldFilePath,
         newFilePath: file.newFilePath,
         type: file.type
       });
     });
   }
+}
+
+/** The change a click landed on, or null when the row has no viewable diff. */
+function readClickedFile(e: Event) {
+  const sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
+  if (!sourceElem.classList.contains("gitDiffPossible")) {
+    return null;
+  }
+  return {
+    oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
+    newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
+    type: <GitFileChangeType>sourceElem.dataset.type
+  };
 }
 
 /**
@@ -1753,6 +1828,9 @@ window.addEventListener("message", (event) => {
       } else {
         showErrorDialog(l10n.repoInProgressActionFailed, msg.status, null);
       }
+      break;
+    case "commitComparison":
+      gitGraph.renderComparison(msg.fileChanges, msg.error);
       break;
     case "fullDiffContent":
       gitGraph.renderFullDiff(msg);
@@ -1988,9 +2066,16 @@ function abbrevCommit(commitHash: string) {
 
 /* Global Listeners */
 document.addEventListener("keyup", (e) => {
-  if (e.key === "Escape") {
-    hideDialogAndContextMenu();
+  if (e.key !== "Escape") {
+    return;
   }
+  // An overlay takes the key first; only once nothing is open does Escape
+  // fall through to dropping the commit selection.
+  if (isDialogOpen() || isContextMenuOpen()) {
+    hideDialogAndContextMenu();
+    return;
+  }
+  gitGraph.clearSelection();
 });
 document.addEventListener("click", hideContextMenuIfOpen);
 document.addEventListener("contextmenu", hideContextMenuIfOpen);

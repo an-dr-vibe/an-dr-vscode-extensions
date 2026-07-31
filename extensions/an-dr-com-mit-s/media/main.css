@@ -576,6 +576,12 @@ body.filesPanelHidden #filesPanel {
 #commitTable tr.commit.commitDetailsOpen td {
   background-color: rgba(128, 128, 128, 0.25);
 }
+/* Picked out for comparison. Distinct from the open-details highlight, since
+   a commit can be selected without being open. */
+#commitTable tr.commit.selected td {
+  background-color: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.22));
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
 #commitTable tr.commit.commitDetailsOpen:hover td {
   background-color: rgba(128, 128, 128, 0.35);
 }

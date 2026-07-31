@@ -1,6 +1,15 @@
-import type { GitCommitDetails, GitCommitNode, GitFileChangeType } from "./git.types";
+import type {
+  GitCommitDetails,
+  GitCommitNode,
+  GitFileChange,
+  GitFileChangeType
+} from "./git.types";
 
 type QueryPayloads = {
+  commitComparison: {
+    request: { repo: string; fromHash: string; toHash: string };
+    response: { fileChanges: GitFileChange[]; error: string | null };
+  };
   commitDetails: {
     request: { repo: string; commitHash: string };
     response: { commitDetails: GitCommitDetails | null };

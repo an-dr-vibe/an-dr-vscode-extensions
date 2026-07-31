@@ -1,7 +1,8 @@
 # Complete transition plan
 
 Where the MIT transition actually stands, and every remaining stage to
-cutover. Written 2026-07-30, after increments 1–12 plus the `tests-ext` repair.
+cutover. Written 2026-07-30 after increments 1–12; the state table and stage 3
+were re-measured 2026-07-31 after the tab UI parity branch.
 Supersedes nothing; it makes the remaining path in
 [an-dr-commits-mit-transition.md](../an-dr-commits-mit-transition.md)
 concrete and measured.
@@ -11,24 +12,24 @@ Where a figure is an estimate, it says so.
 
 ## Where we are
 
-Updated 2026-07-30, after the 3.0.0 release.
+Updated 2026-07-31, after the tab UI parity branch.
 
-| Surface                   |  Target | Staging today | Gap                                                |
-| ------------------------- | ------: | ------------: | -------------------------------------------------- |
-| Version                   | > 2.0.0 |         3.0.0 | none — no longer a downgrade                       |
-| Commands declared         |       9 |             9 | 0                                                  |
-| Commands implemented      |       9 |             9 | 0                                                  |
-| Settings declared         | 34 kept |            29 | **18** kept keys still missing                     |
-| Activity Bar views        |       1 |             0 | 1 — blocked, see stage 3                           |
-| `contributes.keybindings` |       1 |        absent | 1                                                  |
-| `YOURS` source re-fitted  |  ~2,480 |          ~640 | ~1,840 re-fittable; ~2,650 blocked behind baseline |
+| Surface                   |  Target | Staging today | Gap                                                 |
+| ------------------------- | ------: | ------------: | --------------------------------------------------- |
+| Version                   | > 2.0.0 |         3.0.0 | none — no longer a downgrade                        |
+| Commands declared         |       9 |             9 | 0                                                   |
+| Commands implemented      |       9 |             9 | 0                                                   |
+| Settings declared         | 34 kept |            40 | 0 kept keys missing; 6 declared beyond the kept set |
+| Activity Bar views        |       1 |             0 | 1 — blocked, see stage 3                            |
+| `contributes.keybindings` |       1 |        absent | 1                                                   |
+| `YOURS` source re-fitted  |  ~2,480 |          ~640 | ~1,840 re-fittable; ~2,650 blocked behind baseline  |
 
 The `YOURS` row no longer counts 5,134 as the target: ADR-002 established that
 about 2,650 of those lines cannot run here without reimplementing the baseline
 substrate they were written against.
 
 Verification is real and green: typecheck, lint, format, `l10n:check` at
-127/127 in both Chinese locales, 248 Vitest tests, 33 `vscode-test` tests, and
+183/183 in both Chinese locales, 520 Vitest tests, 33 `vscode-test` tests, and
 `check-provenance.js` at zero `BASELINE`.
 
 ### What is already genuinely done
@@ -99,12 +100,17 @@ The real division is **how much of the old tab a feature needs**:
 | Self-contained services | blame, status monitor, avatars, file icons, tag pills                                     |   ~640 | **done**                                                                                                              |
 | Extension-host actions  | `src/views/tab/*Actions.ts` — working tree, misc, commit graph, diff/file content         |    325 | Re-fittable; needs a UI trigger, or it is dead on arrival                                                             |
 | Cache                   | `repositoryGraphCache.ts`                                                                 |    114 | Key must be **redesigned** for `loadCommits(git, { branchName, maxCommits })`, which has no stash or ordering concept |
-| Tab UI glue             | `tableRender`, `constructorInit`, `loadProcessing`, `controlsLayout`, `branchPanelRender` | ~1,230 | **Blocked** behind the baseline substrate                                                                             |
-| Panels                  | `changesPanel`, `filesPanel`, `fullDiffPanel` + CSS                                       | ~1,052 | **Blocked**, same reason                                                                                              |
+| Tab UI glue             | `tableRender`, `constructorInit`, `loadProcessing`, `controlsLayout`, `branchPanelRender` | ~1,230 | **Reimplemented**, not ported — toolbar, layout and commit table now match 2.0; see tab-ui-parity.md                  |
+| Panels                  | `changesPanel`, `filesPanel`, `fullDiffPanel` + CSS                                       | ~1,052 | files and full-diff panels **done**; `changesPanel` is 0.0% baseline and ports directly                               |
 | Sidebar                 | `src/views/sidebar/*`, `web/sidebar/*`                                                    | ~1,404 | **Blocked**; also needs `contributes.views`                                                                           |
 
-Roughly 2,650 of the remaining lines are blocked, not merely unscheduled. They
-return only if the substrate is reimplemented, which ADR-002 rejected for now.
+The sidebar remains blocked. The tab glue and panels no longer are, and the
+2026-07-31 branch is why: ADR-002 was right that those files cannot be _ported_,
+and wrong to conclude the features were therefore out of reach. Reading 2.0 for
+its behaviour and reimplementing against the MIT view delivered the toolbar,
+the viewport layout, the commit table, selection and both panels without
+touching the baseline substrate. Treat "blocked" in this table as "cannot be
+copied", never as "cannot be built".
 
 **Each action handler needs a caller.** The four `*Actions.ts` files are
 message handlers with no view coupling, so they re-fit cleanly onto

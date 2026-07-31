@@ -1,13 +1,14 @@
 # Minor non-migrated items
 
 Small gaps between `an-dr-commits` and this staging extension that are **not**
-covered by a stage of [transition-plan.md](transition-plan.md). Everything here
+covered by a stage of [transition-plan.md](transition-plan.md) or by
+[tab-ui-parity.md](tab-ui-parity.md), which owns the tab's look and behaviour. Everything here
 is under roughly 60 changed lines on its own; the plan's stages hold the large
 and blocked work.
 
 An item is _unblocked_ when the feature that owns it already exists here. The
-unblocked set is currently empty: everything that could be done without first
-building a larger feature has been.
+tab UI parity branch reopened two of these by building the features they waited
+on.
 
 ## Closed
 
@@ -19,18 +20,24 @@ building a larger feature has been.
 | 4   | `branchPanel.groupsFirst`                             | The panel always sorted folders above plain refs.                                                                                                               | `BranchPanelRenderModel.groupsFirst`        |
 | 5   | `branchPanel.flattenSingleChildGroups`                | A chain of single-child folders rendered as nested rows instead of one `release/7.0` row.                                                                       | `flattenSingleChildFolders` in the renderer |
 
+## Unblocked
+
+| #   | Item                                                                                | Why it is now reachable                                                                                        |
+| --- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 6   | Ref drag-and-drop (`web/main/actions/dragDrop.ts`, `web/graphRebase.ts`, 155 lines) | Ref pills now render, so this needs only the drag handlers and drop targets.                                   |
+| 7   | Date visible with the Dev column hidden                                             | The date moved into the Dev cell with the 2.0 column layout, so hiding that column now hides the date as well. |
+
 ## Blocked, and on what
 
-| #   | Item                                                                                | Blocked on                                                                                                               |
-| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 6   | Syntax highlighting in the diff panel (`web/main/syntaxHighlight.ts`, 68 lines)     | A bundled `highlight.js`. This extension has no such dependency, and adding one is a packaging decision, not a port.     |
-| 7   | Submodule endpoints in the diff panel                                               | `GitFileChange` here carries no `submodule` field, so the backend cannot tell a gitlink from a file.                     |
-| 8   | Ref drag-and-drop (`web/main/actions/dragDrop.ts`, `web/graphRebase.ts`, 155 lines) | The commit table renders no draggable ref pills yet.                                                                     |
-| 9   | `commitDetailsView.defaultDiffMode`                                                 | Its `Quick` value names the inline diff in the commit details view, which does not exist here. Only `Full` is reachable. |
-| 10  | `branchPanel.showLocalBranchUpstream`                                               | `loadBranches` returns names only; upstream tracking is not queried.                                                     |
-| 11  | `defaultCommitMessage`                                                              | There is no commit UI to default a message for.                                                                          |
-| 12  | `graph.showTagsInActivityBar`                                                       | Needs `contributes.views` and the activity bar graph.                                                                    |
-| 13  | `repository.onLoad.*` (2 settings)                                                  | Initial branch selection is decided webview-side and has no config input yet.                                            |
+| #   | Item                                                                            | Blocked on                                                                                                               |
+| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 8   | Syntax highlighting in the diff panel (`web/main/syntaxHighlight.ts`, 68 lines) | A bundled `highlight.js`. This extension has no such dependency, and adding one is a packaging decision, not a port.     |
+| 9   | Submodule endpoints in the diff panel                                           | `GitFileChange` here carries no `submodule` field, so the backend cannot tell a gitlink from a file.                     |
+| 10  | `commitDetailsView.defaultDiffMode`                                             | Its `Quick` value names the inline diff in the commit details view, which does not exist here. Only `Full` is reachable. |
+| 11  | `branchPanel.showLocalBranchUpstream`                                           | `loadBranches` returns names only; upstream tracking is not queried.                                                     |
+| 12  | `defaultCommitMessage`                                                          | There is no commit UI to default a message for; it arrives with the changes panel.                                       |
+| 13  | `graph.showTagsInActivityBar`                                                   | Needs `contributes.views` and the activity bar graph.                                                                    |
+| 14  | `repository.onLoad.*` (2 settings)                                              | Initial branch selection is decided webview-side and has no config input yet.                                            |
 
 ## Decided against
 

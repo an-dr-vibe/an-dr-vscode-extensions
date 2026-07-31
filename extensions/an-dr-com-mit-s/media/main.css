@@ -142,12 +142,12 @@ body.compactUi #commitTable th {
   padding-top: 4px;
   padding-bottom: 4px;
 }
-body.compactUi .commit .avatar.normal {
+body.compactUi #commitTable .avatar.normal {
   width: 16px;
   height: 16px;
   margin-top: 2px;
 }
-body.compactUi .commit .avatar.small {
+body.compactUi #commitTable .avatar.small {
   width: 13px;
   height: 13px;
   margin-top: 3px;
@@ -177,12 +177,12 @@ body.extraCompactUi #commitTable th {
   padding-top: 3px;
   padding-bottom: 3px;
 }
-body.extraCompactUi .commit .avatar.normal {
+body.extraCompactUi #commitTable .avatar.normal {
   width: 14px;
   height: 14px;
   margin-top: 2px;
 }
-body.extraCompactUi .commit .avatar.small {
+body.extraCompactUi #commitTable .avatar.small {
   width: 12px;
   height: 12px;
   margin-top: 3px;
@@ -455,7 +455,10 @@ body.filesPanelHidden #filesPanel {
   position: absolute;
   left: 8px;
   top: 0px;
-  z-index: -1;
+  /* Above the content, not behind it: #view paints an opaque background, and a
+     negative z-index put the graph underneath it. Clicks pass through. */
+  z-index: 2;
+  pointer-events: none;
 }
 #commitGraph circle.current {
   fill: var(--vscode-editor-background);
@@ -481,6 +484,20 @@ body.filesPanelHidden #filesPanel {
 #commitTable table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
+}
+/* The merged graph/message cell takes every spare pixel; max-width:0 stops the
+   browser sizing it to its content and pushing the trailing columns off. */
+#commitTable td:first-child {
+  width: 100%;
+  max-width: 0;
+}
+#commitTable td.committedCol,
+#commitTable th.committedCol {
+  max-width: 190px;
+}
+#commitTable th.tableColHeader:nth-child(2) {
+  text-align: left;
 }
 #commitTable table,
 #commitTable tbody,
@@ -697,32 +714,32 @@ svg.fileIcon {
   cursor: help;
 }
 
-.commit .avatar {
+#commitTable .avatar {
   display: inline-flex;
   overflow: hidden;
   vertical-align: top;
   margin-right: 4px;
 }
-.commit .avatar.normal {
+#commitTable .avatar.normal {
   width: 18px;
   height: 18px;
   margin-top: 3px;
 }
-.commit .avatar.small {
+#commitTable .avatar.small {
   width: 14px;
   height: 14px;
   margin-top: 5px;
 }
 /* A placeholder awaiting a fetched image occupies no space until it arrives. */
-.commit .avatar.empty {
+#commitTable .avatar.empty {
   display: none;
 }
-.commit .avatar > img {
+#commitTable .avatar > img {
   display: block;
   width: 100%;
   height: 100%;
 }
-.commit .avatar.initials {
+#commitTable .avatar.initials {
   align-items: center;
   justify-content: center;
   font-weight: 700;

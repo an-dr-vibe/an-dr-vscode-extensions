@@ -22,6 +22,15 @@ export default defineConfig({
         }
       },
       {
+        // Deliberately no vscode alias: this project proves the core runs with
+        // the module genuinely absent, not merely mocked.
+        resolve: { alias },
+        test: {
+          name: "core",
+          include: ["tests/core/**/*.test.ts"]
+        }
+      },
+      {
         resolve: {
           alias: [
             ...alias,

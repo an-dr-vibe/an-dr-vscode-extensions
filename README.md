@@ -16,14 +16,25 @@ Opens the current repo in a git GUI tool from the status bar.
 
 |Setting|Default|Description|
 |-------|-------|-----------|
-|`tool`|`"smartgit"`|Which tool to open (`smartgit`, `gitkraken`, `sourcetree`, `fork`, `tower`, `github-desktop`, `sublime-merge`, `gitextensions`, `gitk`, `git-gui`)|
-|`toolPath`|`""`|Absolute path to executable. Empty = auto-detect.|
+|`tool`|`"smartgit"`|Which tool to open (`smartgit`, `gitkraken`, `sourcetree`, `fork`, `tower`, `github-desktop`, `sublime-merge`, `gitextensions`, `gitk`, `git-gui`, `custom`)|
+|`toolPath`|`""`|Executable: a full path, or a bare command name looked up in PATH (e.g. `commits`). Empty = auto-detect. Required for `custom`.|
+|`customArgs`|`[]`|Arguments for the `custom` tool. `${repoPath}` marks the repo root; without it the repo root is appended last.|
+|`customName`|`""`|Status bar label for the `custom` tool. Empty = derived from the executable name.|
 |`showStatusBar`|`true`|Show/hide the status bar button.|
 |`statusBarIconOnly`|`false`|Show icon only, no tool name.|
 |`statusBarAlignment`|`"right"`|`"left"` or `"right"`.|
 |`statusBarPriority`|`99`|Higher = further from center.|
 
 Tool discovery order: PATH → common install paths → directory search (handles versioned dirs).
+
+Any other tool goes through `custom` — `toolPath` names the executable and `customArgs`
+shapes the invocation; the tool always runs with the repo as its working directory:
+
+```jsonc
+"gitTool.tool": "custom",
+"gitTool.toolPath": "commits",          // resolved from PATH, .exe implied on Windows
+"gitTool.customArgs": []                // → commits <repoRoot>
+```
 
 ---
 

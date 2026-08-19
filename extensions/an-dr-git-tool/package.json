@@ -32,7 +32,8 @@
             "sublime-merge",
             "gitextensions",
             "gitk",
-            "git-gui"
+            "git-gui",
+            "custom"
           ],
           "enumDescriptions": [
             "SmartGit — syntevo.com/smartgit",
@@ -44,7 +45,8 @@
             "Sublime Merge — sublimemerge.com",
             "Git Extensions — gitextensions.github.io (Windows/Linux)",
             "gitk — built into Git",
-            "git gui — built into Git"
+            "git gui — built into Git",
+            "Custom — any executable named by gitTool.toolPath"
           ],
           "default": "smartgit",
           "description": "Which git GUI tool to open when clicking the status bar button."
@@ -52,7 +54,18 @@
         "gitTool.toolPath": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to the git tool executable. Leave empty to auto-detect from PATH and common install locations."
+          "description": "The git tool executable: a full path, or a bare command name looked up in PATH (e.g. \"commits\"). Required when gitTool.tool is \"custom\"; for the built-in tools leave it empty to auto-detect from PATH and common install locations."
+        },
+        "gitTool.customArgs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Arguments for the custom tool. Use ${repoPath} where the repository root belongs; without it the repository root is appended as the last argument. The tool always runs with the repository as its working directory."
+        },
+        "gitTool.customName": {
+          "type": "string",
+          "default": "",
+          "description": "Status bar label for the custom tool. Empty = derived from the executable name."
         },
         "gitTool.showStatusBar": {
           "type": "boolean",

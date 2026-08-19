@@ -24,6 +24,9 @@ interface ToolDef {
     invoke: InvokeMode;
 }
 
+/** Placeholder for the repository root inside gitTool.customArgs. */
+const REPO_PATH_TOKEN = '${repoPath}';
+
 // ── Tool registry ─────────────────────────────────────────────────────────────
 
 const TOOLS: ToolDef[] = [
@@ -176,6 +179,25 @@ const TOOLS: ToolDef[] = [
     },
 ];
 
+/** The 'custom' entry filled in from gitTool.custom* settings.
+ *  `gitTool.toolPath` supplies the executable — a bare name (resolved from PATH) or a full path. */
+function customToolDef(config: vscode.WorkspaceConfiguration): ToolDef {
+    const exe = config.get<string>('toolPath', '').trim();
+    const args = config.get<string[]>('customArgs', []) ?? [];
+    const usesPlaceholder = args.some(a => a.includes(REPO_PATH_TOKEN));
+
+    return {
+        id: 'custom',
+        name: config.get<string>('customName', '').trim() || path.parse(exe).name || 'Custom',
+        exeName: exe,
+        fixedPaths: {},
+        searchDirs: {},
+        // With ${repoPath} spelled out the args are complete and the repo is only the cwd;
+        // without it the repo path is appended, like every built-in 'arg' tool.
+        invoke: usesPlaceholder ? { type: 'cwd', args } : { type: 'arg', prefix: args },
+    };
+}
+
 // ── Path resolution ───────────────────────────────────────────────────────────
 
 function expandEnv(p: string): string {
@@ -227,10 +249,25 @@ function findInDir(dir: string, exeName: string, maxDepth = 3): string | null {
     return search(dir, maxDepth);
 }
 
+/** True when the string names a location on disk rather than a command to look up in PATH. */
+function looksLikePath(s: string): boolean {
+    return s.includes('/') || s.includes('\\');
+}
+
+/** Resolve a user-supplied executable: a path is checked on disk, a bare name is looked up in PATH.
+ *  A bare name that is not in PATH is still tried as a relative path, so './tool' style values work. */
+function resolveUserExe(value: string): string | null {
+    if (looksLikePath(value)) {
+        if (fileExists(value)) return value;
+        return whichSync(value);
+    }
+    return whichSync(value) ?? (fileExists(value) ? path.resolve(value) : null);
+}
+
 function resolveTool(def: ToolDef, customPath?: string): string | null {
-    // 0. User-supplied path takes absolute precedence
+    // 0. User-supplied executable takes absolute precedence — full path or bare PATH name
     if (customPath) {
-        return fileExists(customPath) ? customPath : null;
+        return resolveUserExe(customPath);
     }
 
     const plat = process.platform as Platform;
@@ -279,14 +316,26 @@ function getGitRoot(filePath: string): string {
 
 // ── Launch ────────────────────────────────────────────────────────────────────
 
+function toolDefFor(config: vscode.WorkspaceConfiguration): ToolDef | null {
+    const toolId = config.get<string>('tool', 'smartgit');
+    return toolId === 'custom' ? customToolDef(config) : (TOOLS.find(t => t.id === toolId) ?? null);
+}
+
 async function launchTool(repoPath: string): Promise<void> {
     const config = vscode.workspace.getConfiguration('gitTool');
     const toolId = config.get<string>('tool', 'smartgit');
     const customPath = config.get<string>('toolPath', '').trim();
 
-    const def = TOOLS.find(t => t.id === toolId);
+    const def = toolDefFor(config);
     if (!def) {
         vscode.window.showErrorMessage(`an-dr Git Tool: unknown tool "${toolId}".`);
+        return;
+    }
+    if (toolId === 'custom' && !customPath) {
+        vscode.window.showErrorMessage(
+            'an-dr Git Tool: set "gitTool.toolPath" to the custom tool executable ' +
+            '— a bare name found in PATH (e.g. "commits") or a full path.'
+        );
         return;
     }
 
@@ -294,7 +343,7 @@ async function launchTool(repoPath: string): Promise<void> {
     if (!exe) {
         vscode.window.showErrorMessage(
             `an-dr Git Tool: ${def.name} not found. ` +
-            `Install it or set "gitTool.toolPath" to the executable path.`
+            `Install it or set "gitTool.toolPath" to the executable name or path.`
         );
         return;
     }
@@ -302,14 +351,21 @@ async function launchTool(repoPath: string): Promise<void> {
     const { invoke } = def;
     const spawnArgs = invoke.type === 'arg'
         ? [...(invoke.prefix ?? []), repoPath]
-        : (invoke.args ?? []);
+        : (invoke.args ?? []).map(a => a.split(REPO_PATH_TOKEN).join(repoPath));
+    // Windows cannot spawn a .cmd/.bat shim directly — a custom tool may well be one.
+    const needsShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(exe);
     const spawnOpts: import('child_process').SpawnOptions = {
-        cwd: invoke.type === 'cwd' ? repoPath : undefined,
+        shell: needsShell,
+        // A custom tool always runs inside the repo, whether or not the args name it.
+        cwd: invoke.type === 'cwd' || def.id === 'custom' ? repoPath : undefined,
         detached: true,
         stdio: 'ignore',
     };
 
-    const child = spawn(exe, spawnArgs, spawnOpts);
+    // Through a shell the command line is one string, so quote it here and pass no args array.
+    const child = needsShell
+        ? spawn([exe, ...spawnArgs].map(a => `"${a}"`).join(' '), spawnOpts)
+        : spawn(exe, spawnArgs, spawnOpts);
     child.unref();
 }
 
@@ -336,7 +392,7 @@ function updateStatusBar(item: vscode.StatusBarItem, config: vscode.WorkspaceCon
     if (!gitRoot) { item.hide(); return; }
 
     const toolId = config.get<string>('tool', 'smartgit');
-    const toolName = TOOLS.find(t => t.id === toolId)?.name ?? toolId;
+    const toolName = toolDefFor(config)?.name ?? toolId;
     const iconOnly = config.get<boolean>('statusBarIconOnly', false);
 
     item.text = iconOnly ? '$(source-control)' : `$(source-control) ${toolName}`;

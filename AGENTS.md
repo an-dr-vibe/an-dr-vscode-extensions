@@ -4,10 +4,24 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 
 ## Primary instructions
 
-- Use `agents/AGENTS.md` as the base instruction
+The agent policy is **not** vendored here — there is no `agents/` submodule. Clone
+<https://github.com/an-dr/agents> once and install that clone globally with its
+`agents-install` skill; every repository on the machine, including this one, then reads
+the same policy and skills from it.
+
+```powershell
+git clone https://github.com/an-dr/agents.git
+pwsh agents/skills/agents-install/scripts/install-agents.ps1
+```
+
+Re-run `install-agents.ps1` after pulling the clone or moving it, and
+`verify-agents.ps1` to check an existing install. Without it an agent has only this file,
+which is not enough to run the workflow.
+
+- Use the globally installed `agents/AGENTS.md` as the base instruction
 - Use `AGENTS.md` in the repo root and in the subfolders as scoped extensions of the base rules
 - Priority (later entries extend or overwrite earlier ones):
-  1. `REPO/agents/AGENTS.md` — base
+  1. the installed `agents/AGENTS.md` — base
   2. `REPO/AGENTS.md` — this file
   3. `REPO/**/AGENTS.md` — any subdirectory AGENTS.md, chained by depth
 
@@ -19,7 +33,7 @@ Notes for AI agents working on this repo that cannot be deduced from the code al
 
 ## Commit hygiene
 
-Covered by the COMMIT phase in `agents/AGENTS.md` (WIP-squash before every commit).
+Covered by the COMMIT phase in the installed `agents/AGENTS.md` (WIP-squash before every commit).
 
 ## Architecture decisions
 

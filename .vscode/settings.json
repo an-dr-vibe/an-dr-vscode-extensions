@@ -1,0 +1,6 @@
+{
+    "gitTool.tool": "custom",
+    "gitTool.customName": "commits",
+    "gitTool.toolPath": "commits",
+    "gitTool.statusBarIcon": "git-commit"
+}

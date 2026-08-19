@@ -21,6 +21,7 @@ Opens the current repo in a git GUI tool from the status bar.
 |`customArgs`|`[]`|Arguments for the `custom` tool. `${repoPath}` marks the repo root; without it the repo root is appended last.|
 |`customName`|`""`|Status bar label for the `custom` tool. Empty = derived from the executable name.|
 |`showStatusBar`|`true`|Show/hide the status bar button.|
+|`statusBarIcon`|`"multiple-windows"`|Codicon shown in the status bar (`window`, `rocket`, `tools`, …). The `$(name)` form works too.|
 |`statusBarIconOnly`|`false`|Show icon only, no tool name.|
 |`statusBarAlignment`|`"right"`|`"left"` or `"right"`.|
 |`statusBarPriority`|`99`|Higher = further from center.|

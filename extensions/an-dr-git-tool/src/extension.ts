@@ -379,6 +379,14 @@ function createStatusBarItem(config: vscode.WorkspaceConfiguration): vscode.Stat
     return vscode.window.createStatusBarItem(alignment, priority);
 }
 
+const DEFAULT_STATUS_BAR_ICON = 'multiple-windows';
+
+/** The configured codicon, written either as `name` or as the `$(name)` VS Code already understands. */
+function statusBarIcon(config: vscode.WorkspaceConfiguration): string {
+    const raw = config.get<string>('statusBarIcon', '').trim() || DEFAULT_STATUS_BAR_ICON;
+    return raw.startsWith('$(') ? raw : `$(${raw})`;
+}
+
 function updateStatusBar(item: vscode.StatusBarItem, config: vscode.WorkspaceConfiguration): void {
     if (!config.get<boolean>('showStatusBar', true)) { item.hide(); return; }
 
@@ -394,8 +402,9 @@ function updateStatusBar(item: vscode.StatusBarItem, config: vscode.WorkspaceCon
     const toolId = config.get<string>('tool', 'smartgit');
     const toolName = toolDefFor(config)?.name ?? toolId;
     const iconOnly = config.get<boolean>('statusBarIconOnly', false);
+    const icon = statusBarIcon(config);
 
-    item.text = iconOnly ? '$(source-control)' : `$(source-control) ${toolName}`;
+    item.text = iconOnly ? icon : `${icon} ${toolName}`;
     item.tooltip = `Open repo in ${toolName}`;
     item.command = 'an-dr-git-tool.openInGitTool';
     item.show();

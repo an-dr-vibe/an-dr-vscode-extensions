@@ -72,6 +72,11 @@
           "default": true,
           "description": "Show or hide the status bar button."
         },
+        "gitTool.statusBarIcon": {
+          "type": "string",
+          "default": "multiple-windows",
+          "description": "Codicon shown in the status bar, e.g. \"multiple-windows\", \"window\", \"rocket\", \"tools\". The $(name) form is accepted too. Empty = the default. See https://microsoft.github.io/vscode-codicons/dist/codicon.html"
+        },
         "gitTool.statusBarIconOnly": {
           "type": "boolean",
           "default": false,

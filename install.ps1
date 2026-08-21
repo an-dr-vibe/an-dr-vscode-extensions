@@ -125,44 +125,123 @@ function Test-ExtDirty ([string]$ExtName) {
     return $LASTEXITCODE -ne 0
 }
 
-# Junctioned/symlinked extensions have no 'metadata' object in extensions.json at all (VS
-# Code only fully populates that for extensions installed via the Marketplace or a .vsix),
-# which means they belong only to the profile they were first discovered in - switching to
-# another profile hides them. Setting metadata.isApplicationScoped = true is the same flag
-# VS Code's own "Apply Extension to all Profiles" command sets, so these extensions show up
-# in every profile. See docs/adr/ADR-001-install-application-scoped-extensions.md.
-function Set-ApplicationScopedExtensions ([string[]]$Ids) {
+# Reconciles VS Code's extensions.json against what this run actually linked.
+#
+# Two things are wrong by default for junctioned extensions. First, they have no
+# 'metadata' object at all (VS Code only fully populates that for Marketplace or .vsix
+# installs), so they belong only to the profile that first discovered them and switching
+# profiles hides them; metadata.isApplicationScoped = true is the same flag VS Code's own
+# "Apply Extension to all Profiles" command sets. See ADR-001.
+#
+# Second, nothing ever removes an entry. When an extension is renamed, deleted, or opted
+# out with .installignore, its directory goes away but its registry entry survives, and VS
+# Code keeps reporting a broken extension pointing at nothing. Every run therefore prunes
+# an-dr.* entries this run did not link, but only when the location is absent or is a
+# managed link — a real directory is a manual install and is left alone, and non-an-dr
+# extensions are never touched. See ADR-004.
+function Sync-ExtensionRegistry ([string[]]$Ids, [string[]]$LinkedPaths) {
     $manifestPath = Join-Path $VscodeExtensions 'extensions.json'
     if (-not (Test-Path $manifestPath)) { return }
 
-    $entries = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $entries = @(Get-Content $manifestPath -Raw | ConvertFrom-Json)
     $idSet = @{}
     foreach ($id in $Ids) { $idSet[$id.ToLowerInvariant()] = $true }
 
+    $kept    = [System.Collections.Generic.List[object]]::new()
+    $pruned  = @()
     $changed = $false
+
     foreach ($entry in $entries) {
-        if (-not $idSet.ContainsKey($entry.identifier.id.ToLowerInvariant())) { continue }
-        if ($null -eq $entry.metadata) {
-            $entry | Add-Member -MemberType NoteProperty -Name 'metadata' -Value ([PSCustomObject]@{ isApplicationScoped = $true })
-            $changed = $true
-        } elseif ($entry.metadata.isApplicationScoped -ne $true) {
-            if ($entry.metadata.PSObject.Properties.Name -contains 'isApplicationScoped') {
-                $entry.metadata.isApplicationScoped = $true
-            } else {
-                $entry.metadata | Add-Member -MemberType NoteProperty -Name 'isApplicationScoped' -Value $true
+        $entryId = $entry.identifier.id
+        $isOurs  = $entryId -and $entryId.ToLowerInvariant().StartsWith('an-dr.')
+        $linked  = $entryId -and $idSet.ContainsKey($entryId.ToLowerInvariant())
+
+        # An an-dr.* extension this run did not link is a leftover from a rename, a
+        # deletion, or an .installignore opt-out.
+        if ($isOurs -and -not $linked) {
+            # An unresolvable location is not evidence of an orphan, so it is not a
+            # reason to delete: prune only on a location that is demonstrably gone or is
+            # a link this repo owns.
+            $path = Resolve-EntryLocation $entry
+            if ($path -and (-not (Test-Path $path) -or (Test-ManagedLink $path))) {
+                if ($path -and (Test-ManagedLink $path)) { Remove-ManagedLink $path }
+                $pruned += $entryId
+                $changed = $true
+                continue
             }
-            $changed = $true
         }
+
+        if ($linked) {
+            if ($null -eq $entry.metadata) {
+                $entry | Add-Member -MemberType NoteProperty -Name 'metadata' -Value ([PSCustomObject]@{ isApplicationScoped = $true })
+                $changed = $true
+            } elseif ($entry.metadata.isApplicationScoped -ne $true) {
+                if ($entry.metadata.PSObject.Properties.Name -contains 'isApplicationScoped') {
+                    $entry.metadata.isApplicationScoped = $true
+                } else {
+                    $entry.metadata | Add-Member -MemberType NoteProperty -Name 'isApplicationScoped' -Value $true
+                }
+                $changed = $true
+            }
+        }
+
+        $kept.Add($entry)
     }
 
-    if ($changed) {
-        $json = $entries | ConvertTo-Json -Depth 10
-        [System.IO.File]::WriteAllText($manifestPath, $json, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "  Marked $($Ids.Count) an-dr extension(s) as application-scoped (visible in every profile)." -ForegroundColor DarkGray
-        Write-Host '  If VS Code is currently running, reload the window for this to take effect;' -ForegroundColor DarkGray
-        Write-Host '  re-run install.ps1 if a later VS Code action ever resets it.' -ForegroundColor DarkGray
+    # Managed links with no entry at all: a rename leaves the directory behind when the
+    # registry never learned about it. Same rule, applied from the filesystem side.
+    Remove-OrphanedLinks $LinkedPaths
+
+    if (-not $changed) { return }
+
+    # Pipe the entries in rather than passing -InputObject: -InputObject treats an array
+    # as one object and nests it a level deeper, which VS Code cannot parse. -AsArray
+    # still matters on the pipeline, so a single remaining entry stays an array too.
+    $json = $kept.ToArray() | ConvertTo-Json -Depth 10 -AsArray
+    [System.IO.File]::WriteAllText($manifestPath, $json, [System.Text.UTF8Encoding]::new($false))
+
+    if ($pruned.Count -gt 0) {
+        Write-Host "  Pruned $($pruned.Count) orphaned an-dr entry(s) from extensions.json:" -ForegroundColor DarkGray
+        foreach ($p in $pruned) { Write-Host "    - $p" -ForegroundColor DarkGray }
     }
+    Write-Host "  Marked $($Ids.Count) an-dr extension(s) as application-scoped (visible in every profile)." -ForegroundColor DarkGray
+    Write-Host '  If VS Code is currently running, reload the window for this to take effect;' -ForegroundColor DarkGray
+    Write-Host '  re-run install.ps1 if a later VS Code action ever resets it.' -ForegroundColor DarkGray
 }
+
+# extensions.json stores locations as a file URI object whose 'path' is '/c:/Users/...'.
+# Return a filesystem path, or $null when the entry carries no usable location.
+function Resolve-EntryLocation ($Entry) {
+    $raw = if ($Entry.location -is [string]) { $Entry.location } else { $Entry.location.path }
+    if (-not $raw) {
+        if ($Entry.relativeLocation) { return (Join-Path $VscodeExtensions $Entry.relativeLocation) }
+        return $null
+    }
+    $raw = [Uri]::UnescapeDataString($raw)
+    if ($IsWindows -and $raw -match '^/[A-Za-z]:') { $raw = $raw.Substring(1) }
+    return $raw
+}
+
+# Removes an-dr.* managed links in the extensions folder that this run did not create.
+# Version bumps are already handled inside the main loop; this catches whole extensions
+# that no longer exist under extensions/.
+#
+# Matching is by destination path rather than by parsing a version off the directory
+# name: the name is only ever publisher.name-version by convention, and a version that
+# is not a semver triple would parse into the wrong ID and delete a live extension.
+function Remove-OrphanedLinks ([string[]]$LinkedPaths) {
+    $keep = @{}
+    foreach ($p in $LinkedPaths) { $keep[$p.ToLowerInvariant()] = $true }
+
+    Get-ChildItem -Path $VscodeExtensions -Directory -Filter 'an-dr.*' -ErrorAction SilentlyContinue |
+        Where-Object { Test-ManagedLink $_.FullName } |
+        Where-Object { -not $keep.ContainsKey($_.FullName.ToLowerInvariant()) } |
+        ForEach-Object {
+            Remove-ManagedLink $_.FullName
+            Write-Host "  Removed orphaned link $($_.Name)" -ForegroundColor DarkGray
+        }
+}
+
 
 # Builds one extension. Returns $null on success, or a short string naming the step that
 # failed ('npm install', 'compile', 'entry point').
@@ -233,6 +312,7 @@ $skipped  = 0
 $excluded = 0
 $failed  = @()   # @{ Name; Reason } per extension whose build did not succeed
 $extensionIds = @()
+$linkedPaths  = @()   # destination dirs this run linked; drives orphan-link cleanup
 
 foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     $src = $ext.FullName
@@ -311,6 +391,7 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     # build is fixed the extension works without re-linking. The installer's red output
     # and non-zero exit are the authoritative signal, not the presence of the link.
     New-ManagedLink $dst $src
+    $linkedPaths += $dst
     if ($buildError) {
         Write-Host ' linked (BROKEN BUILD)' -ForegroundColor Red
         $failed += @{ Name = $ext.Name; Reason = $buildError }
@@ -320,9 +401,9 @@ foreach ($ext in Get-ChildItem -Path $ExtensionsSource -Directory) {
     $linked++
 }
 
-if ($extensionIds.Count -gt 0) {
-    Set-ApplicationScopedExtensions $extensionIds
-}
+# Always reconcile, even when nothing linked: an empty link list is precisely the case
+# where every an-dr entry in the registry is an orphan.
+Sync-ExtensionRegistry $extensionIds $linkedPaths
 
 Write-Host ''
 

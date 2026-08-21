@@ -53,6 +53,14 @@ Covered by the COMMIT phase in the installed `agents/AGENTS.md` (WIP-squash befo
   terminating error, so `$ErrorActionPreference = 'Stop'` does not catch it), verifies the
   `main` entry point exists afterwards, skips the build stamp on failure so the next run
   retries, and exits 1. See `docs/adr/ADR-002-install-fails-loudly-on-build-failure.md`.
+- `install.ps1` reconciles `~/.vscode/extensions/extensions.json` on every run: an
+  `an-dr.*` entry the run did not link is removed when its location is absent or is a
+  managed link, and an `an-dr.*` managed link the run did not create is removed with it.
+  Renames, deletions, and `.installignore` opt-outs therefore clean up after themselves
+  instead of leaving an entry VS Code reports as a broken extension. Marketplace
+  extensions, `an-dr` entries backed by a real directory, and entries whose location
+  cannot be resolved are never touched. See
+  `docs/adr/ADR-004-install-prunes-orphaned-extensions.md`.
 - `install.ps1` marks every linked `an-dr.*` extension as application-scoped
   (`metadata.isApplicationScoped = true` in `~/.vscode/extensions/extensions.json`) so they
   stay installed across every VS Code Profile, not just the one that first discovered them.
